@@ -368,9 +368,13 @@ async function startWA() {
       await saveChat(chat.id, name, '', ts, 0, isGroup);
     }
 
-    // 3. Save real messages only
+    // 3. Save real messages + cache for media download
     let saved = 0;
     for (const msg of messages) {
+      if (msg.key && msg.key.id && msg.message) {
+        msgCache.set(msg.key.id, msg);
+        if (msgCache.size > MAX_CACHE) msgCache.delete(msgCache.keys().next().value);
+      }
       if (!isRealMessage(msg)) continue;
       const jid = msg.key?.remoteJid;
       if (!jid || jid === 'status@broadcast') continue;
@@ -516,18 +520,42 @@ function clearSession() {
 async function sendMessage(jid, text, quotedMsgId) {
   if (!sock || !isConnected) throw new Error('WhatsApp not connected');
   const formattedJid = jid.includes('@') ? jid : jid + '@s.whatsapp.net';
-  let options = { text };
+
+  let sendOptions = { text };
+
+  // Build quoted message for reply
   if (quotedMsgId) {
     try {
-      const res = await pool.query('SELECT body, from_me FROM wa_messages WHERE id=$1 AND chat_id=$2', [quotedMsgId, formattedJid]);
+      const res = await pool.query(
+        `SELECT body, from_me, sender FROM wa_messages WHERE id=$1 AND chat_id=$2`,
+        [quotedMsgId, formattedJid]
+      );
       if (res.rows[0]) {
-        options.quoted = { key: { id: quotedMsgId, remoteJid: formattedJid, fromMe: res.rows[0].from_me }, message: { conversation: res.rows[0].body || '' } };
+        // Baileys quoted message format
+        sendOptions.quoted = {
+          key: {
+            id:        quotedMsgId,
+            remoteJid: formattedJid,
+            fromMe:    res.rows[0].from_me,
+            participant: res.rows[0].from_me ? undefined : (res.rows[0].sender || undefined),
+          },
+          message: { conversation: res.rows[0].body || '' },
+        };
+        console.log('[WA] Sending reply to:', quotedMsgId);
       }
-    } catch (_) {}
+    } catch (e) {
+      console.warn('[WA] Could not build quoted message:', e.message);
+    }
   }
-  const result = await sock.sendMessage(formattedJid, options);
+
+  const result = await sock.sendMessage(formattedJid, sendOptions);
   const ts = new Date();
-  await pool.query('INSERT INTO wa_messages (id, chat_id, from_me, sender_name, body, msg_type, timestamp, is_read, status) VALUES ($1,$2,true,\'You\',$3,\'text\',$4,true,\'sent\') ON CONFLICT (id, chat_id) DO NOTHING', [result.key.id, formattedJid, text, ts]);
+  await pool.query(
+    `INSERT INTO wa_messages (id, chat_id, from_me, sender_name, body, msg_type, timestamp, is_read, status, quoted_body)
+     VALUES ($1,$2,true,'You',$3,'text',$4,true,'sent',$5)
+     ON CONFLICT (id, chat_id) DO NOTHING`,
+    [result.key.id, formattedJid, text, ts, quotedMsgId ? `↩ Reply` : null]
+  );
   await saveChat(formattedJid, null, text, ts, 0, formattedJid.endsWith('@g.us'));
   return result;
 }
@@ -588,5 +616,6 @@ async function getQR() {
 }
 
 module.exports = { startWA, sendMessage, logout, getStatus, getQR, setIO, getGroupMetadata, downloadMedia, msgCache };
+
 
 

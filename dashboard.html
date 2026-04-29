@@ -2540,49 +2540,80 @@ function waFilterChats(q) {
 async function waOpenChat(jid, name, phone) {
   waActiveJid = jid;
   var isGroup = jid.endsWith('@g.us');
+
+  // Header title
+  var titleEl = document.getElementById('wa-active-title');
+  if (titleEl) titleEl.innerHTML = '<i class="fab fa-whatsapp" style="color:#25D366;"></i> ' + name;
+
+  // Sub-header: phone for individual, member count for group
+  var phEl = document.getElementById('wa-active-phone');
+  if (phEl) {
+    if (!isGroup) {
+      var rawPhone = jid.split('@')[0];
+      phEl.textContent = rawPhone.startsWith('91') && rawPhone.length === 12
+        ? '+91 ' + rawPhone.slice(2,7) + ' ' + rawPhone.slice(7) : '+' + rawPhone;
+    } else {
+      phEl.textContent = 'Group · loading members...';
+    }
+    phEl.style.display = 'block';
+  }
+
+  // Members button
   var membersBtn = document.getElementById('wa-members-btn');
   var membersPanel = document.getElementById('wa-members-panel');
   if (membersBtn) membersBtn.style.display = isGroup ? 'inline-flex' : 'none';
   if (membersPanel) membersPanel.style.display = 'none';
-  // Header: name + phone number below
-  var titleEl = document.getElementById('wa-active-title');
-  if (titleEl) titleEl.innerHTML = '<i class="fab fa-whatsapp" style="color:#25D366;"></i> ' + name;
-  var phEl = document.getElementById('wa-active-phone');
-  if (phEl) {
-    if (isGroup) {
-      phEl.textContent = 'Group';
-    } else {
-      // Show formatted Indian number
-      var rawPhone = jid.split('@')[0];
-      var formatted = rawPhone.startsWith('91') && rawPhone.length === 12
-        ? '+91 ' + rawPhone.slice(2,7) + ' ' + rawPhone.slice(7)
-        : '+' + rawPhone;
-      phEl.textContent = formatted;
-    }
-    phEl.style.display = 'block';
-  }
+
+  // Avatar
   var av = document.getElementById('wa-active-avatar');
-  if (av) {
-    av.textContent = name.split(' ').map(function(w){return w[0];}).join('').toUpperCase().slice(0,2);
-    av.style.display = 'flex';
-  }
-  waRenderChats(waAllChats);
-  var area = document.getElementById('wa-chat-area');
-  area.innerHTML = '<div style="text-align:center;padding:20px;"><div class="spin-loader" style="margin:0 auto;"></div></div>';
-  // Show reply bar (hidden by default)
+  if (av) { av.textContent = name.charAt(0).toUpperCase(); av.style.display = 'flex'; }
+
+  // Reset reply
   var replyBar = document.getElementById('wa-reply-bar');
   if (replyBar) replyBar.style.display = 'none';
   waReplyTo = null;
+
+  waRenderChats(waAllChats);
+
+  // Load messages
+  var area = document.getElementById('wa-chat-area');
+  area.innerHTML = '<div style="text-align:center;padding:20px;"><div class="spin-loader" style="margin:0 auto;"></div></div>';
   try {
     var res = await fetch(API_BASE + '/wa/messages/' + encodeURIComponent(jid) + '?limit=100', { headers: getAuthHeaders() });
     var msgs = await res.json();
     area.innerHTML = '';
-    msgs.forEach(function(m){ waAppendMessage({ id:m.id, fromMe:m.from_me, body:m.body, ts:m.timestamp, type:m.msg_type, senderName:m.sender_name, sender:m.sender, quotedBody:m.quoted_body }); });
+    msgs.forEach(function(m) {
+      waAppendMessage({ id: m.id, fromMe: m.from_me, body: m.body, ts: m.timestamp, type: m.msg_type, senderName: m.sender_name, sender: m.sender, quotedBody: m.quoted_body });
+    });
     area.scrollTop = area.scrollHeight;
-    var chat = waAllChats.find(function(c){return c.id===jid;});
+    var chat = waAllChats.find(function(c){ return c.id === jid; });
     if (chat) { chat.unread = 0; waRenderChats(waAllChats); }
   } catch (err) {
     area.innerHTML = '<div style="color:var(--red2);padding:16px;font-size:12.5px;">' + err.message + '</div>';
+  }
+
+  // Load group members in background
+  if (isGroup) {
+    try {
+      var gRes = await fetch(API_BASE + '/wa/group/' + encodeURIComponent(jid), { headers: getAuthHeaders() });
+      var gData = await gRes.json();
+      if (gRes.ok && gData.participants) {
+        if (phEl) phEl.textContent = 'Group · ' + gData.participants.length + ' members';
+        // Auto-show members panel for groups
+        var mPanel = document.getElementById('wa-members-panel');
+        var mList  = document.getElementById('wa-members-list');
+        if (mPanel) mPanel.style.display = 'block';
+        if (mList) {
+          mList.innerHTML = gData.participants.map(function(p) {
+            var adminBadge = p.admin ? '<span style="font-size:9px;background:rgba(245,166,35,0.15);color:var(--gold);padding:1px 5px;border-radius:4px;margin-left:4px;">Admin</span>' : '';
+            return '<div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid var(--border);">' +
+              '<div style="width:28px;height:28px;border-radius:50%;background:rgba(37,211,102,0.15);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:#25D366;flex-shrink:0;">' + p.name.charAt(0).toUpperCase() + '</div>' +
+              '<div style="flex:1;min-width:0;"><div style="font-size:12.5px;color:var(--text);">' + p.name + adminBadge + '</div></div>' +
+              '</div>';
+          }).join('');
+        }
+      }
+    } catch (_) {}
   }
 }
 var waReplyTo = null;
@@ -2775,6 +2806,7 @@ function toggleTheme() {
 </script>
 </body>
 </html>
+
 
 
 
