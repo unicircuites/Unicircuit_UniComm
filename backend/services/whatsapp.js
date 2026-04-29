@@ -99,7 +99,7 @@ async function saveChat(jid, name, lastMsg, lastTime, unread, isGroup) {
         last_time    = EXCLUDED.last_time,
         unread       = wa_chats.unread + EXCLUDED.unread,
         updated_at   = NOW()
-    `, [jid, name || phone, lastMsg || '', ts, unread || 0, isGroup || false, phone]);
+    `, [jid, name || phone, phone, lastMsg || '', ts, unread || 0, isGroup || false]);
     console.log(`[WA-DB] ✅ Chat saved: ${jid}`);
   } catch (err) {
     console.error(`[WA-DB] ❌ saveChat error for ${jid}:`, err.message);
