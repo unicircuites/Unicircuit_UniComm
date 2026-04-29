@@ -198,7 +198,17 @@ async function startWA() {
         console.log('[WA-CONN] Reconnecting in 3s...');
         setTimeout(startWA, 3000);
       } else {
-        console.log('[WA-CONN] Logged out — need fresh QR scan');
+        // Logged out — clear session and restart to get fresh QR
+        console.log('[WA-CONN] Logged out — clearing session, generating fresh QR...');
+        const fs = require('fs');
+        try {
+          const files = fs.readdirSync(AUTH_DIR);
+          files.forEach(f => fs.unlinkSync(require('path').join(AUTH_DIR, f)));
+          console.log('[WA-CONN] Session cleared');
+        } catch (e) {
+          console.warn('[WA-CONN] Could not clear session:', e.message);
+        }
+        setTimeout(startWA, 1000);
       }
     }
   });
@@ -288,11 +298,23 @@ async function sendMessage(jid, text) {
 
 // ── LOGOUT ────────────────────────────────────────────────────────────────
 async function logout() {
+  console.log('[WA] Logging out and clearing session...');
   if (sock) {
-    console.log('[WA] Logging out...');
-    await sock.logout();
-    sock = null; isConnected = false; qrString = null;
+    try { await sock.logout(); } catch (_) {}
+    sock = null; isConnected = false; qrString = null; phoneNumber = null;
   }
+  // Clear auth session files so fresh QR is generated on next startWA
+  const fs   = require('fs');
+  const path = require('path');
+  try {
+    const files = fs.readdirSync(AUTH_DIR);
+    files.forEach(f => fs.unlinkSync(path.join(AUTH_DIR, f)));
+    console.log('[WA] Session files cleared');
+  } catch (e) {
+    console.warn('[WA] Could not clear session files:', e.message);
+  }
+  // Restart to generate fresh QR
+  setTimeout(startWA, 500);
 }
 
 // ── STATUS / QR ───────────────────────────────────────────────────────────

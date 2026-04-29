@@ -2449,9 +2449,10 @@ function waOnConnected(phone, name) {
   if (ph) ph.textContent = '+' + phone + (name ? ' - ' + name : '');
 }
 
-async function waGetQR() {
+async function waGetQR(retries) {
+  retries = retries || 0;
   const btn = document.getElementById('wa-get-qr-btn');
-  if (btn) btn.innerHTML = '<span class="spin-loader"></span>';
+  if (btn) btn.innerHTML = '<span class="spin-loader"></span> Generating QR...';
   try {
     const res = await fetch(API_BASE + '/wa/qr', { headers: getAuthHeaders() });
     const data = await res.json();
@@ -2461,12 +2462,20 @@ async function waGetQR() {
       if (img) img.src = data.qr;
       if (wrap) wrap.style.display = 'flex';
       if (btn) btn.style.display = 'none';
+      console.log('[WA-UI] QR displayed');
     } else {
-      if (btn) btn.innerHTML = '<i class="fas fa-qrcode"></i> Show QR Code';
-      notify('QR not ready', 'Server is starting...', 'var(--gold)', 'fas fa-qrcode');
+      // QR not ready yet — retry up to 10 times
+      if (retries < 10) {
+        console.log('[WA-UI] QR not ready, retrying in 2s... attempt', retries+1);
+        if (btn) btn.innerHTML = '<span class="spin-loader"></span> Waiting for QR (' + (retries+1) + '/10)...';
+        setTimeout(function() { waGetQR(retries + 1); }, 2000);
+      } else {
+        if (btn) { btn.innerHTML = '<i class="fas fa-qrcode"></i> Show QR Code'; btn.style.display = 'inline-flex'; }
+        notify('QR timeout', 'Please restart server', 'var(--red)', 'fas fa-exclamation-circle');
+      }
     }
   } catch (_) {
-    if (btn) btn.innerHTML = '<i class="fas fa-qrcode"></i> Show QR Code';
+    if (btn) { btn.innerHTML = '<i class="fas fa-qrcode"></i> Show QR Code'; btn.style.display = 'inline-flex'; }
   }
 }
 
@@ -2610,6 +2619,8 @@ function toggleTheme() {
 </script>
 </body>
 </html>
+
+
 
 
 
