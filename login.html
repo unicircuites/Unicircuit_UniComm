@@ -433,57 +433,25 @@ async function handleLogin(e) {
   btnText.innerHTML = '<span class="spin"></span> Signing in…';
 
   try {
-    // ── Try real API first ──────────────────────────────────────────────────
-    let loginSuccess = false;
-    let userData     = null;
-    let token        = null;
+    const res = await fetch(`${API_BASE}/auth/login`, {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ email, password }),
+    });
+    const data = await res.json();
 
-    try {
-      const res = await fetch(`${API_BASE}/auth/login`, {
-        method:  'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body:    JSON.stringify({ email, password }),
-      });
-      const data = await res.json();
-
-      if (res.ok && data.token) {
-        token        = data.token;
-        userData     = data.user;
-        loginSuccess = true;
-      } else {
-        throw new Error(data.error || 'Invalid credentials.');
-      }
-    } catch (apiErr) {
-      // ── Fallback: offline / demo mode ─────────────────────────────────────
-      // If backend is not running, allow demo login locally
-      const DEMO_USERS = [
-        { email: 'Uniadmin', password: 'Uniadmin@123', name: 'Rajesh Kumar', role: 'admin', initials: 'RK' },
-      ];
-      const found = DEMO_USERS.find(u => u.email === email && u.password === password);
-      if (found) {
-        // Create a mock JWT-like token for demo
-        token = btoa(JSON.stringify({ id: 1, name: found.name, email: found.email, role: found.role, initials: found.initials, exp: Date.now() + 8*3600*1000 }));
-        userData = { id: 1, name: found.name, email: found.email, role: found.role, initials: found.initials };
-        loginSuccess = true;
-      } else if (apiErr.message && !apiErr.message.includes('fetch')) {
-        throw apiErr; // Real API error (wrong password etc.)
-      } else {
-        throw new Error('Invalid credentials.');
-      }
-    }
-
-    if (loginSuccess) {
+    if (res.ok && data.token) {
       // Store session
       const storage = remember ? localStorage : sessionStorage;
-      storage.setItem('uc_token',    token);
-      storage.setItem('uc_user',     JSON.stringify(userData));
+      storage.setItem('uc_token',    data.token);
+      storage.setItem('uc_user',     JSON.stringify(data.user));
       storage.setItem('uc_remember', remember ? '1' : '0');
 
       // Show success animation then redirect
       document.getElementById('successOverlay').classList.add('show');
-      setTimeout(() => {
-        window.location.href = 'dashboard.html';
-      }, 1200);
+      setTimeout(() => { window.location.href = 'dashboard.html'; }, 1200);
+    } else {
+      throw new Error(data.error || 'Invalid credentials.');
     }
 
   } catch (err) {

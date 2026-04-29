@@ -26,15 +26,21 @@ app.get('/', (_req, res) => {
 
 // ── CORS ───────────────────────────────────────────────────────────────────
 app.use(cors({
-  origin: [
-    'http://localhost:3000',
-    'http://127.0.0.1:3000',
-    'http://localhost:5500',
-    'http://127.0.0.1:5500',
-    'http://localhost:5501',
-    'http://127.0.0.1:5501',
-    'null',          // file:// origin during local dev
-  ],
+  origin: function(origin, callback) {
+    // Allow same-origin requests (served by this server) and local dev
+    const allowed = [
+      'http://localhost:4551',
+      'http://127.0.0.1:4551',
+      'http://192.168.0.149:4551',
+      'http://localhost:3000',
+      'http://127.0.0.1:3000',
+      'http://localhost:5500',
+      'http://127.0.0.1:5500',
+    ];
+    // Allow requests with no origin (same-server, mobile apps, curl)
+    if (!origin || allowed.includes(origin)) return callback(null, true);
+    callback(null, true); // Allow all origins in dev — restrict in production
+  },
   credentials: true,
 }));
 
