@@ -57,16 +57,18 @@ function toDate(ts) {
 }
 
 // ── CONTACT NAME RESOLUTION ────────────────────────────────────────────────
-// Priority: saved contact name > pushName > formatted phone number with +
+// Priority: saved contact name > pushName > formatted phone number
 function getContactName(jid, pushName) {
   if (!jid) return '';
-  // Extract clean phone number from JID (remove :device suffix)
   const phone = jid.split('@')[0].split(':')[0];
   const stored = contactsStore[jid] || contactsStore[phone + '@s.whatsapp.net'];
   if (stored?.name)   return stored.name;
   if (stored?.notify) return stored.notify;
   if (pushName)       return pushName;
-  // Format phone number with + prefix for display
+  // Format Indian number: 91XXXXXXXXXX → +91 XXXXX XXXXX
+  if (phone.startsWith('91') && phone.length === 12) {
+    return '+91 ' + phone.slice(2, 7) + ' ' + phone.slice(7);
+  }
   return '+' + phone;
 }
 
@@ -172,10 +174,15 @@ async function saveContact(contact) {
 
 // ── SAVE CHAT ──────────────────────────────────────────────────────────────
 async function saveChat(jid, name, lastMsg, lastTime, unread, isGroup) {
-  // Full phone number with country code (strip @s.whatsapp.net and :device)
   const phone = jid.split('@')[0].split(':')[0];
-  const displayPhone = '+' + phone;
-  const ts    = lastTime instanceof Date ? lastTime : toDate(lastTime);
+  // Format Indian number properly
+  let displayPhone;
+  if (phone.startsWith('91') && phone.length === 12) {
+    displayPhone = '+91 ' + phone.slice(2, 7) + ' ' + phone.slice(7);
+  } else {
+    displayPhone = '+' + phone;
+  }
+  const ts = lastTime instanceof Date ? lastTime : toDate(lastTime);
   try {
     await pool.query(`
       INSERT INTO wa_chats (id, name, phone, is_group, last_message, last_time, unread)

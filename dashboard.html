@@ -855,7 +855,10 @@ select.inp option{background:#1a2035;color:var(--text);}
         <span style="font-size:13px;font-weight:600;color:var(--green2);">WhatsApp Connected</span>
         <span id="wa-phone-display" style="font-size:12px;color:var(--muted);"></span>
         <span id="wa-sync-status" style="font-size:11.5px;color:var(--muted);margin-left:4px;"></span>
-        <button class="btn btn-ghost btn-xs" style="margin-left:auto;" onclick="waRefreshChats()"><i class="fas fa-sync-alt"></i> Refresh</button>
+        <button class="btn btn-green btn-xs" id="wa-sync-btn" onclick="waSync()" style="margin-left:auto;">
+          <i class="fas fa-sync-alt"></i> Sync Chats
+        </button>
+        <button class="btn btn-ghost btn-xs" onclick="waRefreshChats()"><i class="fas fa-redo"></i> Reload</button>
         <button class="btn btn-red btn-xs" onclick="waLogout()"><i class="fas fa-sign-out-alt"></i> Disconnect</button>
       </div>
     </div>
@@ -2580,6 +2583,24 @@ async function waSendMsg() {
 
 function waRefreshChats() { waLoadChats(); }
 
+async function waSync() {
+  var btn = document.getElementById('wa-sync-btn');
+  if (btn) { btn.disabled = true; btn.innerHTML = '<span class="spin-loader"></span> Syncing...'; }
+  try {
+    var res = await fetch(API_BASE + '/wa/sync', { method: 'POST', headers: getAuthHeaders() });
+    var data = await res.json();
+    if (res.ok) {
+      await waLoadChats();
+      notify('Sync complete', 'Groups: ' + data.stats.groups + ' | Indian contacts: ' + data.stats.indian, 'var(--green)', 'fas fa-check-circle');
+    } else {
+      notify('Sync failed', data.error, 'var(--red)', 'fas fa-exclamation-circle');
+    }
+  } catch (err) {
+    notify('Sync error', err.message, 'var(--red)', 'fas fa-exclamation-circle');
+  }
+  if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fas fa-sync-alt"></i> Sync Chats'; }
+}
+
 async function waLogout() {
   if (!confirm('Disconnect WhatsApp? You will need to scan QR again.')) return;
   try {
@@ -2627,6 +2648,7 @@ function toggleTheme() {
 </script>
 </body>
 </html>
+
 
 
 
