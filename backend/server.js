@@ -7,13 +7,23 @@
  * Init DB: node db/init.js
  */
 require('dotenv').config();
-const express   = require('express');
-const cors      = require('cors');
-const path      = require('path');
-const rateLimit = require('express-rate-limit');
+const express    = require('express');
+const cors       = require('cors');
+const path       = require('path');
+const http       = require('http');
+const { Server } = require('socket.io');
+const rateLimit  = require('express-rate-limit');
+const wa         = require('./services/whatsapp');
 
-const app  = express();
-const PORT = process.env.PORT || 4551;
+const app    = express();
+const server = http.createServer(app);
+const io     = new Server(server, {
+  cors: { origin: '*', methods: ['GET','POST'] }
+});
+const PORT = process.env.PORT || 8088;
+
+// Inject Socket.IO into WhatsApp service for real-time push
+wa.setIO(io);
 
 // ── SERVE STATIC HTML FILES (login.html, dashboard.html) ──────────────────
 // Serves files from the project root (one level up from backend/)
@@ -71,6 +81,7 @@ app.use('/api/calls',     apiLimiter,  require('./routes/calls'));
 app.use('/api/campaigns', apiLimiter,  require('./routes/campaigns'));
 app.use('/api/dashboard', apiLimiter,  require('./routes/dashboard'));
 app.use('/api/outlook',   apiLimiter,  require('./routes/outlook'));
+app.use('/api/wa',        apiLimiter,  require('./routes/whatsapp'));
 
 // OAuth2 callback — must be at root level to match redirect URI
 app.use('/auth',          require('./routes/outlook'));
@@ -93,7 +104,11 @@ app.use((err, _req, res, _next) => {
 });
 
 // ── START ──────────────────────────────────────────────────────────────────
-app.listen(PORT, () => {
+server.listen(PORT, () => {
   console.log(`\n🚀  UniComm Pro API  →  http://localhost:${PORT}`);
-  console.log(`🏥  Health check    →  http://localhost:${PORT}/api/health\n`);
+  console.log(`🏥  Health check    →  http://localhost:${PORT}/api/health`);
+  console.log(`📱  WhatsApp        →  starting...\n`);
+
+  // Start WhatsApp — auto-reconnects, QR pushed via Socket.IO
+  wa.startWA().catch(err => console.error('[WA] Start error:', err.message));
 });
