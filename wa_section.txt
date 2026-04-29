@@ -1,0 +1,24 @@
+﻿id="sec-whatsapp">
+    <div class="col-4060" style="height:calc(100vh - 130px);">
+      <div class="card" style="display:flex;flex-direction:column;overflow:hidden;">
+        <div class="card-header"><h3><i class="fab fa-whatsapp" style="color:#25D366;"></i> Conversations</h3><span class="badge b-green">9 Active</span></div>
+        <div style="padding:10px 14px;border-bottom:1px solid var(--border);">
+          <div class="search-box"><i class="fas fa-search"></i><input placeholder="Search conversationsâ€¦" /></div>
+        </div>
+        <div style="flex:1;overflow-y:auto;" id="wa-convo-list"></div>
+      </div>
+      <div class="card" style="display:flex;flex-direction:column;overflow:hidden;">
+        <div class="card-header">
+          <h3 id="wa-active-title"><i class="fab fa-whatsapp" style="color:#25D366;"></i> Select a conversation</h3>
+          <button class="btn btn-ghost btn-sm" onclick="aiWADraft()"><i class="fas fa-robot"></i> AI Reply</button>
+        </div>
+        <div id="wa-chat-area" class="wa-list" style="flex:1;overflow-y:auto;justify-content:flex-end;"></div>
+        <div style="padding:10px 14px;border-top:1px solid var(--border);display:flex;gap:8px;flex-shrink:0;">
+          <input class="inp" id="wa-msg-input" placeholder="Type a messageâ€¦" onkeydown="if(event.key==='Enter')sendWA()" style="font-size:13px;" />
+          <button class="btn btn-green btn-sm" onclick="sendWA()"><i class="fas fa-paper-plane"></i></button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- â–ˆâ–ˆâ–ˆâ–ˆâ–ˆâ–ˆ CONTACTS â–ˆâ
