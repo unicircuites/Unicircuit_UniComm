@@ -2418,6 +2418,10 @@ function initWASocket() {
     else notify('New WhatsApp: ' + (msg.name || msg.chatId.split('@')[0]), msg.body.substring(0,50), 'var(--green)', 'fab fa-whatsapp');
   });
   waSocket.on('wa:chats_updated', () => waLoadChats());
+  waSocket.on('wa:sync_complete', () => {
+    console.log('[WA-UI] Full sync complete — loading all chats');
+    waLoadChats();
+  });
   waSocket.on('wa:syncing', ({ status }) => {
     const el = document.getElementById('wa-sync-status');
     if (el) el.textContent = status === 'done' ? '' : 'Syncing...';
@@ -2623,6 +2627,7 @@ function toggleTheme() {
 </script>
 </body>
 </html>
+
 
 
 

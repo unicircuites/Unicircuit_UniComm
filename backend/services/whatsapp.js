@@ -306,14 +306,14 @@ async function startWA() {
 
   // ── HISTORY SYNC ──────────────────────────────────────────────────────────
   sock.ev.on('messaging-history.set', async ({ chats, contacts, messages, isLatest }) => {
-    console.log(`[WA] History sync — chats=${chats.length} contacts=${contacts?.length||0} messages=${messages.length} isLatest=${isLatest}`);
+    console.log(`[WA] History chunk — chats=${chats.length} contacts=${contacts?.length||0} messages=${messages.length} isLatest=${isLatest}`);
 
-    // Save contacts first (for name resolution)
+    // 1. Save contacts FIRST (needed for name resolution)
     if (contacts?.length) {
       for (const c of contacts) await saveContact(c);
     }
 
-    // Save chats (individual + groups)
+    // 2. Save chats with resolved names
     for (const chat of chats) {
       const isGroup = chat.id.endsWith('@g.us');
       const name    = isGroup
@@ -323,7 +323,7 @@ async function startWA() {
       await saveChat(chat.id, name, '', ts, 0, isGroup);
     }
 
-    // Save real messages only
+    // 3. Save real messages only
     let saved = 0;
     for (const msg of messages) {
       if (!isRealMessage(msg)) continue;
@@ -332,16 +332,20 @@ async function startWA() {
       const result = await saveMessage(msg);
       if (result) {
         saved++;
-        // Update chat's last message
         const isGroup = jid.endsWith('@g.us');
-        const name    = isGroup
-          ? getContactName(jid, null)
-          : getContactName(jid, msg.pushName);
+        const name    = isGroup ? getContactName(jid, null) : getContactName(jid, msg.pushName);
         await saveChat(jid, name, result.body, result.ts, 0, isGroup);
       }
     }
-    console.log(`[WA] History saved — ${saved} messages`);
-    emit('wa:chats_updated', { count: chats.length });
+    console.log(`[WA] Chunk saved — ${saved} messages`);
+
+    // 4. Only refresh frontend on FINAL chunk (isLatest=true)
+    if (isLatest) {
+      console.log('[WA] ✅ Full history sync complete — refreshing UI');
+      // Update all chat names now that all contacts are loaded
+      await updateChatNames();
+      emit('wa:sync_complete', {});
+    }
   });
 
   // ── CHAT LIST UPDATES ─────────────────────────────────────────────────────
@@ -425,14 +429,21 @@ async function startWA() {
 // ── UPDATE CHAT NAMES AFTER CONTACTS SYNC ─────────────────────────────────
 async function updateChatNames() {
   try {
-    const chats = await pool.query(`SELECT id, phone, is_group FROM wa_chats WHERE is_group=false`);
+    const chats = await pool.query(`SELECT id, phone, name, is_group FROM wa_chats`);
+    let updated = 0;
     for (const chat of chats.rows) {
-      const name = getContactName(chat.id, null);
-      if (name && name !== chat.phone) {
-        await pool.query(`UPDATE wa_chats SET name=$1 WHERE id=$2`, [name, chat.id]);
+      if (chat.is_group) continue; // Groups keep their own names
+      const resolvedName = getContactName(chat.id, null);
+      // Only update if we have a better name than the phone number
+      if (resolvedName && resolvedName !== chat.phone && resolvedName !== chat.name) {
+        await pool.query(`UPDATE wa_chats SET name=$1 WHERE id=$2`, [resolvedName, chat.id]);
+        updated++;
       }
     }
-  } catch (_) {}
+    console.log(`[WA] Updated ${updated} chat names`);
+  } catch (err) {
+    console.error('[WA] updateChatNames error:', err.message);
+  }
 }
 
 // ── CLEAR SESSION ─────────────────────────────────────────────────────────
