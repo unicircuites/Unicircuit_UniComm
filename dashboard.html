@@ -1764,13 +1764,30 @@ window.addEventListener('DOMContentLoaded', () => {
   applyTheme(localStorage.getItem('uc_theme') || 'dark');
 
   // ── AUTH GUARD ──────────────────────────────────────────────────────────
-  const token = localStorage.getItem('uc_token') || sessionStorage.getItem('uc_token');
-  const userRaw = localStorage.getItem('uc_user') || sessionStorage.getItem('uc_user');
+  const token   = localStorage.getItem('uc_token') || sessionStorage.getItem('uc_token');
+  const userRaw = localStorage.getItem('uc_user')  || sessionStorage.getItem('uc_user');
 
-  if (!token || !userRaw) {
+  console.log('[GUARD] localStorage uc_token:', localStorage.getItem('uc_token') ? 'EXISTS ('+localStorage.getItem('uc_token').substring(0,20)+'...)' : 'NULL');
+  console.log('[GUARD] sessionStorage uc_token:', sessionStorage.getItem('uc_token') ? 'EXISTS' : 'NULL');
+  console.log('[GUARD] uc_user raw:', userRaw ? userRaw.substring(0,60) : 'NULL');
+  console.log('[GUARD] Token valid?', !!token, '| User valid?', !!userRaw);
+
+  // ── Detect and reject old fake btoa() tokens (they end with == and are not JWT) ──
+  const isRealJWT = token && token.startsWith('eyJ') && token.split('.').length === 3;
+  if (!isRealJWT && token) {
+    console.warn('[GUARD] ⚠️ Stale/fake token detected — clearing and redirecting to login');
+    localStorage.clear();
+    sessionStorage.clear();
     window.location.href = 'login.html';
     return;
   }
+
+  if (!token || !userRaw) {
+    console.warn('[GUARD] ❌ No token or user — redirecting to login');
+    window.location.href = 'login.html';
+    return;
+  }
+  console.log('[GUARD] ✅ Real JWT found, proceeding to dashboard');
 
   // Parse user and populate sidebar
   try {
@@ -1824,15 +1841,26 @@ async function doLogout() {
 const API_BASE = 'http://localhost:4551/api';
 
 function getAuthHeaders() {
-  const token = localStorage.getItem('uc_token') || sessionStorage.getItem('uc_token');
+  const tokenLS  = localStorage.getItem('uc_token');
+  const tokenSS  = sessionStorage.getItem('uc_token');
+  const token    = tokenLS || tokenSS;
+  console.log('[AUTH] localStorage token:', tokenLS ? tokenLS.substring(0,30)+'...' : 'NULL');
+  console.log('[AUTH] sessionStorage token:', tokenSS ? tokenSS.substring(0,30)+'...' : 'NULL');
+  console.log('[AUTH] Using token:', token ? token.substring(0,30)+'...' : 'NULL ← THIS IS THE PROBLEM');
   return { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' };
 }
 
 // ── LOAD DASHBOARD DATA FROM POSTGRESQL ─────────────────────────────────────
 async function loadDashboardData() {
+  console.log('[DASHBOARD] Loading data from API...');
   try {
+    const headers = getAuthHeaders();
+    console.log('[DASHBOARD] Using headers:', JSON.stringify(headers));
+
     // Load contacts from DB
-    const cRes = await fetch(`${API_BASE}/contacts`, { headers: getAuthHeaders() });
+    console.log('[DASHBOARD] Fetching contacts...');
+    const cRes = await fetch(`${API_BASE}/contacts`, { headers });
+    console.log('[DASHBOARD] Contacts response:', cRes.status);
     if (cRes.ok) {
       const dbContacts = await cRes.json();
       if (dbContacts.length > 0) {
@@ -1850,7 +1878,8 @@ async function loadDashboardData() {
     }
 
     // Load pipeline from DB
-    const pRes = await fetch(`${API_BASE}/pipeline`, { headers: getAuthHeaders() });
+    console.log('[DASHBOARD] Fetching pipeline...');
+    const pRes = await fetch(`${API_BASE}/pipeline`, { headers });
     if (pRes.ok) {
       const dbDeals = await pRes.json();
       if (dbDeals.length > 0) {
@@ -1861,7 +1890,8 @@ async function loadDashboardData() {
     }
 
     // Load call logs from DB
-    const lRes = await fetch(`${API_BASE}/calls`, { headers: getAuthHeaders() });
+    console.log('[DASHBOARD] Fetching calls...');
+    const lRes = await fetch(`${API_BASE}/calls`, { headers });
     if (lRes.ok) {
       const { calls: dbCalls } = await lRes.json();
       if (dbCalls && dbCalls.length > 0) {
@@ -1870,7 +1900,8 @@ async function loadDashboardData() {
     }
 
     // Load campaigns from DB
-    const campRes = await fetch(`${API_BASE}/campaigns`, { headers: getAuthHeaders() });
+    console.log('[DASHBOARD] Fetching campaigns...');
+    const campRes = await fetch(`${API_BASE}/campaigns`, { headers });
     if (campRes.ok) {
       const dbCamps = await campRes.json();
       if (dbCamps.length > 0) renderCampaigns(dbCamps);
@@ -2078,24 +2109,33 @@ let searchQuery      = '';
 let searchTimer      = null;
 
 async function checkOutlookStatus() {
+  console.log('[OUTLOOK] Checking status...');
   try {
-    const res  = await fetch(`${API_BASE}/outlook/status`, { headers: getAuthHeaders() });
+    const headers = getAuthHeaders();
+    console.log('[OUTLOOK] Request headers:', headers);
+    const res  = await fetch(`${API_BASE}/outlook/status`, { headers });
+    console.log('[OUTLOOK] Response status:', res.status, res.statusText);
     const data = await res.json();
+    console.log('[OUTLOOK] Response data:', data);
     const dot  = document.getElementById('outlook-status-dot');
     const banner = document.getElementById('outlook-connect-banner');
     if (data.connected) {
+      console.log('[OUTLOOK] ✅ Connected');
       if (dot) { dot.className = 'badge b-green'; dot.textContent = '⬤ Connected'; }
       if (banner) banner.style.display = 'none';
-      // Update topbar pill
       const pill = document.querySelector('.pill-tag i.fa-envelope');
       if (pill) pill.parentElement.style.borderColor = 'rgba(16,185,129,0.3)';
       return true;
     } else {
+      console.log('[OUTLOOK] ❌ Not connected');
       if (dot) { dot.className = 'badge b-red'; dot.textContent = '⬤ Not connected'; }
       if (banner) banner.style.display = 'block';
       return false;
     }
-  } catch (_) { return false; }
+  } catch (err) {
+    console.error('[OUTLOOK] ❌ Check status error:', err);
+    return false;
+  }
 }
 
 async function connectOutlook() {

@@ -463,11 +463,18 @@ async function handleLogin(e) {
 
 // ── AUTO-FILL IF REMEMBERED ──────────────────────────────────────────────────
 window.addEventListener('DOMContentLoaded', () => {
-  // If already logged in, redirect
+  // If already logged in with a REAL JWT, redirect
   const token = localStorage.getItem('uc_token') || sessionStorage.getItem('uc_token');
-  if (token) {
+  const isRealJWT = token && token.startsWith('eyJ') && token.split('.').length === 3;
+  if (isRealJWT) {
     window.location.href = 'dashboard.html';
     return;
+  }
+  // Clear any stale/fake tokens
+  if (token && !isRealJWT) {
+    console.warn('[LOGIN] Clearing stale token');
+    localStorage.clear();
+    sessionStorage.clear();
   }
   // Pre-fill email if remembered
   const remembered = localStorage.getItem('uc_remember');
