@@ -26,6 +26,27 @@
   --red:    #ef4444;
   --red2:   #f87171;
 }
+
+/* ── LIGHT THEME ── */
+html.light {
+  --bg:     #f0f2f8;
+  --bg2:    #e4e8f2;
+  --bg3:    #d8dded;
+  --card:   #ffffff;
+  --card2:  #f5f7fc;
+  --border: rgba(0,0,0,0.08);
+  --border2:rgba(0,0,0,0.14);
+  --text:   #1a2035;
+  --muted:  #7a8aaa;
+  --muted2: #5a6a8a;
+  --gold:   #d4880a;
+  --gold2:  #e8a020;
+  --blue:   #2563eb;
+  --green:  #059669;
+  --green2: #047857;
+  --red:    #dc2626;
+  --red2:   #b91c1c;
+}
 *{margin:0;padding:0;box-sizing:border-box;font-family:'Outfit',sans-serif;}
 body{
   background:var(--bg);
@@ -47,6 +68,24 @@ body{
   background-size:40px 40px;
   pointer-events:none;
 }
+html.light .bg-grid{
+  background-image:
+    linear-gradient(rgba(0,0,0,0.04) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0,0,0,0.04) 1px, transparent 1px);
+}
+
+/* ── THEME TOGGLE BUTTON ── */
+.theme-toggle{
+  position:fixed;top:18px;right:18px;z-index:100;
+  width:38px;height:38px;border-radius:50%;
+  background:var(--card);border:1px solid var(--border2);
+  display:flex;align-items:center;justify-content:center;
+  cursor:pointer;font-size:15px;color:var(--muted2);
+  box-shadow:0 2px 10px rgba(0,0,0,0.2);
+  transition:all 0.2s;
+}
+.theme-toggle:hover{color:var(--gold);border-color:rgba(245,166,35,0.4);transform:scale(1.08);}
+html.light .theme-toggle{box-shadow:0 2px 10px rgba(0,0,0,0.1);}
 .bg-glow-1{
   position:fixed;top:-200px;left:-200px;
   width:600px;height:600px;
@@ -234,6 +273,11 @@ body{
 </style>
 </head>
 <body>
+
+<!-- THEME TOGGLE -->
+<button class="theme-toggle" id="themeToggle" onclick="toggleTheme()" title="Toggle light/dark mode">
+  <i class="fas fa-moon" id="themeIcon"></i>
+</button>
 
 <div class="bg-grid"></div>
 <div class="bg-glow-1"></div>
@@ -463,6 +507,8 @@ window.addEventListener('DOMContentLoaded', () => {
     const user = JSON.parse(localStorage.getItem('uc_user') || '{}');
     if (user.email) document.getElementById('email').value = user.email;
   }
+  // Apply saved theme
+  applyTheme(localStorage.getItem('uc_theme') || 'dark');
 });
 
 // ── CLEAR ERRORS ON INPUT ────────────────────────────────────────────────────
@@ -471,6 +517,24 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById(id).addEventListener('input', hideError);
   });
 });
+
+// ── THEME TOGGLE ─────────────────────────────────────────────────────────────
+function applyTheme(theme) {
+  const icon = document.getElementById('themeIcon');
+  if (theme === 'light') {
+    document.documentElement.classList.add('light');
+    if (icon) { icon.classList.replace('fa-moon', 'fa-sun'); }
+  } else {
+    document.documentElement.classList.remove('light');
+    if (icon) { icon.classList.replace('fa-sun', 'fa-moon'); }
+  }
+  localStorage.setItem('uc_theme', theme);
+}
+
+function toggleTheme() {
+  const current = localStorage.getItem('uc_theme') || 'dark';
+  applyTheme(current === 'dark' ? 'light' : 'dark');
+}
 </script>
 </body>
 </html>

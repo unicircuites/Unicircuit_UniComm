@@ -30,6 +30,44 @@
   --cyan: #06b6d4;
   --purple: #8b5cf6;
 }
+
+/* ── LIGHT THEME ── */
+html.light {
+  --bg:    #f0f2f8;
+  --bg2:   #e4e8f2;
+  --bg3:   #d8dded;
+  --card:  #ffffff;
+  --card2: #f5f7fc;
+  --border:  rgba(0,0,0,0.08);
+  --border2: rgba(0,0,0,0.14);
+  --text:   #1a2035;
+  --muted:  #7a8aaa;
+  --muted2: #4a5a7a;
+  --gold:   #c97d08;
+  --gold2:  #e09010;
+  --blue:   #2563eb;
+  --blue2:  #1d4ed8;
+  --green:  #059669;
+  --green2: #047857;
+  --red:    #dc2626;
+  --red2:   #b91c1c;
+  --cyan:   #0891b2;
+  --purple: #7c3aed;
+}
+html.light body { background: var(--bg); }
+html.light .sidebar { background: var(--bg2); }
+html.light .topbar  { background: var(--bg2); }
+html.light .kpi, html.light .card { background: var(--card); }
+html.light .camp-card { background: var(--card2); }
+html.light .data-table thead th { background: rgba(0,0,0,0.03); }
+html.light .data-table tbody tr:hover { background: rgba(0,0,0,0.025); }
+html.light .inp { background: rgba(0,0,0,0.04); color: var(--text); }
+html.light .inp:focus { background: rgba(0,0,0,0.06); }
+html.light .modal { background: var(--bg3); }
+html.light .notif  { background: var(--card2); }
+html.light .chat-msg.ai { background: var(--card2); }
+html.light .wa-bubble.wa-in { background: var(--card2); }
+html.light select.inp option { background: #fff; color: var(--text); }
 *{margin:0;padding:0;box-sizing:border-box;font-family:'Outfit',sans-serif;}
 body{background:var(--bg);color:var(--text);height:100vh;overflow:hidden;font-size:14px;}
 code,pre,.mono{font-family:'JetBrains Mono',monospace;}
@@ -383,6 +421,17 @@ select.inp option{background:#1a2035;color:var(--text);}
   border-radius:10px;padding:14px;margin-bottom:10px;
 }
 
+/* ── THEME TOGGLE BUTTON (topbar) ── */
+.theme-btn{
+  width:34px;height:34px;border-radius:8px;
+  background:rgba(255,255,255,0.05);
+  border:1px solid var(--border2);
+  display:flex;align-items:center;justify-content:center;
+  cursor:pointer;font-size:14px;color:var(--muted2);
+  transition:all 0.18s;flex-shrink:0;
+}
+.theme-btn:hover{color:var(--gold);border-color:rgba(245,166,35,0.4);background:rgba(245,166,35,0.08);}
+
 /* ── AUTH GUARD OVERLAY ── */
 #auth-guard{
   position:fixed;inset:0;background:var(--bg);z-index:9999;
@@ -486,6 +535,7 @@ select.inp option{background:#1a2035;color:var(--text);}
       <div class="pill-tag"><i class="fas fa-envelope" style="color:#0078d4;"></i> Outlook</div>
       <button class="btn btn-gold btn-sm" onclick="openModal('contact-modal')"><i class="fas fa-user-plus"></i> Add Contact</button>
       <button class="btn btn-ghost btn-sm" onclick="nav('ai',document.querySelector('[onclick*=\"nav(\'ai\'\"]'))"><i class="fas fa-robot"></i> Ask AI</button>
+      <button class="theme-btn" id="themeToggle" onclick="toggleTheme()" title="Toggle light/dark mode"><i class="fas fa-moon" id="themeIcon"></i></button>
     </div>
   </div>
 
@@ -1655,6 +1705,9 @@ async function dashAIWA() {
 
 // ── INIT ──
 window.addEventListener('DOMContentLoaded', () => {
+  // Apply saved theme
+  applyTheme(localStorage.getItem('uc_theme') || 'dark');
+
   // ── AUTH GUARD ──────────────────────────────────────────────────────────
   const token = localStorage.getItem('uc_token') || sessionStorage.getItem('uc_token');
   const userRaw = localStorage.getItem('uc_user') || sessionStorage.getItem('uc_user');
@@ -1960,6 +2013,22 @@ async function createCampaign() {
     closeModal('campaign-modal');
     notify('Campaign saved locally', name + ' (offline)', 'var(--gold)', 'fas fa-bullhorn');
   }
+}
+
+// ── THEME TOGGLE ─────────────────────────────────────────────────────────────
+function applyTheme(theme) {
+  const icon = document.getElementById('themeIcon');
+  if (theme === 'light') {
+    document.documentElement.classList.add('light');
+    if (icon) { icon.classList.replace('fa-moon','fa-sun'); }
+  } else {
+    document.documentElement.classList.remove('light');
+    if (icon) { icon.classList.replace('fa-sun','fa-moon'); }
+  }
+  localStorage.setItem('uc_theme', theme);
+}
+function toggleTheme() {
+  applyTheme((localStorage.getItem('uc_theme') || 'dark') === 'dark' ? 'light' : 'dark');
 }
 </script>
 </body>
