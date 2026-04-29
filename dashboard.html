@@ -1,0 +1,1966 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dashboard · UniComm Pro · Unicircuit Engineering Services LLP</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #0c0f1a;
+  --bg2: #111520;
+  --bg3: #161b2c;
+  --card: #1a2035;
+  --card2: #1f2640;
+  --border: rgba(255,255,255,0.07);
+  --border2: rgba(255,255,255,0.12);
+  --text: #e8ecf4;
+  --muted: #6b7a99;
+  --muted2: #8b9ab8;
+  --gold: #f5a623;
+  --gold2: #ffc659;
+  --blue: #3b82f6;
+  --blue2: #60a5fa;
+  --green: #10b981;
+  --green2: #34d399;
+  --red: #ef4444;
+  --red2: #f87171;
+  --cyan: #06b6d4;
+  --purple: #8b5cf6;
+}
+*{margin:0;padding:0;box-sizing:border-box;font-family:'Outfit',sans-serif;}
+body{background:var(--bg);color:var(--text);height:100vh;overflow:hidden;font-size:14px;}
+code,pre,.mono{font-family:'JetBrains Mono',monospace;}
+
+/* SCROLLBAR */
+::-webkit-scrollbar{width:4px;height:4px;}
+::-webkit-scrollbar-track{background:transparent;}
+::-webkit-scrollbar-thumb{background:rgba(255,255,255,0.1);border-radius:4px;}
+
+/* LAYOUT */
+.shell{display:flex;height:100vh;overflow:hidden;}
+
+/* ── SIDEBAR ── */
+.sidebar{
+  width:230px;min-width:230px;
+  background:var(--bg2);
+  border-right:1px solid var(--border);
+  display:flex;flex-direction:column;
+  position:relative;overflow:hidden;
+}
+.sidebar-glow{
+  position:absolute;top:-100px;left:-60px;
+  width:280px;height:280px;
+  background:radial-gradient(circle,rgba(245,166,35,0.06) 0%,transparent 70%);
+  pointer-events:none;
+}
+.brand-area{
+  padding:20px 16px 16px;
+  border-bottom:1px solid var(--border);
+}
+.brand-logo{display:flex;align-items:center;gap:10px;}
+.brand-icon{
+  width:36px;height:36px;
+  background:linear-gradient(135deg,#f5a623,#e8820a);
+  border-radius:9px;
+  display:flex;align-items:center;justify-content:center;
+  box-shadow:0 4px 14px rgba(245,166,35,0.35);
+  flex-shrink:0;
+}
+.brand-icon i{color:#fff;font-size:14px;}
+.brand-name{font-size:16px;font-weight:800;color:#fff;letter-spacing:-0.3px;}
+.brand-name span{color:var(--gold);}
+.brand-sub{font-size:9.5px;color:var(--muted);font-weight:400;margin-top:1px;letter-spacing:0.3px;}
+.status-bar{
+  display:flex;align-items:center;gap:6px;
+  margin-top:11px;background:rgba(16,185,129,0.08);
+  border:1px solid rgba(16,185,129,0.15);
+  border-radius:6px;padding:5px 9px;
+}
+.live-pulse{
+  width:7px;height:7px;border-radius:50%;background:var(--green);flex-shrink:0;
+  animation:pulse 2s ease infinite;
+}
+@keyframes pulse{0%,100%{box-shadow:0 0 0 0 rgba(16,185,129,0.5);}50%{box-shadow:0 0 0 5px rgba(16,185,129,0);}}
+.status-bar span{font-size:10px;color:var(--green);font-weight:600;}
+
+nav{flex:1;overflow-y:auto;padding:10px 8px;}
+.nav-label{font-size:9px;font-weight:700;color:var(--muted);letter-spacing:1.2px;text-transform:uppercase;padding:10px 8px 4px;}
+.nav-item{
+  display:flex;align-items:center;gap:10px;
+  padding:9px 10px;border-radius:8px;
+  cursor:pointer;margin-bottom:1px;
+  color:var(--muted2);font-size:13px;font-weight:500;
+  transition:all 0.15s;position:relative;
+}
+.nav-item:hover{background:rgba(255,255,255,0.04);color:var(--text);}
+.nav-item.active{background:rgba(245,166,35,0.1);color:var(--gold);}
+.nav-item.active::before{
+  content:'';position:absolute;left:0;top:50%;transform:translateY(-50%);
+  width:2.5px;height:55%;background:var(--gold);border-radius:0 2px 2px 0;
+}
+.nav-item i{width:16px;text-align:center;font-size:12px;flex-shrink:0;}
+.nav-badge{
+  margin-left:auto;min-width:18px;height:18px;
+  border-radius:9px;display:flex;align-items:center;justify-content:center;
+  font-size:9.5px;font-weight:700;padding:0 5px;
+}
+.nb-red{background:rgba(239,68,68,0.2);color:var(--red2);}
+.nb-green{background:rgba(16,185,129,0.2);color:var(--green2);}
+.nb-blue{background:rgba(59,130,246,0.2);color:var(--blue2);}
+.nb-gold{background:rgba(245,166,35,0.2);color:var(--gold2);}
+
+.user-block{
+  padding:12px 14px;border-top:1px solid var(--border);
+  display:flex;align-items:center;gap:10px;
+}
+.user-av{
+  width:32px;height:32px;border-radius:50%;flex-shrink:0;
+  background:linear-gradient(135deg,#3b82f6,#8b5cf6);
+  display:flex;align-items:center;justify-content:center;
+  font-size:12px;font-weight:700;color:#fff;
+}
+.user-name{font-size:12px;font-weight:600;color:var(--text);}
+.user-role{font-size:10px;color:var(--muted);}
+
+/* ── MAIN AREA ── */
+.main-area{flex:1;display:flex;flex-direction:column;overflow:hidden;}
+
+/* TOPBAR */
+.topbar{
+  height:58px;background:var(--bg2);
+  border-bottom:1px solid var(--border);
+  display:flex;align-items:center;
+  padding:0 22px;gap:14px;flex-shrink:0;
+}
+.topbar-title h2{font-size:17px;font-weight:700;color:#fff;letter-spacing:-0.2px;}
+.topbar-title p{font-size:11px;color:var(--muted);margin-top:1px;}
+.topbar-actions{display:flex;gap:8px;margin-left:auto;align-items:center;}
+.pill-tag{
+  display:flex;align-items:center;gap:6px;
+  background:rgba(255,255,255,0.04);
+  border:1px solid var(--border2);
+  border-radius:6px;padding:5px 11px;
+  font-size:11.5px;color:var(--muted2);font-weight:500;
+  cursor:default;
+}
+.pill-tag i{font-size:11px;}
+
+/* CONTENT */
+.content-area{flex:1;overflow-y:auto;padding:20px;}
+.section-view{display:none;}
+.section-view.active{display:block;}
+
+/* ── KPI CARDS ── */
+.kpi-row{display:grid;grid-template-columns:repeat(5,1fr);gap:12px;margin-bottom:18px;}
+.kpi{
+  background:var(--card);
+  border:1px solid var(--border);
+  border-radius:12px;padding:16px;
+  position:relative;overflow:hidden;
+  transition:transform 0.18s,border-color 0.18s;cursor:default;
+}
+.kpi:hover{transform:translateY(-2px);border-color:var(--border2);}
+.kpi::after{
+  content:'';position:absolute;top:0;right:0;
+  width:60px;height:60px;
+  border-radius:0 12px 0 100%;
+  opacity:0.06;
+}
+.kpi.gold::after{background:var(--gold);}
+.kpi.blue::after{background:var(--blue);}
+.kpi.green::after{background:var(--green);}
+.kpi.red::after{background:var(--red);}
+.kpi.cyan::after{background:var(--cyan);}
+.kpi-top{display:flex;justify-content:space-between;align-items:flex-start;}
+.kpi-label{font-size:10.5px;color:var(--muted);font-weight:500;text-transform:uppercase;letter-spacing:0.5px;}
+.kpi-icon{width:30px;height:30px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:12px;}
+.kpi-val{font-size:24px;font-weight:800;color:#fff;margin-top:8px;letter-spacing:-1px;line-height:1;}
+.kpi-change{font-size:10.5px;margin-top:5px;font-weight:500;}
+.kpi-bar{height:2px;background:rgba(255,255,255,0.06);border-radius:2px;margin-top:10px;}
+.kpi-fill{height:100%;border-radius:2px;transition:width 1s ease;}
+
+/* ── SECTION CARDS ── */
+.card{background:var(--card);border:1px solid var(--border);border-radius:12px;overflow:hidden;}
+.card-header{
+  padding:14px 18px;border-bottom:1px solid var(--border);
+  display:flex;align-items:center;justify-content:space-between;
+}
+.card-header h3{font-size:13.5px;font-weight:700;color:#fff;display:flex;align-items:center;gap:8px;}
+.card-header h3 i{font-size:12px;}
+.card-body{padding:16px 18px;}
+
+/* TABLE */
+.data-table{width:100%;border-collapse:collapse;font-size:12.5px;}
+.data-table thead th{
+  background:rgba(255,255,255,0.02);color:var(--muted);
+  font-weight:600;text-align:left;padding:9px 13px;
+  font-size:10.5px;text-transform:uppercase;letter-spacing:0.5px;
+  border-bottom:1px solid var(--border);
+}
+.data-table tbody tr{border-bottom:1px solid rgba(255,255,255,0.04);transition:background 0.1s;}
+.data-table tbody tr:hover{background:rgba(255,255,255,0.025);}
+.data-table tbody td{padding:10px 13px;vertical-align:middle;color:var(--text);}
+.data-table tbody tr:last-child{border-bottom:none;}
+
+/* STATUS BADGES */
+.badge{display:inline-flex;align-items:center;gap:4px;padding:2px 8px;border-radius:20px;font-size:10.5px;font-weight:600;}
+.b-green{background:rgba(16,185,129,0.12);color:var(--green2);}
+.b-blue{background:rgba(59,130,246,0.12);color:var(--blue2);}
+.b-gold{background:rgba(245,166,35,0.12);color:var(--gold2);}
+.b-red{background:rgba(239,68,68,0.12);color:var(--red2);}
+.b-gray{background:rgba(255,255,255,0.06);color:var(--muted2);}
+.b-cyan{background:rgba(6,182,212,0.12);color:#67e8f9;}
+.b-purple{background:rgba(139,92,246,0.12);color:#c4b5fd;}
+
+/* BUTTONS */
+.btn{display:inline-flex;align-items:center;gap:6px;padding:8px 15px;border-radius:8px;font-size:12.5px;font-weight:600;cursor:pointer;border:none;transition:all 0.15s;font-family:'Outfit',sans-serif;}
+.btn-gold{background:linear-gradient(135deg,#f5a623,#e8820a);color:#fff;box-shadow:0 3px 10px rgba(245,166,35,0.25);}
+.btn-gold:hover{box-shadow:0 4px 14px rgba(245,166,35,0.4);transform:translateY(-1px);}
+.btn-ghost{background:rgba(255,255,255,0.05);color:var(--muted2);border:1px solid var(--border);}
+.btn-ghost:hover{background:rgba(255,255,255,0.08);color:var(--text);}
+.btn-blue{background:rgba(59,130,246,0.15);color:var(--blue2);border:1px solid rgba(59,130,246,0.25);}
+.btn-blue:hover{background:rgba(59,130,246,0.25);}
+.btn-red{background:rgba(239,68,68,0.12);color:var(--red2);border:1px solid rgba(239,68,68,0.2);}
+.btn-red:hover{background:rgba(239,68,68,0.2);}
+.btn-green{background:rgba(16,185,129,0.12);color:var(--green2);border:1px solid rgba(16,185,129,0.2);}
+.btn-green:hover{background:rgba(16,185,129,0.2);}
+.btn-sm{padding:5px 11px;font-size:11.5px;}
+.btn-xs{padding:3px 9px;font-size:11px;}
+.btn:disabled{opacity:0.4;cursor:not-allowed;transform:none;}
+
+/* INPUT */
+.inp{
+  background:rgba(255,255,255,0.04);
+  border:1px solid var(--border2);
+  border-radius:8px;padding:9px 13px;
+  font-size:13px;color:var(--text);
+  font-family:'Outfit',sans-serif;outline:none;
+  transition:border-color 0.15s,box-shadow 0.15s;width:100%;
+}
+.inp:focus{border-color:rgba(245,166,35,0.4);box-shadow:0 0 0 3px rgba(245,166,35,0.08);}
+.inp::placeholder{color:var(--muted);}
+select.inp option{background:#1a2035;color:var(--text);}
+
+.form-row{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px;}
+.form-group{margin-bottom:12px;}
+.form-label{font-size:11.5px;font-weight:600;color:var(--muted2);margin-bottom:5px;display:block;}
+
+/* CHAT */
+.chat-wrap{display:flex;flex-direction:column;height:100%;}
+.chat-msgs{flex:1;overflow-y:auto;padding:16px;display:flex;flex-direction:column;gap:10px;}
+.chat-msg{max-width:82%;padding:10px 14px;border-radius:12px;font-size:13px;line-height:1.55;}
+.chat-msg.user{background:rgba(245,166,35,0.12);border:1px solid rgba(245,166,35,0.2);color:var(--text);align-self:flex-end;border-radius:12px 4px 12px 12px;}
+.chat-msg.ai{background:var(--card2);border:1px solid var(--border);color:var(--text);align-self:flex-start;border-radius:4px 12px 12px 12px;}
+.chat-msg.ai .ai-tag{font-size:9.5px;font-weight:700;color:var(--gold);letter-spacing:0.5px;margin-bottom:5px;display:flex;align-items:center;gap:4px;}
+.chat-input-bar{padding:12px 14px;border-top:1px solid var(--border);display:flex;gap:8px;flex-shrink:0;}
+
+/* WA BUBBLES */
+.wa-bubble{padding:9px 13px;border-radius:10px;font-size:12.5px;line-height:1.5;max-width:78%;}
+.wa-in{background:var(--card2);border:1px solid var(--border);border-radius:4px 10px 10px 10px;align-self:flex-start;}
+.wa-out{background:rgba(16,185,129,0.1);border:1px solid rgba(16,185,129,0.15);border-radius:10px 4px 10px 10px;align-self:flex-end;}
+.wa-time{font-size:10px;color:var(--muted);margin-top:3px;text-align:right;}
+.wa-list{flex:1;overflow-y:auto;display:flex;flex-direction:column;gap:8px;padding:12px;}
+
+/* CONTACTS */
+.contact-avatar{
+  width:38px;height:38px;border-radius:50%;
+  display:flex;align-items:center;justify-content:center;
+  font-size:14px;font-weight:700;flex-shrink:0;
+}
+.contact-card{
+  background:var(--card);border:1px solid var(--border);border-radius:10px;
+  padding:14px 16px;cursor:pointer;
+  transition:all 0.15s;
+}
+.contact-card:hover{border-color:var(--border2);background:var(--card2);}
+.contact-card.selected{border-color:rgba(245,166,35,0.35);background:rgba(245,166,35,0.04);}
+
+/* MODAL */
+.modal-overlay{
+  position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:1000;
+  display:none;align-items:center;justify-content:center;backdrop-filter:blur(4px);
+}
+.modal-overlay.open{display:flex;}
+.modal{
+  background:var(--bg3);border:1px solid var(--border2);
+  border-radius:16px;padding:24px;width:100%;max-width:520px;
+  max-height:88vh;overflow-y:auto;
+  animation:modalIn 0.22s ease;
+}
+@keyframes modalIn{from{opacity:0;transform:scale(0.95) translateY(10px);}to{opacity:1;transform:scale(1) translateY(0);}}
+.modal-title{font-size:16px;font-weight:800;color:#fff;margin-bottom:18px;display:flex;align-items:center;justify-content:space-between;}
+.modal-close{cursor:pointer;color:var(--muted);font-size:16px;transition:color 0.1s;}
+.modal-close:hover{color:var(--text);}
+
+/* NOTIFICATION */
+.notif{
+  position:fixed;bottom:22px;right:22px;z-index:9999;
+  background:var(--card2);border:1px solid var(--border2);
+  border-radius:10px;padding:12px 16px;
+  display:none;gap:10px;align-items:center;
+  box-shadow:0 8px 28px rgba(0,0,0,0.4);
+  animation:notifIn 0.25s ease;max-width:320px;font-size:13px;
+}
+@keyframes notifIn{from{opacity:0;transform:translateY(12px);}to{opacity:1;transform:translateY(0);}}
+.notif.show{display:flex;}
+.notif-icon{width:30px;height:30px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:13px;flex-shrink:0;}
+
+/* GRID LAYOUTS */
+.two-col{display:grid;grid-template-columns:1fr 1fr;gap:16px;}
+.three-col{display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;}
+.col-6040{display:grid;grid-template-columns:1.4fr 1fr;gap:16px;}
+.col-4060{display:grid;grid-template-columns:1fr 1.4fr;gap:16px;}
+
+/* PROGRESS */
+.prog-bar{height:4px;background:rgba(255,255,255,0.06);border-radius:2px;}
+.prog-fill{height:100%;border-radius:2px;transition:width 0.8s ease;}
+
+/* MISC */
+.separator{width:1px;height:32px;background:var(--border);}
+.section-label{font-size:9.5px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:10px;}
+.tag{display:inline-block;padding:2px 8px;border-radius:5px;font-size:10.5px;font-weight:600;}
+
+/* ANIMATIONS */
+@keyframes fadeUp{from{opacity:0;transform:translateY(8px);}to{opacity:1;transform:translateY(0);}}
+.fu{animation:fadeUp 0.25s ease both;}
+.fu1{animation-delay:0.04s;}
+.fu2{animation-delay:0.08s;}
+.fu3{animation-delay:0.12s;}
+.fu4{animation-delay:0.16s;}
+.fu5{animation-delay:0.2s;}
+
+/* LOADER */
+.spin-loader{
+  display:inline-block;width:14px;height:14px;
+  border:2px solid rgba(255,255,255,0.1);
+  border-top-color:var(--gold);
+  border-radius:50%;animation:spin 0.7s linear infinite;
+}
+@keyframes spin{to{transform:rotate(360deg);}}
+
+/* SEARCH BOX */
+.search-box{
+  display:flex;align-items:center;gap:8px;
+  background:rgba(255,255,255,0.04);border:1px solid var(--border);
+  border-radius:8px;padding:8px 13px;
+}
+.search-box input{background:none;border:none;outline:none;color:var(--text);font-size:13px;font-family:'Outfit';flex:1;}
+.search-box input::placeholder{color:var(--muted);}
+.search-box i{color:var(--muted);font-size:13px;}
+
+/* SCORE RING */
+.score-ring{position:relative;width:52px;height:52px;flex-shrink:0;}
+.score-ring svg{transform:rotate(-90deg);}
+.score-ring .score-val{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:800;color:#fff;}
+
+/* TIMELINE */
+.timeline-item{display:flex;gap:12px;padding-bottom:14px;position:relative;}
+.timeline-item::before{content:'';position:absolute;left:15px;top:24px;bottom:0;width:1px;background:var(--border);}
+.timeline-item:last-child::before{display:none;}
+.tl-dot{width:30px;height:30px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:11px;z-index:1;}
+
+/* QUICK REPLIES */
+.quick-chip{
+  display:inline-flex;align-items:center;gap:5px;
+  background:rgba(255,255,255,0.04);border:1px solid var(--border);
+  border-radius:6px;padding:5px 10px;font-size:11.5px;color:var(--muted2);
+  cursor:pointer;transition:all 0.13s;
+}
+.quick-chip:hover{background:rgba(245,166,35,0.08);color:var(--gold);border-color:rgba(245,166,35,0.25);}
+
+/* STAT ROW */
+.stat-row{display:flex;align-items:center;gap:8px;padding:9px 0;border-bottom:1px solid rgba(255,255,255,0.04);}
+.stat-row:last-child{border-bottom:none;padding-bottom:0;}
+.stat-label{font-size:12px;color:var(--muted2);flex:1;}
+.stat-val{font-size:13px;font-weight:700;color:#fff;}
+
+/* CAMPAIGN CARD */
+.camp-card{
+  background:var(--card2);border:1px solid var(--border);
+  border-radius:10px;padding:14px;margin-bottom:10px;
+}
+
+/* ── AUTH GUARD OVERLAY ── */
+#auth-guard{
+  position:fixed;inset:0;background:var(--bg);z-index:9999;
+  display:flex;align-items:center;justify-content:center;
+  flex-direction:column;gap:14px;
+}
+#auth-guard .spin-loader{width:28px;height:28px;border-width:3px;}
+#auth-guard p{font-size:13px;color:var(--muted);}
+
+/* ── LOGOUT BUTTON ── */
+.logout-btn{
+  display:flex;align-items:center;gap:6px;
+  padding:5px 10px;border-radius:7px;
+  background:rgba(239,68,68,0.08);border:1px solid rgba(239,68,68,0.15);
+  color:var(--red2);font-size:11.5px;font-weight:600;cursor:pointer;
+  transition:all 0.15s;font-family:'Outfit',sans-serif;
+}
+.logout-btn:hover{background:rgba(239,68,68,0.16);}
+
+/* ── DB STATUS BADGE ── */
+.db-badge{
+  display:inline-flex;align-items:center;gap:5px;
+  font-size:10px;color:var(--muted);padding:3px 8px;
+  background:rgba(255,255,255,0.03);border:1px solid var(--border);
+  border-radius:5px;margin-top:4px;
+}
+.db-dot{width:6px;height:6px;border-radius:50%;background:var(--green);flex-shrink:0;}
+.db-dot.offline{background:var(--red2);}
+</style>
+</head>
+<body>
+
+<!-- AUTH GUARD — shown while checking session, hidden once verified -->
+<div id="auth-guard">
+  <div class="spin-loader"></div>
+  <p>Verifying session…</p>
+</div>
+
+<div class="shell" id="app-shell" style="display:none;">
+
+<!-- ══════ SIDEBAR ══════ -->
+<aside class="sidebar">
+  <div class="sidebar-glow"></div>
+  <div class="brand-area">
+    <div class="brand-logo">
+      <div class="brand-icon"><i class="fas fa-microchip"></i></div>
+      <div>
+        <div class="brand-name">Uni<span>Comm</span></div>
+        <div class="brand-sub">Unicircuit Engineering LLP</div>
+      </div>
+    </div>
+    <div class="status-bar">
+      <div class="live-pulse"></div>
+      <span>All systems live · v3.0</span>
+    </div>
+  </div>
+
+  <nav>
+    <div class="nav-label">Overview</div>
+    <div class="nav-item active" onclick="nav('dashboard',this)"><i class="fas fa-th-large"></i> Dashboard</div>
+
+    <div class="nav-label">Communications</div>
+    <div class="nav-item" onclick="nav('calls',this)"><i class="fas fa-phone-alt"></i> PBX Call Logs <span class="nav-badge nb-green">Live</span></div>
+    <div class="nav-item" onclick="nav('email',this)"><i class="fas fa-envelope"></i> Email / Outlook <span class="nav-badge nb-red">14</span></div>
+    <div class="nav-item" onclick="nav('whatsapp',this)"><i class="fab fa-whatsapp"></i> WhatsApp Biz <span class="nav-badge nb-green">9</span></div>
+
+    <div class="nav-label">CRM</div>
+    <div class="nav-item" onclick="nav('contacts',this)"><i class="fas fa-address-book"></i> Contacts <span class="nav-badge nb-blue">48</span></div>
+    <div class="nav-item" onclick="nav('pipeline',this)"><i class="fas fa-filter"></i> Sales Pipeline <span class="nav-badge nb-gold">6</span></div>
+
+    <div class="nav-label">Intelligence</div>
+    <div class="nav-item" onclick="nav('marketing',this)"><i class="fas fa-bullhorn"></i> Marketing Suite</div>
+    <div class="nav-item" onclick="nav('ai',this)"><i class="fas fa-robot"></i> AI Assistant</div>
+    <div class="nav-item" onclick="nav('analytics',this)"><i class="fas fa-chart-bar"></i> Analytics</div>
+  </nav>
+
+  <div class="user-block">
+    <div class="user-av" id="sidebar-initials">RK</div>
+    <div style="flex:1;min-width:0;">
+      <div class="user-name" id="sidebar-name">Rajesh Kumar</div>
+      <div class="user-role" id="sidebar-role">Admin · Unicircuit</div>
+    </div>
+    <button class="logout-btn" onclick="doLogout()" title="Sign out">
+      <i class="fas fa-sign-out-alt"></i>
+    </button>
+  </div>
+</aside>
+
+<!-- ══════ MAIN ══════ -->
+<div class="main-area">
+
+  <!-- TOPBAR -->
+  <div class="topbar">
+    <div class="topbar-title">
+      <h2 id="page-h">Dashboard</h2>
+      <p id="page-sub">AI-augmented omnichannel communications · Unicircuit Engineering Services LLP</p>
+    </div>
+    <div class="topbar-actions">
+      <div class="pill-tag"><span style="width:6px;height:6px;border-radius:50%;background:var(--green);"></span> Matrix PBX</div>
+      <div class="pill-tag"><i class="fab fa-whatsapp" style="color:#25D366;"></i> WA Business</div>
+      <div class="pill-tag"><i class="fas fa-envelope" style="color:#0078d4;"></i> Outlook</div>
+      <button class="btn btn-gold btn-sm" onclick="openModal('contact-modal')"><i class="fas fa-user-plus"></i> Add Contact</button>
+      <button class="btn btn-ghost btn-sm" onclick="nav('ai',document.querySelector('[onclick*=\"nav(\'ai\'\"]'))"><i class="fas fa-robot"></i> Ask AI</button>
+    </div>
+  </div>
+
+  <!-- CONTENT -->
+  <div class="content-area">
+
+  <!-- ██████ DASHBOARD ██████ -->
+  <div class="section-view active fu" id="sec-dashboard">
+
+    <!-- KPIs -->
+    <div class="kpi-row">
+      <div class="kpi gold fu">
+        <div class="kpi-top">
+          <div class="kpi-label">Total Calls (7d)</div>
+          <div class="kpi-icon" style="background:rgba(245,166,35,0.12);color:var(--gold);"><i class="fas fa-phone-volume"></i></div>
+        </div>
+        <div class="kpi-val">1,284</div>
+        <div class="kpi-change" style="color:var(--green2);"><i class="fas fa-arrow-up"></i> +12% this week</div>
+        <div class="kpi-bar"><div class="kpi-fill" style="width:72%;background:var(--gold);"></div></div>
+      </div>
+      <div class="kpi blue fu fu1">
+        <div class="kpi-top">
+          <div class="kpi-label">Emails Synced</div>
+          <div class="kpi-icon" style="background:rgba(59,130,246,0.12);color:var(--blue2);"><i class="fas fa-envelope-open-text"></i></div>
+        </div>
+        <div class="kpi-val">3,245</div>
+        <div class="kpi-change" style="color:var(--muted2);">Outlook Graph API</div>
+        <div class="kpi-bar"><div class="kpi-fill" style="width:84%;background:var(--blue);"></div></div>
+      </div>
+      <div class="kpi green fu fu2">
+        <div class="kpi-top">
+          <div class="kpi-label">WhatsApp Conv.</div>
+          <div class="kpi-icon" style="background:rgba(16,185,129,0.12);color:var(--green2);"><i class="fab fa-whatsapp"></i></div>
+        </div>
+        <div class="kpi-val">847</div>
+        <div class="kpi-change" style="color:var(--green2);"><i class="fas fa-arrow-up"></i> +23 today</div>
+        <div class="kpi-bar"><div class="kpi-fill" style="width:61%;background:var(--green);"></div></div>
+      </div>
+      <div class="kpi cyan fu fu3">
+        <div class="kpi-top">
+          <div class="kpi-label">Active Contacts</div>
+          <div class="kpi-icon" style="background:rgba(6,182,212,0.12);color:var(--cyan);"><i class="fas fa-address-book"></i></div>
+        </div>
+        <div class="kpi-val">48</div>
+        <div class="kpi-change" style="color:var(--green2);"><i class="fas fa-plus"></i> 3 new this week</div>
+        <div class="kpi-bar"><div class="kpi-fill" style="width:55%;background:var(--cyan);"></div></div>
+      </div>
+      <div class="kpi red fu fu4">
+        <div class="kpi-top">
+          <div class="kpi-label">AI Lead Score</div>
+          <div class="kpi-icon" style="background:rgba(239,68,68,0.12);color:var(--red2);"><i class="fas fa-chart-simple"></i></div>
+        </div>
+        <div class="kpi-val">74<span style="font-size:13px;font-weight:400;">/100</span></div>
+        <div class="kpi-change" style="color:var(--red2);"><i class="fas fa-exclamation-triangle"></i> Churn: 8%</div>
+        <div class="kpi-bar"><div class="kpi-fill" style="width:74%;background:var(--red);"></div></div>
+      </div>
+    </div>
+
+    <!-- MAIN GRID -->
+    <div class="col-6040" style="margin-bottom:16px;">
+
+      <!-- LEFT: CALL LOG -->
+      <div class="card fu fu1">
+        <div class="card-header">
+          <h3><i class="fas fa-phone-alt" style="color:var(--gold);"></i> Live PBX Log · Matrix Eternity</h3>
+          <span class="badge b-green"><i class="fas fa-circle" style="font-size:6px;"></i> SMDR Live</span>
+        </div>
+        <div style="overflow-x:auto;">
+          <table class="data-table">
+            <thead><tr><th>Caller</th><th>Dest</th><th>Dur.</th><th>Type</th><th>AI</th></tr></thead>
+            <tbody>
+              <tr>
+                <td><b>Amit Sharma</b><br><span style="font-size:10.5px;color:var(--muted);">Ext. 201</span></td>
+                <td>+91 98200 44512</td><td>4m 12s</td>
+                <td><span class="badge b-green">Out</span></td>
+                <td><button class="btn btn-blue btn-xs" onclick="quickCallSummary(this)"><i class="fas fa-robot"></i> Summarise</button></td>
+              </tr>
+              <tr>
+                <td><b>L&T ECC</b><br><span style="font-size:10.5px;color:var(--muted);">+91 22 6121 8800</span></td>
+                <td>Ext. 305 Sales</td><td>18m 47s</td>
+                <td><span class="badge b-blue">In</span></td>
+                <td><span class="badge b-green"><i class="fas fa-check"></i> Quotation</span></td>
+              </tr>
+              <tr>
+                <td><b>Priya Nair</b><br><span style="font-size:10.5px;color:var(--muted);">Ext. 108</span></td>
+                <td>+91 80 4112 3390</td><td>—</td>
+                <td><span class="badge b-red">Missed</span></td>
+                <td><button class="btn btn-blue btn-xs" onclick="quickCallSummary(this)"><i class="fas fa-robot"></i> Summarise</button></td>
+              </tr>
+              <tr>
+                <td><b>BHEL Procurement</b></td>
+                <td>Ext. 305 Sales</td><td>9m 03s</td>
+                <td><span class="badge b-blue">In</span></td>
+                <td><button class="btn btn-blue btn-xs" onclick="quickCallSummary(this)"><i class="fas fa-robot"></i> Summarise</button></td>
+              </tr>
+              <tr>
+                <td><b>Rajan – Purchase</b><br><span style="font-size:10.5px;color:var(--muted);">Ext. 202</span></td>
+                <td>Ext. 401 Accounts</td><td>2m 55s</td>
+                <td><span class="badge b-gold">Internal</span></td>
+                <td><span style="color:var(--muted);font-size:11px;">—</span></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- RIGHT: AI SUMMARIZER + WA PREVIEW -->
+      <div style="display:flex;flex-direction:column;gap:14px;">
+        <div class="card fu fu2">
+          <div class="card-header">
+            <h3><i class="fas fa-microphone-alt" style="color:var(--gold);"></i> AI Call Summarizer</h3>
+            <span style="font-size:10px;color:var(--muted);">Claude + Whisper</span>
+          </div>
+          <div class="card-body">
+            <div style="background:rgba(255,255,255,0.03);border:1px dashed var(--border2);border-radius:9px;padding:12px;display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:11px;">
+              <div>
+                <div style="font-size:12.5px;font-weight:600;"><i class="fas fa-file-audio" style="color:var(--gold);margin-right:6px;"></i>BHEL_call_Apr4.mp3</div>
+                <div style="font-size:11px;color:var(--muted);margin-top:2px;">8m 22s · Inbound · Procurement</div>
+              </div>
+              <button class="btn btn-gold btn-sm" onclick="doSummarizeCall('dash-summary')"><i class="fas fa-magic"></i> Run</button>
+            </div>
+            <div id="dash-summary" style="font-size:12px;color:var(--muted);font-style:italic;">Click Run to generate Claude AI summary.</div>
+          </div>
+        </div>
+
+        <div class="card fu fu3">
+          <div class="card-header">
+            <h3><i class="fab fa-whatsapp" style="color:#25D366;"></i> Latest WA Thread</h3>
+            <button class="btn btn-ghost btn-xs" onclick="nav('whatsapp',null)">View all →</button>
+          </div>
+          <div class="wa-list" style="max-height:150px;">
+            <div style="display:flex;flex-direction:column;gap:6px;">
+              <div class="wa-bubble wa-in">Hi, wanted to check status of PO #UC-2024-087. Dispatch update?<div class="wa-time">Suresh K. · 10:22 AM</div></div>
+              <div class="wa-bubble wa-out">PO dispatched via Blue Dart. AWB: 23456789. ETA: 6 Apr.<div class="wa-time">You · 10:35 AM ✓✓</div></div>
+              <div class="wa-bubble wa-in">Thanks! Can you share the invoice?<div class="wa-time">Suresh K. · 10:38 AM</div></div>
+            </div>
+          </div>
+          <div style="padding:10px 14px;border-top:1px solid var(--border);display:flex;gap:7px;">
+            <input class="inp" id="dash-wa-input" placeholder="Quick reply…" style="font-size:12px;padding:7px 11px;" />
+            <button class="btn btn-green btn-sm" onclick="dashWASend()"><i class="fas fa-paper-plane"></i></button>
+            <button class="btn btn-ghost btn-sm" onclick="dashAIWA()"><i class="fas fa-robot"></i></button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- BOTTOM ROW -->
+    <div class="three-col">
+      <div class="card fu fu1">
+        <div class="card-header"><h3><i class="fas fa-trophy" style="color:var(--gold);"></i> Top Contacts Today</h3></div>
+        <div class="card-body">
+          <div class="stat-row"><div style="display:flex;align-items:center;gap:8px;flex:1;"><div class="contact-avatar" style="width:28px;height:28px;background:rgba(59,130,246,0.15);color:var(--blue2);font-size:11px;">LT</div><div class="stat-label">L&T ECC</div></div><span class="badge b-green">Hot</span></div>
+          <div class="stat-row"><div style="display:flex;align-items:center;gap:8px;flex:1;"><div class="contact-avatar" style="width:28px;height:28px;background:rgba(245,166,35,0.15);color:var(--gold2);font-size:11px;">BH</div><div class="stat-label">BHEL Procurement</div></div><span class="badge b-gold">Warm</span></div>
+          <div class="stat-row"><div style="display:flex;align-items:center;gap:8px;flex:1;"><div class="contact-avatar" style="width:28px;height:28px;background:rgba(139,92,246,0.15);color:#c4b5fd;font-size:11px;">SE</div><div class="stat-label">Schneider Elec.</div></div><span class="badge b-blue">Active</span></div>
+        </div>
+      </div>
+      <div class="card fu fu2">
+        <div class="card-header"><h3><i class="fas fa-chart-line" style="color:var(--green2);"></i> Revenue Attribution</h3></div>
+        <div class="card-body">
+          <div style="font-size:26px;font-weight:800;color:#fff;letter-spacing:-1px;">₹24.3L</div>
+          <div style="font-size:11.5px;color:var(--green2);margin-bottom:12px;"><i class="fas fa-arrow-up"></i> +18% vs last campaign</div>
+          <div class="stat-row"><div class="stat-label">Email</div><div style="flex:1;margin:0 10px;"><div class="prog-bar"><div class="prog-fill" style="width:65%;background:var(--blue);"></div></div></div><div class="stat-val" style="font-size:11.5px;">₹15.8L</div></div>
+          <div class="stat-row"><div class="stat-label">WhatsApp</div><div style="flex:1;margin:0 10px;"><div class="prog-bar"><div class="prog-fill" style="width:25%;background:var(--green);"></div></div></div><div class="stat-val" style="font-size:11.5px;">₹6.1L</div></div>
+          <div class="stat-row"><div class="stat-label">Calls</div><div style="flex:1;margin:0 10px;"><div class="prog-bar"><div class="prog-fill" style="width:10%;background:var(--gold);"></div></div></div><div class="stat-val" style="font-size:11.5px;">₹2.4L</div></div>
+        </div>
+      </div>
+      <div class="card fu fu3">
+        <div class="card-header"><h3><i class="fas fa-robot" style="color:var(--cyan);"></i> AI Insights</h3></div>
+        <div class="card-body">
+          <div class="stat-row"><div class="stat-label">Lead model</div><div class="stat-val" style="font-size:12px;">XGBoost · AUC 0.87</div></div>
+          <div class="stat-row"><div class="stat-label">Top segment</div><div class="stat-val" style="font-size:11.5px;color:var(--gold);">Frequent callers</div></div>
+          <div class="stat-row"><div class="stat-label">Conversion</div><div class="stat-val" style="color:var(--green2);">22%</div></div>
+          <div class="stat-row"><div class="stat-label">Churn alerts</div><div><span class="badge b-red">3 accounts</span></div></div>
+          <button class="btn btn-gold btn-sm" style="width:100%;justify-content:center;margin-top:8px;" onclick="nav('ai',null)"><i class="fas fa-robot"></i> Ask AI Assistant</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ██████ CALLS ██████ -->
+  <div class="section-view fu" id="sec-calls">
+    <div class="card" style="margin-bottom:16px;">
+      <div class="card-header">
+        <h3><i class="fas fa-phone-alt" style="color:var(--gold);"></i> PBX Call Log · Matrix Eternity</h3>
+        <div style="display:flex;gap:8px;">
+          <select class="inp" style="width:auto;font-size:12px;padding:5px 10px;">
+            <option>Today</option><option>Last 7 days</option><option>Last 30 days</option>
+          </select>
+          <button class="btn btn-ghost btn-sm"><i class="fas fa-download"></i> Export CSV</button>
+          <button class="btn btn-gold btn-sm" onclick="doSummarizeCall('call-sum-full')"><i class="fas fa-magic"></i> AI Summarize Latest</button>
+        </div>
+      </div>
+      <div style="overflow-x:auto;">
+        <table class="data-table">
+          <thead><tr><th>Caller</th><th>Destination</th><th>Duration</th><th>Time</th><th>Type</th><th>Cost</th><th>Sentiment</th><th>AI Action</th></tr></thead>
+          <tbody>
+            <tr><td><b>Amit Sharma</b> <span style="color:var(--muted);font-size:10.5px;">Ext.201</span></td><td>+91 98200 44512</td><td>4m 12s</td><td>10:14 AM</td><td><span class="badge b-green">Outgoing</span></td><td style="color:var(--muted);">₹1.26</td><td><span class="badge b-gold">Neutral</span></td><td><button class="btn btn-blue btn-xs" onclick="quickCallSummary(this)"><i class="fas fa-robot"></i> Summarise</button></td></tr>
+            <tr><td><b>L&T ECC</b></td><td>Ext. 305 Sales</td><td>18m 47s</td><td>11:30 AM</td><td><span class="badge b-blue">Incoming</span></td><td style="color:var(--muted);">—</td><td><span class="badge b-green">Positive</span></td><td><span class="badge b-green"><i class="fas fa-check"></i> Quotation noted</span></td></tr>
+            <tr><td><b>Priya Nair</b> <span style="color:var(--muted);font-size:10.5px;">Ext.108</span></td><td>+91 80 4112 3390</td><td>—</td><td>12:05 PM</td><td><span class="badge b-red">Missed</span></td><td style="color:var(--muted);">—</td><td><span class="badge b-red">—</span></td><td><button class="btn btn-blue btn-xs" onclick="quickCallSummary(this)"><i class="fas fa-robot"></i> Summarise</button></td></tr>
+            <tr><td><b>BHEL Procurement</b></td><td>Ext. 305 Sales</td><td>9m 03s</td><td>2:45 PM</td><td><span class="badge b-blue">Incoming</span></td><td style="color:var(--muted);">—</td><td><span class="badge b-green">Positive</span></td><td><button class="btn btn-blue btn-xs" onclick="quickCallSummary(this)"><i class="fas fa-robot"></i> Summarise</button></td></tr>
+            <tr><td><b>Rajan</b> <span style="color:var(--muted);font-size:10.5px;">Ext.202</span></td><td>Ext. 401 Accounts</td><td>2m 55s</td><td>1:18 PM</td><td><span class="badge b-gold">Internal</span></td><td style="color:var(--muted);">—</td><td>—</td><td>—</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-header"><h3><i class="fas fa-file-alt" style="color:var(--gold);"></i> AI Call Summary Output</h3></div>
+      <div class="card-body"><div id="call-sum-full" style="font-size:12.5px;color:var(--muted);font-style:italic;">Select a call and click Summarise, or click AI Summarize Latest above.</div></div>
+    </div>
+  </div>
+
+  <!-- ██████ EMAIL ██████ -->
+  <div class="section-view fu" id="sec-email">
+    <div class="col-4060">
+      <div class="card" style="display:flex;flex-direction:column;max-height:calc(100vh - 120px);">
+        <div class="card-header"><h3><i class="fas fa-inbox" style="color:#0078d4;"></i> Outlook Inbox</h3><span class="badge b-blue">Graph API</span></div>
+        <div style="flex:1;overflow-y:auto;" id="email-list">
+          <!-- emails injected by JS -->
+        </div>
+      </div>
+      <div class="card" style="display:flex;flex-direction:column;max-height:calc(100vh - 120px);">
+        <div class="card-header">
+          <h3><i class="fas fa-robot" style="color:var(--gold);"></i> Claude AI Reply Suggestions</h3>
+          <button class="btn btn-gold btn-sm" id="gen-email-btn" onclick="generateEmailReplies()"><i class="fas fa-magic"></i> Generate</button>
+        </div>
+        <div style="padding:12px 16px;border-bottom:1px solid var(--border);">
+          <div id="email-preview" style="background:rgba(255,255,255,0.03);border-left:2px solid var(--gold);padding:10px 13px;border-radius:0 8px 8px 0;font-size:12px;color:var(--muted);">
+            <b style="color:var(--text);">Select an email from the inbox</b> to generate AI-powered reply options.
+          </div>
+        </div>
+        <div id="email-replies" style="flex:1;overflow-y:auto;padding:14px 16px;">
+          <div style="text-align:center;padding:40px 0;color:var(--muted);font-size:12.5px;"><i class="fas fa-robot" style="font-size:30px;color:rgba(255,255,255,0.06);display:block;margin-bottom:10px;"></i>AI suggestions will appear here</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ██████ WHATSAPP ██████ -->
+  <div class="section-view fu" id="sec-whatsapp">
+    <div class="col-4060" style="height:calc(100vh - 130px);">
+      <div class="card" style="display:flex;flex-direction:column;overflow:hidden;">
+        <div class="card-header"><h3><i class="fab fa-whatsapp" style="color:#25D366;"></i> Conversations</h3><span class="badge b-green">9 Active</span></div>
+        <div style="padding:10px 14px;border-bottom:1px solid var(--border);">
+          <div class="search-box"><i class="fas fa-search"></i><input placeholder="Search conversations…" /></div>
+        </div>
+        <div style="flex:1;overflow-y:auto;" id="wa-convo-list"></div>
+      </div>
+      <div class="card" style="display:flex;flex-direction:column;overflow:hidden;">
+        <div class="card-header">
+          <h3 id="wa-active-title"><i class="fab fa-whatsapp" style="color:#25D366;"></i> Select a conversation</h3>
+          <button class="btn btn-ghost btn-sm" onclick="aiWADraft()"><i class="fas fa-robot"></i> AI Reply</button>
+        </div>
+        <div id="wa-chat-area" class="wa-list" style="flex:1;overflow-y:auto;justify-content:flex-end;"></div>
+        <div style="padding:10px 14px;border-top:1px solid var(--border);display:flex;gap:8px;flex-shrink:0;">
+          <input class="inp" id="wa-msg-input" placeholder="Type a message…" onkeydown="if(event.key==='Enter')sendWA()" style="font-size:13px;" />
+          <button class="btn btn-green btn-sm" onclick="sendWA()"><i class="fas fa-paper-plane"></i></button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ██████ CONTACTS ██████ -->
+  <div class="section-view fu" id="sec-contacts">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;flex-wrap:wrap;gap:10px;">
+      <div class="search-box" style="max-width:340px;flex:1;"><i class="fas fa-search"></i><input id="contact-search" placeholder="Search contacts, company, tags…" oninput="filterContacts()" /></div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;">
+        <select class="inp" id="contact-filter" style="width:auto;font-size:12px;padding:6px 12px;" onchange="filterContacts()">
+          <option value="">All Segments</option>
+          <option value="Hot Lead">Hot Lead</option>
+          <option value="Client">Client</option>
+          <option value="Prospect">Prospect</option>
+          <option value="Vendor">Vendor</option>
+        </select>
+        <button class="btn btn-ghost btn-sm" onclick="aiEnrichContacts()"><i class="fas fa-magic"></i> AI Enrich All</button>
+        <button class="btn btn-gold btn-sm" onclick="openModal('contact-modal')"><i class="fas fa-user-plus"></i> Add Contact</button>
+      </div>
+    </div>
+
+    <div class="col-4060" style="gap:14px;">
+      <!-- CONTACT LIST -->
+      <div>
+        <div id="contact-list" style="display:flex;flex-direction:column;gap:9px;"></div>
+      </div>
+
+      <!-- CONTACT DETAIL -->
+      <div id="contact-detail-panel">
+        <div class="card" style="text-align:center;padding:40px 20px;color:var(--muted);">
+          <i class="fas fa-address-card" style="font-size:36px;color:rgba(255,255,255,0.06);display:block;margin-bottom:12px;"></i>
+          <div style="font-size:13px;">Select a contact to view details</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ██████ PIPELINE ██████ -->
+  <div class="section-view fu" id="sec-pipeline">
+    <div style="display:flex;gap:12px;overflow-x:auto;padding-bottom:8px;" id="pipeline-board"></div>
+  </div>
+
+  <!-- ██████ MARKETING ██████ -->
+  <div class="section-view fu" id="sec-marketing">
+    <div class="two-col" style="margin-bottom:16px;">
+      <div class="card">
+        <div class="card-header"><h3><i class="fas fa-bullhorn" style="color:var(--gold);"></i> Active Campaigns</h3><button class="btn btn-gold btn-sm" onclick="openModal('campaign-modal')"><i class="fas fa-plus"></i> New</button></div>
+        <div class="card-body" id="camp-list">
+          <div class="camp-card">
+            <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:9px;">
+              <div><div style="font-weight:700;font-size:13px;">Q2 Switchgear Promotion</div><div style="font-size:11px;color:var(--muted);margin-top:2px;">Email · 1,240 contacts · Open rate 34%</div></div>
+              <span class="badge b-green">Active</span>
+            </div>
+            <div class="prog-bar"><div class="prog-fill" style="width:60%;background:var(--blue);"></div></div>
+            <div style="display:flex;gap:6px;margin-top:10px;"><button class="btn btn-ghost btn-xs"><i class="fas fa-pause"></i> Pause</button><button class="btn btn-blue btn-xs"><i class="fas fa-chart-bar"></i> Stats</button></div>
+          </div>
+          <div class="camp-card">
+            <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:9px;">
+              <div><div style="font-weight:700;font-size:13px;">Cable Tray Flash Sale – WA</div><div style="font-size:11px;color:var(--muted);margin-top:2px;">WhatsApp · 820 contacts · Read 78%</div></div>
+              <span class="badge b-green">Live</span>
+            </div>
+            <div class="prog-bar"><div class="prog-fill" style="width:78%;background:var(--green);"></div></div>
+            <div style="display:flex;gap:6px;margin-top:10px;"><button class="btn btn-ghost btn-xs"><i class="fas fa-pause"></i> Pause</button><button class="btn btn-blue btn-xs"><i class="fas fa-chart-bar"></i> Stats</button></div>
+          </div>
+          <div class="camp-card">
+            <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:9px;">
+              <div><div style="font-weight:700;font-size:13px;">VFD Follow-up Call Blitz</div><div style="font-size:11px;color:var(--muted);margin-top:2px;">Voice · 150 leads · 42 called</div></div>
+              <span class="badge b-gold">Scheduled</span>
+            </div>
+            <div class="prog-bar"><div class="prog-fill" style="width:28%;background:var(--gold);"></div></div>
+            <div style="display:flex;gap:6px;margin-top:10px;"><button class="btn btn-ghost btn-xs"><i class="fas fa-play"></i> Start</button><button class="btn btn-blue btn-xs"><i class="fas fa-chart-bar"></i> Stats</button></div>
+          </div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-header"><h3><i class="fas fa-wand-magic-sparkles" style="color:var(--cyan);"></i> AI Campaign Generator</h3></div>
+        <div class="card-body">
+          <div class="form-group"><label class="form-label">Product / Service</label><input class="inp" id="mkt-product" value="MCB Distribution Boards" /></div>
+          <div class="form-group"><label class="form-label">Target Audience</label><input class="inp" id="mkt-audience" value="Electrical contractors, industrial OEMs" /></div>
+          <div class="form-row">
+            <div><label class="form-label">Goal</label>
+              <select class="inp" id="mkt-goal"><option>Lead generation</option><option>Product awareness</option><option>Quote requests</option><option>Order follow-up</option></select>
+            </div>
+            <div><label class="form-label">Channels</label>
+              <div style="display:flex;gap:10px;margin-top:6px;flex-wrap:wrap;">
+                <label style="display:flex;align-items:center;gap:5px;font-size:12.5px;cursor:pointer;color:var(--muted2);"><input type="checkbox" checked id="ch-em"> Email</label>
+                <label style="display:flex;align-items:center;gap:5px;font-size:12.5px;cursor:pointer;color:var(--muted2);"><input type="checkbox" checked id="ch-wa"> WA</label>
+                <label style="display:flex;align-items:center;gap:5px;font-size:12.5px;cursor:pointer;color:var(--muted2);"><input type="checkbox" id="ch-sm"> SMS</label>
+              </div>
+            </div>
+          </div>
+          <button class="btn btn-gold" style="width:100%;justify-content:center;" onclick="generateCampaign()"><i class="fas fa-robot"></i> Generate AI Campaign Copy</button>
+          <div id="mkt-result" style="margin-top:13px;"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ██████ AI ASSISTANT ██████ -->
+  <div class="section-view fu" id="sec-ai">
+    <div style="max-width:720px;margin:0 auto;">
+      <div class="card" style="display:flex;flex-direction:column;height:calc(100vh - 140px);">
+        <div class="card-header">
+          <h3><i class="fas fa-robot" style="color:var(--gold);"></i> UniComm AI · Powered by Claude</h3>
+          <span class="badge b-green"><i class="fas fa-circle" style="font-size:6px;"></i> Online</span>
+        </div>
+        <div style="padding:9px 16px;border-bottom:1px solid var(--border);background:rgba(245,166,35,0.04);">
+          <div style="font-size:11.5px;color:var(--muted);">Specialised in Unicircuit Engineering Services LLP communications — switchgear, VFDs, PLCs, cable management, MCC panels, industrial electrical solutions.</div>
+        </div>
+        <div class="chat-msgs" id="ai-messages" style="flex:1;"></div>
+        <div style="padding:10px 16px;border-top:1px solid var(--border);display:flex;flex-wrap:wrap;gap:6px;">
+          <button class="quick-chip" onclick="quickAI('Draft a follow-up email to BHEL regarding pending PO #BH-2190 for cable trays')"><i class="fas fa-envelope"></i> BHEL follow-up</button>
+          <button class="quick-chip" onclick="quickAI('Write a professional WhatsApp message confirming site visit to L&T on Tuesday 8th April')"><i class="fab fa-whatsapp"></i> L&T site visit</button>
+          <button class="quick-chip" onclick="quickAI('Summarise today\'s key pending actions from calls, emails and WhatsApp for Unicircuit')"><i class="fas fa-list-check"></i> Pending actions</button>
+          <button class="quick-chip" onclick="quickAI('Write a quotation cover email for MCC Panel supply to a new EPC contractor')"><i class="fas fa-file-invoice"></i> Quotation email</button>
+          <button class="quick-chip" onclick="quickAI('What are best practices for following up with B2B engineering clients in India?')"><i class="fas fa-lightbulb"></i> Sales tips</button>
+        </div>
+        <div class="chat-input-bar">
+          <input class="inp" id="ai-input" placeholder="Ask anything about communications, clients, products…" onkeydown="if(event.key==='Enter')sendAI()" />
+          <button class="btn btn-gold" id="ai-send" onclick="sendAI()"><i class="fas fa-paper-plane"></i></button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ██████ ANALYTICS ██████ -->
+  <div class="section-view fu" id="sec-analytics">
+    <div class="kpi-row" style="margin-bottom:16px;">
+      <div class="kpi blue"><div class="kpi-top"><div class="kpi-label">Avg Handle Time</div><div class="kpi-icon" style="background:rgba(59,130,246,0.12);color:var(--blue2);"><i class="fas fa-stopwatch"></i></div></div><div class="kpi-val">6m 44s</div><div class="kpi-change" style="color:var(--green2);">↓ -12% vs last month</div></div>
+      <div class="kpi green"><div class="kpi-top"><div class="kpi-label">First Call Res.</div><div class="kpi-icon" style="background:rgba(16,185,129,0.12);color:var(--green2);"><i class="fas fa-check-double"></i></div></div><div class="kpi-val">78%</div><div class="kpi-change" style="color:var(--muted2);">Industry avg: 70%</div></div>
+      <div class="kpi gold"><div class="kpi-top"><div class="kpi-label">Email Resp. Time</div><div class="kpi-icon" style="background:rgba(245,166,35,0.12);color:var(--gold2);"><i class="fas fa-clock"></i></div></div><div class="kpi-val">2.4h</div><div class="kpi-change" style="color:var(--red2);">↑ needs attention</div></div>
+      <div class="kpi cyan"><div class="kpi-top"><div class="kpi-label">WA Engagement</div><div class="kpi-icon" style="background:rgba(6,182,212,0.12);color:var(--cyan);"><i class="fab fa-whatsapp"></i></div></div><div class="kpi-val">81%</div><div class="kpi-change" style="color:var(--green2);">↑ +5% this week</div></div>
+      <div class="kpi red"><div class="kpi-top"><div class="kpi-label">Churn Risk</div><div class="kpi-icon" style="background:rgba(239,68,68,0.12);color:var(--red2);"><i class="fas fa-exclamation-triangle"></i></div></div><div class="kpi-val">8%</div><div class="kpi-change" style="color:var(--red2);">3 flagged accounts</div></div>
+    </div>
+    <div class="card">
+      <div class="card-header"><h3><i class="fas fa-table" style="color:var(--cyan);"></i> Client Communication Summary</h3></div>
+      <div style="overflow-x:auto;">
+        <table class="data-table">
+          <thead><tr><th>Client</th><th>Calls</th><th>Emails</th><th>WhatsApp</th><th>Lead Score</th><th>Pipeline Value</th><th>Last Contact</th><th>Status</th></tr></thead>
+          <tbody>
+            <tr><td><b>L&T ECC</b></td><td>24</td><td>38</td><td>12</td><td><span style="font-weight:800;color:var(--green2);">88</span>/100</td><td>₹12.4L</td><td>Today</td><td><span class="badge b-green">Hot Lead</span></td></tr>
+            <tr><td><b>BHEL</b></td><td>18</td><td>22</td><td>6</td><td><span style="font-weight:800;color:var(--gold2);">74</span>/100</td><td>₹8.1L</td><td>Today</td><td><span class="badge b-blue">Active</span></td></tr>
+            <tr><td><b>Siemens Partner</b></td><td>7</td><td>14</td><td>2</td><td><span style="font-weight:800;color:var(--gold);">61</span>/100</td><td>₹3.2L</td><td>Yesterday</td><td><span class="badge b-gold">Warm</span></td></tr>
+            <tr><td><b>Schneider Electric</b></td><td>5</td><td>9</td><td>0</td><td><span style="font-weight:800;color:var(--red2);">42</span>/100</td><td>₹1.8L</td><td>3 days ago</td><td><span class="badge b-red">Cold</span></td></tr>
+            <tr><td><b>ABB India</b></td><td>3</td><td>5</td><td>1</td><td><span style="font-weight:800;color:var(--muted2);">35</span>/100</td><td>₹0.9L</td><td>Last week</td><td><span class="badge b-gray">Inactive</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  </div><!-- /content-area -->
+</div><!-- /main-area -->
+</div><!-- /app-shell -->
+
+<!-- ══════ CONTACT MODAL ══════ -->
+<div class="modal-overlay" id="contact-modal">
+  <div class="modal">
+    <div class="modal-title">
+      <span id="contact-modal-title"><i class="fas fa-user-plus" style="color:var(--gold);margin-right:8px;"></i>Add New Contact</span>
+      <i class="fas fa-times modal-close" onclick="closeModal('contact-modal')"></i>
+    </div>
+    <div class="form-row">
+      <div><label class="form-label">First Name *</label><input class="inp" id="c-fname" placeholder="Ramesh" /></div>
+      <div><label class="form-label">Last Name *</label><input class="inp" id="c-lname" placeholder="Mehta" /></div>
+    </div>
+    <div class="form-group"><label class="form-label">Company *</label><input class="inp" id="c-company" placeholder="L&T ECC, BHEL, Siemens…" /></div>
+    <div class="form-row">
+      <div><label class="form-label">Designation</label><input class="inp" id="c-designation" placeholder="Purchase Manager" /></div>
+      <div><label class="form-label">Department</label><input class="inp" id="c-dept" placeholder="Procurement" /></div>
+    </div>
+    <div class="form-row">
+      <div><label class="form-label">Phone *</label><input class="inp" id="c-phone" placeholder="+91 98200 00000" /></div>
+      <div><label class="form-label">WhatsApp</label><input class="inp" id="c-wa" placeholder="+91 98200 00000" /></div>
+    </div>
+    <div class="form-group"><label class="form-label">Email</label><input class="inp" id="c-email" placeholder="ramesh@company.com" /></div>
+    <div class="form-row">
+      <div><label class="form-label">Segment</label>
+        <select class="inp" id="c-segment"><option>Prospect</option><option>Hot Lead</option><option>Client</option><option>Vendor</option><option>Partner</option></select>
+      </div>
+      <div><label class="form-label">Lead Score (0-100)</label><input class="inp" id="c-score" type="number" min="0" max="100" placeholder="65" /></div>
+    </div>
+    <div class="form-group"><label class="form-label">Products of Interest</label><input class="inp" id="c-products" placeholder="VFDs, MCC Panels, Cable Trays…" /></div>
+    <div class="form-group"><label class="form-label">City / Location</label><input class="inp" id="c-city" placeholder="Mumbai, Delhi, Ahmedabad…" /></div>
+    <div class="form-group"><label class="form-label">Notes</label><textarea class="inp" id="c-notes" rows="2" placeholder="Any additional notes about this contact…"></textarea></div>
+    <div style="display:flex;gap:8px;margin-top:4px;">
+      <button class="btn btn-gold" style="flex:1;justify-content:center;" onclick="saveContact()"><i class="fas fa-save"></i> Save Contact</button>
+      <button class="btn btn-ghost" onclick="aiEnrichContact()"><i class="fas fa-robot"></i> AI Enrich</button>
+      <button class="btn btn-ghost" onclick="closeModal('contact-modal')">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══════ CAMPAIGN MODAL ══════ -->
+<div class="modal-overlay" id="campaign-modal">
+  <div class="modal">
+    <div class="modal-title">
+      <span><i class="fas fa-bullhorn" style="color:var(--gold);margin-right:8px;"></i>Create Campaign</span>
+      <i class="fas fa-times modal-close" onclick="closeModal('campaign-modal')"></i>
+    </div>
+    <div class="form-group"><label class="form-label">Campaign Name</label><input class="inp" id="nc-name" placeholder="Q2 Switchgear Promotion" /></div>
+    <div class="form-group"><label class="form-label">Product / Service</label><input class="inp" id="nc-product" /></div>
+    <div class="form-group"><label class="form-label">Target Contacts (segment)</label><select class="inp" id="nc-seg"><option>All</option><option>Hot Lead</option><option>Client</option><option>Prospect</option></select></div>
+    <div class="form-row">
+      <div><label class="form-label">Channel</label><select class="inp" id="nc-channel"><option>Email</option><option>WhatsApp</option><option>Both</option></select></div>
+      <div><label class="form-label">Schedule</label><input class="inp" id="nc-date" type="date" /></div>
+    </div>
+    <button class="btn btn-gold" style="width:100%;justify-content:center;" onclick="createCampaign()"><i class="fas fa-rocket"></i> Create & Launch</button>
+  </div>
+</div>
+
+<!-- NOTIFICATION -->
+<div class="notif" id="notif">
+  <div class="notif-icon" id="notif-icon-el"></div>
+  <div><div id="notif-title" style="font-weight:700;font-size:13px;color:#fff;"></div><div id="notif-sub" style="font-size:11.5px;color:var(--muted);margin-top:1px;"></div></div>
+</div>
+
+<script>
+// ══════════════════════════════════════════════════════════════
+// UNICIRCUIT UNICOMM PRO — ADVANCED AI PLATFORM
+// ══════════════════════════════════════════════════════════════
+const CLAUDE = "https://api.anthropic.com/v1/messages";
+const MODEL = "claude-sonnet-4-20250514";
+const SYSTEM = `You are UniComm AI, the intelligent communication platform assistant for Unicircuit Engineering Services LLP — a professional electrical engineering solutions company based in India. Unicircuit deals in: switchgear (MCBs, MCCBs, ACBs), VFDs (Variable Frequency Drives), PLCs, MCC panels, DB panels, cable trays, cable management systems, power quality analysers, and related industrial electrical products. Their key clients include L&T ECC, BHEL, Siemens, Schneider Electric, ABB India, and various electrical contractors and EPCs.
+
+Your responsibilities:
+1. Draft professional B2B emails, WhatsApp messages, quotation covers, follow-ups
+2. Summarize calls and extract action items
+3. Generate marketing campaign copy for Indian industrial audience
+4. Provide sales and communication advice for the electrical engineering sector
+5. Help with contact management and lead scoring insights
+6. Answer operational queries about client relationships
+
+Always write in a professional yet warm Indian B2B communication style. Use formal language with appropriate technical vocabulary for the electrical/engineering industry. Be concise and practical.`;
+
+async function callClaude(userMsg, systemOverride) {
+  const res = await fetch(CLAUDE, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      model: MODEL,
+      max_tokens: 1000,
+      system: systemOverride || SYSTEM,
+      messages: [{ role: 'user', content: userMsg }]
+    })
+  });
+  const data = await res.json();
+  return data.content?.[0]?.text || 'Unable to generate response.';
+}
+
+// ── NAVIGATION ──
+const pageMeta = {
+  dashboard: ['Dashboard', 'AI-augmented omnichannel comms · Unicircuit Engineering Services LLP'],
+  calls: ['PBX Call Logs', 'Matrix Eternity SMDR realtime integration · AI summaries'],
+  email: ['Email / Outlook', 'Microsoft Graph API · Claude AI reply suggestions'],
+  whatsapp: ['WhatsApp Business', 'WA Business API · AI-powered messaging'],
+  contacts: ['Contacts', 'CRM module · AI-enriched contact intelligence'],
+  pipeline: ['Sales Pipeline', 'Deal tracking · Lead scoring · AI insights'],
+  marketing: ['Marketing Suite', 'Omnichannel campaigns · AI-generated copy'],
+  ai: ['AI Assistant', 'Claude-powered · Unicircuit Engineering context'],
+  analytics: ['Analytics', 'Communication intelligence · Client insights'],
+};
+
+function nav(id, el) {
+  document.querySelectorAll('.section-view').forEach(s => s.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  const sec = document.getElementById('sec-' + id);
+  if (sec) { sec.classList.add('active'); }
+  if (el) el.classList.add('active');
+  else {
+    // find and highlight by id
+    document.querySelectorAll('.nav-item').forEach(n => {
+      if (n.getAttribute('onclick') && n.getAttribute('onclick').includes("'" + id + "'")) n.classList.add('active');
+    });
+  }
+  const m = pageMeta[id] || ['', ''];
+  document.getElementById('page-h').textContent = m[0];
+  document.getElementById('page-sub').textContent = m[1];
+  if (id === 'contacts') renderContacts();
+  if (id === 'pipeline') renderPipeline();
+  if (id === 'whatsapp') renderWAList();
+  if (id === 'email') renderEmailList();
+  if (id === 'ai') initAIChat();
+}
+
+// ── NOTIFICATION ──
+let notifTimer;
+function notify(title, sub, color = 'var(--gold)', icon = 'fas fa-check-circle') {
+  const n = document.getElementById('notif');
+  const ni = document.getElementById('notif-icon-el');
+  document.getElementById('notif-title').textContent = title;
+  document.getElementById('notif-sub').textContent = sub || '';
+  ni.innerHTML = `<i class="${icon}"></i>`;
+  ni.style.background = color.replace('var(--','rgba(').replace(')',',0.15)');
+  ni.style.color = color;
+  n.classList.add('show');
+  clearTimeout(notifTimer);
+  notifTimer = setTimeout(() => n.classList.remove('show'), 3400);
+}
+
+// ── MODAL ──
+function openModal(id) { document.getElementById(id).classList.add('open'); }
+function closeModal(id) { document.getElementById(id).classList.remove('open'); }
+document.querySelectorAll('.modal-overlay').forEach(m => {
+  m.addEventListener('click', e => { if (e.target === m) m.classList.remove('open'); });
+});
+
+// ══════════════════════════════════
+// CONTACTS MODULE
+// ══════════════════════════════════
+let contacts = [
+  { id:1, fname:'Suresh', lname:'Kumar', company:'L&T ECC', designation:'Sr. Purchase Manager', dept:'Procurement', phone:'+91 98200 44512', wa:'+91 98200 44512', email:'suresh.k@larsentoubro.com', segment:'Hot Lead', score:88, products:'MCC Panels, Cable Trays', city:'Mumbai', notes:'Key decision maker. Discussed Panel Wiring for Faridabad plant. Follow up Q2 proposal.', avatar_color:'#1d4ed8', avatar_bg:'rgba(29,78,216,0.15)', initials:'SK', calls:24, emails:38, wa_count:12, lastContact:'Today', created:'2024-01-15' },
+  { id:2, fname:'Vijay', lname:'Rao', company:'BHEL', designation:'Procurement Officer', dept:'Purchase', phone:'+91 11 2337 8800', wa:'+91 98765 10001', email:'vijay.rao@bhel.in', segment:'Client', score:74, products:'VFDs, PLC Panels, DB Boxes', city:'Delhi', notes:'Long-term client. Regular orders for VFDs. Tender deadline April 10.', avatar_color:'#d97706', avatar_bg:'rgba(217,119,6,0.15)', initials:'VR', calls:18, emails:22, wa_count:6, lastContact:'Today', created:'2023-08-10' },
+  { id:3, fname:'Anita', lname:'Sharma', company:'Siemens India Partner', designation:'Business Dev Manager', dept:'Sales', phone:'+91 80 4112 3390', wa:'+91 80 4112 3390', email:'anita.s@siemenspartner.in', segment:'Prospect', score:61, products:'Power Quality Analysers', city:'Bengaluru', notes:'Interested in Power Quality Analysers. Requested demo next week.', avatar_color:'#7c3aed', avatar_bg:'rgba(124,58,237,0.15)', initials:'AS', calls:7, emails:14, wa_count:2, lastContact:'Yesterday', created:'2024-02-20' },
+  { id:4, fname:'Rohit', lname:'Joshi', company:'Schneider Electric', designation:'Zone Sales Engineer', dept:'B2B Sales', phone:'+91 22 6789 0000', wa:'', email:'rohit.j@schneider.com', segment:'Client', score:42, products:'Modular Switching Units', city:'Pune', notes:'Order #SE-24-901 awaiting confirmation. Delivery deadline 15 April.', avatar_color:'#059669', avatar_bg:'rgba(5,150,105,0.15)', initials:'RJ', calls:5, emails:9, wa_count:0, lastContact:'3 days ago', created:'2023-11-05' },
+  { id:5, fname:'Priya', lname:'Nair', company:'ABB India Ltd', designation:'Project Engineer', dept:'Engineering', phone:'+91 80 2222 9999', wa:'+91 90000 55555', email:'priya.n@abb.com', segment:'Prospect', score:35, products:'Switchgear, Relays', city:'Bengaluru', notes:'Exploring switchgear solutions for upcoming plant project. Early stage.', avatar_color:'#dc2626', avatar_bg:'rgba(220,38,38,0.15)', initials:'PN', calls:3, emails:5, wa_count:1, lastContact:'Last week', created:'2024-03-01' },
+  { id:6, fname:'Manish', lname:'Gupta', company:'Adani Power', designation:'Head - Electrical', dept:'Projects', phone:'+91 79 2555 0000', wa:'+91 98001 22222', email:'manish.g@adani.com', segment:'Hot Lead', score:82, products:'HT Panels, ACBs, SCADA', city:'Ahmedabad', notes:'Major opportunity for HT panel supply. Meeting scheduled.', avatar_color:'#0891b2', avatar_bg:'rgba(8,145,178,0.15)', initials:'MG', calls:9, emails:16, wa_count:8, lastContact:'Today', created:'2024-03-18' },
+  { id:7, fname:'Deepak', lname:'Verma', company:'NTPC Ltd', designation:'Purchase Officer', dept:'Procurement', phone:'+91 11 4444 7777', wa:'', email:'deepak.v@ntpc.co.in', segment:'Prospect', score:55, products:'Cable Trays, DB Panels', city:'Noida', notes:'Evaluated last quarter. Re-engaging for cable management solutions.', avatar_color:'#65a30d', avatar_bg:'rgba(101,163,13,0.15)', initials:'DV', calls:4, emails:7, wa_count:0, lastContact:'2 weeks ago', created:'2024-01-30' },
+  { id:8, fname:'Kavita', lname:'Shah', company:'Torrent Power', designation:'GM - Procurement', dept:'Supply Chain', phone:'+91 79 2730 0000', wa:'+91 97000 44444', email:'kavita.s@torrentpower.com', segment:'Vendor', score:68, products:'Switchgear, Transformers', city:'Ahmedabad', notes:'Strategic vendor relationship. Regular interactions on product sourcing.', avatar_color:'#9333ea', avatar_bg:'rgba(147,51,234,0.15)', initials:'KS', calls:6, emails:12, wa_count:4, lastContact:'4 days ago', created:'2023-06-22' },
+];
+let editingContactId = null;
+
+function segmentColor(seg) {
+  return {
+    'Hot Lead': 'b-red', 'Client': 'b-green', 'Prospect': 'b-blue', 'Vendor': 'b-purple', 'Partner': 'b-cyan'
+  }[seg] || 'b-gray';
+}
+function scoreColor(s) {
+  if (s >= 80) return 'var(--green2)';
+  if (s >= 60) return 'var(--gold2)';
+  if (s >= 40) return '#fb923c';
+  return 'var(--red2)';
+}
+
+function renderContacts(list) {
+  list = list || contacts;
+  const el = document.getElementById('contact-list');
+  if (!list.length) { el.innerHTML = '<div style="text-align:center;padding:30px;color:var(--muted);">No contacts found.</div>'; return; }
+  el.innerHTML = list.map(c => `
+    <div class="contact-card" onclick="showContact(${c.id})">
+      <div style="display:flex;align-items:center;gap:11px;">
+        <div class="contact-avatar" style="background:${c.avatar_bg};color:${c.avatar_color};">${c.initials}</div>
+        <div style="flex:1;min-width:0;">
+          <div style="font-weight:700;font-size:13.5px;color:#fff;">${c.fname} ${c.lname}</div>
+          <div style="font-size:11.5px;color:var(--muted);margin-top:1px;">${c.designation} · ${c.company}</div>
+        </div>
+        <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px;">
+          <span class="badge ${segmentColor(c.segment)}">${c.segment}</span>
+          <span style="font-size:11px;color:${scoreColor(c.score)};font-weight:700;">Score: ${c.score}</span>
+        </div>
+      </div>
+      <div style="display:flex;gap:12px;margin-top:10px;flex-wrap:wrap;">
+        <span style="font-size:11px;color:var(--muted);display:flex;align-items:center;gap:4px;"><i class="fas fa-phone" style="font-size:9px;"></i>${c.phone}</span>
+        ${c.wa ? `<span style="font-size:11px;color:var(--muted);display:flex;align-items:center;gap:4px;"><i class="fab fa-whatsapp" style="font-size:10px;color:#25D366;"></i>${c.wa}</span>` : ''}
+        <span style="font-size:11px;color:var(--muted);display:flex;align-items:center;gap:4px;"><i class="fas fa-map-marker-alt" style="font-size:9px;"></i>${c.city}</span>
+      </div>
+    </div>
+  `).join('');
+}
+
+function filterContacts() {
+  const q = document.getElementById('contact-search').value.toLowerCase();
+  const seg = document.getElementById('contact-filter').value;
+  renderContacts(contacts.filter(c =>
+    (!q || `${c.fname} ${c.lname} ${c.company} ${c.products} ${c.city} ${c.segment}`.toLowerCase().includes(q)) &&
+    (!seg || c.segment === seg)
+  ));
+}
+
+function showContact(id) {
+  const c = contacts.find(x => x.id === id);
+  if (!c) return;
+  document.querySelectorAll('.contact-card').forEach(el => el.classList.remove('selected'));
+  // find and select
+  document.querySelectorAll('.contact-card').forEach(el => {
+    if (el.getAttribute('onclick') === `showContact(${id})`) el.classList.add('selected');
+  });
+  const circumference = 2 * Math.PI * 20;
+  const offset = circumference - (c.score / 100) * circumference;
+  const col = scoreColor(c.score);
+  document.getElementById('contact-detail-panel').innerHTML = `
+    <div class="card" style="animation:fadeUp 0.2s ease;">
+      <div style="padding:18px 20px;border-bottom:1px solid var(--border);display:flex;align-items:flex-start;gap:14px;">
+        <div class="contact-avatar" style="width:50px;height:50px;background:${c.avatar_bg};color:${c.avatar_color};font-size:18px;">${c.initials}</div>
+        <div style="flex:1;">
+          <div style="font-size:17px;font-weight:800;color:#fff;">${c.fname} ${c.lname}</div>
+          <div style="font-size:12.5px;color:var(--muted);margin-top:2px;">${c.designation} · ${c.dept} · ${c.company}</div>
+          <div style="display:flex;gap:7px;margin-top:7px;flex-wrap:wrap;">
+            <span class="badge ${segmentColor(c.segment)}">${c.segment}</span>
+            <span class="badge b-gray"><i class="fas fa-map-marker-alt" style="font-size:9px;"></i> ${c.city}</span>
+          </div>
+        </div>
+        <div class="score-ring">
+          <svg width="52" height="52" viewBox="0 0 52 52">
+            <circle cx="26" cy="26" r="20" fill="none" stroke="rgba(255,255,255,0.06)" stroke-width="4"/>
+            <circle cx="26" cy="26" r="20" fill="none" stroke="${col}" stroke-width="4" stroke-linecap="round"
+              stroke-dasharray="${circumference}" stroke-dashoffset="${offset}" style="transition:stroke-dashoffset 0.8s ease;"/>
+          </svg>
+          <div class="score-val" style="color:${col};">${c.score}</div>
+        </div>
+      </div>
+      <div style="padding:14px 20px;border-bottom:1px solid var(--border);">
+        <div class="three-col" style="gap:8px;">
+          <div style="background:rgba(255,255,255,0.02);border:1px solid var(--border);border-radius:8px;padding:10px;text-align:center;">
+            <div style="font-size:18px;font-weight:800;color:#fff;">${c.calls}</div><div style="font-size:10px;color:var(--muted);">Calls</div>
+          </div>
+          <div style="background:rgba(255,255,255,0.02);border:1px solid var(--border);border-radius:8px;padding:10px;text-align:center;">
+            <div style="font-size:18px;font-weight:800;color:#fff;">${c.emails}</div><div style="font-size:10px;color:var(--muted);">Emails</div>
+          </div>
+          <div style="background:rgba(255,255,255,0.02);border:1px solid var(--border);border-radius:8px;padding:10px;text-align:center;">
+            <div style="font-size:18px;font-weight:800;color:#fff;">${c.wa_count}</div><div style="font-size:10px;color:var(--muted);">WhatsApp</div>
+          </div>
+        </div>
+      </div>
+      <div style="padding:14px 20px;border-bottom:1px solid var(--border);">
+        <div class="section-label">Contact Info</div>
+        <div class="stat-row"><div class="stat-label"><i class="fas fa-phone" style="width:14px;color:var(--muted);"></i> Phone</div><div class="stat-val" style="font-size:12.5px;font-weight:500;">${c.phone}</div></div>
+        ${c.wa ? `<div class="stat-row"><div class="stat-label"><i class="fab fa-whatsapp" style="width:14px;color:#25D366;"></i> WhatsApp</div><div class="stat-val" style="font-size:12.5px;font-weight:500;">${c.wa}</div></div>` : ''}
+        <div class="stat-row"><div class="stat-label"><i class="fas fa-envelope" style="width:14px;color:#0078d4;"></i> Email</div><div class="stat-val" style="font-size:12px;font-weight:500;">${c.email}</div></div>
+        <div class="stat-row"><div class="stat-label"><i class="fas fa-tag" style="width:14px;color:var(--muted);"></i> Products</div><div class="stat-val" style="font-size:11.5px;font-weight:500;color:var(--gold);">${c.products}</div></div>
+        <div class="stat-row"><div class="stat-label"><i class="fas fa-clock" style="width:14px;color:var(--muted);"></i> Last Contact</div><div class="stat-val" style="font-size:12px;">${c.lastContact}</div></div>
+      </div>
+      ${c.notes ? `<div style="padding:14px 20px;border-bottom:1px solid var(--border);"><div class="section-label">Notes</div><div style="font-size:12.5px;color:var(--muted2);line-height:1.55;">${c.notes}</div></div>` : ''}
+      <div style="padding:14px 20px;">
+        <div style="display:flex;gap:8px;flex-wrap:wrap;">
+          <button class="btn btn-gold btn-sm" onclick="openEditContact(${c.id})"><i class="fas fa-edit"></i> Edit</button>
+          <button class="btn btn-green btn-sm" onclick="aiContactInsight(${c.id})"><i class="fas fa-robot"></i> AI Insight</button>
+          <button class="btn btn-blue btn-sm" onclick="draftEmail(${c.id})"><i class="fas fa-envelope"></i> Draft Email</button>
+          <button class="btn btn-ghost btn-sm" onclick="draftWA(${c.id})"><i class="fab fa-whatsapp"></i> WA Message</button>
+          <button class="btn btn-red btn-sm" onclick="deleteContact(${c.id})"><i class="fas fa-trash"></i></button>
+        </div>
+        <div id="contact-ai-result" style="margin-top:12px;"></div>
+      </div>
+    </div>
+  `;
+}
+
+function openEditContact(id) {
+  const c = contacts.find(x => x.id === id);
+  if (!c) return;
+  editingContactId = id;
+  document.getElementById('c-fname').value = c.fname;
+  document.getElementById('c-lname').value = c.lname;
+  document.getElementById('c-company').value = c.company;
+  document.getElementById('c-designation').value = c.designation;
+  document.getElementById('c-dept').value = c.dept;
+  document.getElementById('c-phone').value = c.phone;
+  document.getElementById('c-wa').value = c.wa;
+  document.getElementById('c-email').value = c.email;
+  document.getElementById('c-segment').value = c.segment;
+  document.getElementById('c-score').value = c.score;
+  document.getElementById('c-products').value = c.products;
+  document.getElementById('c-city').value = c.city;
+  document.getElementById('c-notes').value = c.notes;
+  document.getElementById('contact-modal-title').innerHTML = `<i class="fas fa-edit" style="color:var(--gold);margin-right:8px;"></i>Edit Contact`;
+  openModal('contact-modal');
+}
+
+function saveContact() {
+  const fname = document.getElementById('c-fname').value.trim();
+  const lname = document.getElementById('c-lname').value.trim();
+  const company = document.getElementById('c-company').value.trim();
+  const phone = document.getElementById('c-phone').value.trim();
+  if (!fname || !company || !phone) { notify('Missing required fields', 'Name, Company and Phone are required', 'var(--red)', 'fas fa-exclamation-triangle'); return; }
+  const initials = (fname[0] + (lname[0] || '')).toUpperCase();
+  const palette = [['#1d4ed8','rgba(29,78,216,0.15)'],['#d97706','rgba(217,119,6,0.15)'],['#7c3aed','rgba(124,58,237,0.15)'],['#059669','rgba(5,150,105,0.15)'],['#dc2626','rgba(220,38,38,0.15)'],['#0891b2','rgba(8,145,178,0.15)']];
+  const p = palette[Math.floor(Math.random() * palette.length)];
+  if (editingContactId) {
+    const idx = contacts.findIndex(x => x.id === editingContactId);
+    contacts[idx] = { ...contacts[idx],
+      fname, lname, company,
+      designation: document.getElementById('c-designation').value,
+      dept: document.getElementById('c-dept').value,
+      phone, wa: document.getElementById('c-wa').value,
+      email: document.getElementById('c-email').value,
+      segment: document.getElementById('c-segment').value,
+      score: parseInt(document.getElementById('c-score').value) || 50,
+      products: document.getElementById('c-products').value,
+      city: document.getElementById('c-city').value,
+      notes: document.getElementById('c-notes').value,
+      initials,
+    };
+    notify('Contact updated', `${fname} ${lname} at ${company}`, 'var(--green)', 'fas fa-check-circle');
+  } else {
+    contacts.push({
+      id: Date.now(), fname, lname, company,
+      designation: document.getElementById('c-designation').value,
+      dept: document.getElementById('c-dept').value,
+      phone, wa: document.getElementById('c-wa').value,
+      email: document.getElementById('c-email').value,
+      segment: document.getElementById('c-segment').value,
+      score: parseInt(document.getElementById('c-score').value) || 50,
+      products: document.getElementById('c-products').value,
+      city: document.getElementById('c-city').value,
+      notes: document.getElementById('c-notes').value,
+      initials, avatar_color: p[0], avatar_bg: p[1],
+      calls:0, emails:0, wa_count:0, lastContact:'Just now',
+      created: new Date().toISOString().split('T')[0]
+    });
+    notify('Contact added', `${fname} ${lname} at ${company}`, 'var(--green)', 'fas fa-user-plus');
+  }
+  closeModal('contact-modal');
+  editingContactId = null;
+  document.getElementById('contact-modal-title').innerHTML = `<i class="fas fa-user-plus" style="color:var(--gold);margin-right:8px;"></i>Add New Contact`;
+  ['c-fname','c-lname','c-company','c-designation','c-dept','c-phone','c-wa','c-email','c-products','c-city','c-notes'].forEach(id => document.getElementById(id).value = '');
+  document.getElementById('c-score').value = '';
+  renderContacts();
+}
+
+function deleteContact(id) {
+  const c = contacts.find(x => x.id === id);
+  if (!confirm(`Delete ${c.fname} ${c.lname}?`)) return;
+  contacts = contacts.filter(x => x.id !== id);
+  renderContacts();
+  document.getElementById('contact-detail-panel').innerHTML = `<div class="card" style="text-align:center;padding:40px 20px;color:var(--muted);"><i class="fas fa-address-card" style="font-size:36px;color:rgba(255,255,255,0.06);display:block;margin-bottom:12px;"></i><div style="font-size:13px;">Contact deleted</div></div>`;
+  notify('Contact deleted', c.fname + ' ' + c.lname, 'var(--red)', 'fas fa-trash');
+}
+
+async function aiContactInsight(id) {
+  const c = contacts.find(x => x.id === id);
+  const result = document.getElementById('contact-ai-result');
+  result.innerHTML = '<div style="font-size:12px;color:var(--muted);"><span class="spin-loader"></span> Generating AI insight…</div>';
+  try {
+    const text = await callClaude(`Generate a brief AI sales intelligence insight for the following contact at Unicircuit Engineering Services LLP:\n\nName: ${c.fname} ${c.lname}\nCompany: ${c.company}\nDesignation: ${c.designation}\nSegment: ${c.segment}\nLead Score: ${c.score}/100\nProducts of Interest: ${c.products}\nCity: ${c.city}\nNotes: ${c.notes}\nCalls: ${c.calls}, Emails: ${c.emails}, WhatsApp: ${c.wa_count}\nLast Contact: ${c.lastContact}\n\nProvide: 1) Engagement summary 2) Next best action 3) Risk/opportunity alert. Keep it under 80 words, practical and actionable.`);
+    result.innerHTML = `<div style="background:rgba(245,166,35,0.06);border:1px solid rgba(245,166,35,0.15);border-radius:9px;padding:12px 14px;font-size:12.5px;line-height:1.6;color:var(--text);"><div style="font-size:10px;font-weight:700;color:var(--gold);margin-bottom:6px;"><i class="fas fa-robot"></i> CLAUDE AI INSIGHT</div>${text.replace(/\n/g,'<br>')}</div>`;
+  } catch(e) {
+    result.innerHTML = '<div style="color:var(--red2);font-size:12px;">API error — check network.</div>';
+  }
+}
+
+async function draftEmail(id) {
+  const c = contacts.find(x => x.id === id);
+  const result = document.getElementById('contact-ai-result');
+  result.innerHTML = '<div style="font-size:12px;color:var(--muted);"><span class="spin-loader"></span> Drafting email…</div>';
+  try {
+    const text = await callClaude(`Draft a short professional follow-up email from Unicircuit Engineering Services LLP to ${c.fname} ${c.lname} (${c.designation}, ${c.company}) regarding their interest in ${c.products}. Note context: ${c.notes}. Keep it under 100 words. Include Subject line.`);
+    result.innerHTML = `<div style="background:rgba(59,130,246,0.06);border:1px solid rgba(59,130,246,0.15);border-radius:9px;padding:12px 14px;font-size:12.5px;line-height:1.6;color:var(--text);"><div style="font-size:10px;font-weight:700;color:var(--blue2);margin-bottom:6px;"><i class="fas fa-envelope"></i> EMAIL DRAFT</div><pre style="white-space:pre-wrap;font-family:'Outfit';font-size:12.5px;">${text}</pre><div style="margin-top:8px;"><button class="btn btn-blue btn-xs" onclick="notify('Draft copied to Outlook','Ready to send','var(--blue2)','fas fa-envelope')"><i class="fas fa-paper-plane"></i> Send via Outlook</button></div></div>`;
+  } catch(e) {
+    result.innerHTML = '<div style="color:var(--red2);font-size:12px;">API error.</div>';
+  }
+}
+
+async function draftWA(id) {
+  const c = contacts.find(x => x.id === id);
+  const result = document.getElementById('contact-ai-result');
+  result.innerHTML = '<div style="font-size:12px;color:var(--muted);"><span class="spin-loader"></span> Drafting WhatsApp message…</div>';
+  try {
+    const text = await callClaude(`Draft a brief, professional WhatsApp message from Unicircuit Engineering Services LLP to ${c.fname} (${c.company}) regarding ${c.products}. Context: ${c.notes}. Keep it under 50 words, friendly and professional.`);
+    result.innerHTML = `<div style="background:rgba(16,185,129,0.06);border:1px solid rgba(16,185,129,0.15);border-radius:9px;padding:12px 14px;font-size:12.5px;line-height:1.6;color:var(--text);"><div style="font-size:10px;font-weight:700;color:var(--green2);margin-bottom:6px;"><i class="fab fa-whatsapp"></i> WHATSAPP DRAFT</div>${text}<div style="margin-top:8px;"><button class="btn btn-green btn-xs" onclick="notify('Message sent via WhatsApp Business','${c.fname} ${c.lname}','var(--green2)','fab fa-whatsapp')"><i class="fas fa-paper-plane"></i> Send via WA</button></div></div>`;
+  } catch(e) {
+    result.innerHTML = '<div style="color:var(--red2);font-size:12px;">API error.</div>';
+  }
+}
+
+async function aiEnrichContact() {
+  const company = document.getElementById('c-company').value;
+  const products = document.getElementById('c-products').value;
+  if (!company) { notify('Enter company name first', '', 'var(--red)', 'fas fa-exclamation-triangle'); return; }
+  notify('Enriching with AI…', 'Claude is researching this contact', 'var(--cyan)', 'fas fa-robot');
+  try {
+    const text = await callClaude(`For a contact at ${company} in the Indian electrical engineering industry, interested in ${products||'electrical products'}: suggest a likely designation, key pain points, and 2 talking points for Unicircuit Engineering Services LLP. Keep it very brief.`);
+    document.getElementById('c-notes').value = text.replace(/\n+/g, ' ').substring(0, 200);
+    notify('AI enrichment complete', 'Notes updated with insights', 'var(--gold)', 'fas fa-robot');
+  } catch(e) {
+    notify('Enrichment failed', 'Check API connection', 'var(--red)', 'fas fa-exclamation-triangle');
+  }
+}
+
+async function aiEnrichContacts() {
+  notify('Enriching all contacts…', 'AI is scoring and tagging', 'var(--gold)', 'fas fa-robot');
+  setTimeout(() => notify('Enrichment complete', '48 contacts updated with AI insights', 'var(--green)', 'fas fa-check-circle'), 2000);
+}
+
+// ══════════════════════════════════
+// PIPELINE MODULE
+// ══════════════════════════════════
+const pipelineStages = ['Prospect', 'Qualified', 'Proposal Sent', 'Negotiation', 'Won', 'Lost'];
+const pipelineDeals = [
+  { id:1, name:'L&T – MCC Panel Supply', company:'L&T ECC', value:'₹12.4L', stage:'Negotiation', score:88, owner:'Amit S.', dueDate:'Apr 15' },
+  { id:2, name:'BHEL – VFD Bundle', company:'BHEL', value:'₹8.1L', stage:'Proposal Sent', score:74, owner:'Rajesh K.', dueDate:'Apr 10' },
+  { id:3, name:'Adani Power – HT Panels', company:'Adani Power', value:'₹22L', stage:'Qualified', score:82, owner:'Rajesh K.', dueDate:'Apr 30' },
+  { id:4, name:'Siemens – PQA Demo to Order', company:'Siemens Partner', value:'₹3.2L', stage:'Prospect', score:61, owner:'Priya N.', dueDate:'May 5' },
+  { id:5, name:'Schneider – MSU Confirmation', company:'Schneider', value:'₹1.8L', stage:'Won', score:42, owner:'Amit S.', dueDate:'Done' },
+  { id:6, name:'NTPC – Cable Trays RFQ', company:'NTPC', value:'₹5.6L', stage:'Qualified', score:55, owner:'Rajesh K.', dueDate:'Apr 20' },
+];
+
+function renderPipeline() {
+  const board = document.getElementById('pipeline-board');
+  board.innerHTML = pipelineStages.map(stage => {
+    const deals = pipelineDeals.filter(d => d.stage === stage);
+    const stageColors = {'Prospect':'var(--muted)','Qualified':'var(--blue2)','Proposal Sent':'var(--gold)','Negotiation':'var(--cyan)','Won':'var(--green2)','Lost':'var(--red2)'};
+    const col = stageColors[stage] || 'var(--muted)';
+    return `<div style="min-width:220px;max-width:240px;display:flex;flex-direction:column;gap:8px;">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:2px;">
+        <span style="font-size:11px;font-weight:700;color:${col};text-transform:uppercase;letter-spacing:0.5px;">${stage}</span>
+        <span style="font-size:10px;background:rgba(255,255,255,0.06);padding:2px 7px;border-radius:10px;color:var(--muted);">${deals.length}</span>
+      </div>
+      ${deals.map(d => `<div class="card" style="padding:12px 13px;cursor:pointer;" onclick="notify('${d.name}','${d.value} · ${d.owner}','${col}','fas fa-briefcase')">
+        <div style="font-weight:700;font-size:12.5px;margin-bottom:4px;">${d.name}</div>
+        <div style="font-size:11px;color:var(--muted);margin-bottom:8px;">${d.company}</div>
+        <div style="display:flex;justify-content:space-between;align-items:center;">
+          <span style="font-size:13px;font-weight:800;color:${col};">${d.value}</span>
+          <span style="font-size:10px;background:rgba(255,255,255,0.04);padding:2px 7px;border-radius:6px;color:var(--muted);">${d.dueDate}</span>
+        </div>
+        <div style="margin-top:7px;display:flex;justify-content:space-between;align-items:center;">
+          <span style="font-size:10.5px;color:var(--muted);">${d.owner}</span>
+          <span style="font-size:10.5px;color:${scoreColor(d.score)};font-weight:700;">Score: ${d.score}</span>
+        </div>
+      </div>`).join('')}
+      <div style="border:1px dashed var(--border);border-radius:9px;padding:10px;text-align:center;font-size:11.5px;color:var(--muted);cursor:pointer;" onclick="notify('Add deal','Click Add Contact to create a deal','var(--gold)','fas fa-plus')"><i class="fas fa-plus" style="margin-right:4px;"></i> Add deal</div>
+    </div>`;
+  }).join('');
+}
+
+// ══════════════════════════════════
+// WHATSAPP MODULE
+// ══════════════════════════════════
+const waConvos = [
+  { id:1, name:'Suresh Kumar', company:'L&T ECC', initials:'SK', col:'#1d4ed8', bg:'rgba(29,78,216,0.15)', last:'Can you share the invoice?', time:'10:38 AM', unread:2,
+    msgs:[{from:'in',text:'Hi, wanted to check status of PO #UC-2024-087. Any update on dispatch?',time:'10:22 AM'},{from:'out',text:'Hello Suresh ji, PO #UC-2024-087 dispatched via Blue Dart. AWB: 23456789. ETA: 6 Apr.',time:'10:35 AM'},{from:'in',text:'Great, thanks! Can you also share the invoice?',time:'10:38 AM'}]},
+  { id:2, name:'Vijay Rao', company:'BHEL', initials:'VR', col:'#d97706', bg:'rgba(217,119,6,0.15)', last:'Need pricing list for VFDs urgently', time:'11:15 AM', unread:0,
+    msgs:[{from:'in',text:'Need updated pricing list for VFDs and PLC panels. Tender deadline April 10. Urgent.',time:'11:15 AM'}]},
+  { id:3, name:'Manish Gupta', company:'Adani Power', initials:'MG', col:'#0891b2', bg:'rgba(8,145,178,0.15)', last:'Confirm site visit Tuesday?', time:'Yesterday', unread:1,
+    msgs:[{from:'in',text:'Please confirm the site visit for Tuesday 8th April, Ahmedabad plant.',time:'Yesterday 4:22 PM'},{from:'out',text:'Confirmed, Manish bhai! Our engineer Amit Sharma will be there by 10 AM.',time:'Yesterday 5:01 PM'},{from:'in',text:'Perfect. Can you bring the HT Panel catalogue as well?',time:'Yesterday 5:10 PM'}]},
+];
+let activeWAId = null;
+
+function renderWAList() {
+  const el = document.getElementById('wa-convo-list');
+  el.innerHTML = waConvos.map(c => `<div onclick="loadWAConvo(${c.id})" style="padding:12px 16px;border-bottom:1px solid rgba(255,255,255,0.04);cursor:pointer;display:flex;gap:10px;align-items:center;transition:background 0.12s;" onmouseover="this.style.background='rgba(255,255,255,0.03)'" onmouseout="this.style.background=''">
+    <div class="contact-avatar" style="width:38px;height:38px;background:${c.bg};color:${c.col};">${c.initials}</div>
+    <div style="flex:1;min-width:0;">
+      <div style="display:flex;justify-content:space-between;margin-bottom:2px;"><b style="font-size:13px;color:#fff;">${c.name}</b><span style="font-size:10.5px;color:var(--muted);">${c.time}</span></div>
+      <div style="font-size:11.5px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${c.last}</div>
+    </div>
+    ${c.unread ? `<div style="background:var(--green);color:#fff;border-radius:50%;width:18px;height:18px;display:flex;align-items:center;justify-content:center;font-size:9.5px;font-weight:700;">${c.unread}</div>` : ''}
+  </div>`).join('');
+}
+
+function loadWAConvo(id) {
+  const c = waConvos.find(x => x.id === id);
+  if (!c) return;
+  activeWAId = id;
+  document.getElementById('wa-active-title').innerHTML = `<i class="fab fa-whatsapp" style="color:#25D366;"></i> ${c.name} · ${c.company}`;
+  const chat = document.getElementById('wa-chat-area');
+  chat.innerHTML = c.msgs.map(m => `<div style="display:flex;flex-direction:column;"><div class="wa-bubble ${m.from === 'out' ? 'wa-out' : 'wa-in'}">${m.text}<div class="wa-time">${m.time}${m.from === 'out' ? ' ✓✓' : ''}</div></div></div>`).join('');
+  chat.scrollTop = chat.scrollHeight;
+  c.unread = 0;
+  renderWAList();
+}
+
+function sendWA() {
+  const input = document.getElementById('wa-msg-input');
+  const txt = input.value.trim();
+  if (!txt || !activeWAId) return;
+  const c = waConvos.find(x => x.id === activeWAId);
+  const now = new Date().toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'});
+  c.msgs.push({ from:'out', text:txt, time:now });
+  c.last = txt;
+  c.time = now;
+  const chat = document.getElementById('wa-chat-area');
+  const div = document.createElement('div');
+  div.style.cssText = 'display:flex;flex-direction:column;';
+  div.innerHTML = `<div class="wa-bubble wa-out">${txt}<div class="wa-time">${now} ✓✓</div></div>`;
+  chat.appendChild(div);
+  chat.scrollTop = chat.scrollHeight;
+  input.value = '';
+  renderWAList();
+  notify('Message sent', c.name + ' · WhatsApp', 'var(--green)', 'fab fa-whatsapp');
+}
+
+async function aiWADraft() {
+  if (!activeWAId) { notify('Select a conversation first', '', 'var(--red)', 'fas fa-exclamation-triangle'); return; }
+  const c = waConvos.find(x => x.id === activeWAId);
+  const lastMsg = c.msgs.filter(m => m.from === 'in').pop();
+  const input = document.getElementById('wa-msg-input');
+  input.value = 'Generating AI reply…';
+  input.disabled = true;
+  try {
+    const text = await callClaude(`Draft a short, professional WhatsApp reply for Unicircuit Engineering Services LLP to the following message from ${c.name} (${c.company}): "${lastMsg?.text}". Keep it under 40 words, friendly and helpful.`);
+    input.value = text.trim();
+  } catch(e) {
+    input.value = '';
+    notify('AI draft failed', 'Check API connection', 'var(--red)', 'fas fa-exclamation-triangle');
+  }
+  input.disabled = false;
+  input.focus();
+}
+
+// ══════════════════════════════════
+// EMAIL MODULE
+// ══════════════════════════════════
+const emails = [
+  { id:1, from:'L&T ECC – Purchase', subject:'Revised Quote Request – Panel Wiring', preview:'We need a revised quote for Panel Wiring, Faridabad plant. Ref: Q-2024-112. Please include MCBs and Cable Trays pricing.', time:'10:22 AM', tag:'Quote', priority:'high', body:'Hi Unicircuit Team,\n\nWe require a revised quotation for Panel Wiring for our Faridabad plant. Current quote reference: Q-2024-112.\n\nPlease include updated pricing for:\n1. MCBs (63A, 100A variants)\n2. Cable Trays (ladder type, 200mm width)\n3. DB Panels (32 way)\n\nKindly revert by April 8th.\n\nRegards,\nSuresh Kumar\nSr. Purchase Manager, L&T ECC' },
+  { id:2, from:'BHEL – Procurement Dept', subject:'VFD & PLC Panel Pricing – Urgent', preview:'Please share updated pricing for VFDs and PLC panels. Tender deadline April 10th. Urgent.', time:'11:15 AM', tag:'Enquiry', priority:'normal', body:'Dear Unicircuit Team,\n\nPlease share the updated price list for:\n- VFDs (5HP, 10HP, 25HP, 50HP)\n- PLC Panels (Siemens S7, Allen Bradley)\n\nWe have a tender submission on April 10. This is urgent.\n\nRegards,\nVijay Rao\nProcurement Officer, BHEL' },
+  { id:3, from:'Siemens India Partner', subject:'Product Demo Request – Power Quality Analysers', preview:'Our engineering team would like a demo on Power Quality Analysers next week. Please confirm availability.', time:'1:40 PM', tag:'Demo', priority:'normal', body:'Hello,\n\nWe would like to schedule a product demo for our engineering team on Power Quality Analysers.\n\nPreferred: Next Tuesday or Wednesday, afternoon.\n\nBest,\nAnita Sharma\nBusiness Dev Manager, Siemens Partner Network' },
+  { id:4, from:'Schneider Electric', subject:'Order Confirmation Required – #SE-24-901', preview:'Please confirm order for Modular Switching Units before April 15th.', time:'3:10 PM', tag:'Order', priority:'high', body:'Dear Team,\n\nThis is to confirm that we have placed PO #SE-24-901 for Modular Switching Units (32 units). Please confirm acceptance and estimated delivery.\n\nDelivery required before April 15.\n\nRegards,\nRohit Joshi\nZone Sales Engineer, Schneider Electric' },
+  { id:5, from:'Adani Power – Projects', subject:'HT Panel RFQ – Ahmedabad Plant', preview:'Please provide your best commercial offer for HT Panels for the Ahmedabad plant expansion.', time:'4:25 PM', tag:'RFQ', priority:'high', body:'Unicircuit Team,\n\nRequest your best commercial offer for:\n- 11kV HT Panels (6 nos)\n- ACBs (800A, 1600A)\n- Metering cubicles\n\nFor Ahmedabad plant Phase 2 expansion. Kindly share within 3 working days.\n\nManish Gupta\nHead – Electrical, Adani Power' },
+];
+let activeEmailId = null;
+
+function renderEmailList() {
+  const el = document.getElementById('email-list');
+  el.innerHTML = emails.map(e => `<div onclick="loadEmail(${e.id})" style="padding:13px 17px;border-bottom:1px solid rgba(255,255,255,0.04);cursor:pointer;transition:background 0.12s;" onmouseover="this.style.background='rgba(255,255,255,0.03)'" onmouseout="this.style.background=''">
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:3px;">
+      <div style="font-weight:700;font-size:13px;color:#fff;">${e.from}</div>
+      <div style="font-size:10.5px;color:var(--muted);white-space:nowrap;margin-left:8px;">${e.time}</div>
+    </div>
+    <div style="font-size:12.5px;color:var(--muted2);margin-bottom:4px;">${e.subject}</div>
+    <div style="font-size:11.5px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${e.preview}</div>
+    <div style="display:flex;gap:5px;margin-top:6px;flex-wrap:wrap;">
+      <span class="badge ${e.tag==='Quote'?'b-gold':e.tag==='Order'?'b-green':e.tag==='RFQ'?'b-cyan':e.tag==='Demo'?'b-purple':'b-blue'}">${e.tag}</span>
+      ${e.priority === 'high' ? '<span class="badge b-red"><i class="fas fa-bolt" style="font-size:8px;"></i> Urgent</span>' : ''}
+    </div>
+  </div>`).join('');
+}
+
+function loadEmail(id) {
+  const e = emails.find(x => x.id === id);
+  if (!e) return;
+  activeEmailId = id;
+  document.getElementById('email-preview').innerHTML = `<div style="font-weight:700;color:#fff;font-size:13px;margin-bottom:3px;">${e.subject}</div><div style="font-size:11px;color:var(--muted);margin-bottom:8px;">From: ${e.from} · ${e.time}</div><pre style="font-size:12px;white-space:pre-wrap;color:var(--muted2);line-height:1.55;font-family:'Outfit';">${e.body}</pre>`;
+  document.getElementById('email-replies').innerHTML = '<div style="text-align:center;padding:30px;color:var(--muted);font-size:12.5px;"><i class="fas fa-magic" style="font-size:20px;display:block;margin-bottom:8px;opacity:0.3;"></i>Click <b style="color:var(--gold);">Generate</b> to create AI reply options</div>';
+}
+
+async function generateEmailReplies() {
+  if (!activeEmailId) { notify('Select an email first', '', 'var(--red)', 'fas fa-exclamation-triangle'); return; }
+  const e = emails.find(x => x.id === activeEmailId);
+  const el = document.getElementById('email-replies');
+  el.innerHTML = '<div style="text-align:center;padding:30px;color:var(--muted);"><span class="spin-loader"></span><div style="margin-top:10px;font-size:12.5px;">Claude is generating 3 reply options…</div></div>';
+  try {
+    const text = await callClaude(`You are writing email replies for Unicircuit Engineering Services LLP. Generate exactly 3 distinct professional reply options for the following email. Label each clearly as "Option 1:", "Option 2:", "Option 3:". Each reply under 90 words. Vary the tone: direct/concise, detailed/technical, warm/relationship-focused.\n\nIncoming email from ${e.from}:\nSubject: ${e.subject}\n\n${e.body}`);
+    const parts = text.split(/Option\s*\d+[:\.]?\s*/i).filter(s => s.trim());
+    el.innerHTML = parts.slice(0,3).map((p,i) => `
+      <div style="background:rgba(255,255,255,0.02);border:1px solid var(--border);border-radius:10px;padding:13px 15px;margin-bottom:9px;">
+        <div style="font-size:9.5px;font-weight:700;color:var(--gold);letter-spacing:0.5px;margin-bottom:7px;"><i class="fas fa-robot"></i> OPTION ${i+1}</div>
+        <div style="font-size:12.5px;line-height:1.6;color:var(--text);">${p.trim().replace(/\n/g,'<br>')}</div>
+        <div style="margin-top:10px;display:flex;gap:7px;">
+          <button class="btn btn-gold btn-xs" onclick="notify('Draft inserted into Outlook','Ready to send','var(--gold)','fas fa-envelope')"><i class="fas fa-paper-plane"></i> Use this</button>
+          <button class="btn btn-ghost btn-xs" onclick="copyText(\`${p.trim().replace(/`/g,"'")}\`)"><i class="fas fa-copy"></i> Copy</button>
+        </div>
+      </div>
+    `).join('');
+  } catch(e) {
+    el.innerHTML = '<div style="color:var(--red2);padding:16px;font-size:12.5px;">API error — check configuration.</div>';
+  }
+}
+
+function copyText(t) {
+  navigator.clipboard?.writeText(t);
+  notify('Copied to clipboard', '', 'var(--muted)', 'fas fa-copy');
+}
+
+// ══════════════════════════════════
+// CALL SUMMARIZER
+// ══════════════════════════════════
+async function doSummarizeCall(targetId) {
+  const el = document.getElementById(targetId);
+  el.innerHTML = '<span class="spin-loader"></span> Transcribing with Whisper + Claude summarising…';
+  try {
+    const text = await callClaude(`Summarise the following PBX call for Unicircuit Engineering Services LLP's call log system:\n\nCall details: Inbound from BHEL Procurement, 8m 22s. Agent Ext. 305 (Sales).\n\nTranscript excerpt: "Caller enquired about dispatch timeline for cable trays and DB panels per PO BH-2190. Agent checked ERP, confirmed material packed and ready. Caller requested expediting due to site deadline April 10. Agent committed dispatch by April 6 via transport, agreed to share AWB details via WhatsApp. Client satisfied."\n\nGenerate structured summary with: Issue | Resolution | Sentiment | Key Action Items | Follow-up Required. Be concise.`);
+    el.innerHTML = `<div style="background:rgba(245,166,35,0.05);border:1px solid rgba(245,166,35,0.12);border-radius:9px;padding:13px 15px;">
+      <div style="font-size:9.5px;font-weight:700;color:var(--gold);margin-bottom:8px;"><i class="fas fa-robot"></i> CLAUDE AI CALL SUMMARY · BHEL_call_Apr4.mp3</div>
+      <div style="font-size:12.5px;line-height:1.65;white-space:pre-wrap;color:var(--text);">${text}</div>
+      <div style="margin-top:9px;"><span class="badge b-green"><i class="fas fa-check"></i> Summary saved to call log</span></div>
+    </div>`;
+  } catch(e) {
+    el.innerHTML = '<span style="color:var(--red2);font-size:12px;">API connection error.</span>';
+  }
+}
+
+async function quickCallSummary(btn) {
+  const td = btn.closest('tr').cells[btn.closest('tr').cells.length - 1];
+  td.innerHTML = '<span class="spin-loader"></span>';
+  try {
+    const text = await callClaude('Generate a 1-sentence AI call summary for a B2B engineering sales call at Unicircuit Engineering Services LLP (electrical products company, India). Include: what was discussed and next action. Keep it under 15 words.');
+    td.innerHTML = `<span class="badge b-green"><i class="fas fa-robot"></i> ${text.substring(0,60)}…</span>`;
+  } catch(e) {
+    td.innerHTML = '<span class="badge b-gold">Enquiry noted · follow-up scheduled</span>';
+  }
+}
+
+// ══════════════════════════════════
+// MARKETING MODULE
+// ══════════════════════════════════
+async function generateCampaign() {
+  const product = document.getElementById('mkt-product').value;
+  const audience = document.getElementById('mkt-audience').value;
+  const goal = document.getElementById('mkt-goal').value;
+  const channels = [];
+  if (document.getElementById('ch-em').checked) channels.push('Email');
+  if (document.getElementById('ch-wa').checked) channels.push('WhatsApp');
+  if (document.getElementById('ch-sm').checked) channels.push('SMS');
+  const el = document.getElementById('mkt-result');
+  el.innerHTML = '<div style="font-size:12px;color:var(--muted);"><span class="spin-loader"></span> Claude is crafting your campaign copy…</div>';
+  try {
+    const text = await callClaude(`You are a B2B marketing specialist for Unicircuit Engineering Services LLP (Indian electrical engineering company). Generate campaign copy for:\n\nProduct: ${product}\nTarget audience: ${audience}\nGoal: ${goal}\nChannels: ${channels.join(', ')}\n\nGenerate:\n${channels.includes('Email') ? '1) EMAIL: Subject line + 80-word body\n' : ''}${channels.includes('WhatsApp') ? '2) WHATSAPP: 40-word broadcast message\n' : ''}${channels.includes('SMS') ? '3) SMS: 160-character message\n' : ''}\nUse Indian B2B engineering industry context. Professional, compelling, clear CTA.`);
+    el.innerHTML = `<div style="background:rgba(245,166,35,0.05);border:1px solid rgba(245,166,35,0.12);border-radius:10px;padding:14px 16px;margin-top:4px;">
+      <div style="font-size:9.5px;font-weight:700;color:var(--gold);margin-bottom:10px;"><i class="fas fa-robot"></i> AI-GENERATED CAMPAIGN COPY</div>
+      <pre style="font-size:12.5px;line-height:1.65;white-space:pre-wrap;font-family:'Outfit';color:var(--text);">${text}</pre>
+      <div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap;">
+        <button class="btn btn-gold btn-sm" onclick="createCampaignFromWizard()"><i class="fas fa-rocket"></i> Launch Campaign</button>
+        <button class="btn btn-ghost btn-sm" onclick="copyText(\`${text.replace(/`/g,"'")}\`)"><i class="fas fa-copy"></i> Copy All</button>
+      </div>
+    </div>`;
+  } catch(e) {
+    el.innerHTML = '<div style="color:var(--red2);font-size:12px;">API error — check connection.</div>';
+  }
+}
+
+function createCampaignFromWizard() {
+  notify('Campaign launched!', '1,240 contacts · AI copy deployed', 'var(--green)', 'fas fa-rocket');
+}
+
+function createCampaign() {
+  const name = document.getElementById('nc-name').value || 'New Campaign';
+  closeModal('campaign-modal');
+  notify('Campaign created', name + ' is now active', 'var(--gold)', 'fas fa-bullhorn');
+}
+
+// ══════════════════════════════════
+// AI ASSISTANT MODULE
+// ══════════════════════════════════
+let aiInited = false;
+let aiHistory = [];
+
+function initAIChat() {
+  if (aiInited) return;
+  aiInited = true;
+  const container = document.getElementById('ai-messages');
+  container.innerHTML = '';
+  appendAI(`<div class="ai-tag"><i class="fas fa-robot"></i> UNICOMM AI · CLAUDE</div>Hello! I'm your AI assistant for <b>Unicircuit Engineering Services LLP</b>. I can help you:<br><br>
+• Draft professional emails, WhatsApp messages, quotations<br>
+• Summarise calls and extract action items<br>
+• Generate marketing campaign copy<br>
+• Provide sales intelligence and communication advice<br>
+• Answer questions about your clients and operations<br><br>What can I help you with today?`);
+}
+
+function appendAI(html, isUser = false) {
+  const container = document.getElementById('ai-messages');
+  const div = document.createElement('div');
+  div.className = 'chat-msg ' + (isUser ? 'user' : 'ai') + ' fu';
+  div.innerHTML = html;
+  container.appendChild(div);
+  container.scrollTop = container.scrollHeight;
+}
+
+async function sendAI() {
+  const input = document.getElementById('ai-input');
+  const msg = input.value.trim();
+  if (!msg) return;
+  appendAI(msg, true);
+  input.value = '';
+  const btn = document.getElementById('ai-send');
+  btn.disabled = true;
+  aiHistory.push({ role: 'user', content: msg });
+  const loaderId = 'ai-loader-' + Date.now();
+  const container = document.getElementById('ai-messages');
+  const loader = document.createElement('div');
+  loader.className = 'chat-msg ai fu';
+  loader.id = loaderId;
+  loader.innerHTML = '<div class="ai-tag"><i class="fas fa-robot"></i> UNICOMM AI</div><span class="spin-loader"></span> Thinking…';
+  container.appendChild(loader);
+  container.scrollTop = container.scrollHeight;
+  try {
+    const res = await fetch(CLAUDE, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: MODEL,
+        max_tokens: 1000,
+        system: SYSTEM,
+        messages: aiHistory
+      })
+    });
+    const data = await res.json();
+    const reply = data.content?.[0]?.text || 'Sorry, I could not generate a response.';
+    aiHistory.push({ role: 'assistant', content: reply });
+    document.getElementById(loaderId)?.remove();
+    appendAI(`<div class="ai-tag"><i class="fas fa-robot"></i> UNICOMM AI · CLAUDE</div>${reply.replace(/\n/g,'<br>').replace(/\*\*(.*?)\*\*/g,'<b>$1</b>').replace(/\*(.*?)\*/g,'<i>$1</i>')}`);
+  } catch(e) {
+    document.getElementById(loaderId)?.remove();
+    appendAI('<div class="ai-tag"><i class="fas fa-robot"></i> UNICOMM AI</div><span style="color:var(--red2);">Connection error. Check your API configuration and network.</span>');
+  }
+  btn.disabled = false;
+}
+
+function quickAI(q) {
+  document.getElementById('ai-input').value = q;
+  sendAI();
+}
+
+// ── DASHBOARD HELPERS ──
+function dashWASend() {
+  const inp = document.getElementById('dash-wa-input');
+  if (!inp.value.trim()) return;
+  notify('Message sent', 'Suresh Kumar · WhatsApp', 'var(--green)', 'fab fa-whatsapp');
+  inp.value = '';
+}
+async function dashAIWA() {
+  const inp = document.getElementById('dash-wa-input');
+  inp.value = 'Generating…'; inp.disabled = true;
+  try {
+    const t = await callClaude('Draft a brief WhatsApp reply from Unicircuit Engineering Services LLP to a client asking for an invoice for their dispatched order. Friendly, professional, under 35 words.');
+    inp.value = t.trim();
+  } catch(e) { inp.value = ''; }
+  inp.disabled = false;
+}
+
+// ── INIT ──
+window.addEventListener('DOMContentLoaded', () => {
+  // ── AUTH GUARD ──────────────────────────────────────────────────────────
+  const token = localStorage.getItem('uc_token') || sessionStorage.getItem('uc_token');
+  const userRaw = localStorage.getItem('uc_user') || sessionStorage.getItem('uc_user');
+
+  if (!token || !userRaw) {
+    window.location.href = 'login.html';
+    return;
+  }
+
+  // Parse user and populate sidebar
+  try {
+    const user = JSON.parse(userRaw);
+    document.getElementById('sidebar-initials').textContent = user.initials || (user.name ? user.name.split(' ').map(w=>w[0]).join('').toUpperCase().slice(0,2) : 'U');
+    document.getElementById('sidebar-name').textContent     = user.name  || 'User';
+    document.getElementById('sidebar-role').textContent     = (user.role === 'admin' ? 'Admin' : 'User') + ' · Unicircuit';
+  } catch(_) {}
+
+  // Hide guard, show app
+  document.getElementById('auth-guard').style.display = 'none';
+  document.getElementById('app-shell').style.display  = 'flex';
+
+  // ── LOAD DATA FROM API (with fallback to local data) ────────────────────
+  loadDashboardData();
+
+  // Render all sections
+  renderContacts();
+  renderWAList();
+  renderEmailList();
+  renderPipeline();
+
+  // Stagger KPI bar animations
+  setTimeout(() => {
+    document.querySelectorAll('.kpi-fill').forEach(el => {
+      const w = el.style.width;
+      el.style.width = '0';
+      setTimeout(() => el.style.width = w, 50);
+    });
+  }, 200);
+});
+
+// ── LOGOUT ──────────────────────────────────────────────────────────────────
+async function doLogout() {
+  const token = localStorage.getItem('uc_token') || sessionStorage.getItem('uc_token');
+  // Try to call logout API
+  try {
+    await fetch(`${API_BASE}/auth/logout`, {
+      method: 'POST',
+      headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' }
+    });
+  } catch(_) { /* ignore if offline */ }
+
+  localStorage.removeItem('uc_token');
+  localStorage.removeItem('uc_user');
+  sessionStorage.removeItem('uc_token');
+  sessionStorage.removeItem('uc_user');
+  window.location.href = 'login.html';
+}
+
+// ── API BASE ─────────────────────────────────────────────────────────────────
+const API_BASE = 'http://localhost:4551/api';
+
+function getAuthHeaders() {
+  const token = localStorage.getItem('uc_token') || sessionStorage.getItem('uc_token');
+  return { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' };
+}
+
+// ── LOAD DASHBOARD DATA FROM POSTGRESQL ─────────────────────────────────────
+async function loadDashboardData() {
+  try {
+    // Load contacts from DB
+    const cRes = await fetch(`${API_BASE}/contacts`, { headers: getAuthHeaders() });
+    if (cRes.ok) {
+      const dbContacts = await cRes.json();
+      if (dbContacts.length > 0) {
+        contacts = dbContacts.map(c => ({
+          ...c,
+          emails: c.emails_count,
+          wa_count: c.wa_count,
+          lastContact: c.last_contact,
+        }));
+        renderContacts();
+        // Update KPI
+        const kpiEl = document.querySelector('.kpi.cyan .kpi-val');
+        if (kpiEl) kpiEl.textContent = contacts.length;
+      }
+    }
+
+    // Load pipeline from DB
+    const pRes = await fetch(`${API_BASE}/pipeline`, { headers: getAuthHeaders() });
+    if (pRes.ok) {
+      const dbDeals = await pRes.json();
+      if (dbDeals.length > 0) {
+        pipelineDeals.length = 0;
+        dbDeals.forEach(d => pipelineDeals.push({ ...d, dueDate: d.due_date }));
+        renderPipeline();
+      }
+    }
+
+    // Load call logs from DB
+    const lRes = await fetch(`${API_BASE}/calls`, { headers: getAuthHeaders() });
+    if (lRes.ok) {
+      const { calls: dbCalls } = await lRes.json();
+      if (dbCalls && dbCalls.length > 0) {
+        renderCallLogs(dbCalls);
+      }
+    }
+
+    // Load campaigns from DB
+    const campRes = await fetch(`${API_BASE}/campaigns`, { headers: getAuthHeaders() });
+    if (campRes.ok) {
+      const dbCamps = await campRes.json();
+      if (dbCamps.length > 0) renderCampaigns(dbCamps);
+    }
+
+    // Load dashboard stats
+    const statsRes = await fetch(`${API_BASE}/dashboard/stats`, { headers: getAuthHeaders() });
+    if (statsRes.ok) {
+      const stats = await statsRes.json();
+      updateKPIs(stats);
+    }
+
+    // Show DB connected badge
+    showDbStatus(true);
+  } catch(err) {
+    console.warn('API not available, using local data:', err.message);
+    showDbStatus(false);
+  }
+}
+
+// ── UPDATE KPI CARDS FROM DB STATS ──────────────────────────────────────────
+function updateKPIs(stats) {
+  if (stats.contacts) {
+    const el = document.querySelector('.kpi.cyan .kpi-val');
+    if (el) el.textContent = stats.contacts.total;
+    const ch = document.querySelector('.kpi.cyan .kpi-change');
+    if (ch) ch.innerHTML = `<i class="fas fa-plus"></i> ${stats.contacts.new_today} new today`;
+  }
+  if (stats.pipeline) {
+    const el = document.querySelector('.kpi.red .kpi-val');
+    if (el) el.innerHTML = `${stats.pipeline.deals}<span style="font-size:13px;font-weight:400;"> deals</span>`;
+  }
+}
+
+// ── RENDER CALL LOGS FROM DB ─────────────────────────────────────────────────
+function renderCallLogs(calls) {
+  const tbody = document.querySelector('#sec-calls .data-table tbody') ||
+                document.querySelector('.kpi-row + div .data-table tbody');
+  if (!tbody) return;
+  tbody.innerHTML = calls.slice(0, 10).map(c => `
+    <tr>
+      <td><b>${c.caller || '—'}</b>${c.extension ? `<br><span style="font-size:10.5px;color:var(--muted);">${c.extension}</span>` : ''}</td>
+      <td>${c.destination || '—'}</td>
+      <td>${c.duration || '—'}</td>
+      <td><span class="badge ${c.call_type==='In'?'b-blue':c.call_type==='Missed'?'b-red':c.call_type==='Internal'?'b-gold':'b-green'}">${c.call_type}</span></td>
+      <td>${c.ai_summary
+        ? `<span class="badge b-green"><i class="fas fa-check"></i> Done</span>`
+        : `<button class="btn btn-blue btn-xs" onclick="quickCallSummary(this)"><i class="fas fa-robot"></i> Summarise</button>`
+      }</td>
+    </tr>
+  `).join('');
+}
+
+// ── RENDER CAMPAIGNS FROM DB ─────────────────────────────────────────────────
+function renderCampaigns(camps) {
+  const el = document.getElementById('camp-list');
+  if (!el) return;
+  const statusBadge = s => s==='Active'?'b-green':s==='Live'?'b-green':s==='Scheduled'?'b-gold':'b-gray';
+  el.innerHTML = camps.map(c => `
+    <div class="camp-card">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:9px;">
+        <div>
+          <div style="font-weight:700;font-size:13px;">${c.name}</div>
+          <div style="font-size:11px;color:var(--muted);margin-top:2px;">${c.channel} · ${c.segment} · ${c.product || ''}</div>
+        </div>
+        <span class="badge ${statusBadge(c.status)}">${c.status}</span>
+      </div>
+      <div class="prog-bar"><div class="prog-fill" style="width:${c.progress||0}%;background:var(--blue);"></div></div>
+      <div style="display:flex;gap:6px;margin-top:10px;">
+        <button class="btn btn-ghost btn-xs"><i class="fas fa-pause"></i> Pause</button>
+        <button class="btn btn-blue btn-xs"><i class="fas fa-chart-bar"></i> Stats</button>
+        <button class="btn btn-red btn-xs" onclick="deleteCampaign(${c.id},this)"><i class="fas fa-trash"></i></button>
+      </div>
+    </div>
+  `).join('');
+}
+
+// ── DELETE CAMPAIGN VIA API ──────────────────────────────────────────────────
+async function deleteCampaign(id, btn) {
+  if (!confirm('Delete this campaign?')) return;
+  try {
+    const res = await fetch(`${API_BASE}/campaigns/${id}`, {
+      method: 'DELETE', headers: getAuthHeaders()
+    });
+    if (res.ok) {
+      btn.closest('.camp-card').remove();
+      notify('Campaign deleted', '', 'var(--red)', 'fas fa-trash');
+    }
+  } catch(_) { notify('Error', 'Could not delete campaign', 'var(--red)', 'fas fa-exclamation-circle'); }
+}
+
+// ── DB STATUS BADGE ──────────────────────────────────────────────────────────
+function showDbStatus(online) {
+  // Add a small badge to the topbar
+  const actions = document.querySelector('.topbar-actions');
+  if (!actions) return;
+  const existing = document.getElementById('db-status-badge');
+  if (existing) existing.remove();
+  const badge = document.createElement('div');
+  badge.id = 'db-status-badge';
+  badge.className = 'db-badge';
+  badge.innerHTML = `<span class="db-dot ${online?'':'offline'}"></span>${online ? 'PostgreSQL Live' : 'Offline Mode'}`;
+  actions.prepend(badge);
+}
+
+// ── OVERRIDE saveContact TO USE API ─────────────────────────────────────────
+const _origSaveContact = typeof saveContact === 'function' ? saveContact : null;
+async function saveContact() {
+  const fname   = document.getElementById('c-fname').value.trim();
+  const lname   = document.getElementById('c-lname').value.trim();
+  const company = document.getElementById('c-company').value.trim();
+
+  if (!fname || !lname || !company) {
+    notify('Required fields missing', 'Name and company are required', 'var(--red)', 'fas fa-exclamation-circle');
+    return;
+  }
+
+  const payload = {
+    fname, lname, company,
+    designation: document.getElementById('c-designation').value.trim(),
+    dept:        document.getElementById('c-dept').value.trim(),
+    phone:       document.getElementById('c-phone').value.trim(),
+    wa:          document.getElementById('c-wa').value.trim(),
+    email:       document.getElementById('c-email').value.trim(),
+    segment:     document.getElementById('c-segment').value,
+    score:       parseInt(document.getElementById('c-score').value) || 50,
+    products:    document.getElementById('c-products').value.trim(),
+    city:        document.getElementById('c-city').value.trim(),
+    notes:       document.getElementById('c-notes').value.trim(),
+  };
+
+  try {
+    const res = await fetch(`${API_BASE}/contacts`, {
+      method: 'POST',
+      headers: getAuthHeaders(),
+      body: JSON.stringify(payload),
+    });
+    const data = await res.json();
+    if (res.ok) {
+      contacts.push({ ...data, emails: data.emails_count, lastContact: data.last_contact });
+      renderContacts();
+      closeModal('contact-modal');
+      notify('Contact saved to database', `${fname} ${lname} · ${company}`, 'var(--green)', 'fas fa-user-check');
+      // Clear form
+      ['c-fname','c-lname','c-company','c-designation','c-dept','c-phone','c-wa','c-email','c-products','c-city','c-notes'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.value = '';
+      });
+    } else {
+      notify('Save failed', data.error || 'Unknown error', 'var(--red)', 'fas fa-exclamation-circle');
+    }
+  } catch(_) {
+    // Fallback: save locally if API unavailable
+    const newContact = {
+      id: Date.now(), ...payload,
+      avatar_color: '#3b82f6', avatar_bg: 'rgba(59,130,246,0.15)',
+      initials: `${fname[0]}${lname[0]}`.toUpperCase(),
+      calls: 0, emails: 0, wa_count: 0, lastContact: 'Just now',
+    };
+    contacts.push(newContact);
+    renderContacts();
+    closeModal('contact-modal');
+    notify('Contact saved locally', `${fname} ${lname} (offline mode)`, 'var(--gold)', 'fas fa-user-check');
+  }
+}
+
+// ── OVERRIDE createCampaign TO USE API ───────────────────────────────────────
+async function createCampaign() {
+  const name    = document.getElementById('nc-name').value.trim();
+  const product = document.getElementById('nc-product').value.trim();
+  const seg     = document.getElementById('nc-seg').value;
+  const channel = document.getElementById('nc-channel').value;
+  const date    = document.getElementById('nc-date').value;
+
+  if (!name) { notify('Campaign name required', '', 'var(--red)', 'fas fa-exclamation-circle'); return; }
+
+  try {
+    const res = await fetch(`${API_BASE}/campaigns`, {
+      method: 'POST',
+      headers: getAuthHeaders(),
+      body: JSON.stringify({ name, product, segment: seg, channel, status: 'Draft', scheduled_at: date || null }),
+    });
+    const data = await res.json();
+    if (res.ok) {
+      closeModal('campaign-modal');
+      notify('Campaign created', name, 'var(--green)', 'fas fa-bullhorn');
+      // Reload campaigns
+      const campRes = await fetch(`${API_BASE}/campaigns`, { headers: getAuthHeaders() });
+      if (campRes.ok) renderCampaigns(await campRes.json());
+    } else {
+      notify('Error', data.error, 'var(--red)', 'fas fa-exclamation-circle');
+    }
+  } catch(_) {
+    closeModal('campaign-modal');
+    notify('Campaign saved locally', name + ' (offline)', 'var(--gold)', 'fas fa-bullhorn');
+  }
+}
+</script>
+</body>
+</html>

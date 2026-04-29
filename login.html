@@ -1,0 +1,476 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Login · UniComm Pro · Unicircuit Engineering Services LLP</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg:     #0c0f1a;
+  --bg2:    #111520;
+  --bg3:    #161b2c;
+  --card:   #1a2035;
+  --card2:  #1f2640;
+  --border: rgba(255,255,255,0.07);
+  --border2:rgba(255,255,255,0.12);
+  --text:   #e8ecf4;
+  --muted:  #6b7a99;
+  --muted2: #8b9ab8;
+  --gold:   #f5a623;
+  --gold2:  #ffc659;
+  --blue:   #3b82f6;
+  --green:  #10b981;
+  --green2: #34d399;
+  --red:    #ef4444;
+  --red2:   #f87171;
+}
+*{margin:0;padding:0;box-sizing:border-box;font-family:'Outfit',sans-serif;}
+body{
+  background:var(--bg);
+  color:var(--text);
+  min-height:100vh;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  overflow:hidden;
+  position:relative;
+}
+
+/* ── ANIMATED BACKGROUND ── */
+.bg-grid{
+  position:fixed;inset:0;
+  background-image:
+    linear-gradient(rgba(255,255,255,0.025) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255,255,255,0.025) 1px, transparent 1px);
+  background-size:40px 40px;
+  pointer-events:none;
+}
+.bg-glow-1{
+  position:fixed;top:-200px;left:-200px;
+  width:600px;height:600px;
+  background:radial-gradient(circle, rgba(245,166,35,0.07) 0%, transparent 65%);
+  pointer-events:none;
+  animation:floatGlow 8s ease-in-out infinite;
+}
+.bg-glow-2{
+  position:fixed;bottom:-150px;right:-150px;
+  width:500px;height:500px;
+  background:radial-gradient(circle, rgba(59,130,246,0.06) 0%, transparent 65%);
+  pointer-events:none;
+  animation:floatGlow 10s ease-in-out infinite reverse;
+}
+@keyframes floatGlow{
+  0%,100%{transform:translate(0,0);}
+  50%{transform:translate(30px,20px);}
+}
+
+/* ── CARD ── */
+.login-wrap{
+  width:100%;max-width:420px;
+  padding:16px;
+  position:relative;z-index:10;
+}
+.login-card{
+  background:var(--card);
+  border:1px solid var(--border2);
+  border-radius:20px;
+  padding:36px 36px 32px;
+  box-shadow:0 24px 60px rgba(0,0,0,0.5), 0 0 0 1px rgba(245,166,35,0.04);
+  animation:cardIn 0.4s cubic-bezier(0.16,1,0.3,1) both;
+}
+@keyframes cardIn{
+  from{opacity:0;transform:translateY(24px) scale(0.97);}
+  to{opacity:1;transform:translateY(0) scale(1);}
+}
+
+/* ── BRAND ── */
+.brand{display:flex;align-items:center;gap:12px;margin-bottom:28px;}
+.brand-icon{
+  width:44px;height:44px;
+  background:linear-gradient(135deg,#f5a623,#e8820a);
+  border-radius:12px;
+  display:flex;align-items:center;justify-content:center;
+  box-shadow:0 6px 20px rgba(245,166,35,0.4);
+  flex-shrink:0;
+}
+.brand-icon i{color:#fff;font-size:18px;}
+.brand-text .name{font-size:20px;font-weight:800;color:#fff;letter-spacing:-0.4px;}
+.brand-text .name span{color:var(--gold);}
+.brand-text .sub{font-size:10.5px;color:var(--muted);margin-top:2px;letter-spacing:0.3px;}
+
+/* ── HEADING ── */
+.login-heading{margin-bottom:24px;}
+.login-heading h1{font-size:22px;font-weight:800;color:#fff;letter-spacing:-0.4px;}
+.login-heading p{font-size:13px;color:var(--muted);margin-top:4px;}
+
+/* ── FORM ── */
+.form-group{margin-bottom:16px;}
+.form-label{
+  display:block;font-size:12px;font-weight:600;
+  color:var(--muted2);margin-bottom:6px;letter-spacing:0.2px;
+}
+.input-wrap{position:relative;}
+.input-wrap i.icon-left{
+  position:absolute;left:13px;top:50%;transform:translateY(-50%);
+  color:var(--muted);font-size:13px;pointer-events:none;
+}
+.inp{
+  width:100%;
+  background:rgba(255,255,255,0.04);
+  border:1px solid var(--border2);
+  border-radius:10px;
+  padding:11px 13px 11px 38px;
+  font-size:13.5px;color:var(--text);
+  font-family:'Outfit',sans-serif;
+  outline:none;
+  transition:border-color 0.2s, box-shadow 0.2s, background 0.2s;
+}
+.inp:focus{
+  border-color:rgba(245,166,35,0.5);
+  box-shadow:0 0 0 3px rgba(245,166,35,0.1);
+  background:rgba(255,255,255,0.06);
+}
+.inp::placeholder{color:var(--muted);}
+.inp.error{border-color:rgba(239,68,68,0.5);box-shadow:0 0 0 3px rgba(239,68,68,0.08);}
+.toggle-pw{
+  position:absolute;right:13px;top:50%;transform:translateY(-50%);
+  color:var(--muted);cursor:pointer;font-size:13px;
+  transition:color 0.15s;
+}
+.toggle-pw:hover{color:var(--muted2);}
+
+/* ── REMEMBER / FORGOT ── */
+.row-between{display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;}
+.remember{display:flex;align-items:center;gap:7px;cursor:pointer;}
+.remember input[type=checkbox]{
+  width:15px;height:15px;accent-color:var(--gold);cursor:pointer;
+}
+.remember span{font-size:12.5px;color:var(--muted2);}
+.forgot-link{font-size:12.5px;color:var(--gold);text-decoration:none;font-weight:500;transition:color 0.15s;}
+.forgot-link:hover{color:var(--gold2);}
+
+/* ── BUTTON ── */
+.btn-login{
+  width:100%;padding:13px;
+  background:linear-gradient(135deg,#f5a623,#e8820a);
+  color:#fff;font-size:14px;font-weight:700;
+  border:none;border-radius:10px;cursor:pointer;
+  display:flex;align-items:center;justify-content:center;gap:8px;
+  box-shadow:0 4px 16px rgba(245,166,35,0.35);
+  transition:all 0.2s;
+  font-family:'Outfit',sans-serif;
+  letter-spacing:0.2px;
+}
+.btn-login:hover{box-shadow:0 6px 22px rgba(245,166,35,0.5);transform:translateY(-1px);}
+.btn-login:active{transform:translateY(0);}
+.btn-login:disabled{opacity:0.6;cursor:not-allowed;transform:none;}
+
+/* ── ERROR MESSAGE ── */
+.error-msg{
+  background:rgba(239,68,68,0.1);
+  border:1px solid rgba(239,68,68,0.25);
+  border-radius:8px;padding:10px 13px;
+  font-size:12.5px;color:var(--red2);
+  display:none;align-items:center;gap:8px;
+  margin-bottom:16px;
+}
+.error-msg.show{display:flex;}
+
+/* ── DEMO CREDENTIALS ── */
+.demo-box{
+  margin-top:20px;
+  background:rgba(255,255,255,0.03);
+  border:1px solid var(--border);
+  border-radius:10px;padding:12px 14px;
+}
+.demo-box .demo-title{font-size:10.5px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:0.8px;margin-bottom:8px;}
+.demo-cred{display:flex;align-items:center;justify-content:space-between;margin-bottom:5px;}
+.demo-cred:last-child{margin-bottom:0;}
+.demo-cred span{font-size:12px;color:var(--muted2);}
+.demo-cred .val{font-size:12px;color:var(--text);font-weight:600;font-family:'Courier New',monospace;}
+.use-demo{
+  margin-top:10px;width:100%;padding:7px;
+  background:rgba(245,166,35,0.08);border:1px solid rgba(245,166,35,0.2);
+  border-radius:7px;color:var(--gold);font-size:12px;font-weight:600;
+  cursor:pointer;font-family:'Outfit',sans-serif;transition:all 0.15s;
+}
+.use-demo:hover{background:rgba(245,166,35,0.14);}
+
+/* ── FOOTER ── */
+.login-footer{
+  text-align:center;margin-top:20px;
+  font-size:11.5px;color:var(--muted);
+}
+.login-footer a{color:var(--gold);text-decoration:none;}
+
+/* ── SPINNER ── */
+.spin{
+  display:inline-block;width:16px;height:16px;
+  border:2px solid rgba(255,255,255,0.3);
+  border-top-color:#fff;border-radius:50%;
+  animation:spin 0.7s linear infinite;
+}
+@keyframes spin{to{transform:rotate(360deg);}}
+
+/* ── SUCCESS STATE ── */
+.success-overlay{
+  position:fixed;inset:0;background:var(--bg);
+  display:none;align-items:center;justify-content:center;
+  flex-direction:column;gap:16px;z-index:999;
+}
+.success-overlay.show{display:flex;}
+.success-icon{
+  width:64px;height:64px;border-radius:50%;
+  background:rgba(16,185,129,0.15);border:2px solid var(--green);
+  display:flex;align-items:center;justify-content:center;
+  font-size:26px;color:var(--green);
+  animation:popIn 0.4s cubic-bezier(0.16,1,0.3,1);
+}
+@keyframes popIn{from{transform:scale(0.5);opacity:0;}to{transform:scale(1);opacity:1;}}
+.success-text{font-size:16px;font-weight:700;color:#fff;}
+.success-sub{font-size:13px;color:var(--muted);}
+</style>
+</head>
+<body>
+
+<div class="bg-grid"></div>
+<div class="bg-glow-1"></div>
+<div class="bg-glow-2"></div>
+
+<!-- SUCCESS OVERLAY -->
+<div class="success-overlay" id="successOverlay">
+  <div class="success-icon"><i class="fas fa-check"></i></div>
+  <div class="success-text">Login Successful!</div>
+  <div class="success-sub">Redirecting to dashboard…</div>
+</div>
+
+<div class="login-wrap">
+  <div class="login-card">
+
+    <!-- BRAND -->
+    <div class="brand">
+      <div class="brand-icon"><i class="fas fa-microchip"></i></div>
+      <div class="brand-text">
+        <div class="name">Uni<span>Comm</span> Pro</div>
+        <div class="sub">Unicircuit Engineering Services LLP</div>
+      </div>
+    </div>
+
+    <!-- HEADING -->
+    <div class="login-heading">
+      <h1>Welcome back</h1>
+      <p>Sign in to your communications dashboard</p>
+    </div>
+
+    <!-- ERROR -->
+    <div class="error-msg" id="errorMsg">
+      <i class="fas fa-exclamation-circle"></i>
+      <span id="errorText">Invalid credentials. Please try again.</span>
+    </div>
+
+    <!-- FORM -->
+    <form id="loginForm" onsubmit="handleLogin(event)" novalidate>
+
+      <div class="form-group">
+        <label class="form-label" for="email">Email Address</label>
+        <div class="input-wrap">
+          <i class="fas fa-envelope icon-left"></i>
+          <input class="inp" type="email" id="email" name="email"
+                 placeholder="Username" autocomplete="email" required />
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label" for="password">Password</label>
+        <div class="input-wrap">
+          <i class="fas fa-lock icon-left"></i>
+          <input class="inp" type="password" id="password" name="password"
+                 placeholder="Enter your password" autocomplete="current-password" required />
+          <i class="fas fa-eye toggle-pw" id="togglePw" onclick="togglePassword()" title="Show/hide password"></i>
+        </div>
+      </div>
+
+      <div class="row-between">
+        <label class="remember">
+          <input type="checkbox" id="rememberMe" />
+          <span>Remember me</span>
+        </label>
+        <a href="#" class="forgot-link" onclick="showForgot(event)">Forgot password?</a>
+      </div>
+
+      <button type="submit" class="btn-login" id="loginBtn">
+        <i class="fas fa-sign-in-alt"></i>
+        <span id="loginBtnText">Sign In</span>
+      </button>
+
+    </form>
+
+    <!-- ADMIN ACCESS -->
+    <div class="demo-box">
+      <div class="demo-title"><i class="fas fa-lock" style="margin-right:4px;"></i>Quick Access</div>
+      <button class="use-demo" onclick="fillDemo()">
+        <i class="fas fa-bolt"></i> Sign in as Admin
+      </button>
+    </div>
+
+  </div>
+
+  <div class="login-footer">
+    &copy; 2026 Unicircuit Engineering Services LLP &nbsp;·&nbsp;
+    <a href="#">Privacy Policy</a>
+  </div>
+</div>
+
+<script>
+// ── CONFIG ──────────────────────────────────────────────────────────────────
+const API_BASE = 'http://localhost:4551/api';
+
+// ── TOGGLE PASSWORD VISIBILITY ───────────────────────────────────────────────
+function togglePassword() {
+  const pw  = document.getElementById('password');
+  const ico = document.getElementById('togglePw');
+  if (pw.type === 'password') {
+    pw.type = 'text';
+    ico.classList.replace('fa-eye', 'fa-eye-slash');
+  } else {
+    pw.type = 'password';
+    ico.classList.replace('fa-eye-slash', 'fa-eye');
+  }
+}
+
+// ── FILL DEMO CREDENTIALS ────────────────────────────────────────────────────
+function fillDemo() {
+  document.getElementById('email').value    = 'Uniadmin';
+  document.getElementById('password').value = 'Uniadmin@123';
+  document.getElementById('email').classList.remove('error');
+  document.getElementById('password').classList.remove('error');
+  hideError();
+}
+
+// ── SHOW / HIDE ERROR ────────────────────────────────────────────────────────
+function showError(msg) {
+  document.getElementById('errorText').textContent = msg;
+  document.getElementById('errorMsg').classList.add('show');
+  document.getElementById('email').classList.add('error');
+  document.getElementById('password').classList.add('error');
+}
+function hideError() {
+  document.getElementById('errorMsg').classList.remove('show');
+  document.getElementById('email').classList.remove('error');
+  document.getElementById('password').classList.remove('error');
+}
+
+// ── FORGOT PASSWORD ──────────────────────────────────────────────────────────
+function showForgot(e) {
+  e.preventDefault();
+  alert('Please contact your administrator to reset your password.');
+}
+
+// ── HANDLE LOGIN ─────────────────────────────────────────────────────────────
+async function handleLogin(e) {
+  e.preventDefault();
+  hideError();
+
+  const email    = document.getElementById('email').value.trim();
+  const password = document.getElementById('password').value;
+  const remember = document.getElementById('rememberMe').checked;
+
+  if (!email || !password) {
+    showError('Please enter your email and password.');
+    return;
+  }
+
+  // Set loading state
+  const btn     = document.getElementById('loginBtn');
+  const btnText = document.getElementById('loginBtnText');
+  btn.disabled  = true;
+  btnText.innerHTML = '<span class="spin"></span> Signing in…';
+
+  try {
+    // ── Try real API first ──────────────────────────────────────────────────
+    let loginSuccess = false;
+    let userData     = null;
+    let token        = null;
+
+    try {
+      const res = await fetch(`${API_BASE}/auth/login`, {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify({ email, password }),
+      });
+      const data = await res.json();
+
+      if (res.ok && data.token) {
+        token        = data.token;
+        userData     = data.user;
+        loginSuccess = true;
+      } else {
+        throw new Error(data.error || 'Invalid credentials.');
+      }
+    } catch (apiErr) {
+      // ── Fallback: offline / demo mode ─────────────────────────────────────
+      // If backend is not running, allow demo login locally
+      const DEMO_USERS = [
+        { email: 'Uniadmin', password: 'Uniadmin@123', name: 'Rajesh Kumar', role: 'admin', initials: 'RK' },
+      ];
+      const found = DEMO_USERS.find(u => u.email === email && u.password === password);
+      if (found) {
+        // Create a mock JWT-like token for demo
+        token = btoa(JSON.stringify({ id: 1, name: found.name, email: found.email, role: found.role, initials: found.initials, exp: Date.now() + 8*3600*1000 }));
+        userData = { id: 1, name: found.name, email: found.email, role: found.role, initials: found.initials };
+        loginSuccess = true;
+      } else if (apiErr.message && !apiErr.message.includes('fetch')) {
+        throw apiErr; // Real API error (wrong password etc.)
+      } else {
+        throw new Error('Invalid credentials.');
+      }
+    }
+
+    if (loginSuccess) {
+      // Store session
+      const storage = remember ? localStorage : sessionStorage;
+      storage.setItem('uc_token',    token);
+      storage.setItem('uc_user',     JSON.stringify(userData));
+      storage.setItem('uc_remember', remember ? '1' : '0');
+
+      // Show success animation then redirect
+      document.getElementById('successOverlay').classList.add('show');
+      setTimeout(() => {
+        window.location.href = 'dashboard.html';
+      }, 1200);
+    }
+
+  } catch (err) {
+    showError(err.message || 'Login failed. Please try again.');
+    btn.disabled  = false;
+    btnText.innerHTML = '<i class="fas fa-sign-in-alt"></i> Sign In';
+  }
+}
+
+// ── AUTO-FILL IF REMEMBERED ──────────────────────────────────────────────────
+window.addEventListener('DOMContentLoaded', () => {
+  // If already logged in, redirect
+  const token = localStorage.getItem('uc_token') || sessionStorage.getItem('uc_token');
+  if (token) {
+    window.location.href = 'dashboard.html';
+    return;
+  }
+  // Pre-fill email if remembered
+  const remembered = localStorage.getItem('uc_remember');
+  if (remembered === '1') {
+    const user = JSON.parse(localStorage.getItem('uc_user') || '{}');
+    if (user.email) document.getElementById('email').value = user.email;
+  }
+});
+
+// ── CLEAR ERRORS ON INPUT ────────────────────────────────────────────────────
+document.addEventListener('DOMContentLoaded', () => {
+  ['email','password'].forEach(id => {
+    document.getElementById(id).addEventListener('input', hideError);
+  });
+});
+</script>
+</body>
+</html>
