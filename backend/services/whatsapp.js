@@ -1,5 +1,5 @@
-/**
- * WhatsApp Service — Baileys
+﻿/**
+ * WhatsApp Service â€” Baileys
  * Proper WhatsApp Web-like implementation:
  * - Contacts store (name resolution)
  * - Individual chats + Groups (separate handling)
@@ -12,16 +12,16 @@ const {
   DisconnectReason,
   fetchLatestBaileysVersion,
   getContentType,
-  makeInMemoryStore,
-  jidNormalizedUser,
+  downloadMediaMessage,
 } = require('@whiskeysockets/baileys');
 
 const qrcode = require('qrcode');
 const path   = require('path');
+const os     = require('os');
 const fs     = require('fs');
 const pool   = require('../db/pool');
 
-// ── STATE ──────────────────────────────────────────────────────────────────
+// â”€â”€ STATE â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 let sock        = null;
 let qrString    = null;
 let isConnected = false;
@@ -39,7 +39,7 @@ function emit(event, data) {
   if (io) io.emit(event, data);
 }
 
-// ── SAFE TIMESTAMP ─────────────────────────────────────────────────────────
+// â”€â”€ SAFE TIMESTAMP â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function toDate(ts) {
   if (!ts) return new Date();
   try {
@@ -56,7 +56,7 @@ function toDate(ts) {
   } catch (_) { return new Date(); }
 }
 
-// ── CONTACT NAME RESOLUTION ────────────────────────────────────────────────
+// â”€â”€ CONTACT NAME RESOLUTION â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // Priority: saved contact name > pushName > formatted phone number
 function getContactName(jid, pushName) {
   if (!jid) return '';
@@ -65,14 +65,14 @@ function getContactName(jid, pushName) {
   if (stored?.name)   return stored.name;
   if (stored?.notify) return stored.notify;
   if (pushName)       return pushName;
-  // Format Indian number: 91XXXXXXXXXX → +91 XXXXX XXXXX
+  // Format Indian number: 91XXXXXXXXXX â†’ +91 XXXXX XXXXX
   if (phone.startsWith('91') && phone.length === 12) {
     return '+91 ' + phone.slice(2, 7) + ' ' + phone.slice(7);
   }
   return '+' + phone;
 }
 
-// ── IS REAL MESSAGE (not system/protocol) ─────────────────────────────────
+// â”€â”€ IS REAL MESSAGE (not system/protocol) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function isRealMessage(msg) {
   if (!msg?.message) return false;
   const type = getContentType(msg.message);
@@ -86,7 +86,7 @@ function isRealMessage(msg) {
   return !skip.includes(type);
 }
 
-// ── GET MESSAGE BODY + METADATA ───────────────────────────────────────────
+// â”€â”€ GET MESSAGE BODY + METADATA â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function getBody(msg) {
   const type = getContentType(msg.message);
   switch (type) {
@@ -108,9 +108,9 @@ function getBody(msg) {
 
 function getMsgIcon(type) {
   const icons = {
-    imageMessage: '📷', videoMessage: '🎥', audioMessage: '🎵',
-    documentMessage: '📄', stickerMessage: '🎭', locationMessage: '📍',
-    contactMessage: '👤', contactsArrayMessage: '👥',
+    imageMessage: 'ðŸ“·', videoMessage: 'ðŸŽ¥', audioMessage: 'ðŸŽµ',
+    documentMessage: 'ðŸ“„', stickerMessage: 'ðŸŽ­', locationMessage: 'ðŸ“',
+    contactMessage: 'ðŸ‘¤', contactsArrayMessage: 'ðŸ‘¥',
   };
   return icons[type] || '';
 }
@@ -130,7 +130,7 @@ function getQuotedBody(msg) {
   } catch (_) { return null; }
 }
 
-// ── ENSURE DB TABLES ───────────────────────────────────────────────────────
+// â”€â”€ ENSURE DB TABLES â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 async function ensureTables() {
   await pool.query(`
     CREATE TABLE IF NOT EXISTS wa_contacts (
@@ -173,7 +173,7 @@ async function ensureTables() {
   await pool.query(`ALTER TABLE wa_messages ADD COLUMN IF NOT EXISTS quoted_body TEXT`);
 }
 
-// ── SAVE / UPDATE CONTACT ──────────────────────────────────────────────────
+// â”€â”€ SAVE / UPDATE CONTACT â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 async function saveContact(contact) {
   if (!contact?.id) return;
   const jid   = contact.id;
@@ -196,7 +196,7 @@ async function saveContact(contact) {
   } catch (_) {}
 }
 
-// ── SAVE CHAT ──────────────────────────────────────────────────────────────
+// â”€â”€ SAVE CHAT â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 async function saveChat(jid, name, lastMsg, lastTime, unread, isGroup) {
   const phone = jid.split('@')[0].split(':')[0];
   // Format Indian number properly
@@ -223,7 +223,7 @@ async function saveChat(jid, name, lastMsg, lastTime, unread, isGroup) {
   }
 }
 
-// ── SAVE MESSAGE ───────────────────────────────────────────────────────────
+// â”€â”€ SAVE MESSAGE â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 async function saveMessage(msg) {
   try {
     if (!isRealMessage(msg)) return null;
@@ -260,7 +260,7 @@ async function saveMessage(msg) {
   }
 }
 
-// ── LOAD CONTACTS FROM DB INTO MEMORY ─────────────────────────────────────
+// â”€â”€ LOAD CONTACTS FROM DB INTO MEMORY â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 async function loadContactsFromDB() {
   try {
     const res = await pool.query(`SELECT jid, name, notify FROM wa_contacts`);
@@ -269,7 +269,7 @@ async function loadContactsFromDB() {
   } catch (_) {}
 }
 
-// ── START WHATSAPP ─────────────────────────────────────────────────────────
+// â”€â”€ START WHATSAPP â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 async function startWA() {
   await ensureTables();
   await loadContactsFromDB();
@@ -293,14 +293,14 @@ async function startWA() {
     },
   });
 
-  // ── CONNECTION ────────────────────────────────────────────────────────────
+  // â”€â”€ CONNECTION â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   sock.ev.on('connection.update', async (update) => {
     const { connection, lastDisconnect, qr } = update;
 
     if (qr) {
       qrString    = qr;
       isConnected = false;
-      console.log('[WA] QR ready — waiting for scan');
+      console.log('[WA] QR ready â€” waiting for scan');
       try {
         const qrDataUrl = await qrcode.toDataURL(qr);
         emit('wa:qr', { qr: qrDataUrl });
@@ -311,7 +311,7 @@ async function startWA() {
       isConnected = true;
       qrString    = null;
       phoneNumber = sock.user?.id?.split(':')[0] || sock.user?.id;
-      console.log('[WA] ✅ Connected as', phoneNumber);
+      console.log('[WA] âœ… Connected as', phoneNumber);
       emit('wa:connected', { phone: phoneNumber, name: sock.user?.name });
     }
 
@@ -324,7 +324,7 @@ async function startWA() {
       if (shouldReconnect) {
         setTimeout(startWA, 3000);
       } else {
-        // Logged out — clear session, restart for fresh QR
+        // Logged out â€” clear session, restart for fresh QR
         clearSession();
         setTimeout(startWA, 1000);
       }
@@ -333,7 +333,7 @@ async function startWA() {
 
   sock.ev.on('creds.update', saveCreds);
 
-  // ── CONTACTS SYNC ─────────────────────────────────────────────────────────
+  // â”€â”€ CONTACTS SYNC â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   sock.ev.on('contacts.upsert', async (contacts) => {
     console.log(`[WA] contacts.upsert count=${contacts.length}`);
     for (const c of contacts) {
@@ -349,9 +349,9 @@ async function startWA() {
     }
   });
 
-  // ── HISTORY SYNC ──────────────────────────────────────────────────────────
+  // â”€â”€ HISTORY SYNC â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   sock.ev.on('messaging-history.set', async ({ chats, contacts, messages, isLatest }) => {
-    console.log(`[WA] History chunk — chats=${chats.length} contacts=${contacts?.length||0} messages=${messages.length} isLatest=${isLatest}`);
+    console.log(`[WA] History chunk â€” chats=${chats.length} contacts=${contacts?.length||0} messages=${messages.length} isLatest=${isLatest}`);
 
     // 1. Save contacts FIRST (needed for name resolution)
     if (contacts?.length) {
@@ -382,18 +382,18 @@ async function startWA() {
         await saveChat(jid, name, result.body, result.ts, 0, isGroup);
       }
     }
-    console.log(`[WA] Chunk saved — ${saved} messages`);
+    console.log(`[WA] Chunk saved â€” ${saved} messages`);
 
     // 4. Only refresh frontend on FINAL chunk (isLatest=true)
     if (isLatest) {
-      console.log('[WA] ✅ Full history sync complete — refreshing UI');
+      console.log('[WA] âœ… Full history sync complete â€” refreshing UI');
       // Update all chat names now that all contacts are loaded
       await updateChatNames();
       emit('wa:sync_complete', {});
     }
   });
 
-  // ── CHAT LIST UPDATES ─────────────────────────────────────────────────────
+  // â”€â”€ CHAT LIST UPDATES â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   sock.ev.on('chats.upsert', async (chats) => {
     for (const chat of chats) {
       const isGroup = chat.id.endsWith('@g.us');
@@ -405,9 +405,14 @@ async function startWA() {
     emit('wa:chats_updated', {});
   });
 
-  // ── REAL-TIME MESSAGES ────────────────────────────────────────────────────
+  // â”€â”€ REAL-TIME MESSAGES â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   sock.ev.on('messages.upsert', async ({ messages, type }) => {
     for (const msg of messages) {
+      // Cache for media download
+      if (msg.key && msg.key.id && msg.message) {
+        msgCache.set(msg.key.id, msg);
+        if (msgCache.size > MAX_CACHE) msgCache.delete(msgCache.keys().next().value);
+      }
       if (!isRealMessage(msg)) continue;
       const jid = msg.key.remoteJid;
       if (!jid || jid === 'status@broadcast') continue;
@@ -433,7 +438,7 @@ async function startWA() {
     }
   });
 
-  // ── MESSAGE STATUS ────────────────────────────────────────────────────────
+  // â”€â”€ MESSAGE STATUS â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   sock.ev.on('messages.update', async (updates) => {
     for (const { key, update } of updates) {
       if (update.status) {
@@ -448,7 +453,7 @@ async function startWA() {
     }
   });
 
-  // ── GROUP METADATA ────────────────────────────────────────────────────────
+  // â”€â”€ GROUP METADATA â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   sock.ev.on('groups.upsert', async (groups) => {
     for (const g of groups) {
       await pool.query(
@@ -471,7 +476,7 @@ async function startWA() {
   return sock;
 }
 
-// ── UPDATE CHAT NAMES AFTER CONTACTS SYNC ─────────────────────────────────
+// â”€â”€ UPDATE CHAT NAMES AFTER CONTACTS SYNC â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 async function updateChatNames() {
   try {
     const chats = await pool.query(`SELECT id, phone, name, is_group FROM wa_chats`);
@@ -496,7 +501,7 @@ async function updateChatNames() {
   }
 }
 
-// ── CLEAR SESSION ─────────────────────────────────────────────────────────
+// â”€â”€ CLEAR SESSION â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function clearSession() {
   try {
     if (fs.existsSync(AUTH_DIR)) {
@@ -506,19 +511,59 @@ function clearSession() {
   } catch (e) { console.warn('[WA] clearSession error:', e.message); }
 }
 
-// ── SEND MESSAGE ───────────────────────────────────────────────────────────
-async function sendMessage(jid, text) {
+// â”€â”€ SEND MESSAGE â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── SEND MESSAGE WITH OPTIONAL REPLY ──────────────────────────────────────
+async function sendMessage(jid, text, quotedMsgId) {
   if (!sock || !isConnected) throw new Error('WhatsApp not connected');
-  const formattedJid = jid.includes('@') ? jid : `${jid}@s.whatsapp.net`;
-  const result = await sock.sendMessage(formattedJid, { text });
+  const formattedJid = jid.includes('@') ? jid : jid + '@s.whatsapp.net';
+  let options = { text };
+  if (quotedMsgId) {
+    try {
+      const res = await pool.query('SELECT body, from_me FROM wa_messages WHERE id=$1 AND chat_id=$2', [quotedMsgId, formattedJid]);
+      if (res.rows[0]) {
+        options.quoted = { key: { id: quotedMsgId, remoteJid: formattedJid, fromMe: res.rows[0].from_me }, message: { conversation: res.rows[0].body || '' } };
+      }
+    } catch (_) {}
+  }
+  const result = await sock.sendMessage(formattedJid, options);
   const ts = new Date();
-  await pool.query(`
-    INSERT INTO wa_messages (id, chat_id, from_me, sender_name, body, msg_type, timestamp, is_read, status)
-    VALUES ($1,$2,true,'You',$3,'text',$4,true,'sent')
-    ON CONFLICT (id, chat_id) DO NOTHING
-  `, [result.key.id, formattedJid, text, ts]);
+  await pool.query('INSERT INTO wa_messages (id, chat_id, from_me, sender_name, body, msg_type, timestamp, is_read, status) VALUES ($1,$2,true,\'You\',$3,\'text\',$4,true,\'sent\') ON CONFLICT (id, chat_id) DO NOTHING', [result.key.id, formattedJid, text, ts]);
   await saveChat(formattedJid, null, text, ts, 0, formattedJid.endsWith('@g.us'));
   return result;
+}
+
+// ── GROUP METADATA ─────────────────────────────────────────────────────────
+async function getGroupMetadata(jid) {
+  if (!sock || !isConnected) throw new Error('WhatsApp not connected');
+  const meta = await sock.groupMetadata(jid);
+  return {
+    id: meta.id, name: meta.subject, description: meta.desc || '',
+    participants: meta.participants.map(function(p) {
+      var phone = p.id.split('@')[0];
+      var name = getContactName(p.id, null);
+      var display = (name && name !== '+' + phone) ? name : (phone.startsWith('91') && phone.length === 12 ? '+91 ' + phone.slice(2,7) + ' ' + phone.slice(7) : '+' + phone);
+      return { jid: p.id, phone: phone, name: display, admin: p.admin === 'admin' || p.admin === 'superadmin' };
+    })
+  };
+}
+
+// ── MEDIA CACHE + DOWNLOAD ─────────────────────────────────────────────────
+const msgCache = new Map();
+const MAX_CACHE = 500;
+
+async function downloadMedia(msgId) {
+  const cached = msgCache.get(msgId);
+  if (!cached) throw new Error('Message not in cache. Only recent messages can be downloaded.');
+  const { downloadMediaMessage } = require('@whiskeysockets/baileys');
+  const buffer = await downloadMediaMessage(cached, 'buffer', {});
+  const type = getContentType(cached.message);
+  const docMsg = cached.message.documentMessage;
+  const imgMsg = cached.message.imageMessage;
+  const vidMsg = cached.message.videoMessage;
+  const audMsg = cached.message.audioMessage;
+  const filename = docMsg?.fileName || (type === 'imageMessage' ? 'image.jpg' : type === 'videoMessage' ? 'video.mp4' : type === 'audioMessage' ? 'voice.ogg' : 'file.bin');
+  const mime = docMsg?.mimetype || imgMsg?.mimetype || vidMsg?.mimetype || audMsg?.mimetype || 'application/octet-stream';
+  return { buffer, mime, filename };
 }
 
 // ── LOGOUT ────────────────────────────────────────────────────────────────
@@ -542,4 +587,6 @@ async function getQR() {
   return qrcode.toDataURL(qrString);
 }
 
-module.exports = { startWA, sendMessage, logout, getStatus, getQR, setIO };
+module.exports = { startWA, sendMessage, logout, getStatus, getQR, setIO, getGroupMetadata, downloadMedia, msgCache };
+
+

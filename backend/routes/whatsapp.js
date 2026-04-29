@@ -1,11 +1,5 @@
 /**
  * WhatsApp Routes
- * GET  /api/wa/status        — connection status
- * GET  /api/wa/qr            — get QR code image
- * POST /api/wa/logout        — disconnect
- * GET  /api/wa/chats         — list all chats from DB
- * GET  /api/wa/messages/:jid — messages for a chat
- * POST /api/wa/send          — send a message
  */
 const express = require('express');
 const pool    = require('../db/pool');
@@ -16,28 +10,21 @@ const router = express.Router();
 router.use(authenticate);
 
 // GET /api/wa/status
-router.get('/status', (req, res) => {
-  res.json(wa.getStatus());
-});
+router.get('/status', (req, res) => res.json(wa.getStatus()));
 
 // GET /api/wa/qr
 router.get('/qr', async (req, res) => {
   const qr = await wa.getQR();
-  if (!qr) return res.json({ qr: null, message: 'No QR available. Already connected or not started.' });
-  res.json({ qr });
+  res.json({ qr: qr || null });
 });
 
 // POST /api/wa/logout
 router.post('/logout', async (req, res) => {
-  try {
-    await wa.logout();
-    res.json({ success: true });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
+  try { await wa.logout(); res.json({ success: true }); }
+  catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-// GET /api/wa/chats — only Indian (+91, 10 digits) + groups, no @lid
+// GET /api/wa/chats — Indian +91 numbers + groups only
 router.get('/chats', async (req, res) => {
   try {
     const result = await pool.query(`
@@ -53,35 +40,32 @@ router.get('/chats', async (req, res) => {
       LIMIT 300
     `);
     res.json(result.rows);
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
+  } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-// POST /api/wa/sync
+// POST /api/wa/sync — stats
 router.post('/sync', async (req, res) => {
   if (!wa.getStatus().connected) return res.status(400).json({ error: 'WhatsApp not connected' });
   try {
     const stats = await pool.query(`
       SELECT
         COUNT(*) FILTER (WHERE is_group) AS groups,
-        COUNT(*) FILTER (WHERE NOT is_group
-          AND id LIKE '%@s.whatsapp.net'
-          AND split_part(id,'@',1) LIKE '91%'
-          AND length(split_part(id,'@',1)) = 12
-        ) AS indian_numbers,
-        SUM(unread) FILTER (WHERE NOT is_group
-          AND id LIKE '%@s.whatsapp.net'
-          AND split_part(id,'@',1) LIKE '91%'
-          AND length(split_part(id,'@',1)) = 12
-        ) AS unread_individual,
-        SUM(unread) FILTER (WHERE is_group) AS unread_groups
+        COUNT(*) FILTER (WHERE NOT is_group AND id LIKE '%@s.whatsapp.net' AND split_part(id,'@',1) LIKE '91%' AND length(split_part(id,'@',1))=12) AS indian_numbers,
+        COALESCE(SUM(unread) FILTER (WHERE NOT is_group AND id LIKE '%@s.whatsapp.net' AND split_part(id,'@',1) LIKE '91%' AND length(split_part(id,'@',1))=12), 0) AS unread_individual,
+        COALESCE(SUM(unread) FILTER (WHERE is_group), 0) AS unread_groups
       FROM wa_chats
     `);
     res.json({ success: true, stats: stats.rows[0] });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// GET /api/wa/group/:jid — group members
+router.get('/group/:jid', async (req, res) => {
+  const jid = decodeURIComponent(req.params.jid);
+  try {
+    const meta = await wa.getGroupMetadata(jid);
+    res.json(meta);
+  } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 // GET /api/wa/messages/:jid
@@ -89,33 +73,34 @@ router.get('/messages/:jid', async (req, res) => {
   const jid   = decodeURIComponent(req.params.jid);
   const limit = parseInt(req.query.limit || '100');
   try {
-    const result = await pool.query(`
-      SELECT * FROM wa_messages
-      WHERE chat_id = $1
-      ORDER BY timestamp ASC
-      LIMIT $2
-    `, [jid, limit]);
-
-    // Mark as read
+    const result = await pool.query(
+      `SELECT * FROM wa_messages WHERE chat_id=$1 ORDER BY timestamp ASC LIMIT $2`,
+      [jid, limit]
+    );
     await pool.query(`UPDATE wa_messages SET is_read=true WHERE chat_id=$1 AND from_me=false`, [jid]);
     await pool.query(`UPDATE wa_chats SET unread=0 WHERE id=$1`, [jid]);
-
     res.json(result.rows);
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
+  } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-// POST /api/wa/send
+// POST /api/wa/send — with optional reply
 router.post('/send', async (req, res) => {
-  const { jid, message } = req.body;
+  const { jid, message, quotedMsgId } = req.body;
   if (!jid || !message) return res.status(400).json({ error: 'jid and message required' });
   try {
-    await wa.sendMessage(jid, message);
+    await wa.sendMessage(jid, message, quotedMsgId || null);
     res.json({ success: true });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// GET /api/wa/media/:msgId — download media
+router.get('/media/:msgId', async (req, res) => {
+  try {
+    const { buffer, mime, filename } = await wa.downloadMedia(req.params.msgId);
+    res.setHeader('Content-Type', mime);
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    res.send(buffer);
+  } catch (err) { res.status(404).json({ error: err.message }); }
 });
 
 module.exports = router;

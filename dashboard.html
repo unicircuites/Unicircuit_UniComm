@@ -882,9 +882,17 @@ select.inp option{background:#1a2035;color:var(--text);}
             <div id="wa-active-avatar" style="width:32px;height:32px;border-radius:50%;background:rgba(37,211,102,0.15);display:none;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:#25D366;"></div>
             <div><h3 id="wa-active-title" style="font-size:13.5px;"><i class="fab fa-whatsapp" style="color:#25D366;"></i> Select a chat</h3><div id="wa-active-phone" style="font-size:10.5px;color:var(--muted);display:none;"></div></div>
           </div>
-          <button class="btn btn-ghost btn-sm" onclick="aiWADraft()"><i class="fas fa-robot"></i> AI Reply</button>
+          <div style="display:flex;gap:6px;align-items:center;">
+            <button class="btn btn-ghost btn-xs" id="wa-members-btn" onclick="waToggleMembers()" style="display:none;"><i class="fas fa-users"></i> Members</button>
+            <button class="btn btn-ghost btn-sm" onclick="aiWADraft()"><i class="fas fa-robot"></i> AI Reply</button>
+          </div>
         </div>
         <div id="wa-chat-area" class="wa-list" style="flex:1;overflow-y:auto;padding:12px;display:flex;flex-direction:column;gap:6px;"></div>
+        <!-- Group members panel -->
+        <div id="wa-members-panel" style="display:none;border-top:1px solid var(--border);max-height:180px;overflow-y:auto;padding:10px 14px;">
+          <div style="font-size:10.5px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:0.8px;margin-bottom:8px;">Group Members</div>
+          <div id="wa-members-list" style="display:flex;flex-direction:column;gap:5px;"></div>
+        </div>
         <div style="padding:10px 14px;border-top:1px solid var(--border);display:flex;flex-direction:column;gap:6px;flex-shrink:0;"><div id="wa-reply-bar" style="display:none;background:rgba(37,211,102,0.06);border-left:3px solid #25D366;padding:6px 10px;border-radius:4px;font-size:11.5px;color:var(--muted2);align-items:center;gap:8px;"><i class="fas fa-reply" style="color:#25D366;font-size:11px;"></i><span id="wa-reply-text" style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"></span><button onclick="waCancelReply()" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:12px;"><i class="fas fa-times"></i></button></div><div style="display:flex;gap:8px;">
           <input class="inp" id="wa-msg-input" placeholder="Type a message..." onkeydown="if(event.key==='Enter')waSendMsg()" style="font-size:13px;" />
           <button class="btn btn-green btn-sm" onclick="waSendMsg()"><i class="fas fa-paper-plane"></i></button>
@@ -2532,6 +2540,10 @@ function waFilterChats(q) {
 async function waOpenChat(jid, name, phone) {
   waActiveJid = jid;
   var isGroup = jid.endsWith('@g.us');
+  var membersBtn = document.getElementById('wa-members-btn');
+  var membersPanel = document.getElementById('wa-members-panel');
+  if (membersBtn) membersBtn.style.display = isGroup ? 'inline-flex' : 'none';
+  if (membersPanel) membersPanel.style.display = 'none';
   // Header: name + phone number below
   var titleEl = document.getElementById('wa-active-title');
   if (titleEl) titleEl.innerHTML = '<i class="fab fa-whatsapp" style="color:#25D366;"></i> ' + name;
@@ -2575,19 +2587,24 @@ async function waOpenChat(jid, name, phone) {
 }
 var waReplyTo = null;
 
-function waMediaHTML(type, body) {
-  var icons = { imageMessage:'📷 Photo', videoMessage:'🎥 Video', audioMessage:'🎵 Voice', documentMessage:'📄', stickerMessage:'🎭 Sticker', locationMessage:'📍 Location' };
-  if (type === 'imageMessage' || type === 'videoMessage') {
-    return '<div style="background:rgba(255,255,255,0.06);border-radius:6px;padding:8px 10px;margin-bottom:4px;font-size:12px;">' + (icons[type]||'📎') + (body ? ' ' + body : '') + '</div>';
+function waMediaHTML(type, body, msgId) {
+  var dlUrl = msgId ? (API_BASE + '/wa/media/' + msgId) : null;
+  var dlBtn = dlUrl ? ' <a href="' + dlUrl + '" download style="color:var(--blue2);font-size:10px;margin-left:6px;" title="Download"><i class="fas fa-download"></i></a>' : '';
+  if (type === 'imageMessage') {
+    // Show placeholder with download — actual image needs media download
+    return '<div style="background:rgba(255,255,255,0.06);border-radius:8px;padding:10px;margin-bottom:4px;display:flex;align-items:center;gap:8px;font-size:12px;">📷 Photo' + (body ? ': ' + body : '') + dlBtn + '</div>';
+  }
+  if (type === 'videoMessage') {
+    return '<div style="background:rgba(255,255,255,0.06);border-radius:8px;padding:10px;margin-bottom:4px;display:flex;align-items:center;gap:8px;font-size:12px;">🎥 Video' + (body ? ': ' + body : '') + dlBtn + '</div>';
   }
   if (type === 'audioMessage') {
-    return '<div style="background:rgba(255,255,255,0.06);border-radius:6px;padding:8px 10px;margin-bottom:4px;font-size:12px;">🎵 Voice message</div>';
+    return '<div style="background:rgba(255,255,255,0.06);border-radius:8px;padding:10px;margin-bottom:4px;display:flex;align-items:center;gap:8px;font-size:12px;">🎵 Voice message' + dlBtn + '</div>';
   }
   if (type === 'documentMessage') {
-    return '<div style="background:rgba(255,255,255,0.06);border-radius:6px;padding:8px 10px;margin-bottom:4px;font-size:12px;display:flex;align-items:center;gap:6px;">📄 <span>' + (body||'Document') + '</span></div>';
+    return '<div style="background:rgba(255,255,255,0.06);border-radius:8px;padding:10px;margin-bottom:4px;display:flex;align-items:center;gap:8px;font-size:12px;cursor:pointer;" onclick="window.open(API_BASE+\'/wa/media/' + (msgId||'') + '\',\'_blank\')">📄 <span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + (body||'Document') + '</span>' + dlBtn + '</div>';
   }
-  if (type === 'stickerMessage') return '<div style="font-size:24px;padding:4px;">🎭</div>';
-  if (type === 'locationMessage') return '<div style="background:rgba(255,255,255,0.06);border-radius:6px;padding:8px;font-size:12px;">📍 Location</div>';
+  if (type === 'stickerMessage') return '<div style="font-size:28px;padding:4px;">🎭</div>';
+  if (type === 'locationMessage') return '<div style="background:rgba(255,255,255,0.06);border-radius:8px;padding:10px;font-size:12px;">📍 Location: ' + (body||'') + '</div>';
   return null;
 }
 
@@ -2621,7 +2638,7 @@ function waAppendMessage(msg) {
   var quotedBlock = quotedBody ? '<div style="background:rgba(255,255,255,0.06);border-left:3px solid var(--green2);padding:5px 8px;border-radius:4px;font-size:11px;color:var(--muted2);margin-bottom:4px;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + quotedBody + '</div>' : '';
 
   // Media block
-  var mediaBlock = waMediaHTML(type, body);
+  var mediaBlock = waMediaHTML(type, body, msg.id || msg.key_id || '');
 
   // Message body
   var bodyText = mediaBlock ? (mediaBlock + (body && type !== 'documentMessage' ? '<div style="font-size:13px;margin-top:2px;">' + body + '</div>' : '')) : '<div style="font-size:13px;">' + body + '</div>';
@@ -2652,15 +2669,43 @@ async function waSendMsg() {
   var text = input.value.trim();
   if (!text || !waActiveJid) return;
   input.value = '';
-  waAppendMessage({ fromMe:true, body:text, ts:new Date() });
+  var quotedId = waReplyTo ? waReplyTo.id : null;
+  waAppendMessage({ fromMe:true, body:text, ts:new Date(), quotedBody: waReplyTo ? waReplyTo.body : null });
+  waCancelReply();
   try {
-    await fetch(API_BASE + '/wa/send', { method:'POST', headers:getAuthHeaders(), body:JSON.stringify({ jid:waActiveJid, message:text }) });
+    await fetch(API_BASE + '/wa/send', { method:'POST', headers:getAuthHeaders(), body:JSON.stringify({ jid:waActiveJid, message:text, quotedMsgId: quotedId }) });
     var chat = waAllChats.find(function(c){return c.id===waActiveJid;});
     if (chat) { chat.last_message = text; chat.last_time = new Date(); waRenderChats(waAllChats); }
   } catch (err) { notify('Send failed', err.message, 'var(--red)', 'fas fa-exclamation-circle'); }
 }
 
 function waRefreshChats() { waLoadChats(); }
+
+async function waToggleMembers() {
+  var panel = document.getElementById('wa-members-panel');
+  if (!panel) return;
+  if (panel.style.display !== 'none') { panel.style.display = 'none'; return; }
+  panel.style.display = 'block';
+  var list = document.getElementById('wa-members-list');
+  list.innerHTML = '<div style="color:var(--muted);font-size:12px;"><span class="spin-loader" style="margin-right:6px;"></span>Loading...</div>';
+  try {
+    var res = await fetch(API_BASE + '/wa/group/' + encodeURIComponent(waActiveJid), { headers: getAuthHeaders() });
+    var data = await res.json();
+    if (res.ok) {
+      list.innerHTML = data.participants.map(function(p) {
+        var adminBadge = p.admin ? '<span style="font-size:9px;background:rgba(245,166,35,0.15);color:var(--gold);padding:1px 5px;border-radius:4px;margin-left:4px;">Admin</span>' : '';
+        return '<div style="display:flex;align-items:center;gap:8px;padding:4px 0;border-bottom:1px solid var(--border);">' +
+          '<div style="width:26px;height:26px;border-radius:50%;background:rgba(37,211,102,0.15);display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;color:#25D366;flex-shrink:0;">' + p.name.charAt(0).toUpperCase() + '</div>' +
+          '<div style="flex:1;min-width:0;"><div style="font-size:12px;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + p.name + adminBadge + '</div></div>' +
+          '</div>';
+      }).join('');
+    } else {
+      list.innerHTML = '<div style="color:var(--red2);font-size:12px;">' + (data.error||'Failed') + '</div>';
+    }
+  } catch (err) {
+    list.innerHTML = '<div style="color:var(--red2);font-size:12px;">' + err.message + '</div>';
+  }
+}
 
 async function waSync() {
   var btn = document.getElementById('wa-sync-btn');
@@ -2730,6 +2775,11 @@ function toggleTheme() {
 </script>
 </body>
 </html>
+
+
+
+
+
 
 
 
