@@ -2561,7 +2561,7 @@ function waAppendMessage(msg) {
   area.appendChild(div);
   area.scrollTop = area.scrollHeight;
 }
-function waSendMsg() {
+async function waSendMsg() {
   var input = document.getElementById('wa-msg-input');
   var text = input.value.trim();
   if (!text || !waActiveJid) return;
@@ -2623,6 +2623,7 @@ function toggleTheme() {
 </script>
 </body>
 </html>
+
 
 
 
