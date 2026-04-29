@@ -90,6 +90,25 @@ async function saveChat(jid, name, lastMsg, lastTime, unread, isGroup) {
   `, [jid, name || phone, lastMsg || '', ts, unread || 0, isGroup || false, phone]);
 }
 
+// ── SAFE TIMESTAMP HELPER ─────────────────────────────────────────────────
+// Baileys returns timestamps as protobuf Long objects or plain numbers
+function toDate(ts) {
+  if (!ts) return new Date();
+  try {
+    // Handle protobuf Long object
+    let secs;
+    if (typeof ts === 'object' && ts !== null) {
+      secs = ts.toNumber ? ts.toNumber() : (ts.low || ts.high * 4294967296 + (ts.low >>> 0));
+    } else {
+      secs = Number(ts);
+    }
+    if (!secs || isNaN(secs) || secs < 1000000) return new Date();
+    return new Date(secs * 1000);
+  } catch (_) {
+    return new Date();
+  }
+}
+
 // ── SAVE MESSAGE TO DB ─────────────────────────────────────────────────────
 async function saveMessage(msg) {
   try {
@@ -97,7 +116,7 @@ async function saveMessage(msg) {
     const id       = msg.key.id;
     const fromMe   = msg.key.fromMe || false;
     const sender   = fromMe ? 'me' : (msg.key.participant || jid);
-    const ts       = new Date(Number(msg.messageTimestamp || Math.floor(Date.now() / 1000)) * 1000);
+    const ts       = toDate(msg.messageTimestamp);
     const type     = getContentType(msg.message) || 'text';
 
     let body = '';
@@ -226,14 +245,7 @@ async function startWA() {
   // ── CHAT UPDATES ──────────────────────────────────────────────────────────
   sock.ev.on('chats.upsert', async (chats) => {
     for (const chat of chats) {
-      // conversationTimestamp is Unix seconds (number) from Baileys
-      let ts = new Date();
-      if (chat.conversationTimestamp) {
-        const num = typeof chat.conversationTimestamp === 'object'
-          ? chat.conversationTimestamp.low || chat.conversationTimestamp.toNumber?.() || Date.now()/1000
-          : Number(chat.conversationTimestamp);
-        if (!isNaN(num)) ts = new Date(num * 1000);
-      }
+      const ts = toDate(chat.conversationTimestamp);
       await saveChat(
         chat.id,
         chat.name || chat.id.split('@')[0],

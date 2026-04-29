@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Dashboard · UniComm Pro · Unicircuit Engineering Services LLP</title>
 <script src="https://cdn.tailwindcss.com"></script>
-<script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+<script src="/socket.io/socket.io.js"></script>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
 <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
@@ -2393,7 +2393,7 @@ let waAllChats   = [];
 
 function initWASocket() {
   if (waSocket) return;
-  waSocket = io('http://localhost:8088');
+  waSocket = io(window.location.origin);
   waSocket.on('wa:qr', ({ qr }) => {
     const img = document.getElementById('wa-qr-img');
     const wrap = document.getElementById('wa-qr-wrap');
@@ -2610,6 +2610,7 @@ function toggleTheme() {
 </script>
 </body>
 </html>
+
 
 
 
