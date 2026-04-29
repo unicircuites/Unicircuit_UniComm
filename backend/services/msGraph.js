@@ -13,9 +13,18 @@ const GRAPH = 'https://graph.microsoft.com/v1.0';
 const msalConfig = {
   auth: {
     clientId:     process.env.MS_CLIENT_ID,
-    authority:    `https://login.microsoftonline.com/${process.env.MS_TENANT_ID}`,
+    authority:    `https://login.microsoftonline.com/common`,  // common = works for any tenant
     clientSecret: process.env.MS_CLIENT_SECRET,
   },
+  system: {
+    loggerOptions: {
+      loggerCallback(level, message) {
+        console.log(`[MSAL][${level}] ${message}`);
+      },
+      piiLoggingEnabled: false,
+      logLevel: 3, // Info
+    }
+  }
 };
 
 const cca = new msal.ConfidentialClientApplication(msalConfig);
@@ -94,26 +103,50 @@ async function getAccessToken(email) {
 }
 
 // ── BUILD AUTH URL ─────────────────────────────────────────────────────────
-function getAuthUrl(state) {
-  return cca.getAuthCodeUrl({
-    scopes:      SCOPES,
-    redirectUri: process.env.MS_REDIRECT_URI,
-    loginHint:   process.env.MS_USER_EMAIL,
-    state:       state || 'unicomm',
-    prompt:      'select_account',
-  });
+async function getAuthUrl(state) {
+  console.log('[MSAL] Building auth URL...');
+  console.log('[MSAL] Tenant ID:', process.env.MS_TENANT_ID);
+  console.log('[MSAL] Client ID:', process.env.MS_CLIENT_ID);
+  console.log('[MSAL] Redirect URI:', process.env.MS_REDIRECT_URI);
+  console.log('[MSAL] Login hint:', process.env.MS_USER_EMAIL);
+  console.log('[MSAL] Authority:', `https://login.microsoftonline.com/${process.env.MS_TENANT_ID}`);
+
+  try {
+    const url = await cca.getAuthCodeUrl({
+      scopes:      SCOPES,
+      redirectUri: process.env.MS_REDIRECT_URI,
+      loginHint:   process.env.MS_USER_EMAIL,
+      state:       state || 'unicomm',
+      prompt:      'select_account',
+    });
+    console.log('[MSAL] Auth URL generated successfully:', url.substring(0, 80) + '...');
+    return url;
+  } catch (err) {
+    console.error('[MSAL] ❌ getAuthCodeUrl failed:', err.message);
+    console.error('[MSAL] Full error:', JSON.stringify(err, null, 2));
+    throw err;
+  }
 }
 
 // ── EXCHANGE CODE FOR TOKEN ────────────────────────────────────────────────
 async function exchangeCode(code) {
-  const result = await cca.acquireTokenByCode({
-    code,
-    scopes:      SCOPES,
-    redirectUri: process.env.MS_REDIRECT_URI,
-  });
-  const email = result.account?.username || process.env.MS_USER_EMAIL;
-  await saveTokens(email, result);
-  return { result, email };
+  console.log('[MSAL] Exchanging auth code for token...');
+  try {
+    const result = await cca.acquireTokenByCode({
+      code,
+      scopes:      SCOPES,
+      redirectUri: process.env.MS_REDIRECT_URI,
+    });
+    console.log('[MSAL] ✅ Token acquired for:', result.account?.username);
+    const email = result.account?.username || process.env.MS_USER_EMAIL;
+    await saveTokens(email, result);
+    return { result, email };
+  } catch (err) {
+    console.error('[MSAL] ❌ exchangeCode failed:', err.message);
+    console.error('[MSAL] Error code:', err.errorCode);
+    console.error('[MSAL] Sub error:', err.errorMessage);
+    throw err;
+  }
 }
 
 // ── GRAPH API HELPER ───────────────────────────────────────────────────────
