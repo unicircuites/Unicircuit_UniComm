@@ -37,23 +37,17 @@ router.post('/logout', async (req, res) => {
   }
 });
 
-// GET /api/wa/chats — only Indian (+91) numbers + groups, no @lid junk
+// GET /api/wa/chats — only Indian (+91, 10 digits) + groups, no @lid
 router.get('/chats', async (req, res) => {
   try {
     const result = await pool.query(`
       SELECT * FROM wa_chats
       WHERE
-        -- Groups: keep all
         is_group = true
-        OR
-        -- Individual: only real WhatsApp numbers (not @lid internal IDs)
-        -- Indian numbers: 91 + 10 digits = 12 digits total
-        (
+        OR (
           id LIKE '%@s.whatsapp.net'
-          AND (
-            split_part(id, '@', 1) LIKE '91%'
-            AND length(split_part(id, '@', 1)) = 12
-          )
+          AND split_part(id,'@',1) LIKE '91%'
+          AND length(split_part(id,'@',1)) = 12
         )
       ORDER BY last_time DESC NULLS LAST
       LIMIT 300
@@ -64,26 +58,27 @@ router.get('/chats', async (req, res) => {
   }
 });
 
-// POST /api/wa/sync — pull latest messages from WhatsApp and store in DB
+// POST /api/wa/sync
 router.post('/sync', async (req, res) => {
-  const status = wa.getStatus();
-  if (!status.connected) {
-    return res.status(400).json({ error: 'WhatsApp not connected' });
-  }
+  if (!wa.getStatus().connected) return res.status(400).json({ error: 'WhatsApp not connected' });
   try {
-    // Fetch latest chats from DB (already being updated by Baileys events)
-    // Just return current count as confirmation
-    const result = await pool.query(`
-      SELECT COUNT(*) as total,
-             SUM(CASE WHEN is_group THEN 1 ELSE 0 END) as groups,
-             SUM(CASE WHEN NOT is_group AND (phone LIKE '+91%' OR phone LIKE '91%') THEN 1 ELSE 0 END) as indian
+    const stats = await pool.query(`
+      SELECT
+        COUNT(*) FILTER (WHERE is_group) AS groups,
+        COUNT(*) FILTER (WHERE NOT is_group
+          AND id LIKE '%@s.whatsapp.net'
+          AND split_part(id,'@',1) LIKE '91%'
+          AND length(split_part(id,'@',1)) = 12
+        ) AS indian_numbers,
+        SUM(unread) FILTER (WHERE NOT is_group
+          AND id LIKE '%@s.whatsapp.net'
+          AND split_part(id,'@',1) LIKE '91%'
+          AND length(split_part(id,'@',1)) = 12
+        ) AS unread_individual,
+        SUM(unread) FILTER (WHERE is_group) AS unread_groups
       FROM wa_chats
     `);
-    res.json({
-      success: true,
-      message: 'Sync complete',
-      stats: result.rows[0]
-    });
+    res.json({ success: true, stats: stats.rows[0] });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

@@ -86,26 +86,48 @@ function isRealMessage(msg) {
   return !skip.includes(type);
 }
 
-// ── GET MESSAGE BODY ───────────────────────────────────────────────────────
+// ── GET MESSAGE BODY + METADATA ───────────────────────────────────────────
 function getBody(msg) {
   const type = getContentType(msg.message);
   switch (type) {
     case 'conversation':             return msg.message.conversation || '';
     case 'extendedTextMessage':      return msg.message.extendedTextMessage?.text || '';
-    case 'imageMessage':             return msg.message.imageMessage?.caption || '📷 Photo';
-    case 'videoMessage':             return msg.message.videoMessage?.caption || '🎥 Video';
-    case 'audioMessage':             return '🎵 Voice message';
-    case 'documentMessage':          return `📄 ${msg.message.documentMessage?.fileName || 'Document'}`;
-    case 'stickerMessage':           return '🎭 Sticker';
-    case 'locationMessage':          return '📍 Location';
-    case 'contactMessage':           return `👤 ${msg.message.contactMessage?.displayName || 'Contact'}`;
-    case 'contactsArrayMessage':     return '👥 Contacts';
-    case 'liveLocationMessage':      return '📍 Live Location';
-    case 'buttonsMessage':           return msg.message.buttonsMessage?.contentText || '🔘 Buttons';
-    case 'listMessage':              return msg.message.listMessage?.description || '📋 List';
-    case 'templateMessage':          return msg.message.templateMessage?.hydratedTemplate?.hydratedContentText || '📝 Template';
+    case 'imageMessage':             return msg.message.imageMessage?.caption || '';
+    case 'videoMessage':             return msg.message.videoMessage?.caption || '';
+    case 'audioMessage':             return '';
+    case 'documentMessage':          return msg.message.documentMessage?.fileName || 'Document';
+    case 'stickerMessage':           return '';
+    case 'locationMessage':          return `${msg.message.locationMessage?.degreesLatitude},${msg.message.locationMessage?.degreesLongitude}`;
+    case 'contactMessage':           return msg.message.contactMessage?.displayName || 'Contact';
+    case 'contactsArrayMessage':     return 'Contacts';
+    case 'buttonsMessage':           return msg.message.buttonsMessage?.contentText || '';
+    case 'listMessage':              return msg.message.listMessage?.description || '';
     default:                         return '';
   }
+}
+
+function getMsgIcon(type) {
+  const icons = {
+    imageMessage: '📷', videoMessage: '🎥', audioMessage: '🎵',
+    documentMessage: '📄', stickerMessage: '🎭', locationMessage: '📍',
+    contactMessage: '👤', contactsArrayMessage: '👥',
+  };
+  return icons[type] || '';
+}
+
+function getQuotedBody(msg) {
+  try {
+    const ctx = msg.message?.extendedTextMessage?.contextInfo
+      || msg.message?.imageMessage?.contextInfo
+      || msg.message?.videoMessage?.contextInfo
+      || msg.message?.documentMessage?.contextInfo
+      || msg.message?.audioMessage?.contextInfo;
+    if (!ctx?.quotedMessage) return null;
+    const qtype = getContentType(ctx.quotedMessage);
+    if (qtype === 'conversation') return ctx.quotedMessage.conversation;
+    if (qtype === 'extendedTextMessage') return ctx.quotedMessage.extendedTextMessage?.text;
+    return getMsgIcon(qtype) + ' ' + (qtype || '');
+  } catch (_) { return null; }
 }
 
 // ── ENSURE DB TABLES ───────────────────────────────────────────────────────
@@ -140,6 +162,7 @@ async function ensureTables() {
       sender_name  VARCHAR(200),
       body         TEXT,
       msg_type     VARCHAR(30) DEFAULT 'text',
+      quoted_body  TEXT,
       timestamp    TIMESTAMPTZ,
       is_read      BOOLEAN DEFAULT FALSE,
       status       VARCHAR(20) DEFAULT 'sent',
@@ -147,6 +170,7 @@ async function ensureTables() {
       PRIMARY KEY (id, chat_id)
     )
   `);
+  await pool.query(`ALTER TABLE wa_messages ADD COLUMN IF NOT EXISTS quoted_body TEXT`);
 }
 
 // ── SAVE / UPDATE CONTACT ──────────────────────────────────────────────────
@@ -204,23 +228,32 @@ async function saveMessage(msg) {
   try {
     if (!isRealMessage(msg)) return null;
 
-    const jid        = msg.key.remoteJid;
-    const id         = msg.key.id;
-    const fromMe     = msg.key.fromMe || false;
+    const jid         = msg.key.remoteJid;
+    const id          = msg.key.id;
+    const fromMe      = msg.key.fromMe || false;
     const participant = msg.key.participant || (fromMe ? null : jid);
-    const senderJid  = fromMe ? null : (participant || jid);
-    const senderName = fromMe ? 'You' : getContactName(senderJid, msg.pushName);
-    const ts         = toDate(msg.messageTimestamp);
-    const type       = getContentType(msg.message) || 'text';
-    const body       = getBody(msg);
+    const senderJid   = fromMe ? null : (participant || jid);
+    // Format sender phone for display
+    let senderName = 'You';
+    if (!fromMe) {
+      const sPhone = senderJid ? senderJid.split('@')[0].split(':')[0] : '';
+      senderName = getContactName(senderJid, msg.pushName) ||
+        (sPhone.startsWith('91') && sPhone.length === 12
+          ? '+91 ' + sPhone.slice(2,7) + ' ' + sPhone.slice(7)
+          : '+' + sPhone);
+    }
+    const ts          = toDate(msg.messageTimestamp);
+    const type        = getContentType(msg.message) || 'text';
+    const body        = getBody(msg);
+    const quotedBody  = getQuotedBody(msg);
 
     await pool.query(`
-      INSERT INTO wa_messages (id, chat_id, from_me, sender, sender_name, body, msg_type, timestamp, is_read)
-      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
+      INSERT INTO wa_messages (id, chat_id, from_me, sender, sender_name, body, msg_type, timestamp, is_read, quoted_body)
+      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
       ON CONFLICT (id, chat_id) DO NOTHING
-    `, [id, jid, fromMe, senderJid, senderName, body, type, ts, fromMe]);
+    `, [id, jid, fromMe, senderJid, senderName, body, type, ts, fromMe, quotedBody]);
 
-    return { id, jid, fromMe, sender: senderJid, senderName, body, type, ts };
+    return { id, jid, fromMe, sender: senderJid, senderName, body, type, ts, quotedBody };
   } catch (err) {
     console.error('[WA-DB] saveMessage error:', err.message);
     return null;

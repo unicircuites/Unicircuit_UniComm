@@ -885,11 +885,11 @@ select.inp option{background:#1a2035;color:var(--text);}
           <button class="btn btn-ghost btn-sm" onclick="aiWADraft()"><i class="fas fa-robot"></i> AI Reply</button>
         </div>
         <div id="wa-chat-area" class="wa-list" style="flex:1;overflow-y:auto;padding:12px;display:flex;flex-direction:column;gap:6px;"></div>
-        <div style="padding:10px 14px;border-top:1px solid var(--border);display:flex;gap:8px;flex-shrink:0;">
+        <div style="padding:10px 14px;border-top:1px solid var(--border);display:flex;flex-direction:column;gap:6px;flex-shrink:0;"><div id="wa-reply-bar" style="display:none;background:rgba(37,211,102,0.06);border-left:3px solid #25D366;padding:6px 10px;border-radius:4px;font-size:11.5px;color:var(--muted2);align-items:center;gap:8px;"><i class="fas fa-reply" style="color:#25D366;font-size:11px;"></i><span id="wa-reply-text" style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"></span><button onclick="waCancelReply()" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:12px;"><i class="fas fa-times"></i></button></div><div style="display:flex;gap:8px;">
           <input class="inp" id="wa-msg-input" placeholder="Type a message..." onkeydown="if(event.key==='Enter')waSendMsg()" style="font-size:13px;" />
           <button class="btn btn-green btn-sm" onclick="waSendMsg()"><i class="fas fa-paper-plane"></i></button>
           <button class="btn btn-ghost btn-sm" onclick="aiWADraft()"><i class="fas fa-robot"></i></button>
-        </div>
+        </div></div>
       </div>
     </div>
   </div>
@@ -2531,26 +2531,64 @@ function waFilterChats(q) {
 
 async function waOpenChat(jid, name, phone) {
   waActiveJid = jid;
+  var isGroup = jid.endsWith('@g.us');
+  // Header: name + phone number below
   var titleEl = document.getElementById('wa-active-title');
   if (titleEl) titleEl.innerHTML = '<i class="fab fa-whatsapp" style="color:#25D366;"></i> ' + name;
   var phEl = document.getElementById('wa-active-phone');
-  if (phEl) { phEl.textContent = phone ? '+' + phone : jid.split('@')[0]; phEl.style.display = 'block'; }
+  if (phEl) {
+    if (isGroup) {
+      phEl.textContent = 'Group';
+    } else {
+      // Show formatted Indian number
+      var rawPhone = jid.split('@')[0];
+      var formatted = rawPhone.startsWith('91') && rawPhone.length === 12
+        ? '+91 ' + rawPhone.slice(2,7) + ' ' + rawPhone.slice(7)
+        : '+' + rawPhone;
+      phEl.textContent = formatted;
+    }
+    phEl.style.display = 'block';
+  }
   var av = document.getElementById('wa-active-avatar');
-  if (av) { av.textContent = name.split(' ').map(function(w){return w[0];}).join('').toUpperCase().slice(0,2); av.style.display = 'flex'; }
+  if (av) {
+    av.textContent = name.split(' ').map(function(w){return w[0];}).join('').toUpperCase().slice(0,2);
+    av.style.display = 'flex';
+  }
   waRenderChats(waAllChats);
   var area = document.getElementById('wa-chat-area');
   area.innerHTML = '<div style="text-align:center;padding:20px;"><div class="spin-loader" style="margin:0 auto;"></div></div>';
+  // Show reply bar (hidden by default)
+  var replyBar = document.getElementById('wa-reply-bar');
+  if (replyBar) replyBar.style.display = 'none';
+  waReplyTo = null;
   try {
     var res = await fetch(API_BASE + '/wa/messages/' + encodeURIComponent(jid) + '?limit=100', { headers: getAuthHeaders() });
     var msgs = await res.json();
     area.innerHTML = '';
-    msgs.forEach(function(m){ waAppendMessage({ id:m.id, fromMe:m.from_me, body:m.body, ts:m.timestamp, type:m.msg_type }); });
+    msgs.forEach(function(m){ waAppendMessage({ id:m.id, fromMe:m.from_me, body:m.body, ts:m.timestamp, type:m.msg_type, senderName:m.sender_name, sender:m.sender, quotedBody:m.quoted_body }); });
     area.scrollTop = area.scrollHeight;
     var chat = waAllChats.find(function(c){return c.id===jid;});
     if (chat) { chat.unread = 0; waRenderChats(waAllChats); }
   } catch (err) {
     area.innerHTML = '<div style="color:var(--red2);padding:16px;font-size:12.5px;">' + err.message + '</div>';
   }
+}
+var waReplyTo = null;
+
+function waMediaHTML(type, body) {
+  var icons = { imageMessage:'📷 Photo', videoMessage:'🎥 Video', audioMessage:'🎵 Voice', documentMessage:'📄', stickerMessage:'🎭 Sticker', locationMessage:'📍 Location' };
+  if (type === 'imageMessage' || type === 'videoMessage') {
+    return '<div style="background:rgba(255,255,255,0.06);border-radius:6px;padding:8px 10px;margin-bottom:4px;font-size:12px;">' + (icons[type]||'📎') + (body ? ' ' + body : '') + '</div>';
+  }
+  if (type === 'audioMessage') {
+    return '<div style="background:rgba(255,255,255,0.06);border-radius:6px;padding:8px 10px;margin-bottom:4px;font-size:12px;">🎵 Voice message</div>';
+  }
+  if (type === 'documentMessage') {
+    return '<div style="background:rgba(255,255,255,0.06);border-radius:6px;padding:8px 10px;margin-bottom:4px;font-size:12px;display:flex;align-items:center;gap:6px;">📄 <span>' + (body||'Document') + '</span></div>';
+  }
+  if (type === 'stickerMessage') return '<div style="font-size:24px;padding:4px;">🎭</div>';
+  if (type === 'locationMessage') return '<div style="background:rgba(255,255,255,0.06);border-radius:6px;padding:8px;font-size:12px;">📍 Location</div>';
+  return null;
 }
 
 function waAppendMessage(msg) {
@@ -2559,14 +2597,55 @@ function waAppendMessage(msg) {
   var time = msg.ts ? new Date(msg.ts).toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'}) : '';
   var fromMe = msg.fromMe || msg.from_me;
   var body = msg.body || '';
+  var type = msg.type || msg.msg_type || 'conversation';
   var senderName = msg.senderName || msg.sender_name || '';
+  var quotedBody = msg.quotedBody || msg.quoted_body || '';
   var isGroup = waActiveJid && waActiveJid.endsWith('@g.us');
+
+  // Sender phone in group (format if Indian)
+  var senderDisplay = senderName;
+  if (!fromMe && isGroup && msg.sender) {
+    var sp = msg.sender.split('@')[0].split(':')[0];
+    if (sp.startsWith('91') && sp.length === 12) {
+      senderDisplay = senderName && !/^\+/.test(senderName) ? senderName : '+91 ' + sp.slice(2,7) + ' ' + sp.slice(7);
+    }
+  }
+
   var div = document.createElement('div');
-  div.style.cssText = 'display:flex;flex-direction:column;align-items:' + (fromMe?'flex-end':'flex-start') + ';margin-bottom:2px;';
-  var senderLabel = (!fromMe && isGroup && senderName) ? '<div style="font-size:10.5px;color:var(--green2);font-weight:600;margin-bottom:2px;padding-left:2px;">' + senderName + '</div>' : '';
-  div.innerHTML = senderLabel + '<div class="' + (fromMe?'wa-bubble wa-out':'wa-bubble wa-in') + '" style="max-width:75%;">' + body + '<div class="wa-time">' + time + (fromMe?' ✓✓':'') + '</div></div>';
+  div.style.cssText = 'display:flex;flex-direction:column;align-items:' + (fromMe?'flex-end':'flex-start') + ';margin-bottom:3px;';
+
+  // Sender label (group only, incoming)
+  var senderLabel = (!fromMe && isGroup && senderDisplay) ? '<div style="font-size:10.5px;color:var(--green2);font-weight:600;margin-bottom:2px;padding-left:2px;">' + senderDisplay + '</div>' : '';
+
+  // Quoted reply block
+  var quotedBlock = quotedBody ? '<div style="background:rgba(255,255,255,0.06);border-left:3px solid var(--green2);padding:5px 8px;border-radius:4px;font-size:11px;color:var(--muted2);margin-bottom:4px;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + quotedBody + '</div>' : '';
+
+  // Media block
+  var mediaBlock = waMediaHTML(type, body);
+
+  // Message body
+  var bodyText = mediaBlock ? (mediaBlock + (body && type !== 'documentMessage' ? '<div style="font-size:13px;margin-top:2px;">' + body + '</div>' : '')) : '<div style="font-size:13px;">' + body + '</div>';
+
+  // Reply button
+  var replyBtn = '<button onclick="waSetReply(\'' + (msg.id||'') + '\',\'' + body.replace(/'/g,"\\'").substring(0,60) + '\')" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:10px;padding:2px 4px;opacity:0;transition:opacity 0.15s;" class="wa-reply-btn" title="Reply"><i class="fas fa-reply"></i></button>';
+
+  div.innerHTML = senderLabel + '<div class="' + (fromMe?'wa-bubble wa-out':'wa-bubble wa-in') + '" style="max-width:78%;position:relative;" onmouseover="this.querySelector(\'.wa-reply-btn\').style.opacity=1" onmouseout="this.querySelector(\'.wa-reply-btn\').style.opacity=0">' + quotedBlock + bodyText + '<div class="wa-time">' + time + (fromMe?' ✓✓':'') + ' ' + replyBtn + '</div></div>';
   area.appendChild(div);
   area.scrollTop = area.scrollHeight;
+}
+
+function waSetReply(msgId, body) {
+  waReplyTo = { id: msgId, body: body };
+  var bar = document.getElementById('wa-reply-bar');
+  var txt = document.getElementById('wa-reply-text');
+  if (bar) bar.style.display = 'flex';
+  if (txt) txt.textContent = body;
+}
+
+function waCancelReply() {
+  waReplyTo = null;
+  var bar = document.getElementById('wa-reply-bar');
+  if (bar) bar.style.display = 'none';
 }
 async function waSendMsg() {
   var input = document.getElementById('wa-msg-input');
@@ -2591,7 +2670,9 @@ async function waSync() {
     var data = await res.json();
     if (res.ok) {
       await waLoadChats();
-      notify('Sync complete', 'Groups: ' + data.stats.groups + ' | Indian contacts: ' + data.stats.indian, 'var(--green)', 'fas fa-check-circle');
+      var s = data.stats;
+      var msg = 'Groups: ' + s.groups + ' | Numbers: ' + s.indian_numbers + ' | Unread: ' + ((parseInt(s.unread_individual)||0)+(parseInt(s.unread_groups)||0));
+      notify('Sync complete', msg, 'var(--green)', 'fas fa-check-circle');
     } else {
       notify('Sync failed', data.error, 'var(--red)', 'fas fa-exclamation-circle');
     }
@@ -2600,6 +2681,7 @@ async function waSync() {
   }
   if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fas fa-sync-alt"></i> Sync Chats'; }
 }
+
 
 async function waLogout() {
   if (!confirm('Disconnect WhatsApp? You will need to scan QR again.')) return;
@@ -2648,6 +2730,10 @@ function toggleTheme() {
 </script>
 </body>
 </html>
+
+
+
+
 
 
 
