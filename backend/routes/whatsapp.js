@@ -54,7 +54,7 @@ router.get('/chats', async (req, res) => {
 // GET /api/wa/messages/:jid
 router.get('/messages/:jid', async (req, res) => {
   const jid   = decodeURIComponent(req.params.jid);
-  const limit = parseInt(req.query.limit || '50');
+  const limit = parseInt(req.query.limit || '100');
   try {
     const result = await pool.query(`
       SELECT * FROM wa_messages

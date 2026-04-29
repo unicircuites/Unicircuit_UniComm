@@ -2550,14 +2550,18 @@ function waAppendMessage(msg) {
   var area = document.getElementById('wa-chat-area');
   if (!area) return;
   var time = msg.ts ? new Date(msg.ts).toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'}) : '';
+  var fromMe = msg.fromMe || msg.from_me;
+  var body = msg.body || '';
+  var senderName = msg.senderName || msg.sender_name || '';
+  var isGroup = waActiveJid && waActiveJid.endsWith('@g.us');
   var div = document.createElement('div');
-  div.style.cssText = 'display:flex;flex-direction:column;align-items:' + (msg.fromMe?'flex-end':'flex-start') + ';';
-  div.innerHTML = '<div class="' + (msg.fromMe?'wa-bubble wa-out':'wa-bubble wa-in') + '" style="max-width:75%;">' + (msg.body||'') + '<div class="wa-time">' + time + (msg.fromMe?' ✓✓':'') + '</div></div>';
+  div.style.cssText = 'display:flex;flex-direction:column;align-items:' + (fromMe?'flex-end':'flex-start') + ';margin-bottom:2px;';
+  var senderLabel = (!fromMe && isGroup && senderName) ? '<div style="font-size:10.5px;color:var(--green2);font-weight:600;margin-bottom:2px;padding-left:2px;">' + senderName + '</div>' : '';
+  div.innerHTML = senderLabel + '<div class="' + (fromMe?'wa-bubble wa-out':'wa-bubble wa-in') + '" style="max-width:75%;">' + body + '<div class="wa-time">' + time + (fromMe?' ✓✓':'') + '</div></div>';
   area.appendChild(div);
   area.scrollTop = area.scrollHeight;
 }
-
-async function waSendMsg() {
+function waSendMsg() {
   var input = document.getElementById('wa-msg-input');
   var text = input.value.trim();
   if (!text || !waActiveJid) return;
@@ -2619,6 +2623,7 @@ function toggleTheme() {
 </script>
 </body>
 </html>
+
 
 
 
