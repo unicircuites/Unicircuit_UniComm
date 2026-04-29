@@ -135,9 +135,10 @@ async function startWA() {
   sock = makeWASocket({
     version,
     auth:              state,
-    printQRInTerminal: true,
+    printQRInTerminal: false,
     browser:           ['UniComm Pro', 'Chrome', '120.0'],
-    syncFullHistory:   true,   // sync old chats
+    syncFullHistory:   false,   // false = faster connect, recent chats only
+    shouldSyncHistoryMessage: () => true,
     getMessage: async (key) => {
       const res = await pool.query(`SELECT body FROM wa_messages WHERE id=$1`, [key.id]);
       return res.rows[0] ? { conversation: res.rows[0].body } : { conversation: '' };

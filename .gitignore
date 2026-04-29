@@ -5,6 +5,13 @@ backend/node_modules/
 # Environment variables — never commit secrets
 backend/.env
 
+# WhatsApp auth session — sensitive keys, never commit
+backend/wa_auth/
+
+# Temp files
+wa_section.txt
+email_section.txt
+
 # Logs
 *.log
 npm-debug.log*

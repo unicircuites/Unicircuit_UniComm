@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Dashboard Â· UniComm Pro Â· Unicircuit Engineering Services LLP</title>
+<title>Dashboard · UniComm Pro · Unicircuit Engineering Services LLP</title>
 <script src="https://cdn.tailwindcss.com"></script>
 <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
@@ -465,15 +465,15 @@ select.inp option{background:#1a2035;color:var(--text);}
 </head>
 <body>
 
-<!-- AUTH GUARD â€” shown while checking session, hidden once verified -->
+<!-- AUTH GUARD "” shown while checking session, hidden once verified -->
 <div id="auth-guard">
   <div class="spin-loader"></div>
-  <p>Verifying sessionâ€¦</p>
+  <p>Verifying session…</p>
 </div>
 
 <div class="shell" id="app-shell" style="display:none;">
 
-<!-- â•â•â•â•â•â• SIDEBAR â•â•â•â•â•â• -->
+<!-- ══════ SIDEBAR ══════ -->
 <aside class="sidebar">
   <div class="sidebar-glow"></div>
   <div class="brand-area">
@@ -486,7 +486,7 @@ select.inp option{background:#1a2035;color:var(--text);}
     </div>
     <div class="status-bar">
       <div class="live-pulse"></div>
-      <span>All systems live Â· v3.0</span>
+      <span>All systems live · v3.0</span>
     </div>
   </div>
 
@@ -513,7 +513,7 @@ select.inp option{background:#1a2035;color:var(--text);}
     <div class="user-av" id="sidebar-initials">RK</div>
     <div style="flex:1;min-width:0;">
       <div class="user-name" id="sidebar-name">Rajesh Kumar</div>
-      <div class="user-role" id="sidebar-role">Admin Â· Unicircuit</div>
+      <div class="user-role" id="sidebar-role">Admin · Unicircuit</div>
     </div>
     <button class="logout-btn" onclick="doLogout()" title="Sign out">
       <i class="fas fa-sign-out-alt"></i>
@@ -521,14 +521,14 @@ select.inp option{background:#1a2035;color:var(--text);}
   </div>
 </aside>
 
-<!-- â•â•â•â•â•â• MAIN â•â•â•â•â•â• -->
+<!-- ══════ MAIN ══════ -->
 <div class="main-area">
 
   <!-- TOPBAR -->
   <div class="topbar">
     <div class="topbar-title">
       <h2 id="page-h">Dashboard</h2>
-      <p id="page-sub">AI-augmented omnichannel communications Â· Unicircuit Engineering Services LLP</p>
+      <p id="page-sub">AI-augmented omnichannel communications · Unicircuit Engineering Services LLP</p>
     </div>
     <div class="topbar-actions">
       <div class="pill-tag"><span style="width:6px;height:6px;border-radius:50%;background:var(--green);"></span> Matrix PBX</div>
@@ -543,7 +543,7 @@ select.inp option{background:#1a2035;color:var(--text);}
   <!-- CONTENT -->
   <div class="content-area">
 
-  <!-- â–ˆâ–ˆâ–ˆâ–ˆâ–ˆâ–ˆ DASHBOARD â–ˆâ–ˆâ–ˆâ–ˆâ–ˆâ–ˆ -->
+  <!-- ██████ DASHBOARD ██████ -->
   <div class="section-view active fu" id="sec-dashboard">
 
     <!-- KPIs -->
@@ -601,7 +601,7 @@ select.inp option{background:#1a2035;color:var(--text);}
       <!-- LEFT: CALL LOG -->
       <div class="card fu fu1">
         <div class="card-header">
-          <h3><i class="fas fa-phone-alt" style="color:var(--gold);"></i> Live PBX Log Â· Matrix Eternity</h3>
+          <h3><i class="fas fa-phone-alt" style="color:var(--gold);"></i> Live PBX Log · Matrix Eternity</h3>
           <span class="badge b-green"><i class="fas fa-circle" style="font-size:6px;"></i> SMDR Live</span>
         </div>
         <div style="overflow-x:auto;">
@@ -622,7 +622,7 @@ select.inp option{background:#1a2035;color:var(--text);}
               </tr>
               <tr>
                 <td><b>Priya Nair</b><br><span style="font-size:10.5px;color:var(--muted);">Ext. 108</span></td>
-                <td>+91 80 4112 3390</td><td>â€”</td>
+                <td>+91 80 4112 3390</td><td>"”</td>
                 <td><span class="badge b-red">Missed</span></td>
                 <td><button class="btn btn-blue btn-xs" onclick="quickCallSummary(this)"><i class="fas fa-robot"></i> Summarise</button></td>
               </tr>
@@ -633,10 +633,10 @@ select.inp option{background:#1a2035;color:var(--text);}
                 <td><button class="btn btn-blue btn-xs" onclick="quickCallSummary(this)"><i class="fas fa-robot"></i> Summarise</button></td>
               </tr>
               <tr>
-                <td><b>Rajan â€“ Purchase</b><br><span style="font-size:10.5px;color:var(--muted);">Ext. 202</span></td>
+                <td><b>Rajan "“ Purchase</b><br><span style="font-size:10.5px;color:var(--muted);">Ext. 202</span></td>
                 <td>Ext. 401 Accounts</td><td>2m 55s</td>
                 <td><span class="badge b-gold">Internal</span></td>
-                <td><span style="color:var(--muted);font-size:11px;">â€”</span></td>
+                <td><span style="color:var(--muted);font-size:11px;">"”</span></td>
               </tr>
             </tbody>
           </table>
@@ -654,7 +654,7 @@ select.inp option{background:#1a2035;color:var(--text);}
             <div style="background:rgba(255,255,255,0.03);border:1px dashed var(--border2);border-radius:9px;padding:12px;display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:11px;">
               <div>
                 <div style="font-size:12.5px;font-weight:600;"><i class="fas fa-file-audio" style="color:var(--gold);margin-right:6px;"></i>BHEL_call_Apr4.mp3</div>
-                <div style="font-size:11px;color:var(--muted);margin-top:2px;">8m 22s Â· Inbound Â· Procurement</div>
+                <div style="font-size:11px;color:var(--muted);margin-top:2px;">8m 22s · Inbound · Procurement</div>
               </div>
               <button class="btn btn-gold btn-sm" onclick="doSummarizeCall('dash-summary')"><i class="fas fa-magic"></i> Run</button>
             </div>
@@ -669,13 +669,13 @@ select.inp option{background:#1a2035;color:var(--text);}
           </div>
           <div class="wa-list" style="max-height:150px;">
             <div style="display:flex;flex-direction:column;gap:6px;">
-              <div class="wa-bubble wa-in">Hi, wanted to check status of PO #UC-2024-087. Dispatch update?<div class="wa-time">Suresh K. Â· 10:22 AM</div></div>
-              <div class="wa-bubble wa-out">PO dispatched via Blue Dart. AWB: 23456789. ETA: 6 Apr.<div class="wa-time">You Â· 10:35 AM âœ“âœ“</div></div>
-              <div class="wa-bubble wa-in">Thanks! Can you share the invoice?<div class="wa-time">Suresh K. Â· 10:38 AM</div></div>
+              <div class="wa-bubble wa-in">Hi, wanted to check status of PO #UC-2024-087. Dispatch update?<div class="wa-time">Suresh K. · 10:22 AM</div></div>
+              <div class="wa-bubble wa-out">PO dispatched via Blue Dart. AWB: 23456789. ETA: 6 Apr.<div class="wa-time">You · 10:35 AM âœ“âœ“</div></div>
+              <div class="wa-bubble wa-in">Thanks! Can you share the invoice?<div class="wa-time">Suresh K. · 10:38 AM</div></div>
             </div>
           </div>
           <div style="padding:10px 14px;border-top:1px solid var(--border);display:flex;gap:7px;">
-            <input class="inp" id="dash-wa-input" placeholder="Quick replyâ€¦" style="font-size:12px;padding:7px 11px;" />
+            <input class="inp" id="dash-wa-input" placeholder="Quick reply…" style="font-size:12px;padding:7px 11px;" />
             <button class="btn btn-green btn-sm" onclick="dashWASend()"><i class="fas fa-paper-plane"></i></button>
             <button class="btn btn-ghost btn-sm" onclick="dashAIWA()"><i class="fas fa-robot"></i></button>
           </div>
@@ -706,7 +706,7 @@ select.inp option{background:#1a2035;color:var(--text);}
       <div class="card fu fu3">
         <div class="card-header"><h3><i class="fas fa-robot" style="color:var(--cyan);"></i> AI Insights</h3></div>
         <div class="card-body">
-          <div class="stat-row"><div class="stat-label">Lead model</div><div class="stat-val" style="font-size:12px;">XGBoost Â· AUC 0.87</div></div>
+          <div class="stat-row"><div class="stat-label">Lead model</div><div class="stat-val" style="font-size:12px;">XGBoost · AUC 0.87</div></div>
           <div class="stat-row"><div class="stat-label">Top segment</div><div class="stat-val" style="font-size:11.5px;color:var(--gold);">Frequent callers</div></div>
           <div class="stat-row"><div class="stat-label">Conversion</div><div class="stat-val" style="color:var(--green2);">22%</div></div>
           <div class="stat-row"><div class="stat-label">Churn alerts</div><div><span class="badge b-red">3 accounts</span></div></div>
@@ -716,11 +716,11 @@ select.inp option{background:#1a2035;color:var(--text);}
     </div>
   </div>
 
-  <!-- â–ˆâ–ˆâ–ˆâ–ˆâ–ˆâ–ˆ CALLS â–ˆâ–ˆâ–ˆâ–ˆâ–ˆâ–ˆ -->
+  <!-- ██████ CALLS ██████ -->
   <div class="section-view fu" id="sec-calls">
     <div class="card" style="margin-bottom:16px;">
       <div class="card-header">
-        <h3><i class="fas fa-phone-alt" style="color:var(--gold);"></i> PBX Call Log Â· Matrix Eternity</h3>
+        <h3><i class="fas fa-phone-alt" style="color:var(--gold);"></i> PBX Call Log · Matrix Eternity</h3>
         <div style="display:flex;gap:8px;">
           <select class="inp" style="width:auto;font-size:12px;padding:5px 10px;">
             <option>Today</option><option>Last 7 days</option><option>Last 30 days</option>
@@ -734,10 +734,10 @@ select.inp option{background:#1a2035;color:var(--text);}
           <thead><tr><th>Caller</th><th>Destination</th><th>Duration</th><th>Time</th><th>Type</th><th>Cost</th><th>Sentiment</th><th>AI Action</th></tr></thead>
           <tbody>
             <tr><td><b>Amit Sharma</b> <span style="color:var(--muted);font-size:10.5px;">Ext.201</span></td><td>+91 98200 44512</td><td>4m 12s</td><td>10:14 AM</td><td><span class="badge b-green">Outgoing</span></td><td style="color:var(--muted);">â‚¹1.26</td><td><span class="badge b-gold">Neutral</span></td><td><button class="btn btn-blue btn-xs" onclick="quickCallSummary(this)"><i class="fas fa-robot"></i> Summarise</button></td></tr>
-            <tr><td><b>L&T ECC</b></td><td>Ext. 305 Sales</td><td>18m 47s</td><td>11:30 AM</td><td><span class="badge b-blue">Incoming</span></td><td style="color:var(--muted);">â€”</td><td><span class="badge b-green">Positive</span></td><td><span class="badge b-green"><i class="fas fa-check"></i> Quotation noted</span></td></tr>
-            <tr><td><b>Priya Nair</b> <span style="color:var(--muted);font-size:10.5px;">Ext.108</span></td><td>+91 80 4112 3390</td><td>â€”</td><td>12:05 PM</td><td><span class="badge b-red">Missed</span></td><td style="color:var(--muted);">â€”</td><td><span class="badge b-red">â€”</span></td><td><button class="btn btn-blue btn-xs" onclick="quickCallSummary(this)"><i class="fas fa-robot"></i> Summarise</button></td></tr>
-            <tr><td><b>BHEL Procurement</b></td><td>Ext. 305 Sales</td><td>9m 03s</td><td>2:45 PM</td><td><span class="badge b-blue">Incoming</span></td><td style="color:var(--muted);">â€”</td><td><span class="badge b-green">Positive</span></td><td><button class="btn btn-blue btn-xs" onclick="quickCallSummary(this)"><i class="fas fa-robot"></i> Summarise</button></td></tr>
-            <tr><td><b>Rajan</b> <span style="color:var(--muted);font-size:10.5px;">Ext.202</span></td><td>Ext. 401 Accounts</td><td>2m 55s</td><td>1:18 PM</td><td><span class="badge b-gold">Internal</span></td><td style="color:var(--muted);">â€”</td><td>â€”</td><td>â€”</td></tr>
+            <tr><td><b>L&T ECC</b></td><td>Ext. 305 Sales</td><td>18m 47s</td><td>11:30 AM</td><td><span class="badge b-blue">Incoming</span></td><td style="color:var(--muted);">"”</td><td><span class="badge b-green">Positive</span></td><td><span class="badge b-green"><i class="fas fa-check"></i> Quotation noted</span></td></tr>
+            <tr><td><b>Priya Nair</b> <span style="color:var(--muted);font-size:10.5px;">Ext.108</span></td><td>+91 80 4112 3390</td><td>"”</td><td>12:05 PM</td><td><span class="badge b-red">Missed</span></td><td style="color:var(--muted);">"”</td><td><span class="badge b-red">"”</span></td><td><button class="btn btn-blue btn-xs" onclick="quickCallSummary(this)"><i class="fas fa-robot"></i> Summarise</button></td></tr>
+            <tr><td><b>BHEL Procurement</b></td><td>Ext. 305 Sales</td><td>9m 03s</td><td>2:45 PM</td><td><span class="badge b-blue">Incoming</span></td><td style="color:var(--muted);">"”</td><td><span class="badge b-green">Positive</span></td><td><button class="btn btn-blue btn-xs" onclick="quickCallSummary(this)"><i class="fas fa-robot"></i> Summarise</button></td></tr>
+            <tr><td><b>Rajan</b> <span style="color:var(--muted);font-size:10.5px;">Ext.202</span></td><td>Ext. 401 Accounts</td><td>2m 55s</td><td>1:18 PM</td><td><span class="badge b-gold">Internal</span></td><td style="color:var(--muted);">"”</td><td>"”</td><td>"”</td></tr>
           </tbody>
         </table>
       </div>
@@ -748,7 +748,7 @@ select.inp option{background:#1a2035;color:var(--text);}
     </div>
   </div>
 
-  <!-- â–ˆâ–ˆâ–ˆâ–ˆâ–ˆâ–ˆ EMAIL â–ˆâ–ˆâ–ˆâ–ˆâ–ˆâ–ˆ -->
+  <!-- ██████ EMAIL ██████ -->
   <div class="section-view fu" id="sec-email">
 
     <!-- Connect banner (shown when not authenticated) -->
@@ -771,19 +771,19 @@ select.inp option{background:#1a2035;color:var(--text);}
             <span id="inbox-unread-badge" class="badge b-blue" style="margin-left:6px;display:none;"></span>
           </h3>
           <div style="display:flex;gap:6px;align-items:center;">
-            <span id="outlook-status-dot" class="badge b-gray" style="font-size:10px;">â¬¤ Checkingâ€¦</span>
+            <span id="outlook-status-dot" class="badge b-gray" style="font-size:10px;">â¬¤ Checking…</span>
             <button class="btn btn-ghost btn-xs" onclick="loadInbox(true)"><i class="fas fa-sync-alt"></i></button>
           </div>
         </div>
         <div style="padding:8px 14px;border-bottom:1px solid var(--border);">
-          <div class="search-box"><i class="fas fa-search"></i><input id="inbox-search" placeholder="Search inboxâ€¦" oninput="searchInbox(this.value)" /></div>
+          <div class="search-box"><i class="fas fa-search"></i><input id="inbox-search" placeholder="Search inbox…" oninput="searchInbox(this.value)" /></div>
         </div>
         <div style="display:flex;gap:4px;padding:8px 14px;border-bottom:1px solid var(--border);">
           <button class="btn btn-blue btn-xs" id="tab-inbox" onclick="switchFolder('inbox',this)">Inbox</button>
           <button class="btn btn-ghost btn-xs" id="tab-sent"  onclick="switchFolder('sent',this)">Sent</button>
         </div>
         <div style="flex:1;overflow-y:auto;" id="email-list">
-          <div style="text-align:center;padding:40px 20px;color:var(--muted);"><div class="spin-loader" style="margin:0 auto 12px;"></div><div style="font-size:12.5px;">Loading inboxâ€¦</div></div>
+          <div style="text-align:center;padding:40px 20px;color:var(--muted);"><div class="spin-loader" style="margin:0 auto 12px;"></div><div style="font-size:12.5px;">Loading inbox…</div></div>
         </div>
         <div style="padding:8px 14px;border-top:1px solid var(--border);display:flex;gap:6px;justify-content:center;">
           <button class="btn btn-ghost btn-xs" id="inbox-prev" onclick="inboxPage(-1)" disabled><i class="fas fa-chevron-left"></i> Prev</button>
@@ -804,7 +804,7 @@ select.inp option{background:#1a2035;color:var(--text);}
             </div>
           </div>
           <div id="email-detail-meta" style="padding:10px 16px;border-bottom:1px solid var(--border);font-size:12px;color:var(--muted);display:none;">
-            <b style="color:var(--text);" id="email-detail-from"></b> &nbsp;Â·&nbsp; <span id="email-detail-time"></span>
+            <b style="color:var(--text);" id="email-detail-from"></b> &nbsp;·&nbsp; <span id="email-detail-time"></span>
           </div>
           <div id="email-detail-body" style="padding:16px;font-size:13px;line-height:1.65;color:var(--text);max-height:260px;overflow-y:auto;">
             <div style="text-align:center;padding:30px;color:var(--muted);"><i class="fas fa-envelope" style="font-size:32px;color:rgba(255,255,255,0.06);display:block;margin-bottom:10px;"></i>Select an email to read</div>
@@ -819,8 +819,8 @@ select.inp option{background:#1a2035;color:var(--text);}
           <div style="padding:14px 16px;display:flex;flex-direction:column;gap:10px;">
             <div><label class="form-label">To</label><input class="inp" id="compose-to" placeholder="recipient@company.com" style="font-size:12.5px;" /></div>
             <div><label class="form-label">CC <span style="color:var(--muted);font-weight:400;">(optional)</span></label><input class="inp" id="compose-cc" placeholder="cc@company.com" style="font-size:12.5px;" /></div>
-            <div><label class="form-label">Subject</label><input class="inp" id="compose-subject" placeholder="Email subjectâ€¦" style="font-size:12.5px;" /></div>
-            <div><label class="form-label">Message</label><textarea class="inp" id="compose-body" rows="5" placeholder="Write your messageâ€¦" style="font-size:12.5px;resize:vertical;"></textarea></div>
+            <div><label class="form-label">Subject</label><input class="inp" id="compose-subject" placeholder="Email subject…" style="font-size:12.5px;" /></div>
+            <div><label class="form-label">Message</label><textarea class="inp" id="compose-body" rows="5" placeholder="Write your message…" style="font-size:12.5px;resize:vertical;"></textarea></div>
             <button class="btn btn-gold" style="justify-content:center;" id="send-btn" onclick="sendEmail()"><i class="fas fa-paper-plane"></i> Send via Outlook</button>
             <div id="compose-status" style="font-size:12px;display:none;"></div>
           </div>
@@ -829,7 +829,7 @@ select.inp option{background:#1a2035;color:var(--text);}
     </div>
   </div>
 
-  <!-- â–ˆâ–ˆâ–ˆâ–ˆâ–ˆâ–ˆ WHATSAPP â–ˆâ–ˆâ–ˆâ–ˆâ–ˆâ–ˆ -->
+  <!-- ██████ WHATSAPP ██████ -->
   <div class="section-view fu" id="sec-whatsapp">
 
     <!-- QR / Connect Banner -->
@@ -891,10 +891,10 @@ select.inp option{background:#1a2035;color:var(--text);}
     </div>
   </div>
 
-  <!-- â–ˆâ–ˆâ–ˆâ–ˆâ–ˆâ–ˆ CONTACTS â–ˆâ–ˆâ–ˆâ–ˆâ–ˆâ–ˆ -->
+  <!-- ██████ CONTACTS ██████ -->
   <div class="section-view fu" id="sec-contacts">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;flex-wrap:wrap;gap:10px;">
-      <div class="search-box" style="max-width:340px;flex:1;"><i class="fas fa-search"></i><input id="contact-search" placeholder="Search contacts, company, tagsâ€¦" oninput="filterContacts()" /></div>
+      <div class="search-box" style="max-width:340px;flex:1;"><i class="fas fa-search"></i><input id="contact-search" placeholder="Search contacts, company, tags…" oninput="filterContacts()" /></div>
       <div style="display:flex;gap:8px;flex-wrap:wrap;">
         <select class="inp" id="contact-filter" style="width:auto;font-size:12px;padding:6px 12px;" onchange="filterContacts()">
           <option value="">All Segments</option>
@@ -924,12 +924,12 @@ select.inp option{background:#1a2035;color:var(--text);}
     </div>
   </div>
 
-  <!-- â–ˆâ–ˆâ–ˆâ–ˆâ–ˆâ–ˆ PIPELINE â–ˆâ–ˆâ–ˆâ–ˆâ–ˆâ–ˆ -->
+  <!-- ██████ PIPELINE ██████ -->
   <div class="section-view fu" id="sec-pipeline">
     <div style="display:flex;gap:12px;overflow-x:auto;padding-bottom:8px;" id="pipeline-board"></div>
   </div>
 
-  <!-- â–ˆâ–ˆâ–ˆâ–ˆâ–ˆâ–ˆ MARKETING â–ˆâ–ˆâ–ˆâ–ˆâ–ˆâ–ˆ -->
+  <!-- ██████ MARKETING ██████ -->
   <div class="section-view fu" id="sec-marketing">
     <div class="two-col" style="margin-bottom:16px;">
       <div class="card">
@@ -937,7 +937,7 @@ select.inp option{background:#1a2035;color:var(--text);}
         <div class="card-body" id="camp-list">
           <div class="camp-card">
             <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:9px;">
-              <div><div style="font-weight:700;font-size:13px;">Q2 Switchgear Promotion</div><div style="font-size:11px;color:var(--muted);margin-top:2px;">Email Â· 1,240 contacts Â· Open rate 34%</div></div>
+              <div><div style="font-weight:700;font-size:13px;">Q2 Switchgear Promotion</div><div style="font-size:11px;color:var(--muted);margin-top:2px;">Email · 1,240 contacts · Open rate 34%</div></div>
               <span class="badge b-green">Active</span>
             </div>
             <div class="prog-bar"><div class="prog-fill" style="width:60%;background:var(--blue);"></div></div>
@@ -945,7 +945,7 @@ select.inp option{background:#1a2035;color:var(--text);}
           </div>
           <div class="camp-card">
             <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:9px;">
-              <div><div style="font-weight:700;font-size:13px;">Cable Tray Flash Sale â€“ WA</div><div style="font-size:11px;color:var(--muted);margin-top:2px;">WhatsApp Â· 820 contacts Â· Read 78%</div></div>
+              <div><div style="font-weight:700;font-size:13px;">Cable Tray Flash Sale "“ WA</div><div style="font-size:11px;color:var(--muted);margin-top:2px;">WhatsApp · 820 contacts · Read 78%</div></div>
               <span class="badge b-green">Live</span>
             </div>
             <div class="prog-bar"><div class="prog-fill" style="width:78%;background:var(--green);"></div></div>
@@ -953,7 +953,7 @@ select.inp option{background:#1a2035;color:var(--text);}
           </div>
           <div class="camp-card">
             <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:9px;">
-              <div><div style="font-weight:700;font-size:13px;">VFD Follow-up Call Blitz</div><div style="font-size:11px;color:var(--muted);margin-top:2px;">Voice Â· 150 leads Â· 42 called</div></div>
+              <div><div style="font-weight:700;font-size:13px;">VFD Follow-up Call Blitz</div><div style="font-size:11px;color:var(--muted);margin-top:2px;">Voice · 150 leads · 42 called</div></div>
               <span class="badge b-gold">Scheduled</span>
             </div>
             <div class="prog-bar"><div class="prog-fill" style="width:28%;background:var(--gold);"></div></div>
@@ -985,16 +985,16 @@ select.inp option{background:#1a2035;color:var(--text);}
     </div>
   </div>
 
-  <!-- â–ˆâ–ˆâ–ˆâ–ˆâ–ˆâ–ˆ AI ASSISTANT â–ˆâ–ˆâ–ˆâ–ˆâ–ˆâ–ˆ -->
+  <!-- ██████ AI ASSISTANT ██████ -->
   <div class="section-view fu" id="sec-ai">
     <div style="max-width:720px;margin:0 auto;">
       <div class="card" style="display:flex;flex-direction:column;height:calc(100vh - 140px);">
         <div class="card-header">
-          <h3><i class="fas fa-robot" style="color:var(--gold);"></i> UniComm AI Â· Powered by Claude</h3>
+          <h3><i class="fas fa-robot" style="color:var(--gold);"></i> UniComm AI · Powered by Claude</h3>
           <span class="badge b-green"><i class="fas fa-circle" style="font-size:6px;"></i> Online</span>
         </div>
         <div style="padding:9px 16px;border-bottom:1px solid var(--border);background:rgba(245,166,35,0.04);">
-          <div style="font-size:11.5px;color:var(--muted);">Specialised in Unicircuit Engineering Services LLP communications â€” switchgear, VFDs, PLCs, cable management, MCC panels, industrial electrical solutions.</div>
+          <div style="font-size:11.5px;color:var(--muted);">Specialised in Unicircuit Engineering Services LLP communications "” switchgear, VFDs, PLCs, cable management, MCC panels, industrial electrical solutions.</div>
         </div>
         <div class="chat-msgs" id="ai-messages" style="flex:1;"></div>
         <div style="padding:10px 16px;border-top:1px solid var(--border);display:flex;flex-wrap:wrap;gap:6px;">
@@ -1005,14 +1005,14 @@ select.inp option{background:#1a2035;color:var(--text);}
           <button class="quick-chip" onclick="quickAI('What are best practices for following up with B2B engineering clients in India?')"><i class="fas fa-lightbulb"></i> Sales tips</button>
         </div>
         <div class="chat-input-bar">
-          <input class="inp" id="ai-input" placeholder="Ask anything about communications, clients, productsâ€¦" onkeydown="if(event.key==='Enter')sendAI()" />
+          <input class="inp" id="ai-input" placeholder="Ask anything about communications, clients, products…" onkeydown="if(event.key==='Enter')sendAI()" />
           <button class="btn btn-gold" id="ai-send" onclick="sendAI()"><i class="fas fa-paper-plane"></i></button>
         </div>
       </div>
     </div>
   </div>
 
-  <!-- â–ˆâ–ˆâ–ˆâ–ˆâ–ˆâ–ˆ ANALYTICS â–ˆâ–ˆâ–ˆâ–ˆâ–ˆâ–ˆ -->
+  <!-- ██████ ANALYTICS ██████ -->
   <div class="section-view fu" id="sec-analytics">
     <div class="kpi-row" style="margin-bottom:16px;">
       <div class="kpi blue"><div class="kpi-top"><div class="kpi-label">Avg Handle Time</div><div class="kpi-icon" style="background:rgba(59,130,246,0.12);color:var(--blue2);"><i class="fas fa-stopwatch"></i></div></div><div class="kpi-val">6m 44s</div><div class="kpi-change" style="color:var(--green2);">â†“ -12% vs last month</div></div>
@@ -1042,7 +1042,7 @@ select.inp option{background:#1a2035;color:var(--text);}
 </div><!-- /main-area -->
 </div><!-- /app-shell -->
 
-<!-- â•â•â•â•â•â• CONTACT MODAL â•â•â•â•â•â• -->
+<!-- ══════ CONTACT MODAL ══════ -->
 <div class="modal-overlay" id="contact-modal">
   <div class="modal">
     <div class="modal-title">
@@ -1053,7 +1053,7 @@ select.inp option{background:#1a2035;color:var(--text);}
       <div><label class="form-label">First Name *</label><input class="inp" id="c-fname" placeholder="Ramesh" /></div>
       <div><label class="form-label">Last Name *</label><input class="inp" id="c-lname" placeholder="Mehta" /></div>
     </div>
-    <div class="form-group"><label class="form-label">Company *</label><input class="inp" id="c-company" placeholder="L&T ECC, BHEL, Siemensâ€¦" /></div>
+    <div class="form-group"><label class="form-label">Company *</label><input class="inp" id="c-company" placeholder="L&T ECC, BHEL, Siemens…" /></div>
     <div class="form-row">
       <div><label class="form-label">Designation</label><input class="inp" id="c-designation" placeholder="Purchase Manager" /></div>
       <div><label class="form-label">Department</label><input class="inp" id="c-dept" placeholder="Procurement" /></div>
@@ -1069,9 +1069,9 @@ select.inp option{background:#1a2035;color:var(--text);}
       </div>
       <div><label class="form-label">Lead Score (0-100)</label><input class="inp" id="c-score" type="number" min="0" max="100" placeholder="65" /></div>
     </div>
-    <div class="form-group"><label class="form-label">Products of Interest</label><input class="inp" id="c-products" placeholder="VFDs, MCC Panels, Cable Traysâ€¦" /></div>
-    <div class="form-group"><label class="form-label">City / Location</label><input class="inp" id="c-city" placeholder="Mumbai, Delhi, Ahmedabadâ€¦" /></div>
-    <div class="form-group"><label class="form-label">Notes</label><textarea class="inp" id="c-notes" rows="2" placeholder="Any additional notes about this contactâ€¦"></textarea></div>
+    <div class="form-group"><label class="form-label">Products of Interest</label><input class="inp" id="c-products" placeholder="VFDs, MCC Panels, Cable Trays…" /></div>
+    <div class="form-group"><label class="form-label">City / Location</label><input class="inp" id="c-city" placeholder="Mumbai, Delhi, Ahmedabad…" /></div>
+    <div class="form-group"><label class="form-label">Notes</label><textarea class="inp" id="c-notes" rows="2" placeholder="Any additional notes about this contact…"></textarea></div>
     <div style="display:flex;gap:8px;margin-top:4px;">
       <button class="btn btn-gold" style="flex:1;justify-content:center;" onclick="saveContact()"><i class="fas fa-save"></i> Save Contact</button>
       <button class="btn btn-ghost" onclick="aiEnrichContact()"><i class="fas fa-robot"></i> AI Enrich</button>
@@ -1080,7 +1080,7 @@ select.inp option{background:#1a2035;color:var(--text);}
   </div>
 </div>
 
-<!-- â•â•â•â•â•â• CAMPAIGN MODAL â•â•â•â•â•â• -->
+<!-- ══════ CAMPAIGN MODAL ══════ -->
 <div class="modal-overlay" id="campaign-modal">
   <div class="modal">
     <div class="modal-title">
@@ -1105,12 +1105,12 @@ select.inp option{background:#1a2035;color:var(--text);}
 </div>
 
 <script>
-// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
-// UNICIRCUIT UNICOMM PRO â€” ADVANCED AI PLATFORM
-// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+// ══════════════════════════════════════════════════════════════
+// UNICIRCUIT UNICOMM PRO "” ADVANCED AI PLATFORM
+// ══════════════════════════════════════════════════════════════
 const CLAUDE = "https://api.anthropic.com/v1/messages";
 const MODEL = "claude-sonnet-4-20250514";
-const SYSTEM = `You are UniComm AI, the intelligent communication platform assistant for Unicircuit Engineering Services LLP â€” a professional electrical engineering solutions company based in India. Unicircuit deals in: switchgear (MCBs, MCCBs, ACBs), VFDs (Variable Frequency Drives), PLCs, MCC panels, DB panels, cable trays, cable management systems, power quality analysers, and related industrial electrical products. Their key clients include L&T ECC, BHEL, Siemens, Schneider Electric, ABB India, and various electrical contractors and EPCs.
+const SYSTEM = `You are UniComm AI, the intelligent communication platform assistant for Unicircuit Engineering Services LLP "” a professional electrical engineering solutions company based in India. Unicircuit deals in: switchgear (MCBs, MCCBs, ACBs), VFDs (Variable Frequency Drives), PLCs, MCC panels, DB panels, cable trays, cable management systems, power quality analysers, and related industrial electrical products. Their key clients include L&T ECC, BHEL, Siemens, Schneider Electric, ABB India, and various electrical contractors and EPCs.
 
 Your responsibilities:
 1. Draft professional B2B emails, WhatsApp messages, quotation covers, follow-ups
@@ -1139,15 +1139,15 @@ async function callClaude(userMsg, systemOverride) {
 
 // â”€â”€ NAVIGATION â”€â”€
 const pageMeta = {
-  dashboard: ['Dashboard', 'AI-augmented omnichannel comms Â· Unicircuit Engineering Services LLP'],
-  calls: ['PBX Call Logs', 'Matrix Eternity SMDR realtime integration Â· AI summaries'],
-  email: ['Email / Outlook', 'Microsoft Graph API Â· Claude AI reply suggestions'],
-  whatsapp: ['WhatsApp Business', 'WA Business API Â· AI-powered messaging'],
-  contacts: ['Contacts', 'CRM module Â· AI-enriched contact intelligence'],
-  pipeline: ['Sales Pipeline', 'Deal tracking Â· Lead scoring Â· AI insights'],
-  marketing: ['Marketing Suite', 'Omnichannel campaigns Â· AI-generated copy'],
-  ai: ['AI Assistant', 'Claude-powered Â· Unicircuit Engineering context'],
-  analytics: ['Analytics', 'Communication intelligence Â· Client insights'],
+  dashboard: ['Dashboard', 'AI-augmented omnichannel comms · Unicircuit Engineering Services LLP'],
+  calls: ['PBX Call Logs', 'Matrix Eternity SMDR realtime integration · AI summaries'],
+  email: ['Email / Outlook', 'Microsoft Graph API · Claude AI reply suggestions'],
+  whatsapp: ['WhatsApp Business', 'WA Business API · AI-powered messaging'],
+  contacts: ['Contacts', 'CRM module · AI-enriched contact intelligence'],
+  pipeline: ['Sales Pipeline', 'Deal tracking · Lead scoring · AI insights'],
+  marketing: ['Marketing Suite', 'Omnichannel campaigns · AI-generated copy'],
+  ai: ['AI Assistant', 'Claude-powered · Unicircuit Engineering context'],
+  analytics: ['Analytics', 'Communication intelligence · Client insights'],
 };
 
 function nav(id, el) {
@@ -1194,9 +1194,9 @@ document.querySelectorAll('.modal-overlay').forEach(m => {
   m.addEventListener('click', e => { if (e.target === m) m.classList.remove('open'); });
 });
 
-// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+// ══════════════════════════════════
 // CONTACTS MODULE
-// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+// ══════════════════════════════════
 let contacts = [
   { id:1, fname:'Suresh', lname:'Kumar', company:'L&T ECC', designation:'Sr. Purchase Manager', dept:'Procurement', phone:'+91 98200 44512', wa:'+91 98200 44512', email:'suresh.k@larsentoubro.com', segment:'Hot Lead', score:88, products:'MCC Panels, Cable Trays', city:'Mumbai', notes:'Key decision maker. Discussed Panel Wiring for Faridabad plant. Follow up Q2 proposal.', avatar_color:'#1d4ed8', avatar_bg:'rgba(29,78,216,0.15)', initials:'SK', calls:24, emails:38, wa_count:12, lastContact:'Today', created:'2024-01-15' },
   { id:2, fname:'Vijay', lname:'Rao', company:'BHEL', designation:'Procurement Officer', dept:'Purchase', phone:'+91 11 2337 8800', wa:'+91 98765 10001', email:'vijay.rao@bhel.in', segment:'Client', score:74, products:'VFDs, PLC Panels, DB Boxes', city:'Delhi', notes:'Long-term client. Regular orders for VFDs. Tender deadline April 10.', avatar_color:'#d97706', avatar_bg:'rgba(217,119,6,0.15)', initials:'VR', calls:18, emails:22, wa_count:6, lastContact:'Today', created:'2023-08-10' },
@@ -1231,7 +1231,7 @@ function renderContacts(list) {
         <div class="contact-avatar" style="background:${c.avatar_bg};color:${c.avatar_color};">${c.initials}</div>
         <div style="flex:1;min-width:0;">
           <div style="font-weight:700;font-size:13.5px;color:#fff;">${c.fname} ${c.lname}</div>
-          <div style="font-size:11.5px;color:var(--muted);margin-top:1px;">${c.designation} Â· ${c.company}</div>
+          <div style="font-size:11.5px;color:var(--muted);margin-top:1px;">${c.designation} · ${c.company}</div>
         </div>
         <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px;">
           <span class="badge ${segmentColor(c.segment)}">${c.segment}</span>
@@ -1273,7 +1273,7 @@ function showContact(id) {
         <div class="contact-avatar" style="width:50px;height:50px;background:${c.avatar_bg};color:${c.avatar_color};font-size:18px;">${c.initials}</div>
         <div style="flex:1;">
           <div style="font-size:17px;font-weight:800;color:#fff;">${c.fname} ${c.lname}</div>
-          <div style="font-size:12.5px;color:var(--muted);margin-top:2px;">${c.designation} Â· ${c.dept} Â· ${c.company}</div>
+          <div style="font-size:12.5px;color:var(--muted);margin-top:2px;">${c.designation} · ${c.dept} · ${c.company}</div>
           <div style="display:flex;gap:7px;margin-top:7px;flex-wrap:wrap;">
             <span class="badge ${segmentColor(c.segment)}">${c.segment}</span>
             <span class="badge b-gray"><i class="fas fa-map-marker-alt" style="font-size:9px;"></i> ${c.city}</span>
@@ -1408,19 +1408,19 @@ function deleteContact(id) {
 async function aiContactInsight(id) {
   const c = contacts.find(x => x.id === id);
   const result = document.getElementById('contact-ai-result');
-  result.innerHTML = '<div style="font-size:12px;color:var(--muted);"><span class="spin-loader"></span> Generating AI insightâ€¦</div>';
+  result.innerHTML = '<div style="font-size:12px;color:var(--muted);"><span class="spin-loader"></span> Generating AI insight…</div>';
   try {
     const text = await callClaude(`Generate a brief AI sales intelligence insight for the following contact at Unicircuit Engineering Services LLP:\n\nName: ${c.fname} ${c.lname}\nCompany: ${c.company}\nDesignation: ${c.designation}\nSegment: ${c.segment}\nLead Score: ${c.score}/100\nProducts of Interest: ${c.products}\nCity: ${c.city}\nNotes: ${c.notes}\nCalls: ${c.calls}, Emails: ${c.emails}, WhatsApp: ${c.wa_count}\nLast Contact: ${c.lastContact}\n\nProvide: 1) Engagement summary 2) Next best action 3) Risk/opportunity alert. Keep it under 80 words, practical and actionable.`);
     result.innerHTML = `<div style="background:rgba(245,166,35,0.06);border:1px solid rgba(245,166,35,0.15);border-radius:9px;padding:12px 14px;font-size:12.5px;line-height:1.6;color:var(--text);"><div style="font-size:10px;font-weight:700;color:var(--gold);margin-bottom:6px;"><i class="fas fa-robot"></i> CLAUDE AI INSIGHT</div>${text.replace(/\n/g,'<br>')}</div>`;
   } catch(e) {
-    result.innerHTML = '<div style="color:var(--red2);font-size:12px;">API error â€” check network.</div>';
+    result.innerHTML = '<div style="color:var(--red2);font-size:12px;">API error "” check network.</div>';
   }
 }
 
 async function draftEmail(id) {
   const c = contacts.find(x => x.id === id);
   const result = document.getElementById('contact-ai-result');
-  result.innerHTML = '<div style="font-size:12px;color:var(--muted);"><span class="spin-loader"></span> Drafting emailâ€¦</div>';
+  result.innerHTML = '<div style="font-size:12px;color:var(--muted);"><span class="spin-loader"></span> Drafting email…</div>';
   try {
     const text = await callClaude(`Draft a short professional follow-up email from Unicircuit Engineering Services LLP to ${c.fname} ${c.lname} (${c.designation}, ${c.company}) regarding their interest in ${c.products}. Note context: ${c.notes}. Keep it under 100 words. Include Subject line.`);
     result.innerHTML = `<div style="background:rgba(59,130,246,0.06);border:1px solid rgba(59,130,246,0.15);border-radius:9px;padding:12px 14px;font-size:12.5px;line-height:1.6;color:var(--text);"><div style="font-size:10px;font-weight:700;color:var(--blue2);margin-bottom:6px;"><i class="fas fa-envelope"></i> EMAIL DRAFT</div><pre style="white-space:pre-wrap;font-family:'Outfit';font-size:12.5px;">${text}</pre><div style="margin-top:8px;"><button class="btn btn-blue btn-xs" onclick="notify('Draft copied to Outlook','Ready to send','var(--blue2)','fas fa-envelope')"><i class="fas fa-paper-plane"></i> Send via Outlook</button></div></div>`;
@@ -1432,7 +1432,7 @@ async function draftEmail(id) {
 async function draftWA(id) {
   const c = contacts.find(x => x.id === id);
   const result = document.getElementById('contact-ai-result');
-  result.innerHTML = '<div style="font-size:12px;color:var(--muted);"><span class="spin-loader"></span> Drafting WhatsApp messageâ€¦</div>';
+  result.innerHTML = '<div style="font-size:12px;color:var(--muted);"><span class="spin-loader"></span> Drafting WhatsApp message…</div>';
   try {
     const text = await callClaude(`Draft a brief, professional WhatsApp message from Unicircuit Engineering Services LLP to ${c.fname} (${c.company}) regarding ${c.products}. Context: ${c.notes}. Keep it under 50 words, friendly and professional.`);
     result.innerHTML = `<div style="background:rgba(16,185,129,0.06);border:1px solid rgba(16,185,129,0.15);border-radius:9px;padding:12px 14px;font-size:12.5px;line-height:1.6;color:var(--text);"><div style="font-size:10px;font-weight:700;color:var(--green2);margin-bottom:6px;"><i class="fab fa-whatsapp"></i> WHATSAPP DRAFT</div>${text}<div style="margin-top:8px;"><button class="btn btn-green btn-xs" onclick="notify('Message sent via WhatsApp Business','${c.fname} ${c.lname}','var(--green2)','fab fa-whatsapp')"><i class="fas fa-paper-plane"></i> Send via WA</button></div></div>`;
@@ -1445,7 +1445,7 @@ async function aiEnrichContact() {
   const company = document.getElementById('c-company').value;
   const products = document.getElementById('c-products').value;
   if (!company) { notify('Enter company name first', '', 'var(--red)', 'fas fa-exclamation-triangle'); return; }
-  notify('Enriching with AIâ€¦', 'Claude is researching this contact', 'var(--cyan)', 'fas fa-robot');
+  notify('Enriching with AI…', 'Claude is researching this contact', 'var(--cyan)', 'fas fa-robot');
   try {
     const text = await callClaude(`For a contact at ${company} in the Indian electrical engineering industry, interested in ${products||'electrical products'}: suggest a likely designation, key pain points, and 2 talking points for Unicircuit Engineering Services LLP. Keep it very brief.`);
     document.getElementById('c-notes').value = text.replace(/\n+/g, ' ').substring(0, 200);
@@ -1456,21 +1456,21 @@ async function aiEnrichContact() {
 }
 
 async function aiEnrichContacts() {
-  notify('Enriching all contactsâ€¦', 'AI is scoring and tagging', 'var(--gold)', 'fas fa-robot');
+  notify('Enriching all contacts…', 'AI is scoring and tagging', 'var(--gold)', 'fas fa-robot');
   setTimeout(() => notify('Enrichment complete', '48 contacts updated with AI insights', 'var(--green)', 'fas fa-check-circle'), 2000);
 }
 
-// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+// ══════════════════════════════════
 // PIPELINE MODULE
-// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+// ══════════════════════════════════
 const pipelineStages = ['Prospect', 'Qualified', 'Proposal Sent', 'Negotiation', 'Won', 'Lost'];
 const pipelineDeals = [
-  { id:1, name:'L&T â€“ MCC Panel Supply', company:'L&T ECC', value:'â‚¹12.4L', stage:'Negotiation', score:88, owner:'Amit S.', dueDate:'Apr 15' },
-  { id:2, name:'BHEL â€“ VFD Bundle', company:'BHEL', value:'â‚¹8.1L', stage:'Proposal Sent', score:74, owner:'Rajesh K.', dueDate:'Apr 10' },
-  { id:3, name:'Adani Power â€“ HT Panels', company:'Adani Power', value:'â‚¹22L', stage:'Qualified', score:82, owner:'Rajesh K.', dueDate:'Apr 30' },
-  { id:4, name:'Siemens â€“ PQA Demo to Order', company:'Siemens Partner', value:'â‚¹3.2L', stage:'Prospect', score:61, owner:'Priya N.', dueDate:'May 5' },
-  { id:5, name:'Schneider â€“ MSU Confirmation', company:'Schneider', value:'â‚¹1.8L', stage:'Won', score:42, owner:'Amit S.', dueDate:'Done' },
-  { id:6, name:'NTPC â€“ Cable Trays RFQ', company:'NTPC', value:'â‚¹5.6L', stage:'Qualified', score:55, owner:'Rajesh K.', dueDate:'Apr 20' },
+  { id:1, name:'L&T "“ MCC Panel Supply', company:'L&T ECC', value:'â‚¹12.4L', stage:'Negotiation', score:88, owner:'Amit S.', dueDate:'Apr 15' },
+  { id:2, name:'BHEL "“ VFD Bundle', company:'BHEL', value:'â‚¹8.1L', stage:'Proposal Sent', score:74, owner:'Rajesh K.', dueDate:'Apr 10' },
+  { id:3, name:'Adani Power "“ HT Panels', company:'Adani Power', value:'â‚¹22L', stage:'Qualified', score:82, owner:'Rajesh K.', dueDate:'Apr 30' },
+  { id:4, name:'Siemens "“ PQA Demo to Order', company:'Siemens Partner', value:'â‚¹3.2L', stage:'Prospect', score:61, owner:'Priya N.', dueDate:'May 5' },
+  { id:5, name:'Schneider "“ MSU Confirmation', company:'Schneider', value:'â‚¹1.8L', stage:'Won', score:42, owner:'Amit S.', dueDate:'Done' },
+  { id:6, name:'NTPC "“ Cable Trays RFQ', company:'NTPC', value:'â‚¹5.6L', stage:'Qualified', score:55, owner:'Rajesh K.', dueDate:'Apr 20' },
 ];
 
 function renderPipeline() {
@@ -1484,7 +1484,7 @@ function renderPipeline() {
         <span style="font-size:11px;font-weight:700;color:${col};text-transform:uppercase;letter-spacing:0.5px;">${stage}</span>
         <span style="font-size:10px;background:rgba(255,255,255,0.06);padding:2px 7px;border-radius:10px;color:var(--muted);">${deals.length}</span>
       </div>
-      ${deals.map(d => `<div class="card" style="padding:12px 13px;cursor:pointer;" onclick="notify('${d.name}','${d.value} Â· ${d.owner}','${col}','fas fa-briefcase')">
+      ${deals.map(d => `<div class="card" style="padding:12px 13px;cursor:pointer;" onclick="notify('${d.name}','${d.value} · ${d.owner}','${col}','fas fa-briefcase')">
         <div style="font-weight:700;font-size:12.5px;margin-bottom:4px;">${d.name}</div>
         <div style="font-size:11px;color:var(--muted);margin-bottom:8px;">${d.company}</div>
         <div style="display:flex;justify-content:space-between;align-items:center;">
@@ -1501,9 +1501,9 @@ function renderPipeline() {
   }).join('');
 }
 
-// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+// ══════════════════════════════════
 // WHATSAPP MODULE
-// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+// ══════════════════════════════════
 const waConvos = [
   { id:1, name:'Suresh Kumar', company:'L&T ECC', initials:'SK', col:'#1d4ed8', bg:'rgba(29,78,216,0.15)', last:'Can you share the invoice?', time:'10:38 AM', unread:2,
     msgs:[{from:'in',text:'Hi, wanted to check status of PO #UC-2024-087. Any update on dispatch?',time:'10:22 AM'},{from:'out',text:'Hello Suresh ji, PO #UC-2024-087 dispatched via Blue Dart. AWB: 23456789. ETA: 6 Apr.',time:'10:35 AM'},{from:'in',text:'Great, thanks! Can you also share the invoice?',time:'10:38 AM'}]},
@@ -1530,7 +1530,7 @@ function loadWAConvo(id) {
   const c = waConvos.find(x => x.id === id);
   if (!c) return;
   activeWAId = id;
-  document.getElementById('wa-active-title').innerHTML = `<i class="fab fa-whatsapp" style="color:#25D366;"></i> ${c.name} Â· ${c.company}`;
+  document.getElementById('wa-active-title').innerHTML = `<i class="fab fa-whatsapp" style="color:#25D366;"></i> ${c.name} · ${c.company}`;
   const chat = document.getElementById('wa-chat-area');
   chat.innerHTML = c.msgs.map(m => `<div style="display:flex;flex-direction:column;"><div class="wa-bubble ${m.from === 'out' ? 'wa-out' : 'wa-in'}">${m.text}<div class="wa-time">${m.time}${m.from === 'out' ? ' âœ“âœ“' : ''}</div></div></div>`).join('');
   chat.scrollTop = chat.scrollHeight;
@@ -1555,7 +1555,7 @@ function sendWA() {
   chat.scrollTop = chat.scrollHeight;
   input.value = '';
   renderWAList();
-  notify('Message sent', c.name + ' Â· WhatsApp', 'var(--green)', 'fab fa-whatsapp');
+  notify('Message sent', c.name + ' · WhatsApp', 'var(--green)', 'fab fa-whatsapp');
 }
 
 async function aiWADraft() {
@@ -1563,7 +1563,7 @@ async function aiWADraft() {
   const c = waConvos.find(x => x.id === activeWAId);
   const lastMsg = c.msgs.filter(m => m.from === 'in').pop();
   const input = document.getElementById('wa-msg-input');
-  input.value = 'Generating AI replyâ€¦';
+  input.value = 'Generating AI reply…';
   input.disabled = true;
   try {
     const text = await callClaude(`Draft a short, professional WhatsApp reply for Unicircuit Engineering Services LLP to the following message from ${c.name} (${c.company}): "${lastMsg?.text}". Keep it under 40 words, friendly and helpful.`);
@@ -1576,15 +1576,15 @@ async function aiWADraft() {
   input.focus();
 }
 
-// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+// ══════════════════════════════════
 // EMAIL MODULE
-// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+// ══════════════════════════════════
 const emails = [
-  { id:1, from:'L&T ECC â€“ Purchase', subject:'Revised Quote Request â€“ Panel Wiring', preview:'We need a revised quote for Panel Wiring, Faridabad plant. Ref: Q-2024-112. Please include MCBs and Cable Trays pricing.', time:'10:22 AM', tag:'Quote', priority:'high', body:'Hi Unicircuit Team,\n\nWe require a revised quotation for Panel Wiring for our Faridabad plant. Current quote reference: Q-2024-112.\n\nPlease include updated pricing for:\n1. MCBs (63A, 100A variants)\n2. Cable Trays (ladder type, 200mm width)\n3. DB Panels (32 way)\n\nKindly revert by April 8th.\n\nRegards,\nSuresh Kumar\nSr. Purchase Manager, L&T ECC' },
-  { id:2, from:'BHEL â€“ Procurement Dept', subject:'VFD & PLC Panel Pricing â€“ Urgent', preview:'Please share updated pricing for VFDs and PLC panels. Tender deadline April 10th. Urgent.', time:'11:15 AM', tag:'Enquiry', priority:'normal', body:'Dear Unicircuit Team,\n\nPlease share the updated price list for:\n- VFDs (5HP, 10HP, 25HP, 50HP)\n- PLC Panels (Siemens S7, Allen Bradley)\n\nWe have a tender submission on April 10. This is urgent.\n\nRegards,\nVijay Rao\nProcurement Officer, BHEL' },
-  { id:3, from:'Siemens India Partner', subject:'Product Demo Request â€“ Power Quality Analysers', preview:'Our engineering team would like a demo on Power Quality Analysers next week. Please confirm availability.', time:'1:40 PM', tag:'Demo', priority:'normal', body:'Hello,\n\nWe would like to schedule a product demo for our engineering team on Power Quality Analysers.\n\nPreferred: Next Tuesday or Wednesday, afternoon.\n\nBest,\nAnita Sharma\nBusiness Dev Manager, Siemens Partner Network' },
-  { id:4, from:'Schneider Electric', subject:'Order Confirmation Required â€“ #SE-24-901', preview:'Please confirm order for Modular Switching Units before April 15th.', time:'3:10 PM', tag:'Order', priority:'high', body:'Dear Team,\n\nThis is to confirm that we have placed PO #SE-24-901 for Modular Switching Units (32 units). Please confirm acceptance and estimated delivery.\n\nDelivery required before April 15.\n\nRegards,\nRohit Joshi\nZone Sales Engineer, Schneider Electric' },
-  { id:5, from:'Adani Power â€“ Projects', subject:'HT Panel RFQ â€“ Ahmedabad Plant', preview:'Please provide your best commercial offer for HT Panels for the Ahmedabad plant expansion.', time:'4:25 PM', tag:'RFQ', priority:'high', body:'Unicircuit Team,\n\nRequest your best commercial offer for:\n- 11kV HT Panels (6 nos)\n- ACBs (800A, 1600A)\n- Metering cubicles\n\nFor Ahmedabad plant Phase 2 expansion. Kindly share within 3 working days.\n\nManish Gupta\nHead â€“ Electrical, Adani Power' },
+  { id:1, from:'L&T ECC "“ Purchase', subject:'Revised Quote Request "“ Panel Wiring', preview:'We need a revised quote for Panel Wiring, Faridabad plant. Ref: Q-2024-112. Please include MCBs and Cable Trays pricing.', time:'10:22 AM', tag:'Quote', priority:'high', body:'Hi Unicircuit Team,\n\nWe require a revised quotation for Panel Wiring for our Faridabad plant. Current quote reference: Q-2024-112.\n\nPlease include updated pricing for:\n1. MCBs (63A, 100A variants)\n2. Cable Trays (ladder type, 200mm width)\n3. DB Panels (32 way)\n\nKindly revert by April 8th.\n\nRegards,\nSuresh Kumar\nSr. Purchase Manager, L&T ECC' },
+  { id:2, from:'BHEL "“ Procurement Dept', subject:'VFD & PLC Panel Pricing "“ Urgent', preview:'Please share updated pricing for VFDs and PLC panels. Tender deadline April 10th. Urgent.', time:'11:15 AM', tag:'Enquiry', priority:'normal', body:'Dear Unicircuit Team,\n\nPlease share the updated price list for:\n- VFDs (5HP, 10HP, 25HP, 50HP)\n- PLC Panels (Siemens S7, Allen Bradley)\n\nWe have a tender submission on April 10. This is urgent.\n\nRegards,\nVijay Rao\nProcurement Officer, BHEL' },
+  { id:3, from:'Siemens India Partner', subject:'Product Demo Request "“ Power Quality Analysers', preview:'Our engineering team would like a demo on Power Quality Analysers next week. Please confirm availability.', time:'1:40 PM', tag:'Demo', priority:'normal', body:'Hello,\n\nWe would like to schedule a product demo for our engineering team on Power Quality Analysers.\n\nPreferred: Next Tuesday or Wednesday, afternoon.\n\nBest,\nAnita Sharma\nBusiness Dev Manager, Siemens Partner Network' },
+  { id:4, from:'Schneider Electric', subject:'Order Confirmation Required "“ #SE-24-901', preview:'Please confirm order for Modular Switching Units before April 15th.', time:'3:10 PM', tag:'Order', priority:'high', body:'Dear Team,\n\nThis is to confirm that we have placed PO #SE-24-901 for Modular Switching Units (32 units). Please confirm acceptance and estimated delivery.\n\nDelivery required before April 15.\n\nRegards,\nRohit Joshi\nZone Sales Engineer, Schneider Electric' },
+  { id:5, from:'Adani Power "“ Projects', subject:'HT Panel RFQ "“ Ahmedabad Plant', preview:'Please provide your best commercial offer for HT Panels for the Ahmedabad plant expansion.', time:'4:25 PM', tag:'RFQ', priority:'high', body:'Unicircuit Team,\n\nRequest your best commercial offer for:\n- 11kV HT Panels (6 nos)\n- ACBs (800A, 1600A)\n- Metering cubicles\n\nFor Ahmedabad plant Phase 2 expansion. Kindly share within 3 working days.\n\nManish Gupta\nHead "“ Electrical, Adani Power' },
 ];
 let activeEmailId = null;
 
@@ -1608,7 +1608,7 @@ function loadEmail(id) {
   const e = emails.find(x => x.id === id);
   if (!e) return;
   activeEmailId = id;
-  document.getElementById('email-preview').innerHTML = `<div style="font-weight:700;color:#fff;font-size:13px;margin-bottom:3px;">${e.subject}</div><div style="font-size:11px;color:var(--muted);margin-bottom:8px;">From: ${e.from} Â· ${e.time}</div><pre style="font-size:12px;white-space:pre-wrap;color:var(--muted2);line-height:1.55;font-family:'Outfit';">${e.body}</pre>`;
+  document.getElementById('email-preview').innerHTML = `<div style="font-weight:700;color:#fff;font-size:13px;margin-bottom:3px;">${e.subject}</div><div style="font-size:11px;color:var(--muted);margin-bottom:8px;">From: ${e.from} · ${e.time}</div><pre style="font-size:12px;white-space:pre-wrap;color:var(--muted2);line-height:1.55;font-family:'Outfit';">${e.body}</pre>`;
   document.getElementById('email-replies').innerHTML = '<div style="text-align:center;padding:30px;color:var(--muted);font-size:12.5px;"><i class="fas fa-magic" style="font-size:20px;display:block;margin-bottom:8px;opacity:0.3;"></i>Click <b style="color:var(--gold);">Generate</b> to create AI reply options</div>';
 }
 
@@ -1616,7 +1616,7 @@ async function generateEmailReplies() {
   if (!activeEmailId) { notify('Select an email first', '', 'var(--red)', 'fas fa-exclamation-triangle'); return; }
   const e = emails.find(x => x.id === activeEmailId);
   const el = document.getElementById('email-replies');
-  el.innerHTML = '<div style="text-align:center;padding:30px;color:var(--muted);"><span class="spin-loader"></span><div style="margin-top:10px;font-size:12.5px;">Claude is generating 3 reply optionsâ€¦</div></div>';
+  el.innerHTML = '<div style="text-align:center;padding:30px;color:var(--muted);"><span class="spin-loader"></span><div style="margin-top:10px;font-size:12.5px;">Claude is generating 3 reply options…</div></div>';
   try {
     const text = await callClaude(`You are writing email replies for Unicircuit Engineering Services LLP. Generate exactly 3 distinct professional reply options for the following email. Label each clearly as "Option 1:", "Option 2:", "Option 3:". Each reply under 90 words. Vary the tone: direct/concise, detailed/technical, warm/relationship-focused.\n\nIncoming email from ${e.from}:\nSubject: ${e.subject}\n\n${e.body}`);
     const parts = text.split(/Option\s*\d+[:\.]?\s*/i).filter(s => s.trim());
@@ -1631,7 +1631,7 @@ async function generateEmailReplies() {
       </div>
     `).join('');
   } catch(e) {
-    el.innerHTML = '<div style="color:var(--red2);padding:16px;font-size:12.5px;">API error â€” check configuration.</div>';
+    el.innerHTML = '<div style="color:var(--red2);padding:16px;font-size:12.5px;">API error "” check configuration.</div>';
   }
 }
 
@@ -1640,16 +1640,16 @@ function copyText(t) {
   notify('Copied to clipboard', '', 'var(--muted)', 'fas fa-copy');
 }
 
-// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+// ══════════════════════════════════
 // CALL SUMMARIZER
-// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+// ══════════════════════════════════
 async function doSummarizeCall(targetId) {
   const el = document.getElementById(targetId);
-  el.innerHTML = '<span class="spin-loader"></span> Transcribing with Whisper + Claude summarisingâ€¦';
+  el.innerHTML = '<span class="spin-loader"></span> Transcribing with Whisper + Claude summarising…';
   try {
     const text = await callClaude(`Summarise the following PBX call for Unicircuit Engineering Services LLP's call log system:\n\nCall details: Inbound from BHEL Procurement, 8m 22s. Agent Ext. 305 (Sales).\n\nTranscript excerpt: "Caller enquired about dispatch timeline for cable trays and DB panels per PO BH-2190. Agent checked ERP, confirmed material packed and ready. Caller requested expediting due to site deadline April 10. Agent committed dispatch by April 6 via transport, agreed to share AWB details via WhatsApp. Client satisfied."\n\nGenerate structured summary with: Issue | Resolution | Sentiment | Key Action Items | Follow-up Required. Be concise.`);
     el.innerHTML = `<div style="background:rgba(245,166,35,0.05);border:1px solid rgba(245,166,35,0.12);border-radius:9px;padding:13px 15px;">
-      <div style="font-size:9.5px;font-weight:700;color:var(--gold);margin-bottom:8px;"><i class="fas fa-robot"></i> CLAUDE AI CALL SUMMARY Â· BHEL_call_Apr4.mp3</div>
+      <div style="font-size:9.5px;font-weight:700;color:var(--gold);margin-bottom:8px;"><i class="fas fa-robot"></i> CLAUDE AI CALL SUMMARY · BHEL_call_Apr4.mp3</div>
       <div style="font-size:12.5px;line-height:1.65;white-space:pre-wrap;color:var(--text);">${text}</div>
       <div style="margin-top:9px;"><span class="badge b-green"><i class="fas fa-check"></i> Summary saved to call log</span></div>
     </div>`;
@@ -1663,15 +1663,15 @@ async function quickCallSummary(btn) {
   td.innerHTML = '<span class="spin-loader"></span>';
   try {
     const text = await callClaude('Generate a 1-sentence AI call summary for a B2B engineering sales call at Unicircuit Engineering Services LLP (electrical products company, India). Include: what was discussed and next action. Keep it under 15 words.');
-    td.innerHTML = `<span class="badge b-green"><i class="fas fa-robot"></i> ${text.substring(0,60)}â€¦</span>`;
+    td.innerHTML = `<span class="badge b-green"><i class="fas fa-robot"></i> ${text.substring(0,60)}…</span>`;
   } catch(e) {
-    td.innerHTML = '<span class="badge b-gold">Enquiry noted Â· follow-up scheduled</span>';
+    td.innerHTML = '<span class="badge b-gold">Enquiry noted · follow-up scheduled</span>';
   }
 }
 
-// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+// ══════════════════════════════════
 // MARKETING MODULE
-// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+// ══════════════════════════════════
 async function generateCampaign() {
   const product = document.getElementById('mkt-product').value;
   const audience = document.getElementById('mkt-audience').value;
@@ -1681,7 +1681,7 @@ async function generateCampaign() {
   if (document.getElementById('ch-wa').checked) channels.push('WhatsApp');
   if (document.getElementById('ch-sm').checked) channels.push('SMS');
   const el = document.getElementById('mkt-result');
-  el.innerHTML = '<div style="font-size:12px;color:var(--muted);"><span class="spin-loader"></span> Claude is crafting your campaign copyâ€¦</div>';
+  el.innerHTML = '<div style="font-size:12px;color:var(--muted);"><span class="spin-loader"></span> Claude is crafting your campaign copy…</div>';
   try {
     const text = await callClaude(`You are a B2B marketing specialist for Unicircuit Engineering Services LLP (Indian electrical engineering company). Generate campaign copy for:\n\nProduct: ${product}\nTarget audience: ${audience}\nGoal: ${goal}\nChannels: ${channels.join(', ')}\n\nGenerate:\n${channels.includes('Email') ? '1) EMAIL: Subject line + 80-word body\n' : ''}${channels.includes('WhatsApp') ? '2) WHATSAPP: 40-word broadcast message\n' : ''}${channels.includes('SMS') ? '3) SMS: 160-character message\n' : ''}\nUse Indian B2B engineering industry context. Professional, compelling, clear CTA.`);
     el.innerHTML = `<div style="background:rgba(245,166,35,0.05);border:1px solid rgba(245,166,35,0.12);border-radius:10px;padding:14px 16px;margin-top:4px;">
@@ -1693,12 +1693,12 @@ async function generateCampaign() {
       </div>
     </div>`;
   } catch(e) {
-    el.innerHTML = '<div style="color:var(--red2);font-size:12px;">API error â€” check connection.</div>';
+    el.innerHTML = '<div style="color:var(--red2);font-size:12px;">API error "” check connection.</div>';
   }
 }
 
 function createCampaignFromWizard() {
-  notify('Campaign launched!', '1,240 contacts Â· AI copy deployed', 'var(--green)', 'fas fa-rocket');
+  notify('Campaign launched!', '1,240 contacts · AI copy deployed', 'var(--green)', 'fas fa-rocket');
 }
 
 function createCampaign() {
@@ -1707,9 +1707,9 @@ function createCampaign() {
   notify('Campaign created', name + ' is now active', 'var(--gold)', 'fas fa-bullhorn');
 }
 
-// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+// ══════════════════════════════════
 // AI ASSISTANT MODULE
-// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+// ══════════════════════════════════
 let aiInited = false;
 let aiHistory = [];
 
@@ -1718,12 +1718,12 @@ function initAIChat() {
   aiInited = true;
   const container = document.getElementById('ai-messages');
   container.innerHTML = '';
-  appendAI(`<div class="ai-tag"><i class="fas fa-robot"></i> UNICOMM AI Â· CLAUDE</div>Hello! I'm your AI assistant for <b>Unicircuit Engineering Services LLP</b>. I can help you:<br><br>
-â€¢ Draft professional emails, WhatsApp messages, quotations<br>
-â€¢ Summarise calls and extract action items<br>
-â€¢ Generate marketing campaign copy<br>
-â€¢ Provide sales intelligence and communication advice<br>
-â€¢ Answer questions about your clients and operations<br><br>What can I help you with today?`);
+  appendAI(`<div class="ai-tag"><i class="fas fa-robot"></i> UNICOMM AI · CLAUDE</div>Hello! I'm your AI assistant for <b>Unicircuit Engineering Services LLP</b>. I can help you:<br><br>
+"¢ Draft professional emails, WhatsApp messages, quotations<br>
+"¢ Summarise calls and extract action items<br>
+"¢ Generate marketing campaign copy<br>
+"¢ Provide sales intelligence and communication advice<br>
+"¢ Answer questions about your clients and operations<br><br>What can I help you with today?`);
 }
 
 function appendAI(html, isUser = false) {
@@ -1749,7 +1749,7 @@ async function sendAI() {
   const loader = document.createElement('div');
   loader.className = 'chat-msg ai fu';
   loader.id = loaderId;
-  loader.innerHTML = '<div class="ai-tag"><i class="fas fa-robot"></i> UNICOMM AI</div><span class="spin-loader"></span> Thinkingâ€¦';
+  loader.innerHTML = '<div class="ai-tag"><i class="fas fa-robot"></i> UNICOMM AI</div><span class="spin-loader"></span> Thinking…';
   container.appendChild(loader);
   container.scrollTop = container.scrollHeight;
   try {
@@ -1767,7 +1767,7 @@ async function sendAI() {
     const reply = data.content?.[0]?.text || 'Sorry, I could not generate a response.';
     aiHistory.push({ role: 'assistant', content: reply });
     document.getElementById(loaderId)?.remove();
-    appendAI(`<div class="ai-tag"><i class="fas fa-robot"></i> UNICOMM AI Â· CLAUDE</div>${reply.replace(/\n/g,'<br>').replace(/\*\*(.*?)\*\*/g,'<b>$1</b>').replace(/\*(.*?)\*/g,'<i>$1</i>')}`);
+    appendAI(`<div class="ai-tag"><i class="fas fa-robot"></i> UNICOMM AI · CLAUDE</div>${reply.replace(/\n/g,'<br>').replace(/\*\*(.*?)\*\*/g,'<b>$1</b>').replace(/\*(.*?)\*/g,'<i>$1</i>')}`);
   } catch(e) {
     document.getElementById(loaderId)?.remove();
     appendAI('<div class="ai-tag"><i class="fas fa-robot"></i> UNICOMM AI</div><span style="color:var(--red2);">Connection error. Check your API configuration and network.</span>');
@@ -1784,12 +1784,12 @@ function quickAI(q) {
 function dashWASend() {
   const inp = document.getElementById('dash-wa-input');
   if (!inp.value.trim()) return;
-  notify('Message sent', 'Suresh Kumar Â· WhatsApp', 'var(--green)', 'fab fa-whatsapp');
+  notify('Message sent', 'Suresh Kumar · WhatsApp', 'var(--green)', 'fab fa-whatsapp');
   inp.value = '';
 }
 async function dashAIWA() {
   const inp = document.getElementById('dash-wa-input');
-  inp.value = 'Generatingâ€¦'; inp.disabled = true;
+  inp.value = 'Generating…'; inp.disabled = true;
   try {
     const t = await callClaude('Draft a brief WhatsApp reply from Unicircuit Engineering Services LLP to a client asking for an invoice for their dispatched order. Friendly, professional, under 35 words.');
     inp.value = t.trim();
@@ -1806,7 +1806,7 @@ window.addEventListener('DOMContentLoaded', () => {
   const token   = localStorage.getItem('uc_token') || sessionStorage.getItem('uc_token');
   const userRaw = localStorage.getItem('uc_user')  || sessionStorage.getItem('uc_user');
 
-  // Reject old fake btoa() tokens â€” real JWT has 3 parts separated by dots
+  // Reject old fake btoa() tokens "” real JWT has 3 parts separated by dots
   const isRealJWT = token && token.startsWith('eyJ') && token.split('.').length === 3;
   if (!isRealJWT && token) {
     localStorage.clear(); sessionStorage.clear();
@@ -1823,7 +1823,7 @@ window.addEventListener('DOMContentLoaded', () => {
     const user = JSON.parse(userRaw);
     document.getElementById('sidebar-initials').textContent = user.initials || (user.name ? user.name.split(' ').map(w=>w[0]).join('').toUpperCase().slice(0,2) : 'U');
     document.getElementById('sidebar-name').textContent     = user.name  || 'User';
-    document.getElementById('sidebar-role').textContent     = (user.role === 'admin' ? 'Admin' : 'User') + ' Â· Unicircuit';
+    document.getElementById('sidebar-role').textContent     = (user.role === 'admin' ? 'Admin' : 'User') + ' · Unicircuit';
   } catch(_) {}
 
   // Hide guard, show app
@@ -1960,9 +1960,9 @@ function renderCallLogs(calls) {
   if (!tbody) return;
   tbody.innerHTML = calls.slice(0, 10).map(c => `
     <tr>
-      <td><b>${c.caller || 'â€”'}</b>${c.extension ? `<br><span style="font-size:10.5px;color:var(--muted);">${c.extension}</span>` : ''}</td>
-      <td>${c.destination || 'â€”'}</td>
-      <td>${c.duration || 'â€”'}</td>
+      <td><b>${c.caller || '"”'}</b>${c.extension ? `<br><span style="font-size:10.5px;color:var(--muted);">${c.extension}</span>` : ''}</td>
+      <td>${c.destination || '"”'}</td>
+      <td>${c.duration || '"”'}</td>
       <td><span class="badge ${c.call_type==='In'?'b-blue':c.call_type==='Missed'?'b-red':c.call_type==='Internal'?'b-gold':'b-green'}">${c.call_type}</span></td>
       <td>${c.ai_summary
         ? `<span class="badge b-green"><i class="fas fa-check"></i> Done</span>`
@@ -1982,7 +1982,7 @@ function renderCampaigns(camps) {
       <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:9px;">
         <div>
           <div style="font-weight:700;font-size:13px;">${c.name}</div>
-          <div style="font-size:11px;color:var(--muted);margin-top:2px;">${c.channel} Â· ${c.segment} Â· ${c.product || ''}</div>
+          <div style="font-size:11px;color:var(--muted);margin-top:2px;">${c.channel} · ${c.segment} · ${c.product || ''}</div>
         </div>
         <span class="badge ${statusBadge(c.status)}">${c.status}</span>
       </div>
@@ -2061,7 +2061,7 @@ async function saveContact() {
       contacts.push({ ...data, emails: data.emails_count, lastContact: data.last_contact });
       renderContacts();
       closeModal('contact-modal');
-      notify('Contact saved to database', `${fname} ${lname} Â· ${company}`, 'var(--green)', 'fas fa-user-check');
+      notify('Contact saved to database', `${fname} ${lname} · ${company}`, 'var(--green)', 'fas fa-user-check');
       // Clear form
       ['c-fname','c-lname','c-company','c-designation','c-dept','c-phone','c-wa','c-email','c-products','c-city','c-notes'].forEach(id => {
         const el = document.getElementById(id);
@@ -2180,7 +2180,7 @@ async function loadInbox(forceRefresh) {
     return;
   }
 
-  listEl.innerHTML = `<div style="text-align:center;padding:30px;color:var(--muted);"><div class="spin-loader" style="margin:0 auto 10px;"></div><div style="font-size:12px;">Loadingâ€¦</div></div>`;
+  listEl.innerHTML = `<div style="text-align:center;padding:30px;color:var(--muted);"><div class="spin-loader" style="margin:0 auto 10px;"></div><div style="font-size:12px;">Loading…</div></div>`;
 
   try {
     const skip = inboxCurrentPage * inboxPageSize;
@@ -2249,7 +2249,7 @@ async function openEmail(id) {
   const subjectEl = document.getElementById('email-detail-subject');
   const bodyEl    = document.getElementById('email-detail-body');
   const metaEl    = document.getElementById('email-detail-meta');
-  if (subjectEl) subjectEl.textContent = 'Loadingâ€¦';
+  if (subjectEl) subjectEl.textContent = 'Loading…';
   if (bodyEl)    bodyEl.innerHTML = `<div style="text-align:center;padding:20px;"><div class="spin-loader" style="margin:0 auto;"></div></div>`;
 
   try {
@@ -2297,7 +2297,7 @@ async function aiDraftReply() {
   const subj = document.getElementById('email-detail-subject')?.textContent || '';
   const bodyEl = document.getElementById('compose-body');
   if (!bodyEl) return;
-  bodyEl.value = 'Generating AI draftâ€¦';
+  bodyEl.value = 'Generating AI draft…';
   bodyEl.disabled = true;
   try {
     const draft = await callClaude(
@@ -2322,7 +2322,7 @@ async function sendEmail() {
 
   const btn = document.getElementById('send-btn');
   btn.disabled = true;
-  btn.innerHTML = '<span class="spin-loader"></span> Sendingâ€¦';
+  btn.innerHTML = '<span class="spin-loader"></span> Sending…';
 
   try {
     const res  = await fetch(`${API_BASE}/outlook/send`, {
