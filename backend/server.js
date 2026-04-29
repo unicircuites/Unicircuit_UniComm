@@ -18,15 +18,15 @@ const wa         = require('./services/whatsapp');
 const app    = express();
 const server = http.createServer(app);
 const io     = new Server(server, {
-  cors: { origin: '*', methods: ['GET','POST'] }
+  cors: { origin: '*', methods: ['GET','POST'] },
+  path: '/socket.io'
 });
 const PORT = process.env.PORT || 8088;
 
 // Inject Socket.IO into WhatsApp service for real-time push
 wa.setIO(io);
 
-// ── SERVE STATIC HTML FILES (login.html, dashboard.html) ──────────────────
-// Serves files from the project root (one level up from backend/)
+// ── SERVE STATIC HTML FILES — after socket.io path is registered ──────────
 app.use(express.static(path.join(__dirname, '..')));
 
 // Redirect root → login page
