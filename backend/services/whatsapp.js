@@ -57,14 +57,17 @@ function toDate(ts) {
 }
 
 // ── CONTACT NAME RESOLUTION ────────────────────────────────────────────────
-// Priority: saved contact name > pushName > phone number
+// Priority: saved contact name > pushName > formatted phone number with +
 function getContactName(jid, pushName) {
-  const phone = jid ? jid.split('@')[0].split(':')[0] : '';
+  if (!jid) return '';
+  // Extract clean phone number from JID (remove :device suffix)
+  const phone = jid.split('@')[0].split(':')[0];
   const stored = contactsStore[jid] || contactsStore[phone + '@s.whatsapp.net'];
-  if (stored?.name)     return stored.name;
-  if (stored?.notify)   return stored.notify;
-  if (pushName)         return pushName;
-  return phone || jid;
+  if (stored?.name)   return stored.name;
+  if (stored?.notify) return stored.notify;
+  if (pushName)       return pushName;
+  // Format phone number with + prefix for display
+  return '+' + phone;
 }
 
 // ── IS REAL MESSAGE (not system/protocol) ─────────────────────────────────
@@ -169,7 +172,9 @@ async function saveContact(contact) {
 
 // ── SAVE CHAT ──────────────────────────────────────────────────────────────
 async function saveChat(jid, name, lastMsg, lastTime, unread, isGroup) {
+  // Full phone number with country code (strip @s.whatsapp.net and :device)
   const phone = jid.split('@')[0].split(':')[0];
+  const displayPhone = '+' + phone;
   const ts    = lastTime instanceof Date ? lastTime : toDate(lastTime);
   try {
     await pool.query(`
@@ -181,7 +186,7 @@ async function saveChat(jid, name, lastMsg, lastTime, unread, isGroup) {
         last_time    = GREATEST(EXCLUDED.last_time, wa_chats.last_time),
         unread       = wa_chats.unread + EXCLUDED.unread,
         updated_at   = NOW()
-    `, [jid, name || phone, phone, isGroup || false, lastMsg || '', ts, unread || 0]);
+    `, [jid, name || displayPhone, displayPhone, isGroup || false, lastMsg || '', ts, unread || 0]);
   } catch (err) {
     console.error(`[WA-DB] saveChat error ${jid}:`, err.message);
   }
@@ -432,12 +437,17 @@ async function updateChatNames() {
     const chats = await pool.query(`SELECT id, phone, name, is_group FROM wa_chats`);
     let updated = 0;
     for (const chat of chats.rows) {
-      if (chat.is_group) continue; // Groups keep their own names
+      if (chat.is_group) continue;
       const resolvedName = getContactName(chat.id, null);
-      // Only update if we have a better name than the phone number
-      if (resolvedName && resolvedName !== chat.phone && resolvedName !== chat.name) {
+      const phone = chat.id.split('@')[0].split(':')[0];
+      const displayPhone = '+' + phone;
+      // Update if we have a real name (not just the phone number)
+      if (resolvedName && resolvedName !== displayPhone && resolvedName !== phone) {
         await pool.query(`UPDATE wa_chats SET name=$1 WHERE id=$2`, [resolvedName, chat.id]);
         updated++;
+      } else if (chat.name !== displayPhone && !chat.is_group) {
+        // Ensure phone is displayed with + prefix
+        await pool.query(`UPDATE wa_chats SET phone=$1 WHERE id=$2 AND name NOT LIKE '+%'`, [displayPhone, chat.id]);
       }
     }
     console.log(`[WA] Updated ${updated} chat names`);
