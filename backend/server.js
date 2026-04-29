@@ -64,6 +64,10 @@ app.use('/api/pipeline',  apiLimiter,  require('./routes/pipeline'));
 app.use('/api/calls',     apiLimiter,  require('./routes/calls'));
 app.use('/api/campaigns', apiLimiter,  require('./routes/campaigns'));
 app.use('/api/dashboard', apiLimiter,  require('./routes/dashboard'));
+app.use('/api/outlook',   apiLimiter,  require('./routes/outlook'));
+
+// OAuth2 callback — must be at root level to match redirect URI
+app.use('/auth',          require('./routes/outlook'));
 
 // ── HEALTH CHECK ───────────────────────────────────────────────────────────
 app.get('/api/health', (_req, res) => {
