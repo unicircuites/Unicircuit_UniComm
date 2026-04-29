@@ -156,7 +156,7 @@ async function startWA() {
     auth:              state,
     printQRInTerminal: false,
     browser:           ['UniComm Pro', 'Chrome', '120.0'],
-    syncFullHistory:   false,
+    syncFullHistory:   true,   // get all chats history
     getMessage: async (key) => {
       const res = await pool.query(`SELECT body FROM wa_messages WHERE id=$1`, [key.id]);
       return res.rows[0] ? { conversation: res.rows[0].body } : { conversation: '' };
@@ -215,26 +215,65 @@ async function startWA() {
 
   sock.ev.on('creds.update', saveCreds);
 
+  // ── HISTORY SYNC (old chats + messages on first connect) ─────────────────
+  sock.ev.on('messaging-history.set', async ({ chats, messages, isLatest }) => {
+    console.log(`[WA-HIST] messaging-history.set — chats=${chats.length} messages=${messages.length} isLatest=${isLatest}`);
+    // Save all chats from history
+    for (const chat of chats) {
+      const ts = toDate(chat.conversationTimestamp);
+      await saveChat(
+        chat.id,
+        chat.name || chat.id.split('@')[0],
+        '',
+        ts,
+        0,
+        chat.id.endsWith('@g.us')
+      );
+    }
+    // Save all messages from history
+    for (const msg of messages) {
+      if (!msg.message) continue;
+      const jid = msg.key?.remoteJid;
+      if (!jid || jid === 'status@broadcast') continue;
+      const type = getContentType(msg.message);
+      if (!type || type === 'protocolMessage' || type === 'senderKeyDistributionMessage') continue;
+      await saveMessage(msg);
+    }
+    console.log(`[WA-HIST] ✅ History sync done`);
+    emit('wa:chats_updated', { count: chats.length });
+  });
+
   // ── INCOMING MESSAGES ─────────────────────────────────────────────────────
   sock.ev.on('messages.upsert', async ({ messages, type }) => {
     console.log(`[WA-MSGS] messages.upsert type=${type} count=${messages.length}`);
     for (const msg of messages) {
-      if (!msg.message) { console.log('[WA-MSGS] Skipping — no message content'); continue; }
+      if (!msg.message) { continue; }
       const jid = msg.key.remoteJid;
-      if (jid === 'status@broadcast') { console.log('[WA-MSGS] Skipping status broadcast'); continue; }
+      if (jid === 'status@broadcast') { continue; }
 
-      console.log(`[WA-MSGS] Processing: jid=${jid} fromMe=${msg.key.fromMe} pushName=${msg.pushName}`);
+      // Skip internal protocol/system messages
+      const msgType = getContentType(msg.message);
+      if (msgType === 'protocolMessage' || msgType === 'senderKeyDistributionMessage' ||
+          msgType === 'messageContextInfo' || msgType === 'reactionMessage') {
+        console.log(`[WA-MSGS] Skipping system message type=${msgType}`);
+        continue;
+      }
+
+      console.log(`[WA-MSGS] Processing: jid=${jid} fromMe=${msg.key.fromMe} type=${msgType}`);
       const saved = await saveMessage(msg);
-      if (!saved) { console.warn('[WA-MSGS] saveMessage returned null'); continue; }
+      if (!saved) { continue; }
 
       const name = msg.pushName || jid.split('@')[0];
       await saveChat(jid, name, saved.body, saved.ts, msg.key.fromMe ? 0 : 1, jid.endsWith('@g.us'));
 
-      emit('wa:message', {
-        id: saved.id, chatId: jid, fromMe: saved.fromMe,
-        sender: saved.sender, body: saved.body, type: saved.type,
-        ts: saved.ts, name,
-      });
+      // Only emit real-time for new messages (type=notify), not history
+      if (type === 'notify') {
+        emit('wa:message', {
+          id: saved.id, chatId: jid, fromMe: saved.fromMe,
+          sender: saved.sender, body: saved.body, type: saved.type,
+          ts: saved.ts, name,
+        });
+      }
     }
   });
 
