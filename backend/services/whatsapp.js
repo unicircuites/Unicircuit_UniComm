@@ -69,16 +69,25 @@ async function ensureTables() {
 // ── SAVE CHAT TO DB ────────────────────────────────────────────────────────
 async function saveChat(jid, name, lastMsg, lastTime, unread, isGroup) {
   const phone = jid.split('@')[0];
+  // Safely parse timestamp
+  let ts = new Date();
+  try {
+    if (lastTime) {
+      const d = new Date(lastTime);
+      if (!isNaN(d.getTime())) ts = d;
+    }
+  } catch (_) {}
+
   await pool.query(`
-    INSERT INTO wa_chats (id, name, phone, last_message, last_time, unread, is_group, updated_at)
-    VALUES ($1,$2,$3,$4,$5,$6,$7,NOW())
+    INSERT INTO wa_chats (id, name, phone, last_message, last_time, unread, is_group)
+    VALUES ($1,$2,$3,$4,$5,$6,$7)
     ON CONFLICT (id) DO UPDATE SET
       name         = EXCLUDED.name,
       last_message = EXCLUDED.last_message,
       last_time    = EXCLUDED.last_time,
-      unread       = EXCLUDED.unread,
+      unread       = wa_chats.unread + EXCLUDED.unread,
       updated_at   = NOW()
-  `, [jid, name || phone, lastMsg, lastTime, unread || 0, isGroup || false]);
+  `, [jid, name || phone, lastMsg || '', ts, unread || 0, isGroup || false, phone]);
 }
 
 // ── SAVE MESSAGE TO DB ─────────────────────────────────────────────────────
@@ -88,7 +97,7 @@ async function saveMessage(msg) {
     const id       = msg.key.id;
     const fromMe   = msg.key.fromMe || false;
     const sender   = fromMe ? 'me' : (msg.key.participant || jid);
-    const ts       = new Date((msg.messageTimestamp || Date.now() / 1000) * 1000);
+    const ts       = new Date(Number(msg.messageTimestamp || Math.floor(Date.now() / 1000)) * 1000);
     const type     = getContentType(msg.message) || 'text';
 
     let body = '';
@@ -216,11 +225,19 @@ async function startWA() {
   // ── CHAT UPDATES ──────────────────────────────────────────────────────────
   sock.ev.on('chats.upsert', async (chats) => {
     for (const chat of chats) {
+      // conversationTimestamp is Unix seconds (number) from Baileys
+      let ts = new Date();
+      if (chat.conversationTimestamp) {
+        const num = typeof chat.conversationTimestamp === 'object'
+          ? chat.conversationTimestamp.low || chat.conversationTimestamp.toNumber?.() || Date.now()/1000
+          : Number(chat.conversationTimestamp);
+        if (!isNaN(num)) ts = new Date(num * 1000);
+      }
       await saveChat(
         chat.id,
         chat.name || chat.id.split('@')[0],
         chat.lastMessage?.message?.conversation || '',
-        chat.conversationTimestamp ? new Date(chat.conversationTimestamp * 1000) : new Date(),
+        ts,
         chat.unreadCount || 0,
         chat.id.endsWith('@g.us')
       );
