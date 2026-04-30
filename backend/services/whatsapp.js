@@ -570,27 +570,59 @@ async function sendMessage(jid, text, quotedMsgId) {
   return result;
 }
 
+// ── LID → PHONE MAPPING ───────────────────────────────────────────────────
+function buildLidMapping() {
+  const mapping = {};
+  try {
+    const files = fs.readdirSync(AUTH_DIR).filter(f => f.includes('_reverse.json'));
+    for (const file of files) {
+      const lid   = file.replace('lid-mapping-', '').replace('_reverse.json', '');
+      const phone = JSON.parse(fs.readFileSync(path.join(AUTH_DIR, file), 'utf8'));
+      if (lid && phone) mapping[lid + '@lid'] = phone + '@s.whatsapp.net';
+    }
+  } catch (_) {}
+  return mapping;
+}
+
 // ── GROUP METADATA ─────────────────────────────────────────────────────────
 async function getGroupMetadata(jid) {
   if (!sock || !isConnected) throw new Error('WhatsApp not connected');
   const meta = await sock.groupMetadata(jid);
+
+  // Build LID → phone mapping from auth files
+  const lidMap = buildLidMapping();
+
+  // Load contacts from DB
+  const contactsRes = await pool.query(`SELECT jid, name, notify FROM wa_contacts`);
+  const dbContacts = {};
+  contactsRes.rows.forEach(c => { dbContacts[c.jid] = c; });
+
   return {
     id: meta.id, name: meta.subject, description: meta.desc || '',
-    participants: meta.participants.map(function(p) {
-      const phone = p.id.split('@')[0].split(':')[0];
-      // Try contact store first
-      const stored = contactsStore[p.id] || contactsStore[phone + '@s.whatsapp.net'];
+    participants: meta.participants.map(p => {
+      const pJid  = p.id;
+      const phone = pJid.split('@')[0].split(':')[0];
+
+      // Resolve @lid to real phone via mapping
+      const realJid = lidMap[pJid] || pJid;
+      const realPhone = realJid.split('@')[0];
+
+      // Look up contact name
+      const stored = dbContacts[realJid] || dbContacts[pJid] || contactsStore[realJid] || contactsStore[pJid];
       let display;
-      if (stored?.name)   display = stored.name;
+      if (stored?.name)    display = stored.name;
       else if (stored?.notify) display = stored.notify;
-      else if (phone.startsWith('91') && phone.length === 12) {
-        display = '+91 ' + phone.slice(2,7) + ' ' + phone.slice(7);
-      } else {
+      else if (realPhone.startsWith('91') && realPhone.length === 12) {
+        display = '+91 ' + realPhone.slice(2,7) + ' ' + realPhone.slice(7);
+      } else if (!pJid.endsWith('@lid')) {
         display = '+' + phone;
+      } else {
+        display = 'Member'; // @lid with no mapping
       }
+
       return {
-        jid:   p.id,
-        phone: phone,
+        jid:   pJid,
+        phone: realPhone !== phone ? realPhone : phone,
         name:  display,
         admin: p.admin === 'admin' || p.admin === 'superadmin',
       };
