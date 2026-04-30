@@ -231,16 +231,26 @@ async function saveMessage(msg) {
     const jid         = msg.key.remoteJid;
     const id          = msg.key.id;
     const fromMe      = msg.key.fromMe || false;
-    const participant = msg.key.participant || (fromMe ? null : jid);
+    // For group messages: participant is in msg.key.participant OR msg.participant
+    const participant = msg.key.participant || msg.participant || (fromMe ? null : jid);
     const senderJid   = fromMe ? null : (participant || jid);
-    // Format sender phone for display
+    const isGroupMsg  = jid.endsWith('@g.us');
+
+    // Format sender name/number
     let senderName = 'You';
     if (!fromMe) {
       const sPhone = senderJid ? senderJid.split('@')[0].split(':')[0] : '';
-      senderName = getContactName(senderJid, msg.pushName) ||
-        (sPhone.startsWith('91') && sPhone.length === 12
-          ? '+91 ' + sPhone.slice(2,7) + ' ' + sPhone.slice(7)
-          : '+' + sPhone);
+      const resolved = getContactName(senderJid, msg.pushName);
+      // Only use resolved name if it's a real name (not just a phone number)
+      if (resolved && !/^\+?\d[\d\s]+$/.test(resolved)) {
+        senderName = resolved;
+      } else if (sPhone.startsWith('91') && sPhone.length === 12) {
+        senderName = '+91 ' + sPhone.slice(2,7) + ' ' + sPhone.slice(7);
+      } else if (sPhone) {
+        senderName = '+' + sPhone;
+      } else {
+        senderName = msg.pushName || 'Unknown';
+      }
     }
     const ts          = toDate(msg.messageTimestamp);
     const type        = getContentType(msg.message) || 'text';
