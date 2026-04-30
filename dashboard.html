@@ -2454,12 +2454,19 @@ function initWASocket() {
 async function checkWAStatus() {
   initWASocket();
   try {
-    const res = await fetch(API_BASE + '/wa/status', { headers: getAuthHeaders() });
+    // /wa/status is public — no auth needed
+    const res = await fetch(API_BASE + '/wa/status');
     const data = await res.json();
-    if (data.connected) { waOnConnected(data.phone, data.name); waLoadChats(); }
-    else {
+    if (data.connected) {
+      waOnConnected(data.phone, data.name);
+      // Only load chats if we have a valid token
+      const token = localStorage.getItem('uc_token') || sessionStorage.getItem('uc_token');
+      if (token) waLoadChats();
+    } else {
       const cb = document.getElementById('wa-connect-banner');
       if (cb) cb.style.display = 'block';
+      // Auto-show QR if not connected
+      setTimeout(waGetQR, 1000);
     }
   } catch (_) {
     const cb = document.getElementById('wa-connect-banner');
@@ -2506,6 +2513,12 @@ async function waGetQR(retries) {
 async function waLoadChats() {
   try {
     const res = await fetch(API_BASE + '/wa/chats', { headers: getAuthHeaders() });
+    if (res.status === 401) {
+      // Token expired — redirect to login
+      localStorage.clear(); sessionStorage.clear();
+      window.location.href = 'login.html';
+      return;
+    }
     waAllChats = await res.json();
     waRenderChats(waAllChats);
   } catch (_) {}
@@ -2780,6 +2793,7 @@ async function waSync() {
   if (btn) { btn.disabled = true; btn.innerHTML = '<span class="spin-loader"></span> Syncing...'; }
   try {
     var res = await fetch(API_BASE + '/wa/sync', { method: 'POST', headers: getAuthHeaders() });
+    if (res.status === 401) { localStorage.clear(); sessionStorage.clear(); window.location.href = 'login.html'; return; }
     var data = await res.json();
     if (res.ok) {
       await waLoadChats();
