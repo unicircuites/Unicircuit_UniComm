@@ -2598,7 +2598,12 @@ async function waOpenChat(jid, name, phone) {
       var gRes = await fetch(API_BASE + '/wa/group/' + encodeURIComponent(jid), { headers: getAuthHeaders() });
       var gData = await gRes.json();
       if (gRes.ok && gData.participants) {
-        if (phEl) phEl.textContent = 'Group · ' + gData.participants.length + ' members';
+        // WhatsApp style: "Group · X members" + comma-separated names in sub-header
+        var memberNames = gData.participants.map(function(p) { return p.name; }).join(', ');
+        if (phEl) {
+          phEl.innerHTML = '<span style="color:var(--muted2);">Group · ' + gData.participants.length + ' members</span><br>' +
+            '<span style="font-size:10px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:block;max-width:400px;">' + memberNames + '</span>';
+        }
         // Auto-show members panel for groups
         var mPanel = document.getElementById('wa-members-panel');
         var mList  = document.getElementById('wa-members-list');
@@ -2650,12 +2655,21 @@ function waAppendMessage(msg) {
   var quotedBody = msg.quotedBody || msg.quoted_body || '';
   var isGroup = waActiveJid && waActiveJid.endsWith('@g.us');
 
-  // Sender phone in group (format if Indian)
-  var senderDisplay = senderName;
-  if (!fromMe && isGroup && msg.sender) {
-    var sp = msg.sender.split('@')[0].split(':')[0];
-    if (sp.startsWith('91') && sp.length === 12) {
-      senderDisplay = senderName && !/^\+/.test(senderName) ? senderName : '+91 ' + sp.slice(2,7) + ' ' + sp.slice(7);
+  // Sender display: use senderName if it's a real name, else format the phone number
+  var senderDisplay = '';
+  if (!fromMe && isGroup) {
+    if (msg.sender) {
+      var sp = msg.sender.split('@')[0].split(':')[0];
+      // If senderName is a real name (not a number), use it; else format phone
+      if (senderName && senderName !== 'You' && !/^\+?\d[\d\s]+$/.test(senderName)) {
+        senderDisplay = senderName; // saved contact name
+      } else if (sp.startsWith('91') && sp.length === 12) {
+        senderDisplay = '+91 ' + sp.slice(2,7) + ' ' + sp.slice(7);
+      } else {
+        senderDisplay = '+' + sp;
+      }
+    } else if (senderName && senderName !== 'You') {
+      senderDisplay = senderName;
     }
   }
 
@@ -2806,6 +2820,7 @@ function toggleTheme() {
 </script>
 </body>
 </html>
+
 
 
 

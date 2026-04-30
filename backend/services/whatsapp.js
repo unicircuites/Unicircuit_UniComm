@@ -567,10 +567,23 @@ async function getGroupMetadata(jid) {
   return {
     id: meta.id, name: meta.subject, description: meta.desc || '',
     participants: meta.participants.map(function(p) {
-      var phone = p.id.split('@')[0];
-      var name = getContactName(p.id, null);
-      var display = (name && name !== '+' + phone) ? name : (phone.startsWith('91') && phone.length === 12 ? '+91 ' + phone.slice(2,7) + ' ' + phone.slice(7) : '+' + phone);
-      return { jid: p.id, phone: phone, name: display, admin: p.admin === 'admin' || p.admin === 'superadmin' };
+      const phone = p.id.split('@')[0].split(':')[0];
+      // Try contact store first
+      const stored = contactsStore[p.id] || contactsStore[phone + '@s.whatsapp.net'];
+      let display;
+      if (stored?.name)   display = stored.name;
+      else if (stored?.notify) display = stored.notify;
+      else if (phone.startsWith('91') && phone.length === 12) {
+        display = '+91 ' + phone.slice(2,7) + ' ' + phone.slice(7);
+      } else {
+        display = '+' + phone;
+      }
+      return {
+        jid:   p.id,
+        phone: phone,
+        name:  display,
+        admin: p.admin === 'admin' || p.admin === 'superadmin',
+      };
     })
   };
 }
