@@ -1885,6 +1885,18 @@ function getAuthHeaders() {
   return { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' };
 }
 
+// Global 401 handler — if token expired, redirect to login
+async function apiFetch(url, options) {
+  const res = await fetch(url, options);
+  if (res.status === 401) {
+    console.warn('[AUTH] 401 received — token expired, redirecting to login');
+    localStorage.clear(); sessionStorage.clear();
+    window.location.href = 'login.html';
+    return res;
+  }
+  return res;
+}
+
 // â”€â”€ LOAD DASHBOARD DATA FROM POSTGRESQL â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 async function loadDashboardData() {
   try {
@@ -2467,12 +2479,30 @@ function waOnConnected(phone, name) {
 async function waGetQR(retries) {
   retries = retries || 0;
   const btn = document.getElementById('wa-get-qr-btn');
-  if (btn) btn.innerHTML = '<span class="spin-loader"></span> Generating QR...';
+  if (btn) btn.innerHTML = '<span class="spin-loader"></span> Waiting for QR (' + (retries+1) + '/15)...';
   try {
-    const res = await fetch(API_BASE + '/wa/qr', { headers: getAuthHeaders() });
+    // QR is public — no auth header needed
+    const res = await fetch(API_BASE + '/wa/qr');
     const data = await res.json();
     if (data.qr) {
       const img = document.getElementById('wa-qr-img');
+      const wrap = document.getElementById('wa-qr-wrap');
+      if (img) img.src = data.qr;
+      if (wrap) wrap.style.display = 'flex';
+      if (btn) btn.style.display = 'none';
+    } else {
+      if (retries < 15) {
+        setTimeout(function() { waGetQR(retries + 1); }, 2000);
+      } else {
+        if (btn) { btn.innerHTML = '<i class="fas fa-qrcode"></i> Show QR Code'; btn.style.display = 'inline-flex'; }
+        notify('QR timeout', 'Please restart server', 'var(--red)', 'fas fa-exclamation-circle');
+      }
+    }
+  } catch (_) {
+    if (btn) { btn.innerHTML = '<i class="fas fa-qrcode"></i> Show QR Code'; btn.style.display = 'inline-flex'; }
+  }
+}
+g = document.getElementById('wa-qr-img');
       const wrap = document.getElementById('wa-qr-wrap');
       if (img) img.src = data.qr;
       if (wrap) wrap.style.display = 'flex';
@@ -2819,6 +2849,7 @@ function toggleTheme() {
 </script>
 </body>
 </html>
+
 
 
 
