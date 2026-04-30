@@ -2634,25 +2634,40 @@ var waReplyTo = null;
 
 function waMediaHTML(type, body, msgId) {
   var dlUrl = msgId ? (API_BASE + '/wa/media/' + msgId) : null;
-  var dlBtn = dlUrl ? ' <a href="' + dlUrl + '" download style="color:var(--blue2);font-size:10px;margin-left:6px;" title="Download"><i class="fas fa-download"></i></a>' : '';
+  var cleanBody = (body || '').replace(/^📷\s*|^📄\s*/,'').trim();
+
   if (type === 'imageMessage') {
-    // Show placeholder with download — actual image needs media download
-    return '<div style="background:rgba(255,255,255,0.06);border-radius:8px;padding:10px;margin-bottom:4px;display:flex;align-items:center;gap:8px;font-size:12px;">📷 Photo' + (body ? ': ' + body : '') + dlBtn + '</div>';
+    // Show image placeholder with download link
+    var dlLink = dlUrl ? '<a href="' + dlUrl + '" target="_blank" style="display:inline-flex;align-items:center;gap:4px;margin-top:6px;font-size:11px;color:var(--blue2);text-decoration:none;"><i class="fas fa-download"></i> Download Photo</a>' : '';
+    return '<div style="background:rgba(255,255,255,0.06);border-radius:8px;padding:10px;margin-bottom:4px;">' +
+      '<div style="display:flex;align-items:center;gap:8px;font-size:13px;">📷 <span>' + (cleanBody || 'Photo') + '</span></div>' +
+      dlLink + '</div>';
   }
   if (type === 'videoMessage') {
-    return '<div style="background:rgba(255,255,255,0.06);border-radius:8px;padding:10px;margin-bottom:4px;display:flex;align-items:center;gap:8px;font-size:12px;">🎥 Video' + (body ? ': ' + body : '') + dlBtn + '</div>';
+    var dlLink = dlUrl ? '<a href="' + dlUrl + '" target="_blank" style="display:inline-flex;align-items:center;gap:4px;margin-top:6px;font-size:11px;color:var(--blue2);text-decoration:none;"><i class="fas fa-download"></i> Download Video</a>' : '';
+    return '<div style="background:rgba(255,255,255,0.06);border-radius:8px;padding:10px;margin-bottom:4px;">' +
+      '<div style="display:flex;align-items:center;gap:8px;font-size:13px;">🎥 <span>' + (cleanBody || 'Video') + '</span></div>' +
+      dlLink + '</div>';
   }
   if (type === 'audioMessage') {
-    return '<div style="background:rgba(255,255,255,0.06);border-radius:8px;padding:10px;margin-bottom:4px;display:flex;align-items:center;gap:8px;font-size:12px;">🎵 Voice message' + dlBtn + '</div>';
+    var dlLink = dlUrl ? '<a href="' + dlUrl + '" target="_blank" style="display:inline-flex;align-items:center;gap:4px;margin-top:6px;font-size:11px;color:var(--blue2);text-decoration:none;"><i class="fas fa-download"></i> Download Audio</a>' : '';
+    return '<div style="background:rgba(255,255,255,0.06);border-radius:8px;padding:10px;margin-bottom:4px;">' +
+      '<div style="display:flex;align-items:center;gap:8px;font-size:13px;">🎵 Voice message</div>' +
+      dlLink + '</div>';
   }
   if (type === 'documentMessage') {
-    return '<div style="background:rgba(255,255,255,0.06);border-radius:8px;padding:10px;margin-bottom:4px;display:flex;align-items:center;gap:8px;font-size:12px;cursor:pointer;" onclick="window.open(API_BASE+\'/wa/media/' + (msgId||'') + '\',\'_blank\')">📄 <span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + (body||'Document') + '</span>' + dlBtn + '</div>';
+    var fname = cleanBody || 'Document';
+    var dlLink = dlUrl
+      ? '<a href="' + dlUrl + '" download="' + fname + '" style="display:inline-flex;align-items:center;gap:6px;margin-top:8px;background:rgba(59,130,246,0.15);border:1px solid rgba(59,130,246,0.3);border-radius:6px;padding:5px 10px;font-size:11.5px;color:var(--blue2);text-decoration:none;cursor:pointer;"><i class="fas fa-download"></i> Download</a>'
+      : '';
+    return '<div style="background:rgba(255,255,255,0.06);border-radius:8px;padding:10px;margin-bottom:4px;">' +
+      '<div style="display:flex;align-items:center;gap:8px;font-size:13px;">📄 <span style="word-break:break-all;">' + fname + '</span></div>' +
+      dlLink + '</div>';
   }
   if (type === 'stickerMessage') return '<div style="font-size:28px;padding:4px;">🎭</div>';
-  if (type === 'locationMessage') return '<div style="background:rgba(255,255,255,0.06);border-radius:8px;padding:10px;font-size:12px;">📍 Location: ' + (body||'') + '</div>';
+  if (type === 'locationMessage') return '<div style="background:rgba(255,255,255,0.06);border-radius:8px;padding:10px;font-size:13px;">📍 ' + (cleanBody || 'Location') + '</div>';
   return null;
 }
-
 function waAppendMessage(msg) {
   var area = document.getElementById('wa-chat-area');
   if (!area) return;
@@ -2828,6 +2843,8 @@ function toggleTheme() {
 </script>
 </body>
 </html>
+
+
 
 
 

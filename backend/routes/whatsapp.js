@@ -22,10 +22,16 @@ router.get('/chats', authenticate, async (req, res) => {
   try {
     const result = await pool.query(`
       SELECT * FROM wa_chats
-      WHERE is_group = true
-        OR (id LIKE '%@s.whatsapp.net'
-            AND split_part(id,'@',1) LIKE '91%'
-            AND length(split_part(id,'@',1)) = 12)
+      WHERE
+        -- Groups: real WhatsApp groups only
+        (is_group = true AND id LIKE '%@g.us')
+        OR
+        -- Individual: only Indian +91 numbers on real WhatsApp
+        (
+          id LIKE '%@s.whatsapp.net'
+          AND split_part(id,'@',1) LIKE '91%'
+          AND length(split_part(id,'@',1)) = 12
+        )
       ORDER BY last_time DESC NULLS LAST LIMIT 300
     `);
     res.json(result.rows);
