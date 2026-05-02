@@ -66,7 +66,25 @@ router.get('/messages/:jid', authenticate, async (req, res) => {
   const limit = parseInt(req.query.limit || '100');
   try {
     const result = await pool.query(
-      `SELECT * FROM wa_messages WHERE chat_id=$1 ORDER BY timestamp ASC LIMIT $2`,
+      `SELECT m.*,
+        CASE
+          WHEN m.sender LIKE '%@lid' AND c.phone IS NOT NULL AND c.phone ~ '^[0-9]{7,15}$'
+            THEN CASE
+              WHEN c.phone LIKE '91%' AND length(c.phone) = 12
+              THEN '+91 ' || substring(c.phone, 3, 5) || ' ' || substring(c.phone, 8, 5)
+              ELSE '+' || c.phone
+            END
+          WHEN m.sender NOT LIKE '%@lid' AND m.sender NOT LIKE '%@g.us' AND m.sender IS NOT NULL
+            THEN CASE
+              WHEN split_part(m.sender,'@',1) LIKE '91%' AND length(split_part(m.sender,'@',1)) = 12
+              THEN '+91 ' || substring(split_part(m.sender,'@',1), 3, 5) || ' ' || substring(split_part(m.sender,'@',1), 8, 5)
+              ELSE '+' || split_part(m.sender,'@',1)
+            END
+          ELSE NULL
+        END AS sender_phone
+       FROM (SELECT * FROM wa_messages WHERE chat_id=$1 ORDER BY timestamp DESC LIMIT $2) m
+       LEFT JOIN wa_contacts c ON c.jid = m.sender
+       ORDER BY m.timestamp ASC`,
       [jid, limit]
     );
     await pool.query(`UPDATE wa_messages SET is_read=true WHERE chat_id=$1 AND from_me=false`, [jid]);

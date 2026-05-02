@@ -13,6 +13,7 @@ const pool = new Pool({
   max: 10,
   idleTimeoutMillis: 30000,
   connectionTimeoutMillis: 3000,
+  options: '-c client_encoding=UTF8',
 });
 
 pool.on('error', (err) => {

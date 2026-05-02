@@ -1,9 +1,38 @@
 const express = require('express');
 const pool    = require('../db/pool');
 const { authenticate } = require('../middleware/auth');
+const smdr    = require('../services/matrixSmdr');
 
 const router = express.Router();
 router.use(authenticate);
+
+// GET /api/calls/pbx-status
+router.get('/pbx-status', (req, res) => {
+  res.json(smdr.getStatus());
+});
+
+// GET /api/calls/contacts — distinct numbers seen in PBX logs (caller + destination)
+router.get('/contacts', async (req, res) => {
+  try {
+    const result = await pool.query(`
+      SELECT phone,
+             MAX(created_at) AS last_call,
+             COUNT(*)::int AS call_count
+      FROM (
+        SELECT NULLIF(TRIM(destination), '') AS phone, created_at FROM call_logs WHERE destination IS NOT NULL
+        UNION ALL
+        SELECT NULLIF(TRIM(caller), '') AS phone, created_at FROM call_logs WHERE caller IS NOT NULL
+      ) t
+      WHERE phone IS NOT NULL AND phone <> ''
+      GROUP BY phone
+      ORDER BY MAX(created_at) DESC NULLS LAST
+      LIMIT 500
+    `);
+    return res.json(result.rows);
+  } catch (err) {
+    return res.status(500).json({ error: 'Failed to fetch PBX contacts.' });
+  }
+});
 
 // GET /api/calls
 router.get('/', async (req, res) => {

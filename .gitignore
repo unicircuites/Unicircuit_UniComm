@@ -5,6 +5,10 @@ backend/node_modules/
 # Environment variables — never commit secrets
 backend/.env
 
+# Local TLS keys (generate on tower; never commit)
+backend/certs/*.key
+backend/certs/*.pem
+
 # WhatsApp auth session — sensitive keys, never commit
 backend/wa_auth/
 

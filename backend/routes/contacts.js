@@ -1,9 +1,33 @@
 const express = require('express');
 const pool    = require('../db/pool');
+const mailStore  = require('../services/outlookMailStore');
 const { authenticate } = require('../middleware/auth');
 
 const router = express.Router();
 router.use(authenticate);
+
+async function countBroadcastsForEmail(email) {
+  const e = String(email || '').trim().toLowerCase();
+  if (!e) return 0;
+  try {
+    const r = await pool.query(
+      `SELECT COUNT(*)::int AS n
+       FROM email_broadcasts b
+       WHERE b.status IN ('sent', 'sending')
+       AND EXISTS (
+         SELECT 1 FROM jsonb_array_elements(COALESCE(b.recipients, '[]'::jsonb)) AS elem
+         WHERE (
+           (jsonb_typeof(elem) = 'string' AND lower(trim(both '"' from elem::text)) = $1)
+           OR (jsonb_typeof(elem) = 'object' AND lower(trim(elem->>'email')) = $1)
+         )
+       )`,
+      [e]
+    );
+    return r.rows[0].n;
+  } catch (_) {
+    return 0;
+  }
+}
 
 // GET /api/contacts
 router.get('/', async (req, res) => {
@@ -14,7 +38,7 @@ router.get('/', async (req, res) => {
   if (q) {
     params.push(`%${q}%`);
     const n = params.length;
-    sql += ` AND (fname ILIKE $${n} OR lname ILIKE $${n} OR company ILIKE $${n} OR city ILIKE $${n} OR products ILIKE $${n})`;
+    sql += ` AND (fname ILIKE $${n} OR lname ILIKE $${n} OR company ILIKE $${n} OR city ILIKE $${n} OR products ILIKE $${n} OR email ILIKE $${n})`;
   }
   if (segment) {
     params.push(segment);
@@ -28,6 +52,60 @@ router.get('/', async (req, res) => {
   } catch (err) {
     console.error('[Contacts] GET error:', err.message);
     return res.status(500).json({ error: 'Failed to fetch contacts.' });
+  }
+});
+
+// GET /api/contacts/:id/activity — Outlook mail stats and broadcast count
+router.get('/:id/activity', async (req, res) => {
+  const id = parseInt(req.params.id, 10);
+  if (Number.isNaN(id)) return res.status(400).json({ error: 'Invalid id.' });
+  try {
+    const row = await pool.query(
+      `SELECT id, email, last_contact FROM contacts WHERE id = $1`, [id]
+    );
+    if (!row.rowCount) return res.status(404).json({ error: 'Contact not found.' });
+    const email = row.rows[0].email;
+
+    let lastEmailAt             = null;
+    let outlookSentToThem       = 0;
+    let outlookReceivedFromThem = 0;
+    let outlookError            = null;
+    let outlookHint             = null;
+
+    if (email && String(email).trim()) {
+      // Read from DB cache (populated by POST /api/outlook/sync-messages)
+      const cached = await mailStore.getStatsForEmail(email);
+      if (cached) {
+        lastEmailAt             = cached.last_email_at ? new Date(cached.last_email_at).toISOString() : null;
+        outlookSentToThem       = cached.sent_to_them    || 0;
+        outlookReceivedFromThem = cached.received_from   || 0;
+      } else {
+        outlookHint = 'No data yet — click "Sync Mail Stats" in Email / Outlook to scan your mailbox.';
+      }
+
+      // Persist last_contact to DB if we got a date
+      if (lastEmailAt) {
+        const disp = new Date(lastEmailAt).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' });
+        pool.query(`UPDATE contacts SET last_contact = $1 WHERE id = $2`, [disp, id]).catch(() => {});
+      }
+    }
+
+    const broadcastCount = await countBroadcastsForEmail(email);
+
+    return res.json({
+      lastEmailAt,
+      lastContactLabel: lastEmailAt
+        ? new Date(lastEmailAt).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' })
+        : null,
+      outlookSentToThem,
+      outlookReceivedFromThem,
+      broadcastCount,
+      outlookError,
+      outlookHint,
+    });
+  } catch (err) {
+    console.error('[Contacts] activity error:', err.message);
+    return res.status(500).json({ error: err.message });
   }
 });
 

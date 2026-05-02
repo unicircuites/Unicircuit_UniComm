@@ -9,11 +9,22 @@ const pool  = require('../db/pool');
 
 const GRAPH = 'https://graph.microsoft.com/v1.0';
 
+function msAuthority() {
+  const tid = (process.env.MS_TENANT_ID || '').trim().toLowerCase();
+  if (tid === 'common' || tid === 'organizations') {
+    return `https://login.microsoftonline.com/${tid}`;
+  }
+  if (tid) {
+    return `https://login.microsoftonline.com/${tid}`;
+  }
+  return 'https://login.microsoftonline.com/common';
+}
+
 // ── MSAL Confidential Client ───────────────────────────────────────────────
 const msalConfig = {
   auth: {
     clientId:     process.env.MS_CLIENT_ID,
-    authority:    `https://login.microsoftonline.com/common`,  // common = works for any tenant
+    authority:    msAuthority(),
     clientSecret: process.env.MS_CLIENT_SECRET,
   },
   system: {
@@ -104,12 +115,15 @@ async function getAccessToken(email) {
 
 // ── BUILD AUTH URL ─────────────────────────────────────────────────────────
 async function getAuthUrl(state) {
-  console.log('[MSAL] Building auth URL...');
-  console.log('[MSAL] Tenant ID:', process.env.MS_TENANT_ID);
-  console.log('[MSAL] Client ID:', process.env.MS_CLIENT_ID);
-  console.log('[MSAL] Redirect URI:', process.env.MS_REDIRECT_URI);
-  console.log('[MSAL] Login hint:', process.env.MS_USER_EMAIL);
-  console.log('[MSAL] Authority:', `https://login.microsoftonline.com/${process.env.MS_TENANT_ID}`);
+  const authority = msAuthority();
+  console.log('\n[Outlook OAuth] getAuthUrl() — values actually used this request:');
+  console.log('  authority (tenant segment) =', authority);
+  console.log('  MS_TENANT_ID (raw .env)     =', process.env.MS_TENANT_ID || '(empty)');
+  console.log('  MS_CLIENT_ID                =', process.env.MS_CLIENT_ID || '(empty)');
+  console.log('  MS_REDIRECT_URI             =', process.env.MS_REDIRECT_URI || '(empty)');
+  console.log('  MS_USER_EMAIL (login_hint)  =', process.env.MS_USER_EMAIL || '(empty)');
+  console.log('  client_secret in .env?      =', process.env.MS_CLIENT_SECRET ? `yes (${process.env.MS_CLIENT_SECRET.length} chars)` : 'NO — OAuth will fail');
+  console.log('  scopes                      =', SCOPES.join(', '));
 
   try {
     const url = await cca.getAuthCodeUrl({
@@ -119,13 +133,43 @@ async function getAuthUrl(state) {
       state:       state || 'unicomm',
       prompt:      'select_account',
     });
-    console.log('[MSAL] Auth URL generated successfully:', url.substring(0, 80) + '...');
+    try {
+      const u = new URL(url);
+      console.log('  built URL (parsed):');
+      console.log('    client_id     =', u.searchParams.get('client_id'));
+      console.log('    redirect_uri  =', u.searchParams.get('redirect_uri'));
+      console.log('    scope (head)  =', (u.searchParams.get('scope') || '').slice(0, 120) + '…');
+    } catch (_) {
+      console.log('  full URL (first 120 chars) =', url.slice(0, 120) + '…');
+    }
+    console.log('[Outlook OAuth] If Microsoft shows AADSTS700016: that CLIENT_ID is not registered in THIS tenant.');
+    console.log('  Fix: In Azure → App registrations → your app → Overview → "Directory (tenant) ID" must match MS_TENANT_ID,');
+    console.log('  OR create a new app registration inside that tenant and put its Application (client) ID in MS_CLIENT_ID.\n');
     return url;
   } catch (err) {
-    console.error('[MSAL] ❌ getAuthCodeUrl failed:', err.message);
-    console.error('[MSAL] Full error:', JSON.stringify(err, null, 2));
+    console.error('[MSAL] getAuthCodeUrl failed:', err.message);
+    console.error('[MSAL] errorCode:', err.errorCode, 'subError:', err.subError);
     throw err;
   }
+}
+
+/** Call once after dotenv (e.g. from server.js) — does not print secrets */
+function logOutlookOAuthConfigAtStartup() {
+  const tid = (process.env.MS_TENANT_ID || '').trim() || '(missing)';
+  const cid = (process.env.MS_CLIENT_ID || '').trim() || '(missing)';
+  const redir = (process.env.MS_REDIRECT_URI || '').trim() || '(missing)';
+  const email = (process.env.MS_USER_EMAIL || '').trim() || '(missing)';
+  const secretOk = !!(process.env.MS_CLIENT_SECRET && String(process.env.MS_CLIENT_SECRET).length > 8);
+  console.log('\n── Microsoft Graph / Outlook (.env) ──────────────────────────────────');
+  console.log('  MS_TENANT_ID     ', tid);
+  console.log('  MS_CLIENT_ID     ', cid);
+  console.log('  MS_REDIRECT_URI  ', redir);
+  console.log('  MS_USER_EMAIL    ', email);
+  console.log('  MS_CLIENT_SECRET ', secretOk ? '(set)' : '(MISSING or too short)');
+  console.log('  computed authority:', msAuthority());
+  console.log('  Tip: AADSTS700016 = app not in tenant. Directory (tenant) ID on the app');
+  console.log('       registration in Azure must equal MS_TENANT_ID (or use a new app in that tenant).');
+  console.log('────────────────────────────────────────────────────────────────────────\n');
 }
 
 // ── EXCHANGE CODE FOR TOKEN ────────────────────────────────────────────────
@@ -217,4 +261,5 @@ module.exports = {
   graphPatch,
   isAuthenticated,
   saveTokens,
+  logOutlookOAuthConfigAtStartup,
 };
