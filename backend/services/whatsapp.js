@@ -404,8 +404,13 @@ async function startWA() {
     if (connection === 'open') {
       isConnected = true;
       qrString    = null;
-      phoneNumber = sock.user?.id?.split(':')[0] || sock.user?.id;
-      console.log('[WA] âœ… Connected as', phoneNumber);
+      const rawId = sock.user?.id || '';
+      console.log('[WA] sock.user:', JSON.stringify(sock.user));
+      // sock.user.id can be "919545073545:48@s.whatsapp.net" or LID "49868...@lid"
+      // Extract real phone: take part before ':' or '@'
+      const idPart = rawId.split('@')[0].split(':')[0];
+      phoneNumber = idPart || rawId;
+      console.log('[WA] Connected as', phoneNumber, '| raw id:', rawId);
       emit('wa:connected', { phone: phoneNumber, name: sock.user?.name });
     }
 
@@ -995,10 +1000,13 @@ async function importExportedChat(chatText, chatJid, mediaFiles, clearOld) {
 
 function getConnectedPhone() {
   if (!isConnected) return null;
-  // If we have a phone number, use it. If it's an LID, try to find the mapped phone.
-  if (phoneNumber && !phoneNumber.includes('@lid')) return phoneNumber;
+  // phoneNumber already cleaned (no @ or :) from connection handler
+  if (phoneNumber && !String(phoneNumber).includes('@')) return phoneNumber;
+  // Fallback: search contactsStore for own mapped phone
+  console.log('[WA] getConnectedPhone fallback — phoneNumber:', phoneNumber);
   const mapped = Object.values(contactsStore).find(c => c.phoneJid);
-  return mapped ? mapped.phoneJid.split('@')[0] : (phoneNumber || 'CONNECTED');
+  console.log('[WA] mapped:', mapped ? mapped.phoneJid : 'NOT FOUND');
+  return mapped ? mapped.phoneJid.split('@')[0] : (phoneNumber || null);
 }
 
 module.exports = { startWA, sendMessage, logout, getStatus, getQR, setIO, getGroupMetadata, downloadMedia, msgCache, importExportedChat, getConnectedPhone };
