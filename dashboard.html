@@ -4583,7 +4583,8 @@ async function waOpenChat(jid, name, phone) {
 var waReplyTo = null;
 
 function waMediaHTML(type, body, msgId) {
-  var dlUrl = msgId ? (API_BASE + '/wa/media/' + msgId) : null;
+  var token = localStorage.getItem('unicomm_token') || '';
+  var dlUrl = msgId ? (API_BASE + '/wa/media/' + msgId + (token ? '?token=' + encodeURIComponent(token) : '')) : null;
   var cleanBody = (body || '').replace(/^📷\s*|^📄\s*/,'').trim();
 
   if (type === 'imageMessage') {
