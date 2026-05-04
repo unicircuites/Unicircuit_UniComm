@@ -3559,7 +3559,15 @@ async function loadCallLogs() {
       return;
     }
     tbody.innerHTML = calls.map(function(c) {
-      var dt = c.call_date ? new Date(c.call_date).toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'2-digit'}) : '';
+      var dt = '';
+      if (c.call_date) {
+        // Parse DATE string directly (YYYY-MM-DD) to avoid timezone shift
+        var dp = c.call_date.substring(0,10).split('-');
+        var dObj = new Date(parseInt(dp[0]), parseInt(dp[1])-1, parseInt(dp[2]));
+        dt = dObj.toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'2-digit'});
+      } else if (c.created_at) {
+        dt = new Date(c.created_at).toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'2-digit'});
+      }
       var tm = c.call_time ? c.call_time.substring(0,5) : (c.created_at ? new Date(c.created_at).toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'}) : '');
       var typeBadge = c.call_type === 'In' ? 'b-blue' : c.call_type === 'Missed' ? 'b-red' : c.call_type === 'Internal' ? 'b-gold' : 'b-green';
       var typeLabel = c.call_type === 'In' ? 'Incoming' : c.call_type === 'Out' ? 'Outgoing' : c.call_type || '—';
