@@ -6,6 +6,7 @@
 <title>Dashboard · UniComm Pro · Unicircuit Engineering Services LLP</title>
 <script src="https://cdn.tailwindcss.com"></script>
 <script src="/socket.io/socket.io.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
 <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
@@ -1147,6 +1148,7 @@ select.inp option{background:#1a2035;color:var(--text);}
         <span id="wa-sync-status" style="font-size:11px;color:var(--muted);margin-left:4px;"></span>
         <button class="btn btn-green btn-xs" id="wa-sync-btn" onclick="waSync()" style="margin-left:auto;"><i class="fas fa-sync-alt"></i> Sync</button>
         <button class="btn btn-ghost btn-xs" onclick="waRefreshChats()"><i class="fas fa-redo"></i> Reload</button>
+        <button class="btn btn-blue btn-xs" onclick="waOpenImport()" title="Import WhatsApp exported .txt chat"><i class="fas fa-file-import"></i> Import Chat</button>
         <button class="btn btn-red btn-xs" onclick="waLogout()"><i class="fas fa-sign-out-alt"></i> Disconnect</button>
       </div>
     </div>
@@ -1822,10 +1824,28 @@ function notify(title, sub, color = 'var(--gold)', icon = 'fas fa-check-circle')
 }
 
 // ── MODAL ──
-function openModal(id) { document.getElementById(id).classList.add('open'); }
-function closeModal(id) { document.getElementById(id).classList.remove('open'); }
-document.querySelectorAll('.modal-overlay').forEach(m => {
-  m.addEventListener('click', e => { if (e.target === m) m.classList.remove('open'); });
+function openModal(id) {
+  var el = document.getElementById(id);
+  if (!el) return;
+  el.style.display = 'flex';
+  el.classList.add('open');
+  // click-outside-to-close (attach once)
+  if (!el._modalClickBound) {
+    el._modalClickBound = true;
+    el.addEventListener('click', function(e) {
+      if (e.target === el) closeModal(id);
+    });
+  }
+}
+function closeModal(id) {
+  var el = document.getElementById(id);
+  if (!el) return;
+  el.style.display = 'none';
+  el.classList.remove('open');
+}
+// Legacy: also handle pre-existing .modal-overlay elements
+document.querySelectorAll('.modal-overlay').forEach(function(m) {
+  m.addEventListener('click', function(e) { if (e.target === m) m.classList.remove('open'); });
 });
 
 // ──────────────────────────────────
@@ -4584,28 +4604,51 @@ var waReplyTo = null;
 
 function waMediaHTML(type, body, msgId) {
   var token = localStorage.getItem('unicomm_token') || '';
-  var dlUrl = msgId ? (API_BASE + '/wa/media/' + msgId + (token ? '?token=' + encodeURIComponent(token) : '')) : null;
+  var tokenParam = token ? '?token=' + encodeURIComponent(token) : '';
+  var dlUrl = msgId ? (API_BASE + '/wa/media/' + msgId + tokenParam) : null;
   var cleanBody = (body || '').replace(/^📷\s*|^📄\s*/,'').trim();
 
   if (type === 'imageMessage') {
-    // Show image placeholder with download link
-    var dlLink = dlUrl ? '<a href="' + dlUrl + '" target="_blank" style="display:inline-flex;align-items:center;gap:4px;margin-top:6px;font-size:11px;color:var(--blue2);text-decoration:none;"><i class="fas fa-download"></i> Download Photo</a>' : '';
-    return '<div style="background:rgba(255,255,255,0.06);border-radius:8px;padding:10px;margin-bottom:4px;">' +
-      '<div style="display:flex;align-items:center;gap:8px;font-size:13px;">📷 <span>' + (cleanBody || 'Photo') + '</span></div>' +
-      dlLink + '</div>';
+    if (dlUrl) {
+      // Show actual thumbnail — clicking opens inline modal
+      return '<div style="margin-bottom:4px;">' +
+        '<div onclick="openImageViewer(\'' + dlUrl + '\')" style="display:inline-block;cursor:zoom-in;">' +
+          '<img src="' + dlUrl + '" loading="lazy" alt="Photo" ' +
+          'style="max-width:240px;max-height:200px;border-radius:8px;display:block;object-fit:cover;" ' +
+          'onerror="this.parentElement.innerHTML=\'<div style=&quot;background:rgba(255,255,255,0.06);border-radius:8px;padding:10px;font-size:13px;&quot;>📷 ' + (cleanBody||'Photo') + ' <a href=&quot;' + dlUrl + '&quot; target=&quot;_blank&quot; style=&quot;font-size:11px;color:var(--blue2);&quot;>Download</a></div>\'" />' +
+        '</div>' +
+        (cleanBody ? '<div style="font-size:11.5px;color:var(--muted);margin-top:4px;">' + cleanBody + '</div>' : '') +
+      '</div>';
+    }
+    return '<div style="background:rgba(255,255,255,0.06);border-radius:8px;padding:10px;font-size:13px;">📷 ' + (cleanBody || 'Photo') + '</div>';
   }
+
   if (type === 'videoMessage') {
-    var dlLink = dlUrl ? '<a href="' + dlUrl + '" target="_blank" style="display:inline-flex;align-items:center;gap:4px;margin-top:6px;font-size:11px;color:var(--blue2);text-decoration:none;"><i class="fas fa-download"></i> Download Video</a>' : '';
-    return '<div style="background:rgba(255,255,255,0.06);border-radius:8px;padding:10px;margin-bottom:4px;">' +
-      '<div style="display:flex;align-items:center;gap:8px;font-size:13px;">🎥 <span>' + (cleanBody || 'Video') + '</span></div>' +
-      dlLink + '</div>';
+    if (dlUrl) {
+      return '<div style="margin-bottom:4px;background:rgba(0,0,0,0.3);border-radius:8px;overflow:hidden;max-width:260px;">' +
+        '<video controls preload="metadata" style="width:100%;max-height:180px;display:block;border-radius:8px;">' +
+          '<source src="' + dlUrl + '">' +
+          'Your browser does not support video. <a href="' + dlUrl + '" target="_blank">Download Video</a>' +
+        '</video>' +
+        (cleanBody ? '<div style="font-size:11.5px;color:var(--muted);padding:4px 8px 6px;">' + cleanBody + '</div>' : '') +
+      '</div>';
+    }
+    return '<div style="background:rgba(255,255,255,0.06);border-radius:8px;padding:10px;font-size:13px;">🎥 ' + (cleanBody || 'Video') + '</div>';
   }
+
   if (type === 'audioMessage') {
-    var dlLink = dlUrl ? '<a href="' + dlUrl + '" target="_blank" style="display:inline-flex;align-items:center;gap:4px;margin-top:6px;font-size:11px;color:var(--blue2);text-decoration:none;"><i class="fas fa-download"></i> Download Audio</a>' : '';
-    return '<div style="background:rgba(255,255,255,0.06);border-radius:8px;padding:10px;margin-bottom:4px;">' +
-      '<div style="display:flex;align-items:center;gap:8px;font-size:13px;">🎵 Voice message</div>' +
-      dlLink + '</div>';
+    if (dlUrl) {
+      return '<div style="background:rgba(37,211,102,0.06);border:1px solid rgba(37,211,102,0.15);border-radius:10px;padding:8px 12px;margin-bottom:4px;min-width:200px;">' +
+        '<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;font-size:11.5px;color:var(--green2);"><i class="fas fa-microphone"></i> Voice message</div>' +
+        '<audio controls preload="metadata" style="width:100%;height:32px;accent-color:#25D366;">' +
+          '<source src="' + dlUrl + '">' +
+          '<a href="' + dlUrl + '" target="_blank" style="font-size:11px;color:var(--blue2);">Download Audio</a>' +
+        '</audio>' +
+      '</div>';
+    }
+    return '<div style="background:rgba(255,255,255,0.06);border-radius:8px;padding:10px;font-size:13px;">🎵 Voice message</div>';
   }
+
   if (type === 'documentMessage') {
     var fname = cleanBody || 'Document';
     var dlLink = dlUrl
@@ -4615,8 +4658,15 @@ function waMediaHTML(type, body, msgId) {
       '<div style="display:flex;align-items:center;gap:8px;font-size:13px;">📄 <span style="word-break:break-all;">' + fname + '</span></div>' +
       dlLink + '</div>';
   }
+
   if (type === 'stickerMessage') return '<div style="font-size:28px;padding:4px;">🎭</div>';
-  if (type === 'locationMessage') return '<div style="background:rgba(255,255,255,0.06);border-radius:8px;padding:10px;font-size:13px;">📍 ' + (cleanBody || 'Location') + '</div>';
+  if (type === 'locationMessage') {
+    var coords = (cleanBody || '').split(',');
+    var mapLink = coords.length === 2 ? 'https://maps.google.com/?q=' + coords[0].trim() + ',' + coords[1].trim() : null;
+    return '<div style="background:rgba(255,255,255,0.06);border-radius:8px;padding:10px;font-size:13px;">📍 ' +
+      (mapLink ? '<a href="' + mapLink + '" target="_blank" style="color:var(--blue2);">View on Maps</a>' : (cleanBody || 'Location')) +
+    '</div>';
+  }
   return null;
 }
 function waAppendMessage(msg) {
@@ -4664,8 +4714,9 @@ function waAppendMessage(msg) {
   // Media block
   var mediaBlock = waMediaHTML(type, body, msg.id || msg.key_id || '');
 
-  // Message body
-  var bodyText = mediaBlock ? (mediaBlock + (body && type !== 'documentMessage' ? '<div style="font-size:13px;margin-top:2px;">' + body + '</div>' : '')) : '<div style="font-size:13px;">' + body + '</div>';
+  // Message body — preserve newlines
+  var bodyHtml = body.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\n/g,'<br>');
+  var bodyText = mediaBlock ? (mediaBlock + (body && type !== 'documentMessage' ? '<div style="font-size:13px;margin-top:2px;">' + bodyHtml + '</div>' : '')) : '<div style="font-size:13px;">' + bodyHtml + '</div>';
 
   // Reply button
   var replyBtn = '<button onclick="waSetReply(\'' + (msg.id||'') + '\',\'' + body.replace(/'/g,"\\'").substring(0,60) + '\')" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:10px;padding:2px 4px;opacity:0;transition:opacity 0.15s;" class="wa-reply-btn" title="Reply"><i class="fas fa-reply"></i></button>';
@@ -4829,6 +4880,166 @@ async function aiWADraft() {
     input.value = draft.trim();
   } catch (_) { input.value = ''; }
   input.disabled = false; input.focus();
+}
+
+function openImageViewer(url) {
+  var img = document.getElementById('image-viewer-img');
+  var dlLink = document.getElementById('image-viewer-dl');
+  if (img) img.src = url;
+  if (dlLink) dlLink.href = url;
+  openModal('image-viewer-modal');
+}
+
+// ── WA IMPORT CHAT ────────────────────────────────────────────────────────
+function waOpenImport() {
+  var statusEl = document.getElementById('wa-import-status');
+  var fileEl = document.getElementById('wa-import-file');
+  var prevEl = document.getElementById('wa-import-preview');
+  var selectEl = document.getElementById('wa-import-chat-select');
+  
+  if (statusEl) statusEl.innerHTML = '';
+  if (fileEl) fileEl.value = '';
+  if (prevEl) prevEl.innerHTML = '';
+  
+  // Populate existing chats dropdown
+  if (selectEl) {
+    selectEl.innerHTML = '<option value="">-- Select an existing chat --</option>';
+    // Sort chats alphabetically
+    var sortedChats = [...waAllChats].sort((a,b) => (a.name||a.id).localeCompare(b.name||b.id));
+    sortedChats.forEach(function(c) {
+      var opt = document.createElement('option');
+      opt.value = c.id;
+      opt.textContent = (c.name || c.phone || c.id) + (c.is_group ? ' (Group)' : '');
+      selectEl.appendChild(opt);
+    });
+  }
+  
+  openModal('wa-import-modal');
+
+  // Attach file-change listener if not already done
+  if (fileEl && !fileEl._listenerAttached) {
+    fileEl._listenerAttached = true;
+    fileEl.addEventListener('change', async function() {
+      var file = this.files[0];
+      if (!file) return;
+      var namePart = file.name.replace(/\.(txt|zip)$/i, '').replace(/^WhatsApp Chat with /i, '').trim();
+      
+      // Auto-select dropdown if name matches
+      var selectEl = document.getElementById('wa-import-chat-select');
+      if (selectEl) {
+        for (var i = 0; i < selectEl.options.length; i++) {
+          if (selectEl.options[i].text.toLowerCase().includes(namePart.toLowerCase())) {
+            selectEl.selectedIndex = i;
+            break;
+          }
+        }
+      }
+      
+      var prev = document.getElementById('wa-import-preview');
+      if (file.name.toLowerCase().endsWith('.zip')) {
+        if (prev) prev.textContent = 'ZIP file selected. Will extract chat and media on import...';
+      } else {
+        var reader = new FileReader();
+        reader.onload = function(e) {
+          var lines = (e.target.result || '').split('\n').slice(0, 5).join('\n');
+          if (prev) prev.textContent = lines;
+        };
+        reader.readAsText(file, 'UTF-8');
+      }
+    });
+  }
+}
+
+async function waDoImport() {
+  var fileEl = document.getElementById('wa-import-file');
+  var selectEl = document.getElementById('wa-import-chat-select');
+  var statusEl = document.getElementById('wa-import-status');
+  
+  if (!fileEl || !fileEl.files[0]) {
+    statusEl.innerHTML = '<span style="color:var(--red2);">Select a .txt or .zip file first</span>';
+    return;
+  }
+  if (!selectEl || !selectEl.value) {
+    statusEl.innerHTML = '<span style="color:var(--red2);">Please select an existing chat to import into</span>';
+    return;
+  }
+  
+  var file = fileEl.files[0];
+  var chatJid = selectEl.value;
+  var clearOld = document.getElementById('wa-import-clear') ? document.getElementById('wa-import-clear').checked : false;
+  
+  statusEl.innerHTML = '<span class="spin-loader"></span> Reading file...';
+
+  try {
+    let chatText = '';
+    let mediaFiles = [];
+
+    if (file.name.toLowerCase().endsWith('.zip')) {
+      statusEl.innerHTML = '<span class="spin-loader"></span> Extracting ZIP...';
+      const zip = await JSZip.loadAsync(file);
+      const files = Object.keys(zip.files);
+      
+      // Find the text file (usually starts with _chat.txt or WhatsApp Chat)
+      const txtFilename = files.find(f => f.endsWith('.txt'));
+      if (!txtFilename) throw new Error("Could not find a .txt chat file inside the ZIP.");
+      chatText = await zip.files[txtFilename].async("string");
+
+      // Extract media files (limit to prevent memory crash, e.g. first 50 files)
+      statusEl.innerHTML = '<span class="spin-loader"></span> Preparing media...';
+      let count = 0;
+      for (const fname of files) {
+        if (fname === txtFilename || zip.files[fname].dir) continue;
+        if (count > 100) break; // Limit to 100 media files to avoid payload too large
+        
+        const ext = fname.split('.').pop().toLowerCase();
+        let mime = 'application/octet-stream';
+        if (['jpg','jpeg'].includes(ext)) mime = 'image/jpeg';
+        else if (ext === 'png') mime = 'image/png';
+        else if (ext === 'mp4') mime = 'video/mp4';
+        else if (['mp3','opus','ogg'].includes(ext)) mime = 'audio/ogg';
+        
+        const base64Data = await zip.files[fname].async("base64");
+        mediaFiles.push({ filename: fname, base64: base64Data, mime: mime });
+        count++;
+      }
+    } else {
+      chatText = await new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = e => resolve(e.target.result);
+        reader.onerror = reject;
+        reader.readAsText(file, 'UTF-8');
+      });
+    }
+
+    statusEl.innerHTML = '<span class="spin-loader"></span> Sending to server...';
+    
+    // Check payload size
+    const payload = JSON.stringify({
+      chatText: chatText,
+      chatJid: chatJid,
+      clearOld: clearOld,
+      mediaFiles: mediaFiles
+    });
+    if (payload.length > 50 * 1024 * 1024) { // 50MB
+      throw new Error("Payload too large. Please import a smaller chat or without media.");
+    }
+
+    var res = await fetch(API_BASE + '/wa/import-chat', {
+      method: 'POST',
+      headers: getAuthHeaders(),
+      body: payload
+    });
+    var data = await res.json();
+    if (res.ok) {
+      statusEl.innerHTML = '<span style="color:var(--green2);"><i class="fas fa-check-circle"></i> Imported <b>' + data.imported + '</b> messages' + (data.mediaLinked ? ' (' + data.mediaLinked + ' media)' : '') + (data.merged ? ' (merged)' : '') + '</span>';
+      notify('Chat Import Complete', (data.chatName || 'Chat') + ' — ' + data.imported + ' msgs', 'var(--green)', 'fab fa-whatsapp');
+      setTimeout(function() { closeModal('wa-import-modal'); waLoadChats(); }, 1500);
+    } else {
+      statusEl.innerHTML = '<span style="color:var(--red2);">' + (data.error || 'Import failed') + '</span>';
+    }
+  } catch(err) {
+    statusEl.innerHTML = '<span style="color:var(--red2);">' + err.message + '</span>';
+  }
 }
 // ── REAL-TIME CLOCK ───────────────────────────────────────────────────────
 function updateClock() {
@@ -5655,6 +5866,81 @@ function etUseInBroadcast() {
       </div>
     </div>
   </div>
+
+<!-- ██████ WA IMPORT CHAT MODAL ██████ -->
+<div id="wa-import-modal" class="modal-overlay" style="display:none;position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,0.7);align-items:center;justify-content:center;backdrop-filter:blur(4px);">
+  <div style="background:var(--card);border:1px solid var(--border);border-radius:14px;padding:0;width:520px;max-width:96vw;max-height:90vh;overflow:auto;box-shadow:0 20px 60px rgba(0,0,0,0.6);animation:fadeUp 0.2s ease;">
+    <!-- Header -->
+    <div style="padding:16px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;">
+      <div style="display:flex;align-items:center;gap:10px;">
+        <i class="fab fa-whatsapp" style="color:#25D366;font-size:20px;"></i>
+        <div>
+          <div style="font-size:15px;font-weight:800;color:var(--text);">Import WhatsApp Chat</div>
+          <div style="font-size:11px;color:var(--muted);margin-top:1px;">From exported .txt file (Android / iPhone)</div>
+        </div>
+      </div>
+      <button onclick="closeModal('wa-import-modal')" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:18px;padding:4px 6px;"><i class="fas fa-times"></i></button>
+    </div>
+
+    <!-- How to export hint -->
+    <div style="padding:10px 20px;background:rgba(37,211,102,0.05);border-bottom:1px solid var(--border);">
+      <div style="font-size:11.5px;color:var(--muted2);line-height:1.55;">
+        <b style="color:var(--green2);">How to export:</b> WhatsApp → Open chat → ⋮ menu → <i>More → Export Chat → Without media</i> → save .txt file to your PC.
+      </div>
+    </div>
+
+    <!-- Form -->
+    <div style="padding:18px 20px;display:flex;flex-direction:column;gap:14px;">
+
+      <!-- File picker -->
+      <div>
+        <label style="display:block;font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:0.6px;margin-bottom:6px;"><i class="fas fa-file-alt" style="color:#25D366;margin-right:4px;"></i>Chat Export File (.txt)</label>
+        <input type="file" id="wa-import-file" accept=".txt,.zip" style="width:100%;background:rgba(255,255,255,0.04);border:1px solid var(--border);border-radius:8px;padding:8px 12px;color:var(--text);font-family:'Outfit',sans-serif;font-size:12.5px;cursor:pointer;">
+      </div>
+
+      <!-- Preview -->
+      <div id="wa-import-preview" style="display:block;background:rgba(0,0,0,0.25);border:1px solid var(--border);border-radius:8px;padding:10px 12px;font-size:11px;font-family:'JetBrains Mono',monospace;color:var(--muted2);white-space:pre-wrap;min-height:40px;max-height:80px;overflow:auto;line-height:1.4;"></div>
+
+      <!-- Dropdown: Select Target Chat -->
+      <div>
+        <label style="display:block;font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:0.6px;margin-bottom:6px;">Select Existing Chat to Import Into</label>
+        <select class="inp" id="wa-import-chat-select" style="font-size:13px;background:rgba(0,0,0,0.2);">
+          <option value="">-- Select an existing chat --</option>
+        </select>
+        <label style="display:flex;align-items:center;gap:6px;margin-top:10px;font-size:12px;color:var(--muted2);cursor:pointer;">
+          <input type="checkbox" id="wa-import-clear" checked> Overwrite previous imports (Removes duplicate bubbles)
+        </label>
+      </div>
+
+      <!-- Info note -->
+      <div style="background:rgba(59,130,246,0.06);border:1px solid rgba(59,130,246,0.15);border-radius:8px;padding:10px 12px;font-size:11.5px;color:var(--muted2);line-height:1.5;">
+        <i class="fas fa-info-circle" style="color:var(--blue2);margin-right:5px;"></i>
+        Messages will be safely merged into the selected chat. No duplicate chats will be created. Duplicates of already imported messages will be ignored.
+      </div>
+
+      <!-- Status -->
+      <div id="wa-import-status" style="font-size:12.5px;min-height:20px;"></div>
+
+      <!-- Actions -->
+      <div style="display:flex;gap:10px;justify-content:flex-end;padding-top:4px;">
+        <button class="btn btn-ghost" onclick="closeModal('wa-import-modal')">Cancel</button>
+        <button class="btn btn-green" onclick="waDoImport()"><i class="fas fa-file-import"></i> Import Chat</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ██████ IMAGE VIEWER MODAL ██████ -->
+<div id="image-viewer-modal" class="modal-overlay" style="display:none;position:fixed;inset:0;z-index:99999;background:rgba(0,0,0,0.85);align-items:center;justify-content:center;backdrop-filter:blur(5px);">
+  <button onclick="closeModal('image-viewer-modal')" style="position:absolute;top:20px;right:25px;background:rgba(255,255,255,0.1);border:none;border-radius:50%;width:44px;height:44px;color:#fff;font-size:20px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:background 0.2s;" onmouseover="this.style.background='rgba(255,255,255,0.2)'" onmouseout="this.style.background='rgba(255,255,255,0.1)'"><i class="fas fa-times"></i></button>
+  
+  <div style="position:relative;max-width:90vw;max-height:90vh;display:flex;flex-direction:column;align-items:center;animation:zoomIn 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);">
+    <img id="image-viewer-img" src="" style="max-width:100%;max-height:calc(90vh - 60px);object-fit:contain;border-radius:8px;box-shadow:0 10px 40px rgba(0,0,0,0.5);" />
+    <a id="image-viewer-dl" href="#" download target="_blank" style="margin-top:16px;display:inline-flex;align-items:center;gap:8px;background:rgba(255,255,255,0.15);color:#fff;padding:8px 16px;border-radius:20px;font-size:13px;text-decoration:none;transition:background 0.2s;" onmouseover="this.style.background='rgba(255,255,255,0.25)'" onmouseout="this.style.background='rgba(255,255,255,0.15)'">
+      <i class="fas fa-download"></i> Download Image
+    </a>
+  </div>
+</div>
 
 </body>
 </html>
