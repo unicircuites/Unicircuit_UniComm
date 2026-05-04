@@ -223,17 +223,18 @@ async function init() {
     // ── SEED: Call logs ────────────────────────────────────────────────────
     const lCount = await client.query(`SELECT COUNT(*) FROM call_logs`);
     if (parseInt(lCount.rows[0].count) === 0) {
+      const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
       const logs = [
-        ['Amit Sharma','Ext. 201','+91 98200 44512','4m 12s','Out',null],
-        ['L&T ECC','+91 22 6121 8800','Ext. 305 Sales','18m 47s','In','Discussed quotation for Panel Wiring. Follow-up required by April 8.'],
-        ['Priya Nair','Ext. 108','+91 80 4112 3390','—','Missed',null],
-        ['BHEL Procurement',null,'Ext. 305 Sales','9m 03s','In',null],
-        ['Rajan – Purchase','Ext. 202','Ext. 401 Accounts','2m 55s','Internal',null],
+        [today,'10:30:00','Amit Sharma','201','+91 98200 44512','4m 12s','Out',null],
+        [today,'10:45:00','L&T ECC','+91 22 6121 8800','Ext. 305 Sales','18m 47s','In','Discussed quotation for Panel Wiring. Follow-up required by April 8.'],
+        [today,'11:00:00','Priya Nair','108','+91 80 4112 3390','—','Missed',null],
+        [today,'11:20:00','BHEL Procurement',null,'Ext. 305 Sales','9m 03s','In',null],
+        [today,'11:35:00','Rajan – Purchase','202','Ext. 401 Accounts','2m 55s','Internal',null],
       ];
       for (const l of logs) {
         await client.query(`
-          INSERT INTO call_logs (caller,extension,destination,duration,call_type,ai_summary)
-          VALUES ($1,$2,$3,$4,$5,$6)
+          INSERT INTO call_logs (call_date,call_time,caller,extension,destination,duration,call_type,ai_summary)
+          VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
         `, l);
       }
       console.log('✅  Call logs seeded (5 records).');
