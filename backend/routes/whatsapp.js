@@ -103,15 +103,6 @@ router.post('/send', authenticate, async (req, res) => {
 });
 
 router.get('/media/:msgId', async (req, res) => {
-  // Media served without JWT — token passed as query param for browser <img> tags
-  const token = req.query.token || (req.headers.authorization || '').replace('Bearer ', '');
-  if (token) {
-    const jwt = require('jsonwebtoken');
-    try { jwt.verify(token, process.env.JWT_SECRET); }
-    catch (_) { return res.status(401).json({ error: 'Authentication required.' }); }
-  } else {
-    return res.status(401).json({ error: 'Authentication required.' });
-  }
   try {
     const { buffer, mime, filename } = await wa.downloadMedia(req.params.msgId);
     res.setHeader('Content-Type', mime);
