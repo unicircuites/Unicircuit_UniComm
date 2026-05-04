@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -4432,8 +4432,7 @@ async function checkWAStatus() {
     } else {
       const cb = document.getElementById('wa-connect-banner');
       if (cb) cb.style.display = 'block';
-      // Auto-show QR if not connected
-      setTimeout(waGetQR, 1000);
+      // Do NOT auto-show QR — user must click "Show QR Code" button manually
     }
   } catch (_) {
     const cb = document.getElementById('wa-connect-banner');
@@ -4450,12 +4449,10 @@ function waOnConnected(phone, name) {
   if (ph) ph.textContent = '+' + phone + (name ? ' - ' + name : '');
 }
 
-async function waGetQR(retries) {
-  retries = retries || 0;
+async function waGetQR() {
   const btn = document.getElementById('wa-get-qr-btn');
-  if (btn) btn.innerHTML = '<span class="spin-loader"></span> Waiting for QR (' + (retries+1) + '/15)...';
+  if (btn) { btn.innerHTML = '<span class="spin-loader"></span> Getting QR...'; btn.disabled = true; }
   try {
-    // QR is public — no auth header needed
     const res = await fetch(API_BASE + '/wa/qr');
     const data = await res.json();
     if (data.qr) {
@@ -4465,15 +4462,11 @@ async function waGetQR(retries) {
       if (wrap) wrap.style.display = 'flex';
       if (btn) btn.style.display = 'none';
     } else {
-      if (retries < 15) {
-        setTimeout(function() { waGetQR(retries + 1); }, 2000);
-      } else {
-        if (btn) { btn.innerHTML = '<i class="fas fa-qrcode"></i> Show QR Code'; btn.style.display = 'inline-flex'; }
-        notify('QR timeout', 'Please restart server', 'var(--red)', 'fas fa-exclamation-circle');
-      }
+      if (btn) { btn.innerHTML = '<i class="fas fa-qrcode"></i> Show QR Code'; btn.disabled = false; }
+      notify('QR not ready', 'Please wait a moment and try again', 'var(--gold)', 'fas fa-qrcode');
     }
   } catch (_) {
-    if (btn) { btn.innerHTML = '<i class="fas fa-qrcode"></i> Show QR Code'; btn.style.display = 'inline-flex'; }
+    if (btn) { btn.innerHTML = '<i class="fas fa-qrcode"></i> Show QR Code'; btn.disabled = false; }
   }
 }
 
