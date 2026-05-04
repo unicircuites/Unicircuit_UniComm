@@ -417,18 +417,19 @@ async function startWA() {
     if (connection === 'close') {
       isConnected = false;
       const code  = lastDisconnect?.error?.output?.statusCode;
-      const shouldReconnect = code !== DisconnectReason.loggedOut;
-      console.log('[WA] Disconnected. Code:', code, '| Reconnect:', shouldReconnect);
+      console.log('[WA] Disconnected. Code:', code);
       emit('wa:disconnected', { code });
-      if (shouldReconnect) {
-        setTimeout(startWA, 3000);
-      } else {
-        // Logged out â€” clear session, restart for fresh QR
+      if (code === DisconnectReason.loggedOut) {
+        console.log('[WA] Logged out - clearing session. Scan QR to reconnect.');
         clearSession();
         setTimeout(startWA, 1000);
+      } else if (code === 408) {
+        console.log('[WA] QR timeout - waiting for manual QR request.');
+      } else {
+        console.log('[WA] Reconnecting in 5s...');
+        setTimeout(startWA, 5000);
       }
     }
-  });
 
   sock.ev.on('creds.update', saveCreds);
 
