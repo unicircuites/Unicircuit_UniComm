@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -4373,10 +4373,22 @@ function initWASocket() {
     if (sb) sb.style.display = 'none';
     if (cb) cb.style.display = 'block';
   });
-  waSocket.on('wa:message', (msg) => {
-    waLoadChats();
-    if (waActiveJid === msg.chatId) waAppendMessage(msg);
-    else notify('New WhatsApp: ' + (msg.name || msg.chatId.split('@')[0]), msg.body.substring(0,50), 'var(--green)', 'fab fa-whatsapp');
+  waSocket.on('wa:message', function(msg) {
+    // Handle both raw Baileys structure and our flat backend structure
+    var rawJid = msg.chatId || (msg.key ? msg.key.remoteJid : null);
+    if (!rawJid) return;
+    
+    var cleanJid = rawJid.includes('@') ? (rawJid.split(':')[0] + '@' + rawJid.split('@')[1]) : rawJid;
+    
+    if (cleanJid === waActiveJid) {
+      waAppendMessage(msg);
+      var area = document.getElementById('wa-chat-area');
+      if (area) area.scrollTop = area.scrollHeight;
+    } else {
+      var sender = msg.senderName || msg.pushName || cleanJid.split('@')[0];
+      showToast("New WhatsApp from " + sender);
+    }
+    waRefreshChatList();
   });
   waSocket.on('wa:chats_updated', () => waLoadChats());
   waSocket.on('wa:sync_complete', () => {
@@ -4522,7 +4534,9 @@ function waFilterChats(q) {
   waRenderChats(waAllChats.filter(function(c){ return (c.name||'').toLowerCase().includes(q.toLowerCase()) || (c.phone||'').includes(q); }));
 }
 
-async function waOpenChat(jid, name, phone) {
+async function waOpenChat(rawJid, name, phone) {
+  // Normalize JID: remove device suffixes like :48
+  var jid = rawJid.includes('@') ? (rawJid.split(':')[0] + '@' + rawJid.split('@')[1]) : rawJid;
   waActiveJid = jid;
   var isGroup = jid.endsWith('@g.us');
 
@@ -4677,6 +4691,21 @@ function waAppendMessage(msg) {
   var body = msg.body || '';
   var type = msg.type || msg.msg_type || 'conversation';
   var senderName = msg.contactName || msg.contact_name || msg.senderName || msg.sender_name || '';
+  
+  // Deduplication: Don't append if message ID already exists on screen
+  if (document.getElementById('msg-' + msg.id)) return;
+  
+  // Ordering Check: If appending live, only append if newer than last message
+  var lastMsgEl = area.lastElementChild;
+  if (lastMsgEl && lastMsgEl.dataset.ts) {
+    var lastTs = parseInt(lastMsgEl.dataset.ts);
+    var newTs = new Date(msg.ts || msg.timestamp).getTime();
+    if (newTs < lastTs) {
+      // This is an old sync message, don't append to bottom of live view
+      return;
+    }
+  }
+
   var quotedBody = msg.quotedBody || msg.quoted_body || '';
   var isGroup = waActiveJid && waActiveJid.endsWith('@g.us');
 
@@ -4697,6 +4726,8 @@ function waAppendMessage(msg) {
   }
 
   var div = document.createElement('div');
+  div.id = 'msg-' + msg.id;
+  div.dataset.ts = new Date(msg.ts || msg.timestamp).getTime();
   div.style.cssText = 'display:flex;flex-direction:column;align-items:' + (fromMe?'flex-end':'flex-start') + ';margin-bottom:3px;';
 
   // Sender label (group only, incoming) — "~ Name  +91 XXXXX XXXXX"
@@ -4922,7 +4953,7 @@ function waOpenImport() {
     fileEl.addEventListener('change', async function() {
       var file = this.files[0];
       if (!file) return;
-      var namePart = file.name.replace(/\.(txt|zip)$/i, '').replace(/^WhatsApp Chat with /i, '').trim();
+      var namePart = file.name.replace(/\.(txt|zip)$/i, '').replace(/^WhatsApp Chat with /i, '').replace(/\s*\(\d+\)$/, '').trim();
       
       // Auto-select dropdown if name matches
       var selectEl = document.getElementById('wa-import-chat-select');
@@ -4984,12 +5015,12 @@ async function waDoImport() {
       if (!txtFilename) throw new Error("Could not find a .txt chat file inside the ZIP.");
       chatText = await zip.files[txtFilename].async("string");
 
-      // Extract media files (limit to prevent memory crash, e.g. first 50 files)
+      // Extract media files (limit to prevent memory crash, e.g. first 5000 files)
       statusEl.innerHTML = '<span class="spin-loader"></span> Preparing media...';
       let count = 0;
       for (const fname of files) {
         if (fname === txtFilename || zip.files[fname].dir) continue;
-        if (count > 100) break; // Limit to 100 media files to avoid payload too large
+        if (count > 5000) break; // Increased to 5000 to support very large media chats
         
         const ext = fname.split('.').pop().toLowerCase();
         let mime = 'application/octet-stream';
@@ -4999,9 +5030,15 @@ async function waDoImport() {
         else if (['mp3','opus','ogg'].includes(ext)) mime = 'audio/ogg';
         
         const base64Data = await zip.files[fname].async("base64");
-        mediaFiles.push({ filename: fname, base64: base64Data, mime: mime });
+        // Extract just the filename without any folder paths the ZIP might have
+        const baseFilename = fname.split(/[\\/]/).pop();
+        
+        mediaFiles.push({ filename: baseFilename, base64: base64Data, mime: mime });
         count++;
       }
+      console.log("[WA-Import] Total media files extracted from ZIP:", mediaFiles.length);
+      statusEl.innerHTML = '<span style="color:var(--green2);">Extracted ' + mediaFiles.length + ' media files</span>';
+      await new Promise(r => setTimeout(r, 1000)); // Show status briefly
     } else {
       chatText = await new Promise((resolve, reject) => {
         const reader = new FileReader();
@@ -5020,7 +5057,7 @@ async function waDoImport() {
       clearOld: clearOld,
       mediaFiles: mediaFiles
     });
-    if (payload.length > 50 * 1024 * 1024) { // 50MB
+    if (payload.length > 500 * 1024 * 1024) { // 500MB
       throw new Error("Payload too large. Please import a smaller chat or without media.");
     }
 
