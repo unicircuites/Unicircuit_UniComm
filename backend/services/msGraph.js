@@ -282,10 +282,19 @@ async function graphPatch(endpoint, body, email) {
 }
 
 // ── CHECK AUTH STATUS ──────────────────────────────────────────────────────
+// Actually verify mailbox access — not just token existence
 async function isAuthenticated(email) {
   try {
     const token = await getAccessToken(email || process.env.MS_USER_EMAIL);
-    return !!token;
+    if (!token) return false;
+
+    // Do a real Graph call to verify mailbox access works
+    const userEmail = email || process.env.MS_USER_EMAIL;
+    const endpoint = `/users/${encodeURIComponent(userEmail)}/mailFolders/inbox?$select=id`;
+    const res = await fetch(`https://graph.microsoft.com/v1.0${endpoint}`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    return res.ok;
   } catch (_) {
     return false;
   }
