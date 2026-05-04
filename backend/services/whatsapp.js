@@ -420,16 +420,12 @@ async function startWA() {
       console.log('[WA] Disconnected. Code:', code);
       emit('wa:disconnected', { code });
       if (code === DisconnectReason.loggedOut) {
-        console.log('[WA] Logged out - clearing session. Scan QR to reconnect.');
+        // Logged out â€” clear session, restart for fresh QR
         clearSession();
         setTimeout(startWA, 1000);
-      } else if (code === 408) {
-        console.log('[WA] QR timeout - waiting for manual QR request.');
-      } else {
-        console.log('[WA] Reconnecting in 5s...');
-        setTimeout(startWA, 5000);
       }
     }
+  });
 
   sock.ev.on('creds.update', saveCreds);
 
