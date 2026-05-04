@@ -12,6 +12,9 @@ backend/certs/*.pem
 # WhatsApp auth session — sensitive keys, never commit
 backend/wa_auth/
 
+# WhatsApp media cache — large files, never commit
+backend/wa_media/
+
 # Temp files
 wa_section.txt
 email_section.txt

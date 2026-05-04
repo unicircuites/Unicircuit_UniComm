@@ -439,6 +439,25 @@ async function startWA() {
       if (msg.key && msg.key.id && msg.message) {
         msgCache.set(msg.key.id, msg);
         if (msgCache.size > MAX_CACHE) msgCache.delete(msgCache.keys().next().value);
+
+        // Auto-save media to disk so it's available even after cache expires
+        const mtype = getContentType(msg.message);
+        if (['imageMessage','videoMessage','audioMessage','documentMessage'].includes(mtype)) {
+          try {
+            const { downloadMediaMessage } = require('@whiskeysockets/baileys');
+            const buf = await downloadMediaMessage(msg, 'buffer', {});
+            const fs = require('fs');
+            const path = require('path');
+            const mediaDir = path.join(__dirname, '../wa_media');
+            if (!fs.existsSync(mediaDir)) fs.mkdirSync(mediaDir, { recursive: true });
+            const ext = mtype === 'imageMessage' ? 'jpg' : mtype === 'videoMessage' ? 'mp4' : mtype === 'audioMessage' ? 'ogg' : 'bin';
+            const docMsg = msg.message.documentMessage;
+            const fname = docMsg?.fileName || `${msg.key.id}.${ext}`;
+            fs.writeFileSync(path.join(mediaDir, msg.key.id + '_' + fname), buf);
+          } catch (e) {
+            console.warn('[WA] Auto-save media failed:', e.message);
+          }
+        }
       }
       if (!isRealMessage(msg)) continue;
       const jid = msg.key.remoteJid;
@@ -633,6 +652,25 @@ const msgCache = new Map();
 const MAX_CACHE = 500;
 
 async function downloadMedia(msgId) {
+  const fs = require('fs');
+  const path = require('path');
+  const mediaDir = path.join(__dirname, '../wa_media');
+
+  // Check disk first — auto-saved on receive
+  if (fs.existsSync(mediaDir)) {
+    const files = fs.readdirSync(mediaDir).filter(f => f.startsWith(msgId + '_'));
+    if (files.length > 0) {
+      const fpath = path.join(mediaDir, files[0]);
+      const buffer = fs.readFileSync(fpath);
+      const ext = path.extname(files[0]).toLowerCase();
+      const mimeMap = { '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.png': 'image/png', '.mp4': 'video/mp4', '.ogg': 'audio/ogg', '.bin': 'application/octet-stream' };
+      const mime = mimeMap[ext] || 'application/octet-stream';
+      const filename = files[0].replace(msgId + '_', '');
+      return { buffer, mime, filename };
+    }
+  }
+
+  // Fallback: try live download from cache
   const cached = msgCache.get(msgId);
   if (!cached) throw new Error('Message not in cache. Only recent messages can be downloaded.');
   const { downloadMediaMessage } = require('@whiskeysockets/baileys');
