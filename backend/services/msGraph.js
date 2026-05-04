@@ -84,11 +84,36 @@ async function getStoredTokens(email) {
   return res.rows[0] || null;
 }
 
+// ── CLIENT CREDENTIALS TOKEN CACHE ────────────────────────────────────────
+let _ccToken = null;
+let _ccExpiry = null;
+
+async function getClientCredentialsToken() {
+  // Return cached token if still valid (5 min buffer)
+  if (_ccToken && _ccExpiry && _ccExpiry > new Date(Date.now() + 5 * 60 * 1000)) {
+    return _ccToken;
+  }
+  try {
+    const result = await cca.acquireTokenByClientCredential({
+      scopes: ['https://graph.microsoft.com/.default'],
+    });
+    if (result && result.accessToken) {
+      _ccToken  = result.accessToken;
+      _ccExpiry = new Date(Date.now() + (result.expiresIn || 3600) * 1000);
+      console.log('[Graph] ✅ Client credentials token acquired (no user login needed)');
+      return _ccToken;
+    }
+  } catch (err) {
+    console.warn('[Graph] Client credentials failed:', err.message);
+  }
+  return null;
+}
+
 // ── GET VALID ACCESS TOKEN ─────────────────────────────────────────────────
 async function getAccessToken(email) {
   const stored = await getStoredTokens(email);
 
-  // If we have a valid token (not expiring in next 5 min), use it
+  // If we have a valid delegated token (not expiring in next 5 min), use it
   if (stored && stored.access_token && stored.expires_at) {
     const expiresAt = new Date(stored.expires_at);
     if (expiresAt > new Date(Date.now() + 5 * 60 * 1000)) {
@@ -109,6 +134,12 @@ async function getAccessToken(email) {
       console.warn('[Graph] Refresh token failed:', err.message);
     }
   }
+
+  // Fallback: Client Credentials (app-level, no user login needed)
+  // Requires Application permissions + admin consent in Azure
+  console.log('[Graph] No delegated token — trying client credentials flow...');
+  const ccToken = await getClientCredentialsToken();
+  if (ccToken) return ccToken;
 
   return null; // Need re-auth
 }
@@ -194,11 +225,17 @@ async function exchangeCode(code) {
 }
 
 // ── GRAPH API HELPER ───────────────────────────────────────────────────────
+function resolveEndpoint(endpoint, email) {
+  // Client credentials flow does not support /me/ — replace with /users/EMAIL/
+  return endpoint.replace(/^\/me(\/|$)/, `/users/${encodeURIComponent(email || process.env.MS_USER_EMAIL)}$1`);
+}
+
 async function graphGet(endpoint, email) {
   const token = await getAccessToken(email || process.env.MS_USER_EMAIL);
   if (!token) throw new Error('NOT_AUTHENTICATED');
 
-  const res = await fetch(`${GRAPH}${endpoint}`, {
+  const resolvedEndpoint = resolveEndpoint(endpoint, email || process.env.MS_USER_EMAIL);
+  const res = await fetch(`${GRAPH}${resolvedEndpoint}`, {
     headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
   });
   if (!res.ok) {
@@ -212,7 +249,8 @@ async function graphPost(endpoint, body, email) {
   const token = await getAccessToken(email || process.env.MS_USER_EMAIL);
   if (!token) throw new Error('NOT_AUTHENTICATED');
 
-  const res = await fetch(`${GRAPH}${endpoint}`, {
+  const resolvedEndpoint = resolveEndpoint(endpoint, email || process.env.MS_USER_EMAIL);
+  const res = await fetch(`${GRAPH}${resolvedEndpoint}`, {
     method:  'POST',
     headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
     body:    JSON.stringify(body),
@@ -230,7 +268,8 @@ async function graphPatch(endpoint, body, email) {
   const token = await getAccessToken(email || process.env.MS_USER_EMAIL);
   if (!token) throw new Error('NOT_AUTHENTICATED');
 
-  const res = await fetch(`${GRAPH}${endpoint}`, {
+  const resolvedEndpoint = resolveEndpoint(endpoint, email || process.env.MS_USER_EMAIL);
+  const res = await fetch(`${GRAPH}${resolvedEndpoint}`, {
     method:  'PATCH',
     headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
     body:    JSON.stringify(body),
