@@ -12,8 +12,6 @@ const PBX_HOST  = process.env.PBX_HOST  || '192.168.0.81';
 const SMDR_PORT = parseInt(process.env.SMDR_PORT || '5000');
 
 let io          = null;
-let client      = null;
-let reconnTimer = null;
 let isConnected = false;
 let buffer      = '';
 
@@ -158,34 +156,41 @@ function processBuffer() {
   }
 }
 
-// ── CONNECT ───────────────────────────────────────────────────────────────
-function connect() {
-  if (client) { try { client.destroy(); } catch (_) {} }
-  client = new net.Socket();
+// ── TCP SERVER — PBX connects TO us ──────────────────────────────────────
+let tcpServer  = null;
 
-  client.connect(SMDR_PORT, PBX_HOST, () => {
+function startServer() {
+  if (tcpServer) { try { tcpServer.close(); } catch (_) {} }
+
+  tcpServer = net.createServer((socket) => {
     isConnected = true;
-    console.log(`[SMDR] Connected to Matrix PBX ${PBX_HOST}:${SMDR_PORT}`);
+    const remote = `${socket.remoteAddress}:${socket.remotePort}`;
+    console.log(`[SMDR] PBX connected from ${remote}`);
     emit('pbx:connected', { host: PBX_HOST, port: SMDR_PORT });
-    if (reconnTimer) { clearTimeout(reconnTimer); reconnTimer = null; }
+
+    socket.on('data', (data) => {
+      buffer += data.toString();
+      processBuffer();
+    });
+
+    socket.on('close', () => {
+      isConnected = false;
+      console.log('[SMDR] PBX disconnected');
+      emit('pbx:disconnected', {});
+    });
+
+    socket.on('error', (err) => {
+      console.error('[SMDR] Socket error:', err.message);
+    });
   });
 
-  client.on('data', (data) => {
-    buffer += data.toString();
-    processBuffer();
+  tcpServer.listen(SMDR_PORT, '0.0.0.0', () => {
+    console.log(`[SMDR] Listening for Matrix PBX on port ${SMDR_PORT}...`);
   });
 
-  client.on('close', () => {
-    isConnected = false;
-    console.log('[SMDR] Connection closed — reconnecting in 10s...');
-    emit('pbx:disconnected', {});
-    reconnTimer = setTimeout(connect, 10000);
-  });
-
-  client.on('error', (err) => {
-    isConnected = false;
-    console.error('[SMDR] Connection error:', err.message);
-    reconnTimer = setTimeout(connect, 10000);
+  tcpServer.on('error', (err) => {
+    console.error('[SMDR] Server error:', err.message);
+    setTimeout(startServer, 10000);
   });
 }
 
@@ -195,7 +200,7 @@ function getStatus() {
 
 async function start() {
   await ensureTable();
-  connect();
+  startServer();
 }
 
 module.exports = { start, setIO, getStatus };
