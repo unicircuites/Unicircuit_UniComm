@@ -1,4 +1,4 @@
-﻿/**
+/**
  * WhatsApp Service â€” Baileys
  * Proper WhatsApp Web-like implementation:
  * - Contacts store (name resolution)
@@ -25,11 +25,14 @@ const pool   = require('../db/pool');
 let sock        = null;
 let qrString    = null;
 let isConnected = false;
-let phoneNumber = null;
+let phoneNumber = null; // This will store the REAL phone number
+let userJid     = null; // This will store the active JID (Phone or LID)
 let io          = null;
 
 // In-memory contacts store (name lookup)
 const contactsStore = {};
+// In-memory imported chat checkpoint to protect against history sync duplicates
+let importedLastTsMap = {};
 
 const AUTH_DIR = path.join(__dirname, '../wa_auth');
 
@@ -150,7 +153,8 @@ async function ensureTables() {
       last_message TEXT,
       last_time    TIMESTAMPTZ,
       unread       INT DEFAULT 0,
-      updated_at   TIMESTAMPTZ DEFAULT NOW()
+      updated_at   TIMESTAMPTZ DEFAULT NOW(),
+      imported_last_ts TIMESTAMPTZ
     )
   `);
   await pool.query(`
@@ -171,9 +175,48 @@ async function ensureTables() {
     )
   `);
   await pool.query(`ALTER TABLE wa_messages ADD COLUMN IF NOT EXISTS quoted_body TEXT`);
+  await pool.query(`ALTER TABLE wa_chats ADD COLUMN IF NOT EXISTS imported_last_ts TIMESTAMPTZ`);
+
+  // Load imported checkpoints into memory
+  try {
+    const res = await pool.query(`SELECT id, imported_last_ts FROM wa_chats WHERE imported_last_ts IS NOT NULL`);
+    for (const r of res.rows) {
+      importedLastTsMap[r.id] = new Date(r.imported_last_ts).getTime();
+    }
+  } catch(e) {}
 }
 
-// â”€â”€ SAVE / UPDATE CONTACT â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── SAVE CHAT ────────────────────────────────────────────────────────────────────────
+async function saveChat(rawJid, name, lastMsg, lastTime, unread, isGroup) {
+  // Normalize JID: remove device suffixes like :48
+  const jid = rawJid.includes('@') ? (rawJid.split(':')[0] + '@' + rawJid.split('@')[1]) : rawJid;
+  
+  const phone = jid.split('@')[0].split(':')[0];
+  // Format Indian number properly
+  let displayPhone;
+  if (phone.startsWith('91') && phone.length === 12) {
+    displayPhone = '+91 ' + phone.slice(2, 7) + ' ' + phone.slice(7);
+  } else {
+    displayPhone = '+' + phone;
+  }
+  const ts = lastTime instanceof Date ? lastTime : toDate(lastTime);
+  try {
+    await pool.query(`
+      INSERT INTO wa_chats (id, name, phone, is_group, last_message, last_time, unread)
+      VALUES ($1,$2,$3,$4,$5,$6,$7)
+      ON CONFLICT (id) DO UPDATE SET
+        name         = COALESCE(EXCLUDED.name, wa_chats.name),
+        last_message = CASE WHEN EXCLUDED.last_message != '' THEN EXCLUDED.last_message ELSE wa_chats.last_message END,
+        last_time    = GREATEST(EXCLUDED.last_time, wa_chats.last_time),
+        unread       = CASE WHEN EXCLUDED.unread = 0 THEN 0 ELSE wa_chats.unread + EXCLUDED.unread END,
+        updated_at   = NOW()
+    `, [jid, name || displayPhone, displayPhone, isGroup || false, lastMsg || '', ts, unread || 0]);
+  } catch (err) {
+    console.error(`[WA-DB] saveChat error ${jid}:`, err.message);
+  }
+}
+
+// ── SAVE / UPDATE CONTACT ──────────────────────────────────────────────────────────────
 async function saveContact(contact) {
   if (!contact?.id) return;
   const jid    = contact.id;
@@ -184,10 +227,13 @@ async function saveContact(contact) {
   // Update in-memory store
   contactsStore[jid] = { name, notify };
 
-  // For @lid contacts, also store under their phone number if available
+  // Identity Mapping: If this is an LID, link it to the phone number
   if (jid.endsWith('@lid') && contact.phoneNumber) {
-    const phoneJid = contact.phoneNumber.replace(/\D/g,'') + '@s.whatsapp.net';
-    contactsStore[phoneJid] = { name, notify };
+    const pNum = typeof contact.phoneNumber === 'string' ? contact.phoneNumber : contact.phoneNumber.jid;
+    const phoneJid = pNum.replace(/\D/g,'') + '@s.whatsapp.net';
+    contactsStore[jid].phoneJid = phoneJid;
+    // Save mapping to DB too for persistence
+    pool.query('UPDATE wa_contacts SET phone=$1 WHERE jid=$2', [pNum.replace(/\D/g,''), jid]).catch(()=>{});
   }
 
   try {
@@ -234,7 +280,23 @@ async function saveMessage(msg) {
   try {
     if (!isRealMessage(msg)) return null;
 
-    const jid         = msg.key.remoteJid;
+    const rawJid      = msg.key.remoteJid;
+    // Normalize JID: remove device suffixes and resolve LID to phone if possible
+    let jid = rawJid.split(':')[0].split('@')[0] + '@' + rawJid.split('@')[1];
+    
+    // LID to Phone resolution (from memory or DB)
+    if (jid.endsWith('@lid')) {
+      const mapped = Object.values(contactsStore).find(c => c.id === jid && c.phoneJid);
+      if (mapped) jid = mapped.phoneJid;
+    }
+    
+    const ts          = toDate(msg.messageTimestamp);
+    
+    // Protect imported chats from receiving duplicate native history syncs
+    if (importedLastTsMap[jid] && ts.getTime() <= importedLastTsMap[jid]) {
+      return null;
+    }
+
     const id          = msg.key.id;
     const fromMe      = msg.key.fromMe || false;
     // For group messages: participant is in msg.key.participant OR msg.participant
@@ -265,7 +327,6 @@ async function saveMessage(msg) {
         senderName = null;
       }
     }
-    const ts          = toDate(msg.messageTimestamp);
     const type        = getContentType(msg.message) || 'text';
     const body        = getBody(msg);
     const quotedBody  = getQuotedBody(msg);
@@ -298,7 +359,15 @@ async function startWA() {
   await loadContactsFromDB();
 
   const { state, saveCreds } = await useMultiFileAuthState(AUTH_DIR);
-  const { version }          = await fetchLatestBaileysVersion();
+  
+  let version = [2, 3000, 1015901307];
+  try {
+    const res = await fetchLatestBaileysVersion();
+    version = res.version;
+  } catch (err) {
+    console.warn('[WA] Version fetch timeout/error, using fallback v' + version.join('.'));
+  }
+  
   console.log('[WA] Starting Baileys v' + version.join('.'));
 
   sock = makeWASocket({
@@ -314,6 +383,8 @@ async function startWA() {
       );
       return res.rows[0] ? { conversation: res.rows[0].body } : { conversation: '' };
     },
+    connectTimeoutMs: 60000,
+    keepAliveIntervalMs: 10000
   });
 
   // â”€â”€ CONNECTION â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
@@ -460,8 +531,16 @@ async function startWA() {
         }
       }
       if (!isRealMessage(msg)) continue;
-      const jid = msg.key.remoteJid;
-      if (!jid || jid === 'status@broadcast') continue;
+      // Improved Normalization for @s.whatsapp.net, @g.us, AND @lid
+      let jid = rawJid.includes(':') ? (rawJid.split(':')[0] + '@' + rawJid.split('@')[1]) : rawJid;
+      
+      // If it's an LID, try to find the mapped phone JID
+      if (jid.endsWith('@lid')) {
+        const contact = Object.values(contactsStore).find(c => c.id === jid && c.phoneJid);
+        if (contact) jid = contact.phoneJid;
+      }
+
+      console.log(`[WA] Incoming message from ${jid}: ${getBody(msg).substring(0, 30)}`);
 
       const saved = await saveMessage(msg);
       if (!saved) continue;
@@ -474,6 +553,7 @@ async function startWA() {
       await saveChat(jid, chatName, saved.body, saved.ts, msg.key.fromMe ? 0 : 1, isGroup);
 
       if (type === 'notify') {
+        console.log(`[WA] Emitting message to UI: ${saved.id}`);
         emit('wa:message', {
           id: saved.id, chatId: jid, fromMe: saved.fromMe,
           sender: saved.sender, senderName: saved.senderName, body: saved.body,
@@ -698,7 +778,8 @@ async function logout() {
 
 // ── STATUS / QR ───────────────────────────────────────────────────────────
 function getStatus() {
-  return { connected: isConnected, phone: phoneNumber, name: sock?.user?.name || null, hasQR: !!qrString };
+  const phone = getConnectedPhone() || phoneNumber;
+  return { connected: isConnected, phone: phone, name: sock?.user?.name || null, hasQR: !!qrString };
 }
 
 async function getQR() {
@@ -706,7 +787,219 @@ async function getQR() {
   return qrcode.toDataURL(qrString);
 }
 
-module.exports = { startWA, sendMessage, logout, getStatus, getQR, setIO, getGroupMetadata, downloadMedia, msgCache };
+// ── WHATSAPP EXPORT CHAT IMPORT ───────────────────────────────────────────
+// Parses WhatsApp exported chat (Android / iOS .txt format) and saves to DB.
+// Supports:
+//   - Android: DD/MM/YYYY, HH:MM - Name: text
+//   - iOS:     [DD/MM/YYYY, HH:MM:SS] Name: text
+//   - Media files (base64) from zip export — saved to wa_media folder
+//   - Smart duplicate prevention — merges into existing chat by phone
+//
+async function importExportedChat(chatText, chatJid, mediaFiles, clearOld) {
+  // mediaFiles = [{ filename, base64, mime }] — from zip extraction on frontend
 
+  if (!chatJid) throw new Error("A valid chat must be selected to import messages.");
 
+  // Ensure tables exist
+  await ensureTables();
+  await pool.query(`ALTER TABLE wa_messages ADD COLUMN IF NOT EXISTS media_path TEXT`);
+
+  // ── STEP 1: Verify chat exists in DB ─────────────────────────────────────
+  const existing = await pool.query(`SELECT id, name FROM wa_chats WHERE id=$1`, [chatJid]);
+  if (existing.rows.length === 0) {
+    throw new Error("The selected chat does not exist in the database. Only synced chats can receive imports.");
+  }
+  const displayChatName = existing.rows[0].name;
+
+  // ── STEP 1.5: Clean old imports if requested ───────────────────────────
+  if (clearOld) {
+    // User explicitly requested: "db khali karo uss group ki aur zip ki chats + media db mai daalo"
+    await pool.query(`DELETE FROM wa_messages WHERE chat_id=$1`, [chatJid]);
+    console.log(`[WA-Import] Wiped entire chat history for ${chatJid} to replace with ZIP`);
+  }
+
+  // ── STEP 2: Save media files to wa_media folder ────────────────────────
+  const mediaDir = path.join(__dirname, '../wa_media');
+  if (!fs.existsSync(mediaDir)) fs.mkdirSync(mediaDir, { recursive: true });
+
+  // Build filename → saved msgId map for linking
+  const mediaSavedMap = {}; // originalFilename → { msgId, mime, ext }
+  if (Array.isArray(mediaFiles) && mediaFiles.length > 0) {
+    for (const mf of mediaFiles) {
+      try {
+        if (!mf.filename || !mf.base64) continue;
+        const buf = Buffer.from(mf.base64, 'base64');
+        const ext  = path.extname(mf.filename) || '.bin';
+        // Create a stable import msgId from filename
+        const fakeMsgId = 'import_' + Buffer.from(mf.filename).toString('base64').replace(/[^a-zA-Z0-9]/g,'').substring(0,24);
+        const savedName = fakeMsgId + '_' + mf.filename;
+        fs.writeFileSync(path.join(mediaDir, savedName), buf);
+        mediaSavedMap[mf.filename.toLowerCase()] = { msgId: fakeMsgId, mime: mf.mime || 'application/octet-stream', ext };
+        console.log(`[WA-Import] Saved media: ${savedName}`);
+      } catch (e) {
+        console.warn(`[WA-Import] Failed to save media ${mf.filename}:`, e.message);
+      }
+    }
+  }
+
+  // ── STEP 4: Parse chat text ────────────────────────────────────────────
+  const lines = chatText.split('\n');
+  console.log(`[WA-Import] Parsed chatText. lines.length = ${lines.length}`);
+  console.log(`[WA-Import] First line preview: ${lines[0]}`);
+
+  let imported = 0;
+  let skipped  = 0;
+  let mediaLinked = 0;
+  let lastTs   = new Date();
+  let pendingMsg = null;
+
+  // Regex patterns
+  // Android: 02/05/2025, 14:35 - Name: text OR 5/4/26, 1:50 PM - Name: text
+  // Using [\s\u202F\u00A0] to handle various Unicode spaces found in exports
+  const androidRe = /^(\d{1,2})\/(\d{1,2})\/(\d{2,4}),?[\s\u202F\u00A0]+(\d{1,2}):(\d{2})(?::(\d{2}))?[\s\u202F\u00A0]*(am|pm|AM|PM)?[\s\u202F\u00A0]*[-–][\s\u202F\u00A0]*(.+?):\s([\s\S]*)$/;
+  // iOS:     [02/05/2025, 14:35:22] Name: text OR [02/05/2025, 1:35:22 PM] Name: text
+  const iosRe     = /^\[(\d{1,2})\/(\d{1,2})\/(\d{2,4}),?[\s\u202F\u00A0]+(\d{1,2}):(\d{2})(?::(\d{2}))?[\s\u202F\u00A0]*(am|pm|AM|PM)?\][\s\u202F\u00A0]*(.+?):\s([\s\S]*)$/;
+
+  // Media filename pattern — WhatsApp exports write: "IMG-20240501-WA0012.jpg (file attached)"
+  // or just the filename on its own line after the sender prefix. Caption may follow on same line.
+  const mediaAttachedRe = /^(.+?\.(jpg|jpeg|png|gif|mp4|mp3|opus|ogg|pdf|docx?|xlsx?|pptx?|zip|aac|m4a|webp|sticker))(?:\s*\(file attached\))?(?:\s+([\s\S]*))?$/i;
+
+  const flush = async () => {
+    if (!pendingMsg) return;
+    const { ts, senderName, body, msgType, linkedMsgId, linkedMediaPath } = pendingMsg;
+
+    // Skip empty, system, and "without media" placeholders
+    if (!body || body.trim() === '') { pendingMsg = null; skipped++; return; }
+    const cleanBody = body.replace(/^\u200e|\u200f/g, '').trim();
+    if (
+      cleanBody === '<Media omitted>' ||
+      cleanBody.match(/^(Image|Video|Audio|GIF|Sticker|Contact card|Document) omitted$/) ||
+      cleanBody === 'This message was deleted' ||
+      cleanBody === 'You deleted this message' ||
+      cleanBody === 'null'
+    ) {
+      if (cleanBody.includes('omitted')) {
+        console.log(`[WA-Import] Info: WhatsApp omitted a media file from this export: ${cleanBody}`);
+      }
+      pendingMsg = null; skipped++; return;
+    }
+
+    // Deterministic import message ID (prevents re-import duplicates)
+    const msgId = linkedMsgId || (
+      'import_' + Buffer.from(ts.toISOString() + senderName + cleanBody.substring(0, 20))
+        .toString('base64').replace(/[^a-zA-Z0-9]/g, '').substring(0, 32)
+    );
+
+    const isFromMe = (senderName === 'You' || senderName === (sock?.user?.name || ''));
+    const finalType = msgType || 'text';
+
+    // Resolve body: for media messages, extract caption if any, otherwise empty
+    let finalBody = cleanBody;
+    if (finalType !== 'text' && finalType !== 'conversation') {
+      const match = cleanBody.match(mediaAttachedRe);
+      if (match && match[3] && match[3].trim()) {
+        finalBody = match[3].trim();
+      } else {
+        finalBody = ''; // Don't show the raw filename text
+      }
+    }
+
+    try {
+      await pool.query(`
+        INSERT INTO wa_messages (id, chat_id, from_me, sender_name, body, msg_type, timestamp, is_read, status, media_path)
+        VALUES ($1,$2,$3,$4,$5,$6,$7,true,'read',$8)
+        ON CONFLICT (id, chat_id) DO NOTHING
+      `, [msgId, chatJid, isFromMe, isFromMe ? 'You' : senderName, finalBody, finalType, ts, linkedMediaPath]);
+      imported++;
+      lastTs = ts;
+    } catch (e) {
+      console.warn('[WA-Import] DB insert error:', e.message);
+      skipped++;
+    }
+    pendingMsg = null;
+  };
+
+  for (const rawLine of lines) {
+    const line = rawLine.replace(/\r/g, '').trimEnd();
+    if (!line) {
+      if (pendingMsg) pendingMsg.body += '\n';
+      continue;
+    }
+
+    const cleanLine = line.replace(/^\u200e|\u200f/g, '');
+    let match = cleanLine.match(androidRe) || cleanLine.match(iosRe);
+
+    if (match) {
+      await flush();
+
+      let [, day, month, year, hh, mm, ss, ampm, senderName, body] = match;
+      let hour = parseInt(hh, 10);
+      if (ampm) {
+        ampm = ampm.toLowerCase();
+        if (ampm === 'pm' && hour < 12) hour += 12;
+        if (ampm === 'am' && hour === 12) hour = 0;
+      }
+      hh = hour.toString().padStart(2, '0');
+
+      const yr = year.length === 2 ? '20' + year : year;
+      const ts = new Date(`${yr}-${month.padStart(2,'0')}-${day.padStart(2,'0')}T${hh}:${mm.padStart(2,'0')}:${(ss||'00').padStart(2,'0')}+05:30`);
+      
+      const cleanSender = senderName.replace(/^\u200e|\u200f/g, '').trim();
+      const cleanBody   = (body || '').replace(/^\u200e|\u200f/g, '').trim();
+
+      // Detect if this line IS a media attachment reference
+      let msgType = 'text';
+      let linkedMsgId = null;
+      let linkedMediaPath = null;
+
+      const mediaMatch = cleanBody.match(mediaAttachedRe);
+      if (mediaMatch) {
+        const fname = mediaMatch[1].trim();
+        const ext   = mediaMatch[2].toLowerCase();
+        msgType = ext.match(/^(jpg|jpeg|png|gif|webp)$/) ? 'imageMessage'
+                : ext.match(/^(mp4|mov|avi)$/)           ? 'videoMessage'
+                : ext.match(/^(mp3|opus|ogg|aac|m4a)$/)  ? 'audioMessage'
+                : 'documentMessage';
+
+        // If we have the actual file saved, link its msgId and media path
+        const lookup = fname.toLowerCase();
+        if (mediaSavedMap[lookup]) {
+          linkedMsgId = mediaSavedMap[lookup].msgId;
+          linkedMediaPath = mediaSavedMap[lookup].msgId + '_' + fname;
+          mediaLinked++;
+        }
+      }
+
+      pendingMsg = { ts, senderName: cleanSender, body: cleanBody, msgType, linkedMsgId, linkedMediaPath, chatJidLocal: chatJid };
+    } else if (pendingMsg) {
+      // Continuation of previous multi-line message
+      pendingMsg.body += '\n' + line;
+    } else {
+      // System / date header line — skip
+      skipped++;
+    }
+  }
+  await flush(); // flush last message
+
+  // ── STEP 5: Update chat metadata & protect it ──────────────────────────
+  await pool.query(`
+    UPDATE wa_chats SET last_time=$1, updated_at=NOW(), imported_last_ts=GREATEST(imported_last_ts, $1)
+    WHERE id=$2
+  `, [lastTs, chatJid]);
+  
+  importedLastTsMap[chatJid] = new Date(lastTs).getTime();
+
+  console.log(`[WA-Import] Done — imported=${imported} skipped=${skipped} mediaLinked=${mediaLinked} chat=${chatJid} isNew=false`);
+  return { imported, skipped, mediaLinked, chatJid, chatName: displayChatName, merged: true };
+}
+
+function getConnectedPhone() {
+  if (!isConnected) return null;
+  // If we have a phone number, use it. If it's an LID, try to find the mapped phone.
+  if (phoneNumber && !phoneNumber.includes('@lid')) return phoneNumber;
+  const mapped = Object.values(contactsStore).find(c => c.phoneJid);
+  return mapped ? mapped.phoneJid.split('@')[0] : (phoneNumber || 'CONNECTED');
+}
+
+module.exports = { startWA, sendMessage, logout, getStatus, getQR, setIO, getGroupMetadata, downloadMedia, msgCache, importExportedChat, getConnectedPhone };
 

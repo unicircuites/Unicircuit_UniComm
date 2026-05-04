@@ -1,4 +1,4 @@
-﻿/**
+/**
  * WhatsApp Routes
  */
 const express = require('express');
@@ -32,6 +32,12 @@ router.get('/chats', authenticate, async (req, res) => {
           AND split_part(id,'@',1) LIKE '91%'
           AND length(split_part(id,'@',1)) = 12
         )
+        OR
+        -- LID (Linked Identity) chats — own device messages
+        id LIKE '%@lid'
+        OR
+        -- Imported chats (from WhatsApp Export)
+        id LIKE 'import_%'
       ORDER BY last_time DESC NULLS LAST LIMIT 300
     `);
     res.json(result.rows);
@@ -82,7 +88,11 @@ router.get('/messages/:jid', authenticate, async (req, res) => {
             END
           ELSE NULL
         END AS sender_phone
-       FROM (SELECT * FROM wa_messages WHERE chat_id=$1 ORDER BY timestamp DESC LIMIT $2) m
+       FROM (
+         SELECT * FROM wa_messages 
+         WHERE chat_id=$1 OR chat_id LIKE split_part($1, '@', 1) || ':%@' || split_part($1, '@', 2)
+         ORDER BY timestamp DESC LIMIT $2
+       ) m
        LEFT JOIN wa_contacts c ON c.jid = m.sender
        ORDER BY m.timestamp ASC`,
       [jid, limit]
@@ -103,12 +113,36 @@ router.post('/send', authenticate, async (req, res) => {
 });
 
 router.get('/media/:msgId', async (req, res) => {
+  // Support token via query param for <img src> / <audio src> direct links
+  if (req.query.token && !req.headers.authorization) {
+    req.headers.authorization = 'Bearer ' + req.query.token;
+  }
   try {
     const { buffer, mime, filename } = await wa.downloadMedia(req.params.msgId);
     res.setHeader('Content-Type', mime);
     res.setHeader('Content-Disposition', `inline; filename="${filename}"`);
+    res.setHeader('Cache-Control', 'private, max-age=86400');
     res.send(buffer);
   } catch (err) { res.status(404).json({ error: err.message }); }
+});
+
+// ── WhatsApp Export Chat Import ────────────────────────────────────────────
+router.post('/import-chat', authenticate, async (req, res) => {
+  try {
+    const { chatText, chatJid, mediaFiles, clearOld } = req.body;
+    if (!chatText || typeof chatText !== 'string') {
+      return res.status(400).json({ error: 'chatText is required' });
+    }
+    if (!chatJid) {
+      return res.status(400).json({ error: 'chatJid is required' });
+    }
+
+    const result = await wa.importExportedChat(chatText, chatJid, mediaFiles, clearOld);
+    res.json({ success: true, ...result });
+  } catch (err) {
+    console.error('[WA-Import] Error:', err.message);
+    res.status(500).json({ error: err.message });
+  }
 });
 
 module.exports = router;
