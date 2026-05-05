@@ -63,7 +63,10 @@ router.post('/sync', authenticate, async (req, res) => {
 
 router.get('/group/:jid', authenticate, async (req, res) => {
   try {
-    res.json(await wa.getGroupMetadata(decodeURIComponent(req.params.jid)));
+    let jid = decodeURIComponent(req.params.jid);
+    // Fix double domain suffix
+    jid = jid.replace(/@g\.us@g\.us$/, '@g.us').replace(/@s\.whatsapp\.net@s\.whatsapp\.net$/, '@s.whatsapp.net');
+    res.json(await wa.getGroupMetadata(jid));
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
