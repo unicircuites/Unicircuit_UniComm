@@ -26,73 +26,70 @@ If ANY step fails → revert immediately, do NOT push broken code.
 
 ---
 
-## Known Working State (as of commit `7cd08ca`)
+## Current Working State (as of commit `e6d3455`)
 
-### ✅ WORKING — DO NOT BREAK THESE
-
-#### Connection
+### ✅ Connection
 - Session stored in `backend/wa_auth/`
 - On server stop: session cleared via `process.on('exit/SIGINT/SIGTERM')`
 - QR timeout: 20s (`connectTimeoutMs: 20000`)
 - Code 408 (QR timeout): NO auto-reconnect, wait for manual scan
-- Code 500 (stream error): auto-reconnect after 5s
+- Code 500/515 (stream error/replaced): auto-reconnect after 5s
 - Logged out: clear session + restart in 500ms
-- `syncFullHistory: false` — fast connect, only recent history
+- `syncFullHistory: false` — fast connect
+- Baileys verbose logs suppressed: `logger: require('pino')({ level: 'silent' })`
 
-#### Chat Loading ✅
+### ✅ Chat List (working)
 - Chats loaded from DB via `/api/wa/chats`
-- Filter: `@g.us` groups + `@s.whatsapp.net` Indian numbers + `@lid` + `import_*`
-- Names resolved via `contactsStore` (in-memory) + DB `wa_contacts`
-- `updateChatNames()` called on startup to update DB names from contacts
-- Direct SQL update on startup: `UPDATE wa_chats SET name = wc.name FROM wa_contacts wc WHERE wa_chats.id = wc.jid`
+- Filter includes: `@g.us` groups + `@s.whatsapp.net` Indian numbers + `@lid` WITH real names only + `import_*`
+- `@lid` chats WITHOUT real names are HIDDEN (own device IDs like `+49894668673181`)
+- Names resolved via `contactsStore` + DB `wa_contacts`
+- `updateChatNames()` called on startup
+- Direct SQL on startup: `UPDATE wa_chats SET name = wc.name FROM wa_contacts wc WHERE wa_chats.id = wc.jid`
+- Phone format in chat list: `+91 XXXXX XXXXX` for Indian, `+` prefix for others
 
-#### Message Loading ✅ (FIXED in 7cd08ca)
+### ✅ Message Loading (working)
 - Click on chat → `waOpenChat(rawJid, name, phone)` called
-- JID normalization in `waOpenChat`: strips `:device` suffix ONLY when colon AND @ both present
+- JID normalization — CRITICAL, DO NOT CHANGE:
   ```js
+  var jid = rawJid;
   if (rawJid.includes(':') && rawJid.includes('@')) {
     jid = rawJid.split(':')[0] + '@' + rawJid.split('@').slice(1).join('@');
   }
   ```
-- **CRITICAL**: Old broken code was `rawJid.split(':')[0] + '@' + rawJid.split('@')[1]`
-  which caused `@g.us@g.us` double suffix for groups. DO NOT revert to this.
+- Old broken code was `rawJid.split('@')[1]` — caused `@g.us@g.us`. NEVER revert.
 - Messages fetched from `/api/wa/messages/:jid?limit=100`
-- Group info fetched from `/api/wa/group/:jid` (route sanitizes double suffix)
+- Group info from `/api/wa/group/:jid` (route sanitizes double suffix)
 
-#### JID Normalization Rules — CRITICAL
-- Strip device suffix: `919545073545:54@s.whatsapp.net` → `919545073545@s.whatsapp.net`
-- Groups: `@g.us` suffix — DO NOT add or modify — use `.slice(1).join('@')` not `[1]`
-- LID: `49868915663011@lid` — keep as-is, shown in chat list
-- NEVER double-append domain suffix
-
-#### Media
-- Auto-saved to `backend/wa_media/` on receive (new messages only)
+### ✅ Media (partially working)
+- **New messages** (after server start): auto-saved to `backend/wa_media/` on receive
+- **Old messages**: 404 expected — WhatsApp encryption key expires, cannot recover
 - Served via `/api/wa/media/:msgId` (no auth required)
-- Disk-first lookup, then in-memory cache fallback
-- Old messages: media not available (WhatsApp server expiry) — shows 404
+- Disk-first lookup: `wa_media/MSGID_filename.ext`
+- In-memory cache fallback for very recent messages
 - `<img>`, `<video>`, `<audio>` tags in `waMediaHTML()`
+- Media folder gitignored: `backend/wa_media/`
 
-#### Real-time
+### ✅ Real-time
 - `messages.upsert` → saves to DB → emits `wa:message` via Socket.IO
-- Dashboard listens on `wa:message` → `waAppendMessage()`
+- `rawJid` declared before use (fixed bug)
+- `notify()` used for new message toast (NOT `showToast` — that doesn't exist)
 - `wa:connected` / `wa:disconnected` → update status bar
-- `showToast` replaced with `notify()` — do not use `showToast`
 
-#### Import Chat
+### ✅ Import Chat
 - Supports `.txt` (text only) and `.zip` (with media)
-- Can import into existing chat OR create new (`__new__` option)
+- Can import into existing chat OR create new (`__new__` option generates `import_*` JID)
 - Media saved to `backend/wa_media/`
 
 ---
 
-## Known Remaining Issues (as of 7cd08ca)
+## JID Normalization Rules — CRITICAL
 
-1. **Contact names** — `@lid` contacts (2365 chats) still show raw numbers
-   - 210 chats have real names (from direct SQL update)
-   - Root cause: `@lid` JIDs in `wa_chats` don't match `wa_contacts` JIDs directly
-   - Fix needed: map `@lid` → phone number via Baileys `p.phoneNumber` field
-
-2. **Media for old messages** — 404 errors expected, only new messages auto-saved
+| JID Type | Example | Rule |
+|---|---|---|
+| Phone | `919545073545:54@s.whatsapp.net` | Strip `:device` → `919545073545@s.whatsapp.net` |
+| Group | `120363402503162424@g.us` | Keep as-is, use `.slice(1).join('@')` NOT `[1]` |
+| LID | `49868915663011@lid` | Keep as-is, hide if no real name |
+| Own LID | `49868915663011@lid` | Hidden from chat list (own device) |
 
 ---
 
@@ -101,18 +98,16 @@ If ANY step fails → revert immediately, do NOT push broken code.
 | Change | Problem |
 |---|---|
 | `rawJid.split('@')[1]` in JID normalization | `@g.us@g.us` double suffix, groups broken |
-| Added JID normalization in `saveChat` | Broke chat names — raw numbers shown |
-| PowerShell line replacement of JS files | Encoding corruption, syntax errors |
-| `rawJid` used before declaration | Runtime crash in `messages.upsert` |
+| Added JID normalization in `saveChat` | Broke chat names |
+| PowerShell line replacement of JS files | Encoding corruption |
+| `rawJid` used before declaration | Runtime crash |
 | Auto QR retry loop | Billboard QR every 2s |
-| `isAuthenticated` returning true without real check | Outlook showed "Connected" but no mails |
-| `showToast()` call | ReferenceError — use `notify()` instead |
+| `showToast()` call | ReferenceError — use `notify()` |
+| Showing all `@lid` chats | Own device IDs like `+49894668673181` shown |
 
 ---
 
 ## Safe Way to Edit whatsapp.js
-
-Use Python for string replacement (avoids encoding issues):
 
 ```python
 with open('backend/services/whatsapp.js', 'r', encoding='utf-8') as f:
@@ -122,20 +117,20 @@ with open('backend/services/whatsapp.js', 'w', encoding='utf-8') as f:
     f.write(c)
 ```
 
-Then always verify: `node --check backend/services/whatsapp.js`
+Always verify: `node --check backend/services/whatsapp.js`
 
 ---
 
-## Recovery Steps If Something Breaks
+## Recovery Steps
 
 ```cmd
-# See recent commits
 git log --oneline -10
-
-# Revert last commit
 git revert HEAD --no-edit
 git push origin main
 
-# Or restore specific file from specific commit
+# Restore specific file
 git checkout COMMIT_HASH -- backend/services/whatsapp.js
 ```
+
+## Last Known Good Commit
+`e6d3455` — hide @lid chats without real names
