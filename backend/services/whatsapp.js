@@ -618,22 +618,49 @@ async function startWA() {
 // â”€â”€ UPDATE CHAT NAMES AFTER CONTACTS SYNC â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 async function updateChatNames() {
   try {
+    // Step 1: Update names from contactsStore (in-memory)
     const chats = await pool.query(`SELECT id, phone, name, is_group FROM wa_chats`);
     let updated = 0;
     for (const chat of chats.rows) {
       if (chat.is_group) continue;
-      const phone = chat.id.split('@')[0].split(':')[0];
-      const displayPhone = '+' + phone;
-      // Try to resolve name from contactsStore (includes LID lookup)
+      const rawPhone = chat.id.split('@')[0].split(':')[0];
       const resolvedName = getContactName(chat.id, null);
-      if (resolvedName && resolvedName !== displayPhone && resolvedName !== phone) {
+      const displayPhone = rawPhone.startsWith('91') && rawPhone.length === 12
+        ? '+91 ' + rawPhone.slice(2,7) + ' ' + rawPhone.slice(7)
+        : '+' + rawPhone;
+      if (resolvedName && resolvedName !== ('+' + rawPhone) && resolvedName !== rawPhone) {
         await pool.query(`UPDATE wa_chats SET name=$1, phone=$2 WHERE id=$3`, [resolvedName, displayPhone, chat.id]);
         updated++;
       } else if (!chat.phone || chat.phone !== displayPhone) {
         await pool.query(`UPDATE wa_chats SET phone=$1 WHERE id=$2`, [displayPhone, chat.id]);
       }
     }
-    console.log(`[WA] Updated ${updated} chat names`);
+
+    // Step 2: For @lid chats, use wa_contacts.phone (same data as group members panel)
+    await pool.query(`
+      UPDATE wa_chats
+      SET phone = CASE
+        WHEN wc.phone LIKE '91%' AND length(wc.phone) = 12
+          THEN '+91 ' || substring(wc.phone, 3, 5) || ' ' || substring(wc.phone, 8, 5)
+        WHEN wc.phone IS NOT NULL AND wc.phone != ''
+          THEN '+' || wc.phone
+        ELSE wa_chats.phone
+      END,
+      name = CASE
+        WHEN (wc.name IS NOT NULL AND wc.name != '' AND wc.name NOT LIKE '+%')
+          THEN wc.name
+        WHEN (wc.notify IS NOT NULL AND wc.notify != '')
+          THEN wc.notify
+        ELSE wa_chats.name
+      END
+      FROM wa_contacts wc
+      WHERE wa_chats.id = wc.jid
+        AND wa_chats.id LIKE '%@lid'
+        AND wc.phone IS NOT NULL
+        AND wc.phone != ''
+    `);
+
+    console.log('[WA] Updated ' + updated + ' chat names');
   } catch (err) {
     console.error('[WA] updateChatNames error:', err.message);
   }
