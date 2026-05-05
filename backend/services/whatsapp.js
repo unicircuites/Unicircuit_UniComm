@@ -250,6 +250,11 @@ async function saveContact(contact) {
 
 // â”€â”€ SAVE CHAT â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 async function saveChat(jid, name, lastMsg, lastTime, unread, isGroup) {
+  // Normalize JID — strip device suffix and fix double domain (e.g. @g.us@g.us)
+  jid = jid.replace(/@g\.us@g\.us$/, '@g.us').replace(/@s\.whatsapp\.net@s\.whatsapp\.net$/, '@s.whatsapp.net');
+  if (jid.includes(':') && !jid.endsWith('@g.us')) {
+    jid = jid.split(':')[0] + '@' + jid.split('@')[1];
+  }
   const phone = jid.split('@')[0].split(':')[0];
   // Format Indian number properly
   let displayPhone;
