@@ -79,6 +79,9 @@ router.get('/messages/:jid', authenticate, async (req, res) => {
   const jid   = decodeURIComponent(req.params.jid);
   const limit = parseInt(req.query.limit || '100');
   try {
+    // For @lid JIDs, also search by the LID number as phone JID
+    // e.g. 183357119950912@lid -> also try 183357119950912@s.whatsapp.net
+    const lidNum = jid.endsWith('@lid') ? jid.split('@')[0] : null;
     const result = await pool.query(
       `SELECT m.*,
         CASE
@@ -98,12 +101,17 @@ router.get('/messages/:jid', authenticate, async (req, res) => {
         END AS sender_phone
        FROM (
          SELECT * FROM wa_messages 
-         WHERE chat_id=$1 OR chat_id LIKE split_part($1, '@', 1) || ':%@' || split_part($1, '@', 2)
+         WHERE chat_id=$1
+            OR chat_id LIKE split_part($1, '@', 1) || ':%@' || split_part($1, '@', 2)
+            OR ($3::text IS NOT NULL AND (
+              chat_id = $3 || '@s.whatsapp.net'
+              OR chat_id LIKE $3 || ':%@s.whatsapp.net'
+            ))
          ORDER BY timestamp DESC LIMIT $2
        ) m
        LEFT JOIN wa_contacts c ON c.jid = m.sender
        ORDER BY m.timestamp ASC`,
-      [jid, limit]
+      [jid, limit, lidNum]
     );
     await pool.query(`UPDATE wa_messages SET is_read=true WHERE chat_id=$1 AND from_me=false`, [jid]);
     await pool.query(`UPDATE wa_chats SET unread=0 WHERE id=$1`, [jid]);

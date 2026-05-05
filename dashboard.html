@@ -4555,12 +4555,19 @@ async function waOpenChat(rawJid, name, phone) {
   if (phEl) {
     if (!isGroup) {
       var rawPhone = jid.split('@')[0];
-      phEl.textContent = rawPhone.startsWith('91') && rawPhone.length === 12
-        ? '+91 ' + rawPhone.slice(2,7) + ' ' + rawPhone.slice(7) : '+' + rawPhone;
+      if (jid.endsWith('@lid')) {
+        // LID chat - show phone param if available, else hide raw LID number
+        phEl.textContent = phone && !phone.startsWith('+1') ? phone : '';
+        phEl.style.display = phone && !phone.startsWith('+1') ? 'block' : 'none';
+      } else {
+        phEl.textContent = rawPhone.startsWith('91') && rawPhone.length === 12
+          ? '+91 ' + rawPhone.slice(2,7) + ' ' + rawPhone.slice(7) : '+' + rawPhone;
+        phEl.style.display = 'block';
+      }
     } else {
       phEl.textContent = 'Group · loading...';
+      phEl.style.display = 'block';
     }
-    phEl.style.display = 'block';
   }
 
   // Group Info button
