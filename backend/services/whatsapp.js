@@ -388,6 +388,7 @@ async function startWA() {
     printQRInTerminal: false,
     browser:           ['UniComm Pro', 'Chrome', '120.0'],
     syncFullHistory:   false, // false = faster connect, only recent history
+    logger: require('pino')({ level: 'silent' }), // suppress verbose Baileys logs
     getMessage: async (key) => {
       const res = await pool.query(
         `SELECT body FROM wa_messages WHERE id=$1 AND chat_id=$2`,
