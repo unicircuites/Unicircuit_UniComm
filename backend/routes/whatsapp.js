@@ -33,8 +33,13 @@ router.get('/chats', authenticate, async (req, res) => {
           AND length(split_part(id,'@',1)) = 12
         )
         OR
-        -- LID (Linked Identity) chats — own device messages
-        id LIKE '%@lid'
+        -- LID (Linked Identity) chats — only show if they have a real name (not own device)
+        (
+          id LIKE '%@lid'
+          AND name IS NOT NULL
+          AND name NOT LIKE '+%'
+          AND length(name) > 0
+        )
         OR
         -- Imported chats (from WhatsApp Export)
         id LIKE 'import_%'
