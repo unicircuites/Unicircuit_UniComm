@@ -7,6 +7,7 @@
 <script src="https://cdn.tailwindcss.com"></script>
 <script src="/socket.io/socket.io.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/gif.js@0.2.0/dist/gif.js"></script>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
 <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
@@ -402,6 +403,8 @@ select.inp option{background:#1a2035;color:var(--text);}
   flex:1;min-height:0;width:100%;border:0;background:transparent;
 }
 .card.email-detail-stack .email-plain-scroll{flex:1;min-height:0;overflow-y:auto;-webkit-overflow-scrolling:touch;}
+#compose-body:empty:before{content:attr(placeholder);color:#aaa;pointer-events:none;}
+#compose-body ol, #compose-body ul{padding-left:24px;margin:4px 0;}
 
 /* PROGRESS */
 .prog-bar{height:4px;background:rgba(255,255,255,0.06);border-radius:2px;}
@@ -2022,20 +2025,23 @@ function outlookDisplayTitle(oc) {
 
 async function loadOutlookContactsDirectory() {
   const el = document.getElementById('contact-list');
-  el.innerHTML = '<div style="text-align:center;padding:28px;"><div class="spin-loader" style="margin:0 auto;"></div><div style="font-size:12px;color:var(--muted);margin-top:10px;">Loading contacts &amp; scanning mailbox…</div></div>';
+  el.innerHTML = '<div style="text-align:center;padding:28px;"><div class="spin-loader" style="margin:0 auto;"></div><div style="font-size:12px;color:var(--muted);margin-top:10px;">Loading contacts…</div></div>';
   try {
     const res = await fetch(`${API_BASE}/outlook/contacts`, { headers: getAuthHeaders() });
-    if (res.status === 401) {
-      outlookContactsCache = [];
-      el.innerHTML = '<div style="padding:24px;color:var(--gold2);font-size:12.5px;line-height:1.5;">Connect Outlook under <strong>Email / Outlook</strong> to load your Microsoft 365 contact folder.</div>';
-      return;
-    }
     if (!res.ok) throw new Error('request failed');
     outlookContactsCache = await res.json();
     filterContacts();
-  } catch (_) {
+    // Show a soft hint if Outlook is not connected (no 'people' source entries)
+    const hasLive = outlookContactsCache.some(c => c.source === 'people');
+    if (!hasLive && outlookContactsCache.length > 0) {
+      const hint = document.createElement('div');
+      hint.style.cssText = 'padding:8px 14px;font-size:11px;color:var(--muted);background:rgba(245,166,35,0.06);border-bottom:1px solid var(--border);';
+      hint.innerHTML = '<i class="fab fa-microsoft" style="color:#0078d4;margin-right:4px;"></i> Showing DB contacts. <button class="btn btn-blue btn-xs" style="margin-left:6px;" onclick="connectOutlook()">Connect Outlook</button> to sync live contacts.';
+      el.parentElement.insertBefore(hint, el);
+    }
+  } catch (err) {
     outlookContactsCache = [];
-    el.innerHTML = '<div style="padding:24px;color:var(--red2);font-size:12.5px;">Could not load Outlook contacts.</div>';
+    el.innerHTML = '<div style="padding:24px;color:var(--red2);font-size:12.5px;">Could not load contacts: ' + err.message + '</div>';
   }
 }
 
@@ -4150,10 +4156,9 @@ async function openEmail(id) {
       if (ctype === 'html' && raw) {
         let htmlSrc = await outlookEmbedInlineCids(raw, msg.id, msg.attachments || []);
         const wrapped = '<!DOCTYPE html><html><head><meta charset="UTF-8"><style>' +
-          'html,body{height:100%;margin:0;padding:12px;box-sizing:border-box;background:' + wrapBg + '!important;color:' + wrapFg + '!important;' +
+          'html,body{height:100%;margin:0;padding:12px;box-sizing:border-box;background:#ffffff!important;color:#1a1a1a;' +
           'font-family:\'Segoe UI\',Outfit,sans-serif;font-size:13px;line-height:1.65;overflow-x:hidden;overflow-y:auto;-webkit-overflow-scrolling:touch;}' +
-          'a{color:' + linkCol + '!important;}img{max-width:100%;height:auto;}' +
-          'table,td,th,p,div,span,font,li,blockquote{color:' + wrapFg + '!important;}' +
+          'img{max-width:100%;height:auto;}' +
           '</style></head><body>' + htmlSrc + '</body></html>';
         const blob = new Blob([wrapped], { type: 'text/html;charset=utf-8' });
         outlookEmailBlobUrl = URL.createObjectURL(blob);
@@ -4229,10 +4234,8 @@ function applyComposeTemplate() {
       const body = document.getElementById('compose-body');
       if (subj && t.subject) subj.value = t.subject;
       if (body && t.html_body) {
-        // Strip HTML tags for plain textarea, keep line breaks
-        const tmp = document.createElement('div');
-        tmp.innerHTML = t.html_body;
-        body.value = tmp.innerText || tmp.textContent || '';
+        // Rich editor — set HTML directly
+        body.innerHTML = t.html_body;
       }
       notify('Template applied', t.name, 'var(--blue)', 'fas fa-file-alt');
     })
@@ -4240,10 +4243,12 @@ function applyComposeTemplate() {
 }
 
 function resetComposeForm() {
-  ['compose-to', 'compose-cc', 'compose-subject', 'compose-body'].forEach(id => {
+  ['compose-to', 'compose-cc', 'compose-subject'].forEach(id => {
     const el = document.getElementById(id);
     if (el) el.value = '';
   });
+  const body = document.getElementById('compose-body');
+  if (body) body.innerHTML = '';
   const s = document.getElementById('compose-status');
   if (s) s.style.display = 'none';
 }
@@ -4262,25 +4267,31 @@ async function aiDraftReply() {
   const subj = document.getElementById('email-detail-subject')?.textContent || '';
   const bodyEl = document.getElementById('compose-body');
   if (!bodyEl) return;
-  bodyEl.value = 'Generating AI draft…';
-  bodyEl.disabled = true;
+  bodyEl.innerHTML = 'Generating AI draft…';
+  bodyEl.contentEditable = 'false';
   try {
     const draft = await callClaude(
       `Draft a professional reply email from Unicircuit Engineering Services LLP to this email: Subject: "${subj}". Keep it concise, professional, and in Indian B2B style. Return only the email body text, no subject line.`
     );
-    bodyEl.value = draft.trim();
-  } catch (_) { bodyEl.value = ''; }
-  bodyEl.disabled = false;
+    bodyEl.innerHTML = (draft.trim()).replace(/\n/g, '<br>');
+  } catch (_) { bodyEl.innerHTML = ''; }
+  bodyEl.contentEditable = 'true';
 }
 
 async function sendEmail() {
-  const to      = document.getElementById('compose-to')?.value.trim();
-  const cc      = document.getElementById('compose-cc')?.value.trim();
+  const toRaw   = document.getElementById('compose-to')?.value.trim();
+  const ccRaw   = document.getElementById('compose-cc')?.value.trim();
   const subject = document.getElementById('compose-subject')?.value.trim();
-  const body    = document.getElementById('compose-body')?.value.trim();
+  const bodyEl  = document.getElementById('compose-body');
+  const body    = bodyEl ? bodyEl.innerHTML.trim() : '';
   const statusEl = document.getElementById('compose-status');
 
-  if (!to || !subject || !body) {
+  // Split comma/semicolon separated emails
+  const parseEmails = (raw) => (raw || '').split(/[,;]+/).map(e => e.trim()).filter(e => e.includes('@'));
+  const to = parseEmails(toRaw);
+  const cc = parseEmails(ccRaw);
+
+  if (!to.length || !subject || !body || body === '<br>') {
     notify('Missing fields', 'To, Subject and Message are required', 'var(--red)', 'fas fa-exclamation-circle');
     return;
   }
@@ -4293,11 +4304,11 @@ async function sendEmail() {
     const res  = await fetch(`${API_BASE}/outlook/send`, {
       method:  'POST',
       headers: getAuthHeaders(),
-      body:    JSON.stringify({ to, cc: cc||undefined, subject, body: body.replace(/\n/g,'<br>') }),
+      body:    JSON.stringify({ to, cc: cc.length ? cc : undefined, subject, body }),
     });
     const data = await res.json();
     if (res.ok) {
-      notify('Email sent!', `To: ${to}`, 'var(--green)', 'fas fa-paper-plane');
+      notify('Email sent!', `To: ${to.join(', ')}`, 'var(--green)', 'fas fa-paper-plane');
       clearCompose();
       if (statusEl) { statusEl.style.display='block'; statusEl.style.color='var(--green2)'; statusEl.textContent='✓ Email sent successfully via Outlook.'; }
     } else {
@@ -5218,10 +5229,10 @@ function etSetFont(family) {
   var ed = etGetEditor();
   if (!ed) return;
   ed.focus();
+  etRestoreSelection();
   try { document.execCommand('styleWithCSS', false, true); } catch(_) {}
   var sel = window.getSelection();
   if (sel && sel.rangeCount && !sel.isCollapsed) {
-    // Has selection — wrap it
     var range = sel.getRangeAt(0);
     var span = document.createElement('span');
     span.style.fontFamily = family;
@@ -5229,17 +5240,16 @@ function etSetFont(family) {
       document.execCommand('fontName', false, family);
     }
   } else {
-    // No selection — apply to next typed chars via execCommand
     document.execCommand('fontName', false, family);
   }
 }
 
-// Font size in px — wraps selection or sets for next typing
 function etSetSize(px) {
   if (!px) return;
   var ed = etGetEditor();
   if (!ed) return;
   ed.focus();
+  etRestoreSelection();
   var sel = window.getSelection();
   if (sel && sel.rangeCount && !sel.isCollapsed) {
     var range = sel.getRangeAt(0);
@@ -5247,13 +5257,11 @@ function etSetSize(px) {
     span.style.fontSize = px;
     try { range.surroundContents(span); } catch(_) {
       document.execCommand('fontSize', false, '4');
-      // fallback: find the font element and replace with span
     }
   } else {
-    // Insert a styled span at cursor for next typing
     var span2 = document.createElement('span');
     span2.style.fontSize = px;
-    span2.innerHTML = '&#8203;'; // zero-width space
+    span2.innerHTML = '&#8203;';
     var r2 = sel && sel.rangeCount ? sel.getRangeAt(0) : null;
     if (r2) { r2.insertNode(span2); r2.setStartAfter(span2); r2.collapse(true); sel.removeAllRanges(); sel.addRange(r2); }
   }
@@ -5286,6 +5294,14 @@ function etInsertHTML(html) {
   var ed = etGetEditor();
   if (!ed) return;
   ed.focus();
+  var sel = window.getSelection();
+  if (!sel.rangeCount || !ed.contains(sel.getRangeAt(0).commonAncestorContainer)) {
+    var range = document.createRange();
+    range.selectNodeContents(ed);
+    range.collapse(false);
+    sel.removeAllRanges();
+    sel.addRange(range);
+  }
   document.execCommand('insertHTML', false, html);
 }
 
@@ -5307,10 +5323,16 @@ function etRenderTemplateList(templates) {
   if (!templates.length) { el.innerHTML = '<div style="text-align:center;padding:20px;color:var(--muted);font-size:12px;">No templates yet.<br>Click + New to create one.</div>'; return; }
   el.innerHTML = templates.map(function(t) {
     var catColor = t.category === 'Product' ? 'var(--blue2)' : t.category === 'Promotion' ? 'var(--gold2)' : t.category === 'Newsletter' ? 'var(--green2)' : 'var(--muted2)';
-    return '<div class="template-card" onclick="etLoadTemplate(' + t.id + ')" id="et-card-' + t.id + '">' +
-      '<div style="font-size:12.5px;font-weight:600;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + (t.name||'Untitled') + '</div>' +
-      '<div style="font-size:10.5px;color:var(--muted);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + (t.subject||'No subject') + '</div>' +
-      '<div style="margin-top:5px;"><span style="font-size:9px;color:' + catColor + ';background:rgba(255,255,255,0.06);padding:1px 6px;border-radius:4px;">' + (t.category||'General') + '</span></div>' +
+    return '<div class="template-card" id="et-card-' + t.id + '" style="position:relative;">' +
+      '<div onclick="etLoadTemplate(' + t.id + ')" style="cursor:pointer;">' +
+        '<div style="font-size:12.5px;font-weight:600;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding-right:44px;">' + (t.name||'Untitled') + '</div>' +
+        '<div style="font-size:10.5px;color:var(--muted);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + (t.subject||'No subject') + '</div>' +
+        '<div style="margin-top:5px;"><span style="font-size:9px;color:' + catColor + ';background:rgba(255,255,255,0.06);padding:1px 6px;border-radius:4px;">' + (t.category||'General') + '</span></div>' +
+      '</div>' +
+      '<div style="position:absolute;top:6px;right:6px;display:flex;gap:3px;">' +
+        '<button onclick="event.stopPropagation();etLoadTemplate(' + t.id + ')" title="Edit" style="background:none;border:none;cursor:pointer;color:var(--muted);padding:3px 5px;border-radius:4px;font-size:11px;line-height:1;" onmouseover="this.style.color=\'var(--gold)\'" onmouseout="this.style.color=\'var(--muted)\'"><i class="fas fa-pen"></i></button>' +
+        '<button onclick="event.stopPropagation();etDeleteFromCard(' + t.id + ',\'' + (t.name||'Untitled').replace(/'/g,"\\'") + '\')" title="Delete" style="background:none;border:none;cursor:pointer;color:var(--muted);padding:3px 5px;border-radius:4px;font-size:11px;line-height:1;" onmouseover="this.style.color=\'var(--red2)\'" onmouseout="this.style.color=\'var(--muted)\'"><i class="fas fa-trash"></i></button>' +
+      '</div>' +
     '</div>';
   }).join('');
 }
@@ -5385,6 +5407,21 @@ async function etDeleteTemplate() {
   openModal('et-delete-modal');
 }
 
+// Delete directly from card (without loading the template first)
+async function etDeleteFromCard(id, name) {
+  document.getElementById('et-del-tname').textContent = '"' + (name || 'this template') + '"';
+  // Temporarily set etCurrentId so etConfirmDelete works
+  var prevId = etCurrentId;
+  etCurrentId = id;
+  openModal('et-delete-modal');
+  // If user cancels, restore previous id
+  var cancelBtn = document.querySelector('#et-delete-modal .btn-ghost');
+  if (cancelBtn) {
+    var origCancel = cancelBtn.onclick;
+    cancelBtn.onclick = function() { etCurrentId = prevId; closeModal('et-delete-modal'); cancelBtn.onclick = origCancel; };
+  }
+}
+
 async function etConfirmDelete() {
   closeModal('et-delete-modal');
   try {
@@ -5399,15 +5436,430 @@ function etInsertHR() {
   etInsertHTML('<hr style="border:none;border-top:2px solid #cccccc;margin:12px 0;"><br>');
 }
 
+// ══════════════════════════════════
+// COMPOSE EMAIL RICH EDITOR HELPERS
+// ══════════════════════════════════
+// COMPOSE EMAIL RICH EDITOR HELPERS
+// ══════════════════════════════════
+function composeToolbarMousedown(event) {
+  // Save current selection BEFORE focus is stolen, then prevent focus loss
+  composeSaveSelection();
+  event.preventDefault();
+}
+
+function composeUpdateToolbarState() {
+  // Detect font family at cursor
+  var fontSel = document.getElementById('compose-font-select');
+  var sizeSel = document.getElementById('compose-size-select');
+  if (!fontSel && !sizeSel) return;
+
+  // Get computed style at cursor position
+  var sel = window.getSelection();
+  var node = sel && sel.rangeCount ? sel.getRangeAt(0).startContainer : null;
+  if (node && node.nodeType === 3) node = node.parentElement; // text node → element
+
+  if (node) {
+    var cs = window.getComputedStyle(node);
+    if (fontSel) {
+      var ff = cs.fontFamily || '';
+      // Strip quotes, take first font name
+      ff = ff.split(',')[0].replace(/['"]/g, '').trim();
+      // Try to match against options
+      var matched = false;
+      for (var i = 0; i < fontSel.options.length; i++) {
+        if (fontSel.options[i].value && ff.toLowerCase().includes(fontSel.options[i].value.toLowerCase())) {
+          fontSel.value = fontSel.options[i].value;
+          matched = true;
+          break;
+        }
+      }
+      if (!matched) fontSel.value = '';
+      // Show current font name in the select label area
+      fontSel.title = ff ? ('Font: ' + ff + ' — select text first, then pick font') : 'Font family — select text first, then pick font';
+    }
+
+    if (sizeSel) {
+      var fs = cs.fontSize || '';
+      // Round to nearest option
+      var pxVal = parseFloat(fs);
+      var matched2 = false;
+      for (var j = 0; j < sizeSel.options.length; j++) {
+        if (sizeSel.options[j].value && parseFloat(sizeSel.options[j].value) === pxVal) {
+          sizeSel.value = sizeSel.options[j].value;
+          matched2 = true;
+          break;
+        }
+      }
+      if (!matched2) sizeSel.value = '';
+      sizeSel.title = fs ? ('Size: ' + Math.round(pxVal) + 'px — select text first, then pick size') : 'Font size — select text first, then pick size';
+    }
+  }
+  // Update bold/italic/underline active state
+  try { composeUpdateActiveButtons(); } catch(_) {}
+}
+function _composeRestoreFocus() {
+  var ed = document.getElementById('compose-body');
+  if (!ed) return false;
+  ed.focus();
+  if (_composeSavedSel) {
+    try {
+      var sel = window.getSelection();
+      sel.removeAllRanges();
+      sel.addRange(_composeSavedSel);
+    } catch(_) {}
+  } else {
+    var sel2 = window.getSelection();
+    var range = document.createRange();
+    range.selectNodeContents(ed);
+    range.collapse(false);
+    sel2.removeAllRanges();
+    sel2.addRange(range);
+  }
+  return true;
+}
+function composeExecCmd(cmd) {
+  if (!_composeRestoreFocus()) return;
+  document.execCommand(cmd, false, null);
+}
+function composeSetFont(font) {
+  if (!font || !_composeRestoreFocus()) return;
+  try { document.execCommand('styleWithCSS', false, true); } catch(_) {}
+  document.execCommand('fontName', false, font);
+}
+function composeSetSize(size) {
+  if (!size || !_composeRestoreFocus()) return;
+  try { document.execCommand('styleWithCSS', false, true); } catch(_) {}
+  var sel = window.getSelection();
+  if (sel.rangeCount && !sel.isCollapsed) {
+    try {
+      var range = sel.getRangeAt(0);
+      var span = document.createElement('span');
+      span.style.fontSize = size;
+      range.surroundContents(span);
+    } catch(_) {
+      document.execCommand('fontSize', false, '4');
+    }
+  } else {
+    document.execCommand('insertHTML', false,
+      '<span style="font-size:' + size + '">&#8203;</span>');
+  }
+}
+var _composeSavedSel = null;
+function composeSaveSelection() {
+  var sel = window.getSelection();
+  if (sel.rangeCount) _composeSavedSel = sel.getRangeAt(0).cloneRange();
+}
+function composeApplyColor(type, color) {
+  var ed = document.getElementById('compose-body');
+  if (!ed) return;
+  ed.focus();
+  if (_composeSavedSel && ed.contains(_composeSavedSel.commonAncestorContainer)) {
+    var sel = window.getSelection();
+    sel.removeAllRanges();
+    sel.addRange(_composeSavedSel);
+  }
+  document.execCommand(type === 'fg' ? 'foreColor' : 'hiliteColor', false, color);
+}
+
+function composeToggleColorPicker(type) {
+  var fgPop = document.getElementById('compose-fgcolor-popup');
+  var bgPop = document.getElementById('compose-bgcolor-popup');
+  if (type === 'fg') {
+    var isOpen = fgPop.style.display !== 'none';
+    fgPop.style.display = isOpen ? 'none' : 'block';
+    bgPop.style.display = 'none';
+  } else {
+    var isOpen2 = bgPop.style.display !== 'none';
+    bgPop.style.display = isOpen2 ? 'none' : 'block';
+    fgPop.style.display = 'none';
+  }
+  // Close on outside click
+  setTimeout(function() {
+    document.addEventListener('click', function closePicker(e) {
+      if (!e.target.closest('#compose-fgcolor-popup') && !e.target.closest('#compose-fgcolor-btn') &&
+          !e.target.closest('#compose-bgcolor-popup') && !e.target.closest('#compose-bgcolor-btn')) {
+        if (fgPop) fgPop.style.display = 'none';
+        if (bgPop) bgPop.style.display = 'none';
+        document.removeEventListener('click', closePicker);
+      }
+    });
+  }, 10);
+}
+
+function composePickColor(type, color) {
+  // Update swatch
+  var swatch = document.getElementById(type === 'fg' ? 'compose-fgcolor-swatch' : 'compose-bgcolor-swatch');
+  if (swatch) swatch.style.background = color === 'transparent' ? 'linear-gradient(135deg,#fff 45%,#f00 45%,#f00 55%,#fff 55%)' : color;
+  // Close popup
+  var pop = document.getElementById(type === 'fg' ? 'compose-fgcolor-popup' : 'compose-bgcolor-popup');
+  if (pop) pop.style.display = 'none';
+  // Apply color
+  composeApplyColor(type, color === 'transparent' ? 'inherit' : color);
+}
+
+function composeUpdateActiveButtons() {
+  var btns = {
+    'compose-btn-bold':      document.queryCommandState('bold'),
+    'compose-btn-italic':    document.queryCommandState('italic'),
+    'compose-btn-underline': document.queryCommandState('underline'),
+    'compose-btn-strike':    document.queryCommandState('strikeThrough'),
+  };
+  Object.keys(btns).forEach(function(id) {
+    var el = document.getElementById(id);
+    if (!el) return;
+    if (btns[id]) {
+      el.style.background = 'rgba(245,166,35,0.18)';
+      el.style.color = 'var(--gold)';
+      el.style.borderColor = 'rgba(245,166,35,0.4)';
+    } else {
+      el.style.background = '';
+      el.style.color = '';
+      el.style.borderColor = '';
+    }
+  });
+}
+function composeInsertHR() {
+  document.execCommand('insertHTML', false, '<hr style="border:none;border-top:1px solid #ccc;margin:10px 0;"><br>');
+  document.getElementById('compose-body')?.focus();
+}
+function composeInsertMarquee() {
+  marqueeOpenModal('compose');
+}
 function etInsertMarquee() {
-  var text = prompt('Enter scrolling text:', 'Special Offer — Limited Time!');
-  if (!text) return;
+  marqueeOpenModal('et');
+}
+var _marqueeTarget = 'compose';
+function marqueeOpenModal(target) {
+  _marqueeTarget = target;
+  // Reset fields
+  document.getElementById('mq-text').value = '';
+  document.getElementById('mq-textcolor').value = '#e8820a';
+  document.getElementById('mq-bgcolor').value = '#fff8ee';
+  document.getElementById('mq-textcolor-hex').textContent = '#e8820a';
+  document.getElementById('mq-bgcolor-hex').textContent = '#fff8ee';
+  document.getElementById('mq-speed').value = 6;
+  document.getElementById('mq-speed-val').textContent = '6';
+  marqueeUpdatePreview();
+  openModal('marquee-modal');
+  setTimeout(function(){ document.getElementById('mq-text').focus(); }, 100);
+}
+function marqueeUpdatePreview() {
+  var text     = document.getElementById('mq-text').value || 'Preview text…';
+  var tc       = document.getElementById('mq-textcolor').value;
+  var bg       = document.getElementById('mq-bgcolor').value;
+  var speed    = document.getElementById('mq-speed').value;
+  document.getElementById('mq-textcolor-hex').textContent = tc;
+  document.getElementById('mq-bgcolor-hex').textContent = bg;
+  var prev = document.getElementById('mq-preview');
+  var mq   = document.getElementById('mq-preview-marquee');
+  if (prev) { prev.style.borderLeftColor = tc; prev.style.background = bg; }
+  if (mq)   { mq.style.color = tc; mq.scrollAmount = speed; mq.innerHTML = text; }
+}
+function marqueeConfirmInsert() {
+  var text  = document.getElementById('mq-text').value.trim();
+  if (!text) { document.getElementById('mq-text').focus(); return; }
+  var tc    = document.getElementById('mq-textcolor').value;
+  var bg    = document.getElementById('mq-bgcolor').value;
+  var speed = parseInt(document.getElementById('mq-speed').value) || 6;
+  var uid   = 'mq' + Date.now();
+  var duration = Math.round(20 / speed * 10) + 's';
+
+  // Inject @keyframes for editor preview + Outlook
+  var styleEl = document.createElement('style');
+  styleEl.textContent = '@keyframes ' + uid + '{0%{transform:translateX(100%)}100%{transform:translateX(-100%)}}';
+  document.head.appendChild(styleEl);
+
+  // Strategy:
+  // - Outlook/Apple Mail: CSS animation scrolls (white-space:nowrap, overflow:hidden)
+  // - Gmail/Yahoo: strips <style>/@keyframes → animation gone → span becomes block
+  //   with white-space:normal so ALL text wraps and nothing is hidden
+  var html =
+    '<div contenteditable="false" style="width:100%;margin:8px 0;position:relative;cursor:default;" class="marquee-block">' +
+      '<div style="width:100%;background:' + bg + ';border-left:4px solid ' + tc + ';padding:8px 0;">' +
+        '<span style="' +
+          'display:block;' +                          // block = full width, wraps in Gmail
+          'white-space:normal;' +                     // Gmail: wrap text, nothing hidden
+          'word-break:break-word;' +                  // Gmail: break long words
+          'animation:' + uid + ' ' + duration + ' linear infinite;' + // Outlook: scroll
+          'color:' + tc + ';font-weight:bold;font-size:15px;font-family:Arial,sans-serif;padding:0 16px;">' +
+          text +
+        '</span>' +
+      '</div>' +
+      '<span onclick="this.parentNode.remove()" title="Delete" ' +
+        'style="position:absolute;top:2px;right:4px;cursor:pointer;font-size:11px;color:#999;' +
+        'background:rgba(255,255,255,0.9);border-radius:3px;padding:0 5px;line-height:18px;z-index:1;" ' +
+        'onmouseover="this.style.color=\'#e00\'" onmouseout="this.style.color=\'#999\'">✕</span>' +
+    '</div><br>';
+
+  closeModal('marquee-modal');
+
+  if (_marqueeTarget === 'compose') {
+    var ed = document.getElementById('compose-body');
+    if (!ed) return;
+    ed.focus();
+    var sel = window.getSelection();
+    if (!sel.rangeCount || !ed.contains(sel.getRangeAt(0).commonAncestorContainer)) {
+      var range = document.createRange(); range.selectNodeContents(ed); range.collapse(false);
+      sel.removeAllRanges(); sel.addRange(range);
+    }
+    document.execCommand('insertHTML', false, html);
+    ed.focus();
+  } else {
+    etInsertHTML(html);
+  }
+}
+
+function marqueeGenerateGIF(text, tc, bg, speed, target) {
+  // Canvas setup
+  var canvas = document.createElement('canvas');
+  var fontSize = 16;
+  var padding = 16;
+  var height = fontSize + padding * 2;
+
+  // Measure text width
+  var ctx = canvas.getContext('2d');
+  ctx.font = 'bold ' + fontSize + 'px Arial, sans-serif';
+  var textW = ctx.measureText(text).width;
+  var canvasW = Math.min(600, Math.max(300, Math.ceil(textW + 40)));
+  canvas.width  = canvasW;
+  canvas.height = height;
+
+  // Total scroll distance: text enters from right, exits left
+  var totalFrames = 40; // number of GIF frames
+  var startX = canvasW;
+  var endX   = -textW - 20;
+  var step   = (endX - startX) / totalFrames;
+  // Speed: higher = faster = fewer delay ms per frame
+  var frameDelay = Math.round(1000 / speed / totalFrames * 10) * 10; // ms, rounded to 10
+  frameDelay = Math.max(30, Math.min(200, frameDelay));
+
+  // Check if gif.js is available
+  if (typeof GIF === 'undefined') {
+    // Fallback: CSS animation (Outlook/Apple Mail) + static for Gmail
+    marqueeInsertCSSFallback(text, tc, bg, speed, target);
+    return;
+  }
+
+  var gif = new GIF({
+    workers: 2,
+    quality: 8,
+    width:   canvasW,
+    height:  height,
+    workerScript: 'https://cdn.jsdelivr.net/npm/gif.js@0.2.0/dist/gif.worker.js',
+  });
+
+  for (var i = 0; i < totalFrames; i++) {
+    var x = startX + step * i;
+    ctx = canvas.getContext('2d');
+    ctx.clearRect(0, 0, canvasW, height);
+    // Background
+    ctx.fillStyle = bg;
+    ctx.fillRect(0, 0, canvasW, height);
+    // Left border
+    ctx.fillStyle = tc;
+    ctx.fillRect(0, 0, 4, height);
+    // Text
+    ctx.font = 'bold ' + fontSize + 'px Arial, sans-serif';
+    ctx.fillStyle = tc;
+    ctx.fillText(text, x, height / 2 + fontSize / 3);
+    gif.addFrame(ctx, { copy: true, delay: frameDelay });
+  }
+
+  gif.on('finished', function(blob) {
+    var reader = new FileReader();
+    reader.onload = function(e) {
+      var dataUrl = e.target.result;
+      var imgHtml = '<img src="' + dataUrl + '" width="' + canvasW + '" height="' + height + '" alt="' + text.replace(/"/g,'&quot;') + '" style="display:block;max-width:100%;border-left:4px solid ' + tc + ';" />';
+      // Replace placeholder
+      var ed = target === 'compose' ? document.getElementById('compose-body') : document.getElementById('et-html-editor');
+      if (ed) {
+        var ph = ed.querySelector('#mq-generating');
+        if (ph) {
+          var wrapper = ph.parentNode;
+          ph.outerHTML = imgHtml;
+        } else {
+          if (target === 'compose') {
+            ed.focus(); document.execCommand('insertHTML', false, imgHtml);
+          } else {
+            etInsertHTML(imgHtml);
+          }
+        }
+      }
+    };
+    reader.readAsDataURL(blob);
+  });
+
+  gif.on('error', function() {
+    marqueeInsertCSSFallback(text, tc, bg, speed, target);
+  });
+
+  gif.render();
+}
+
+function marqueeInsertCSSFallback(text, tc, bg, speed, target) {
+  // Remove placeholder
+  var ed = target === 'compose' ? document.getElementById('compose-body') : document.getElementById('et-html-editor');
+  if (ed) { var ph = ed.querySelector('#mq-generating'); if (ph) ph.parentNode.removeChild(ph); }
+
   var uid = 'mq' + Date.now();
-  var html = '<div style="overflow:hidden;width:100%;background:#fff8ee;border-left:3px solid #e8820a;padding:6px 0;margin:6px 0;">'
-    + '<style>@keyframes ' + uid + '{0%{transform:translateX(100%)}100%{transform:translateX(-100%)}}</style>'
-    + '<span style="display:inline-block;white-space:nowrap;animation:' + uid + ' 10s linear infinite;color:#e8820a;font-weight:bold;font-size:15px;padding:0 16px;">'
-    + text + '</span></div><br>';
-  etInsertHTML(html);
+  var styleEl = document.createElement('style');
+  styleEl.textContent = '@keyframes ' + uid + '{0%{transform:translateX(100%)}100%{transform:translateX(-100%)}}';
+  document.head.appendChild(styleEl);
+  var html = '<div contenteditable="false" style="overflow:hidden;width:100%;background:' + bg + ';border-left:4px solid ' + tc + ';padding:8px 16px;margin:8px 0;position:relative;cursor:default;" class="marquee-block">'
+    + '<span style="display:inline-block;white-space:nowrap;animation:' + uid + ' ' + (21 - speed) + 's linear infinite;color:' + tc + ';font-weight:bold;font-size:15px;">'
+    + text + '</span>'
+    + '<span onclick="this.parentNode.remove()" title="Delete" style="position:absolute;top:2px;right:4px;cursor:pointer;font-size:11px;color:#999;background:rgba(255,255,255,0.8);border-radius:3px;padding:0 4px;line-height:18px;">✕</span>'
+    + '</div><br>';
+  if (target === 'compose') {
+    if (ed) { ed.focus(); document.execCommand('insertHTML', false, html); }
+  } else {
+    etInsertHTML(html);
+  }
+}
+function composeInsertTable() {
+  var rows = parseInt(prompt('Rows:', '3') || '3');
+  var cols = parseInt(prompt('Columns:', '3') || '3');
+  var html = '<table style="border-collapse:collapse;width:100%;margin:10px 0;">';
+  for (var r = 0; r < rows; r++) {
+    html += '<tr>';
+    for (var c = 0; c < cols; c++) {
+      html += '<td style="border:1px solid #ccc;padding:8px;min-width:60px;">' + (r === 0 ? '<b>Header ' + (c+1) + '</b>' : 'Cell') + '</td>';
+    }
+    html += '</tr>';
+  }
+  html += '</table><br>';
+  document.execCommand('insertHTML', false, html);
+  document.getElementById('compose-body')?.focus();
+}
+function composeInsertButton() {
+  var label = prompt('Button text:', 'Click Here') || 'Click Here';
+  var url   = prompt('Button URL:', 'https://') || '#';
+  var html  = '<a href="' + url + '" style="display:inline-block;padding:10px 24px;background:#f5a623;color:#fff;font-weight:700;border-radius:6px;text-decoration:none;font-size:14px;margin:8px 0;">' + label + '</a><br>';
+  document.execCommand('insertHTML', false, html);
+  document.getElementById('compose-body')?.focus();
+}
+function composeInsertSignature() {
+  openModal('et-sig-modal');
+  // Override the Insert button to target compose editor instead of et-html-editor
+  var insertBtn = document.querySelector('#et-sig-modal .btn-gold');
+  if (insertBtn) {
+    insertBtn.onclick = function() {
+      var sig = '<br>' + etBuildSigHTML();
+      var ed = document.getElementById('compose-body');
+      if (!ed) return;
+      ed.focus();
+      var sel = window.getSelection();
+      if (!sel.rangeCount || !ed.contains(sel.getRangeAt(0).commonAncestorContainer)) {
+        var range = document.createRange(); range.selectNodeContents(ed); range.collapse(false);
+        sel.removeAllRanges(); sel.addRange(range);
+      }
+      document.execCommand('insertHTML', false, sig);
+      closeModal('et-sig-modal');
+      // Restore original onclick for template editor
+      insertBtn.onclick = function() { etApplySignature(); };
+    };
+  }
+  setTimeout(etRefreshSigPreview, 80);
 }
 
 function etInsertTable() {
@@ -5495,6 +5947,47 @@ function etInsertEmoji(emoji) {
   document.getElementById('et-emoji-picker').style.display = 'none';
 }
 
+// ── Compose emoji picker (mirrors et emoji functions) ──────────────────────
+var _composeEmojiCat = 'smileys';
+function composeToggleEmoji(btn) {
+  var picker = document.getElementById('compose-emoji-picker');
+  if (!picker) return;
+  if (picker.style.display === 'none') {
+    picker.style.display = 'flex';
+    composeShowEmojiCat('smileys', document.querySelector('#compose-emoji-tabs .emoji-tab'));
+    var s = document.getElementById('compose-emoji-search'); if (s) s.value = '';
+    composeSaveSelection();
+  } else {
+    picker.style.display = 'none';
+  }
+}
+function composeShowEmojiCat(cat, tabEl) {
+  _composeEmojiCat = cat;
+  document.querySelectorAll('#compose-emoji-tabs .emoji-tab').forEach(function(t){ t.classList.remove('active'); });
+  if (tabEl) tabEl.classList.add('active');
+  var grid = document.getElementById('compose-emoji-grid');
+  if (!grid) return;
+  var emojis = (etEmojiData && etEmojiData[cat]) ? etEmojiData[cat] : [];
+  grid.innerHTML = emojis.map(function(e){ return '<span class="emoji-item" onclick="composeInsertEmoji(\'' + e + '\')">' + e + '</span>'; }).join('');
+}
+function composeSearchEmoji(q) {
+  if (!q) { composeShowEmojiCat(_composeEmojiCat, null); return; }
+  var all = [];
+  if (etEmojiData) Object.values(etEmojiData).forEach(function(arr){ all = all.concat(arr); });
+  var grid = document.getElementById('compose-emoji-grid');
+  if (grid) grid.innerHTML = all.filter(function(e){ return e.includes(q); }).map(function(e){ return '<span class="emoji-item" onclick="composeInsertEmoji(\'' + e + '\')">' + e + '</span>'; }).join('');
+}
+function composeInsertEmoji(emoji) {
+  var ed = document.getElementById('compose-body');
+  if (!ed) return;
+  ed.focus();
+  if (_composeSavedSel) {
+    var sel = window.getSelection(); sel.removeAllRanges(); sel.addRange(_composeSavedSel);
+  }
+  document.execCommand('insertText', false, emoji);
+  document.getElementById('compose-emoji-picker').style.display = 'none';
+}
+
 function etInsertSignature() {
   openModal('et-sig-modal');
   setTimeout(etRefreshSigPreview, 80);
@@ -5518,6 +6011,8 @@ function etBuildSigHTML() {
   var imgUrl  = (document.getElementById('sig-img')     ? document.getElementById('sig-img').value     : '').trim();
   var styleEl = document.querySelector('input[name="sig-style"]:checked');
   var style   = styleEl ? styleEl.value : 'classic';
+
+  if (style === 'custom') return etBuildCustomSigHTML();
 
   var logoImg = imgUrl
     ? '<img src="' + imgUrl + '" width="70" style="display:block;border-radius:6px;" alt="Logo">'
@@ -5580,6 +6075,93 @@ function etBuildSigHTML() {
     + '</td></tr></table>';
 }
 
+function etToggleCustomSig() {
+  var styleEl = document.querySelector('input[name="sig-style"]:checked');
+  var sec = document.getElementById('sig-custom-section');
+  var stdFields = document.getElementById('sig-std-fields');
+  if (!sec) return;
+  var isCustom = styleEl && styleEl.value === 'custom';
+  sec.style.display = isCustom ? 'block' : 'none';
+  if (stdFields) stdFields.style.display = isCustom ? 'none' : 'block';
+  // Init badges list if empty
+  if (isCustom && document.getElementById('csig-badges-list').children.length === 0) {
+    csigAddBadge(); csigAddBadge(); csigAddBadge(); csigAddBadge(); csigAddBadge();
+  }
+}
+
+var _csigBadgeCount = 0;
+function csigAddBadge() {
+  var idx = _csigBadgeCount++;
+  var list = document.getElementById('csig-badges-list');
+  if (!list) return;
+  var row = document.createElement('div');
+  row.style.cssText = 'display:grid;grid-template-columns:1fr 80px 32px 28px;gap:6px;align-items:center;';
+  row.id = 'csig-badge-row-' + idx;
+  row.innerHTML = '<input class="inp" id="csig-badge-' + idx + '" placeholder="https://…/iso.png or pick →" style="font-size:12px;" oninput="etRefreshSigPreview()">'
+    + '<input class="inp" id="csig-badge-w-' + idx + '" type="number" value="70" min="20" max="200" placeholder="px" style="font-size:12px;" oninput="etRefreshSigPreview()">'
+    + '<label class="btn btn-ghost btn-xs" style="cursor:pointer;padding:3px 6px;" title="Choose image file"><i class="fas fa-folder-open"></i><input type="file" accept="image/*" style="display:none;" onchange="csigFileToBase64(this,\'csig-badge-' + idx + '\')"></label>'
+    + '<button type="button" class="btn btn-red btn-xs" onmousedown="event.preventDefault()" onclick="document.getElementById(\'csig-badge-row-' + idx + '\').remove();etRefreshSigPreview()" style="padding:4px 6px;"><i class="fas fa-times"></i></button>';
+  list.appendChild(row);
+}
+
+function csigFileToBase64(input, targetId) {
+  var file = input.files && input.files[0];
+  if (!file) return;
+  var reader = new FileReader();
+  reader.onload = function(e) {
+    var el = document.getElementById(targetId);
+    if (el) { el.value = e.target.result; etRefreshSigPreview(); }
+  };
+  reader.readAsDataURL(file);
+}
+
+function etBuildCustomSigHTML() {
+  var logo    = (document.getElementById('csig-logo')    ||{}).value || '';
+  var logoW   = (document.getElementById('csig-logo-w')  ||{}).value || '160';
+  var contact = (document.getElementById('csig-contact') ||{}).value || '';
+
+  // Badges
+  var badgeImgs = '';
+  document.querySelectorAll('[id^="csig-badge-"]').forEach(function(el) {
+    if (el.id.includes('-w-')) return;
+    var idx = el.id.replace('csig-badge-', '');
+    var url = el.value.trim();
+    var w   = (document.getElementById('csig-badge-w-' + idx)||{}).value || '70';
+    if (url) badgeImgs += '<img src="' + url + '" width="' + w + '" style="height:auto;vertical-align:middle;margin-right:8px;" alt="">';
+  });
+
+  var extraImg      = (document.getElementById('csig-extra-img')       ||{}).value || '';
+  var extraLink     = (document.getElementById('csig-extra-link')       ||{}).value || '';
+  var extraW        = (document.getElementById('csig-extra-w')          ||{}).value || '160';
+  var extraText     = (document.getElementById('csig-extra-text')       ||{}).value || '';
+  var extraTextLink = (document.getElementById('csig-extra-text-link')  ||{}).value || '';
+
+  var row1 = '<table style="border-collapse:collapse;font-family:Arial,sans-serif;">'
+    + '<tr>'
+    + (logo ? '<td style="padding-right:20px;vertical-align:top;"><img src="' + logo + '" width="' + logoW + '" style="height:auto;display:block;" alt="Logo"></td>' : '')
+    + '<td style="vertical-align:top;font-size:13px;color:#333;line-height:1.6;">' + contact + '</td>'
+    + '</tr></table>';
+
+  var row2 = badgeImgs
+    ? '<div style="margin-top:10px;">' + badgeImgs + '</div>'
+    : '';
+
+  var row3 = '';
+  if (extraImg) {
+    var imgTag = '<img src="' + extraImg + '" width="' + extraW + '" style="height:auto;display:block;" alt="">';
+    row3 = '<div style="margin-top:10px;">'
+      + (extraLink ? '<a href="' + extraLink + '" target="_blank" style="text-decoration:none;">' + imgTag + '</a>' : imgTag)
+      + '</div>';
+  }
+  if (extraText) {
+    row3 += '<div style="margin-top:6px;font-size:12px;color:#0066cc;">'
+      + (extraTextLink ? '<a href="' + extraTextLink + '" style="color:#0066cc;">' + extraText + '</a>' : extraText)
+      + '</div>';
+  }
+
+  return '<div style="max-width:600px;">' + row1 + row2 + row3 + '</div>';
+}
+
 function etRefreshSigPreview() {
   var frame = document.getElementById('sig-preview-frame');
   if (!frame) return;
@@ -5638,10 +6220,171 @@ function etUseInBroadcast() {
           </select>
           <button type="button" class="btn btn-blue btn-xs" onclick="applyComposeTemplate()"><i class="fas fa-check"></i> Apply</button>
         </div>
-        <div><label class="form-label">To</label><input class="inp" id="compose-to" placeholder="recipient@company.com" style="font-size:12.5px;" autocomplete="off" /></div>
-        <div><label class="form-label">CC <span style="color:var(--muted);font-weight:400;">(optional)</span></label><input class="inp" id="compose-cc" placeholder="cc@company.com" style="font-size:12.5px;" autocomplete="off" /></div>
+        <div><label class="form-label" style="display:flex;align-items:center;gap:6px;">To
+          <span style="position:relative;display:inline-flex;align-items:center;" onmouseenter="this.querySelector('.tt').style.display='block'" onmouseleave="this.querySelector('.tt').style.display='none'">
+            <i class="fas fa-info-circle" style="font-size:11px;color:var(--muted);cursor:default;"></i>
+            <span class="tt" style="display:none;position:absolute;left:18px;top:-4px;background:#1a2035;border:1px solid var(--border2);border-radius:7px;padding:8px 11px;font-size:11.5px;color:var(--text);white-space:nowrap;z-index:999;box-shadow:0 4px 16px rgba(0,0,0,0.4);font-weight:400;">
+              Multiple emails: separate with <b style="color:var(--gold);">comma</b> or <b style="color:var(--gold);">semicolon</b><br>
+              <span style="color:var(--muted);font-size:10.5px;">e.g. a@gmail.com, b@company.com; c@yahoo.com</span>
+            </span>
+          </span>
+        </label><input class="inp" id="compose-to" placeholder="a@gmail.com, b@company.com, c@yahoo.com" style="font-size:12.5px;" autocomplete="off" /></div>
+        <div><label class="form-label" style="display:flex;align-items:center;gap:6px;">CC <span style="color:var(--muted);font-weight:400;">(optional)</span>
+          <span style="position:relative;display:inline-flex;align-items:center;" onmouseenter="this.querySelector('.tt').style.display='block'" onmouseleave="this.querySelector('.tt').style.display='none'">
+            <i class="fas fa-info-circle" style="font-size:11px;color:var(--muted);cursor:default;"></i>
+            <span class="tt" style="display:none;position:absolute;left:18px;top:-4px;background:#1a2035;border:1px solid var(--border2);border-radius:7px;padding:8px 11px;font-size:11.5px;color:var(--text);white-space:nowrap;z-index:999;box-shadow:0 4px 16px rgba(0,0,0,0.4);font-weight:400;">
+              Multiple emails: separate with <b style="color:var(--gold);">comma</b> or <b style="color:var(--gold);">semicolon</b><br>
+              <span style="color:var(--muted);font-size:10.5px;">e.g. a@gmail.com, b@company.com; c@yahoo.com</span>
+            </span>
+          </span>
+        </label><input class="inp" id="compose-cc" placeholder="cc@company.com, cc2@email.com" style="font-size:12.5px;" autocomplete="off" /></div>
         <div><label class="form-label">Subject</label><input class="inp" id="compose-subject" placeholder="Email subject…" style="font-size:12.5px;" autocomplete="off" /></div>
-        <div><label class="form-label">Message</label><textarea class="inp" id="compose-body" rows="8" placeholder="Write your message…" style="font-size:12.5px;resize:vertical;"></textarea></div>
+        <div>
+          <label class="form-label">Message</label>
+          <!-- Full toolbar — exact copy of template editor -->
+          <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;padding:6px 10px;background:var(--card2);border:1px solid var(--border2);border-radius:8px 8px 0 0;border-bottom:none;">
+            <select id="compose-font-select" onmousedown="composeSaveSelection()" onchange="composeSetFont(this.value);this.value=''" style="font-size:11px;padding:3px 4px;background:var(--card2);border:1px solid var(--border);border-radius:5px;color:var(--text);cursor:pointer;max-width:130px;" title="Font family — select text first, then pick font">
+              <option value="">Font</option>
+              <optgroup label="── Word Defaults ──">
+                <option value="Calibri">Calibri</option>
+                <option value="Calibri Light">Calibri Light</option>
+                <option value="Cambria">Cambria</option>
+                <option value="Aptos">Aptos</option>
+                <option value="Segoe UI">Segoe UI</option>
+                <option value="Times New Roman">Times New Roman</option>
+                <option value="Arial">Arial</option>
+                <option value="Arial Narrow">Arial Narrow</option>
+                <option value="Verdana">Verdana</option>
+                <option value="Tahoma">Tahoma</option>
+                <option value="Trebuchet MS">Trebuchet MS</option>
+                <option value="Georgia">Georgia</option>
+                <option value="Garamond">Garamond</option>
+                <option value="Book Antiqua">Book Antiqua</option>
+                <option value="Palatino Linotype">Palatino</option>
+                <option value="Century Gothic">Century Gothic</option>
+                <option value="Helvetica">Helvetica</option>
+              </optgroup>
+              <optgroup label="── Monospace ──">
+                <option value="Courier New">Courier New</option>
+                <option value="Consolas">Consolas</option>
+                <option value="Lucida Console">Lucida Console</option>
+              </optgroup>
+              <optgroup label="── Other ──">
+                <option value="Comic Sans MS">Comic Sans MS</option>
+                <option value="Impact">Impact</option>
+              </optgroup>
+            </select>
+            <select id="compose-size-select" onmousedown="composeSaveSelection()" onchange="composeSetSize(this.value);this.value=''" style="font-size:11px;padding:3px 4px;background:var(--card2);border:1px solid var(--border);border-radius:5px;color:var(--text);cursor:pointer;" title="Font size — select text first, then pick size">
+              <option value="">Size</option>
+              <option value="8px">8</option><option value="9px">9</option><option value="10px">10</option>
+              <option value="11px">11</option><option value="12px">12</option><option value="13px">13</option>
+              <option value="14px">14</option><option value="16px">16</option><option value="18px">18</option>
+              <option value="20px">20</option><option value="22px">22</option><option value="24px">24</option>
+              <option value="28px">28</option><option value="32px">32</option><option value="36px">36</option>
+              <option value="48px">48</option><option value="60px">60</option><option value="72px">72</option>
+            </select>
+            <button type="button" id="compose-btn-bold" class="btn btn-ghost btn-xs" onmousedown="composeToolbarMousedown(event)" onclick="composeExecCmd('bold');composeUpdateActiveButtons()" title="Bold"><b>B</b></button>
+            <button type="button" id="compose-btn-italic" class="btn btn-ghost btn-xs" onmousedown="composeToolbarMousedown(event)" onclick="composeExecCmd('italic');composeUpdateActiveButtons()" title="Italic"><i>I</i></button>
+            <button type="button" id="compose-btn-underline" class="btn btn-ghost btn-xs" onmousedown="composeToolbarMousedown(event)" onclick="composeExecCmd('underline');composeUpdateActiveButtons()" title="Underline"><u>U</u></button>
+            <button type="button" id="compose-btn-strike" class="btn btn-ghost btn-xs" onmousedown="composeToolbarMousedown(event)" onclick="composeExecCmd('strikeThrough');composeUpdateActiveButtons()" title="Strike"><s>S</s></button>
+            <div style="width:1px;height:18px;background:var(--border);margin:0 2px;"></div>
+            <!-- Text color picker -->
+            <div style="position:relative;display:inline-block;">
+              <button type="button" id="compose-fgcolor-btn" onmousedown="composeToolbarMousedown(event)" onclick="composeToggleColorPicker('fg')" title="Text color"
+                style="display:flex;align-items:center;gap:3px;padding:3px 7px;font-size:11px;background:var(--card2);border:1px solid var(--border);border-radius:5px;cursor:pointer;color:var(--text);">
+                <span style="font-size:10px;font-weight:700;">A</span>
+                <span id="compose-fgcolor-swatch" style="display:inline-block;width:14px;height:4px;border-radius:2px;background:#000000;"></span>
+              </button>
+              <div id="compose-fgcolor-popup" style="display:none;position:absolute;top:34px;left:0;z-index:999;background:var(--card);border:1px solid var(--border2);border-radius:8px;padding:10px;box-shadow:0 4px 20px rgba(0,0,0,0.4);min-width:160px;">
+                <div style="font-size:10px;color:var(--muted);margin-bottom:6px;font-weight:600;">TEXT COLOR</div>
+                <div style="display:flex;flex-wrap:wrap;gap:5px;margin-bottom:8px;">
+                  <span onclick="composePickColor('fg','#000000')" style="width:20px;height:20px;border-radius:4px;background:#000000;cursor:pointer;border:2px solid transparent;" title="Black"></span>
+                  <span onclick="composePickColor('fg','#ffffff')" style="width:20px;height:20px;border-radius:4px;background:#ffffff;cursor:pointer;border:1px solid #ccc;" title="White"></span>
+                  <span onclick="composePickColor('fg','#e8820a')" style="width:20px;height:20px;border-radius:4px;background:#e8820a;cursor:pointer;" title="Orange"></span>
+                  <span onclick="composePickColor('fg','#dc2626')" style="width:20px;height:20px;border-radius:4px;background:#dc2626;cursor:pointer;" title="Red"></span>
+                  <span onclick="composePickColor('fg','#16a34a')" style="width:20px;height:20px;border-radius:4px;background:#16a34a;cursor:pointer;" title="Green"></span>
+                  <span onclick="composePickColor('fg','#2563eb')" style="width:20px;height:20px;border-radius:4px;background:#2563eb;cursor:pointer;" title="Blue"></span>
+                  <span onclick="composePickColor('fg','#7c3aed')" style="width:20px;height:20px;border-radius:4px;background:#7c3aed;cursor:pointer;" title="Purple"></span>
+                  <span onclick="composePickColor('fg','#0891b2')" style="width:20px;height:20px;border-radius:4px;background:#0891b2;cursor:pointer;" title="Cyan"></span>
+                  <span onclick="composePickColor('fg','#be185d')" style="width:20px;height:20px;border-radius:4px;background:#be185d;cursor:pointer;" title="Pink"></span>
+                  <span onclick="composePickColor('fg','#92400e')" style="width:20px;height:20px;border-radius:4px;background:#92400e;cursor:pointer;" title="Brown"></span>
+                  <span onclick="composePickColor('fg','#374151')" style="width:20px;height:20px;border-radius:4px;background:#374151;cursor:pointer;" title="Dark gray"></span>
+                  <span onclick="composePickColor('fg','#9ca3af')" style="width:20px;height:20px;border-radius:4px;background:#9ca3af;cursor:pointer;" title="Gray"></span>
+                </div>
+                <div style="display:flex;gap:6px;align-items:center;">
+                  <input type="color" id="compose-fgcolor-custom" value="#000000" style="width:32px;height:28px;padding:1px;border:1px solid var(--border);border-radius:4px;cursor:pointer;flex-shrink:0;">
+                  <span style="font-size:10px;color:var(--muted);">Custom</span>
+                  <button type="button" class="btn btn-gold btn-xs" style="margin-left:auto;" onclick="composePickColor('fg',document.getElementById('compose-fgcolor-custom').value)">Apply</button>
+                </div>
+              </div>
+            </div>
+            <!-- Highlight color picker -->
+            <div style="position:relative;display:inline-block;">
+              <button type="button" id="compose-bgcolor-btn" onmousedown="composeToolbarMousedown(event)" onclick="composeToggleColorPicker('bg')" title="Highlight color"
+                style="display:flex;align-items:center;gap:3px;padding:3px 7px;font-size:11px;background:var(--card2);border:1px solid var(--border);border-radius:5px;cursor:pointer;color:var(--text);">
+                <span style="font-size:10px;">BG</span>
+                <span id="compose-bgcolor-swatch" style="display:inline-block;width:14px;height:4px;border-radius:2px;background:#ffff00;"></span>
+              </button>
+              <div id="compose-bgcolor-popup" style="display:none;position:absolute;top:34px;left:0;z-index:999;background:var(--card);border:1px solid var(--border2);border-radius:8px;padding:10px;box-shadow:0 4px 20px rgba(0,0,0,0.4);min-width:160px;">
+                <div style="font-size:10px;color:var(--muted);margin-bottom:6px;font-weight:600;">HIGHLIGHT COLOR</div>
+                <div style="display:flex;flex-wrap:wrap;gap:5px;margin-bottom:8px;">
+                  <span onclick="composePickColor('bg','transparent')" style="width:20px;height:20px;border-radius:4px;background:transparent;cursor:pointer;border:1px solid #ccc;font-size:9px;display:flex;align-items:center;justify-content:center;color:#999;" title="None">✕</span>
+                  <span onclick="composePickColor('bg','#fef08a')" style="width:20px;height:20px;border-radius:4px;background:#fef08a;cursor:pointer;" title="Yellow"></span>
+                  <span onclick="composePickColor('bg','#bbf7d0')" style="width:20px;height:20px;border-radius:4px;background:#bbf7d0;cursor:pointer;" title="Green"></span>
+                  <span onclick="composePickColor('bg','#bfdbfe')" style="width:20px;height:20px;border-radius:4px;background:#bfdbfe;cursor:pointer;" title="Blue"></span>
+                  <span onclick="composePickColor('bg','#fecaca')" style="width:20px;height:20px;border-radius:4px;background:#fecaca;cursor:pointer;" title="Red"></span>
+                  <span onclick="composePickColor('bg','#e9d5ff')" style="width:20px;height:20px;border-radius:4px;background:#e9d5ff;cursor:pointer;" title="Purple"></span>
+                  <span onclick="composePickColor('bg','#fed7aa')" style="width:20px;height:20px;border-radius:4px;background:#fed7aa;cursor:pointer;" title="Orange"></span>
+                  <span onclick="composePickColor('bg','#f0f0f0')" style="width:20px;height:20px;border-radius:4px;background:#f0f0f0;cursor:pointer;border:1px solid #ddd;" title="Light gray"></span>
+                </div>
+                <div style="display:flex;gap:6px;align-items:center;">
+                  <input type="color" id="compose-bgcolor-custom" value="#ffff00" style="width:32px;height:28px;padding:1px;border:1px solid var(--border);border-radius:4px;cursor:pointer;flex-shrink:0;">
+                  <span style="font-size:10px;color:var(--muted);">Custom</span>
+                  <button type="button" class="btn btn-gold btn-xs" style="margin-left:auto;" onclick="composePickColor('bg',document.getElementById('compose-bgcolor-custom').value)">Apply</button>
+                </div>
+              </div>
+            </div>
+            <div style="width:1px;height:18px;background:var(--border);margin:0 2px;"></div>
+            <button type="button" class="btn btn-ghost btn-xs" onmousedown="composeToolbarMousedown(event)" onclick="composeExecCmd('justifyLeft')" title="Left"><i class="fas fa-align-left"></i></button>
+            <button type="button" class="btn btn-ghost btn-xs" onmousedown="composeToolbarMousedown(event)" onclick="composeExecCmd('justifyCenter')" title="Center"><i class="fas fa-align-center"></i></button>
+            <button type="button" class="btn btn-ghost btn-xs" onmousedown="composeToolbarMousedown(event)" onclick="composeExecCmd('justifyRight')" title="Right"><i class="fas fa-align-right"></i></button>
+            <button type="button" class="btn btn-ghost btn-xs" onmousedown="composeToolbarMousedown(event)" onclick="composeExecCmd('insertOrderedList')" title="Numbered list"><i class="fas fa-list-ol"></i></button>
+            <button type="button" class="btn btn-ghost btn-xs" onmousedown="composeToolbarMousedown(event)" onclick="composeExecCmd('insertUnorderedList')" title="Bullet list"><i class="fas fa-list-ul"></i></button>
+            <div style="width:1px;height:18px;background:var(--border);margin:0 2px;"></div>
+            <span style="font-size:10px;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:0.5px;">Insert:</span>
+            <button type="button" class="btn btn-ghost btn-xs" onmousedown="composeToolbarMousedown(event)" onclick="composeInsertHR()" title="Horizontal Line"><i class="fas fa-minus"></i> HR</button>
+            <button type="button" class="btn btn-ghost btn-xs" onmousedown="composeToolbarMousedown(event)" onclick="composeInsertMarquee()" title="Scrolling text"><i class="fas fa-arrows-alt-h"></i> Marquee</button>
+            <button type="button" class="btn btn-ghost btn-xs" onmousedown="composeToolbarMousedown(event)" onclick="composeInsertTable()" title="Insert Table"><i class="fas fa-table"></i> Table</button>
+            <button type="button" class="btn btn-ghost btn-xs" onmousedown="composeToolbarMousedown(event)" onclick="composeInsertButton()" title="CTA Button"><i class="fas fa-hand-pointer"></i> Button</button>
+            <div style="position:relative;display:inline-block;">
+              <button type="button" class="btn btn-ghost btn-xs" onmousedown="composeToolbarMousedown(event)" onclick="composeToggleEmoji(this)" title="Emoji"><i class="fas fa-smile"></i> Emoji</button>
+              <div id="compose-emoji-picker" class="emoji-picker-popup" style="display:none;top:32px;left:0;">
+                <div class="emoji-tabs" id="compose-emoji-tabs">
+                  <button class="emoji-tab active" onclick="composeShowEmojiCat('smileys',this)" title="Smileys">😀</button>
+                  <button class="emoji-tab" onclick="composeShowEmojiCat('people',this)" title="People">👋</button>
+                  <button class="emoji-tab" onclick="composeShowEmojiCat('nature',this)" title="Nature">🌿</button>
+                  <button class="emoji-tab" onclick="composeShowEmojiCat('food',this)" title="Food">🍕</button>
+                  <button class="emoji-tab" onclick="composeShowEmojiCat('travel',this)" title="Travel">✈️</button>
+                  <button class="emoji-tab" onclick="composeShowEmojiCat('objects',this)" title="Objects">💡</button>
+                  <button class="emoji-tab" onclick="composeShowEmojiCat('symbols',this)" title="Symbols">❤️</button>
+                  <button class="emoji-tab" onclick="composeShowEmojiCat('business',this)" title="Business">💼</button>
+                  <button class="emoji-tab" onclick="composeShowEmojiCat('flags',this)" title="Flags">🏳️</button>
+                </div>
+                <div class="emoji-search"><input id="compose-emoji-search" placeholder="Search emoji..." oninput="composeSearchEmoji(this.value)" /></div>
+                <div class="emoji-grid" id="compose-emoji-grid"></div>
+              </div>
+            </div>
+            <button type="button" class="btn btn-ghost btn-xs" onmousedown="composeToolbarMousedown(event)" onclick="composeInsertSignature()" title="Company Signature"><i class="fas fa-signature"></i> Signature</button>
+          </div>
+          <div id="compose-body"
+               contenteditable="true"
+               style="min-height:180px;max-height:320px;overflow-y:auto;background:#fff;color:#222;font-family:Calibri,Arial,sans-serif;font-size:14px;line-height:1.6;padding:10px 12px 10px 28px;border:1px solid var(--border2);border-radius:0 0 8px 8px;outline:none;"
+               placeholder="Write your message…"
+               onmouseup="composeSaveSelection();composeUpdateToolbarState()"
+               onkeyup="composeSaveSelection();composeUpdateToolbarState()"
+               onfocus="composeUpdateToolbarState()">
+          </div>
+        </div>
         <button type="button" class="btn btn-gold" style="justify-content:center;" id="send-btn" onclick="sendEmail()"><i class="fas fa-paper-plane"></i> Send via Outlook</button>
         <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;">
           <div id="compose-status" style="font-size:12px;display:none;"></div>
@@ -5755,29 +6498,40 @@ function etUseInBroadcast() {
           <!-- Custom toolbar extras -->
           <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;padding:6px 10px;background:var(--card2);border:1px solid var(--border2);border-radius:8px 8px 0 0;border-bottom:none;">
             <!-- Font family -->
-            <select onchange="etSetFont(this.value);this.value=''" style="font-size:11px;padding:3px 4px;background:var(--card2);border:1px solid var(--border);border-radius:5px;color:var(--text);cursor:pointer;max-width:120px;" title="Font family">
+            <select onmousedown="etSaveSelection()" onchange="etSetFont(this.value);this.value=''" style="font-size:11px;padding:3px 4px;background:var(--card2);border:1px solid var(--border);border-radius:5px;color:var(--text);cursor:pointer;max-width:130px;" title="Font family — select text first, then pick font">
               <option value="">Font</option>
-              <option value="Arial">Arial</option>
-              <option value="Calibri">Calibri</option>
-              <option value="Times New Roman">Times New Roman</option>
-              <option value="Georgia">Georgia</option>
-              <option value="Verdana">Verdana</option>
-              <option value="Trebuchet MS">Trebuchet MS</option>
-              <option value="Courier New">Courier New</option>
-              <option value="Tahoma">Tahoma</option>
-              <option value="Helvetica">Helvetica</option>
-              <option value="Garamond">Garamond</option>
-              <option value="Century Gothic">Century Gothic</option>
-              <option value="Comic Sans MS">Comic Sans MS</option>
-              <option value="Impact">Impact</option>
-              <option value="Segoe UI">Segoe UI</option>
-              <option value="Palatino Linotype">Palatino</option>
-              <option value="Book Antiqua">Book Antiqua</option>
-              <option value="Lucida Console">Lucida Console</option>
-              <option value="Consolas">Consolas</option>
+              <optgroup label="── Word Defaults ──" style="font-size:10px;color:var(--muted);">
+                <option value="Calibri" style="font-family:Calibri">Calibri</option>
+                <option value="Calibri Light" style="font-family:'Calibri Light'">Calibri Light</option>
+                <option value="Cambria" style="font-family:Cambria">Cambria</option>
+                <option value="Cambria Math" style="font-family:'Cambria Math'">Cambria Math</option>
+                <option value="Aptos" style="font-family:Aptos">Aptos</option>
+                <option value="Segoe UI" style="font-family:'Segoe UI'">Segoe UI</option>
+                <option value="Times New Roman" style="font-family:'Times New Roman'">Times New Roman</option>
+                <option value="Arial" style="font-family:Arial">Arial</option>
+                <option value="Arial Narrow" style="font-family:'Arial Narrow'">Arial Narrow</option>
+                <option value="Verdana" style="font-family:Verdana">Verdana</option>
+                <option value="Tahoma" style="font-family:Tahoma">Tahoma</option>
+                <option value="Trebuchet MS" style="font-family:'Trebuchet MS'">Trebuchet MS</option>
+                <option value="Georgia" style="font-family:Georgia">Georgia</option>
+                <option value="Garamond" style="font-family:Garamond">Garamond</option>
+                <option value="Book Antiqua" style="font-family:'Book Antiqua'">Book Antiqua</option>
+                <option value="Palatino Linotype" style="font-family:'Palatino Linotype'">Palatino</option>
+                <option value="Century Gothic" style="font-family:'Century Gothic'">Century Gothic</option>
+                <option value="Helvetica" style="font-family:Helvetica">Helvetica</option>
+              </optgroup>
+              <optgroup label="── Monospace ──" style="font-size:10px;color:var(--muted);">
+                <option value="Courier New" style="font-family:'Courier New'">Courier New</option>
+                <option value="Consolas" style="font-family:Consolas">Consolas</option>
+                <option value="Lucida Console" style="font-family:'Lucida Console'">Lucida Console</option>
+              </optgroup>
+              <optgroup label="── Other ──" style="font-size:10px;color:var(--muted);">
+                <option value="Comic Sans MS" style="font-family:'Comic Sans MS'">Comic Sans MS</option>
+                <option value="Impact" style="font-family:Impact">Impact</option>
+              </optgroup>
             </select>
             <!-- Font size — full range 8–72 -->
-            <select onchange="etSetSize(this.value);this.value=''" style="font-size:11px;padding:3px 4px;background:var(--card2);border:1px solid var(--border);border-radius:5px;color:var(--text);cursor:pointer;" title="Font size">
+            <select onmousedown="etSaveSelection()" onchange="etSetSize(this.value);this.value=''" style="font-size:11px;padding:3px 4px;background:var(--card2);border:1px solid var(--border);border-radius:5px;color:var(--text);cursor:pointer;" title="Font size — select text first, then pick size">
               <option value="">Size</option>
               <option value="8px">8</option><option value="9px">9</option><option value="10px">10</option>
               <option value="11px">11</option><option value="12px">12</option><option value="13px">13</option>
@@ -5787,10 +6541,10 @@ function etUseInBroadcast() {
               <option value="48px">48</option><option value="60px">60</option><option value="72px">72</option>
             </select>
             <!-- Formatting -->
-            <button class="btn btn-ghost btn-xs" onclick="etFmt('bold')" title="Bold"><b>B</b></button>
-            <button class="btn btn-ghost btn-xs" onclick="etFmt('italic')" title="Italic"><i>I</i></button>
-            <button class="btn btn-ghost btn-xs" onclick="etFmt('underline')" title="Underline"><u>U</u></button>
-            <button class="btn btn-ghost btn-xs" onclick="etFmt('strikeThrough')" title="Strike"><s>S</s></button>
+            <button class="btn btn-ghost btn-xs" onmousedown="event.preventDefault()" onclick="etFmt('bold')" title="Bold"><b>B</b></button>
+            <button class="btn btn-ghost btn-xs" onmousedown="event.preventDefault()" onclick="etFmt('italic')" title="Italic"><i>I</i></button>
+            <button class="btn btn-ghost btn-xs" onmousedown="event.preventDefault()" onclick="etFmt('underline')" title="Underline"><u>U</u></button>
+            <button class="btn btn-ghost btn-xs" onmousedown="event.preventDefault()" onclick="etFmt('strikeThrough')" title="Strike"><s>S</s></button>
             <!-- Color pickers — save selection on mousedown, apply on change -->
             <span style="font-size:9px;color:var(--muted);">A</span>
             <input type="color" id="et-fgcolor" value="#000000"
@@ -5803,19 +6557,19 @@ function etUseInBroadcast() {
               onchange="etApplyColor('bg',this.value)"
               title="Highlight color" style="width:26px;height:26px;padding:1px;border:1px solid var(--border);border-radius:4px;cursor:pointer;" />
             <div style="width:1px;height:18px;background:var(--border);margin:0 2px;"></div>
-            <button class="btn btn-ghost btn-xs" onclick="etFmt('justifyLeft')" title="Align left"><i class="fas fa-align-left"></i></button>
-            <button class="btn btn-ghost btn-xs" onclick="etFmt('justifyCenter')" title="Center"><i class="fas fa-align-center"></i></button>
-            <button class="btn btn-ghost btn-xs" onclick="etFmt('justifyRight')" title="Align right"><i class="fas fa-align-right"></i></button>
-            <button class="btn btn-ghost btn-xs" onclick="etFmt('insertOrderedList')" title="Numbered list"><i class="fas fa-list-ol"></i></button>
-            <button class="btn btn-ghost btn-xs" onclick="etFmt('insertUnorderedList')" title="Bullet list"><i class="fas fa-list-ul"></i></button>
+            <button class="btn btn-ghost btn-xs" onmousedown="event.preventDefault()" onclick="etFmt('justifyLeft')" title="Align left"><i class="fas fa-align-left"></i></button>
+            <button class="btn btn-ghost btn-xs" onmousedown="event.preventDefault()" onclick="etFmt('justifyCenter')" title="Center"><i class="fas fa-align-center"></i></button>
+            <button class="btn btn-ghost btn-xs" onmousedown="event.preventDefault()" onclick="etFmt('justifyRight')" title="Align right"><i class="fas fa-align-right"></i></button>
+            <button class="btn btn-ghost btn-xs" onmousedown="event.preventDefault()" onclick="etFmt('insertOrderedList')" title="Numbered list"><i class="fas fa-list-ol"></i></button>
+            <button class="btn btn-ghost btn-xs" onmousedown="event.preventDefault()" onclick="etFmt('insertUnorderedList')" title="Bullet list"><i class="fas fa-list-ul"></i></button>
             <div style="width:1px;height:18px;background:var(--border);margin:0 2px;"></div>
             <span style="font-size:10px;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:0.5px;">Insert:</span>
-            <button class="btn btn-ghost btn-xs" onclick="etInsertHR()" title="Horizontal Line"><i class="fas fa-minus"></i> HR</button>
-            <button class="btn btn-ghost btn-xs" onclick="etInsertMarquee()" title="Scrolling text"><i class="fas fa-arrows-alt-h"></i> Marquee</button>
-            <button class="btn btn-ghost btn-xs" onclick="etInsertTable()" title="Insert Table"><i class="fas fa-table"></i> Table</button>
-            <button class="btn btn-ghost btn-xs" onclick="etInsertButton()" title="CTA Button"><i class="fas fa-hand-pointer"></i> Button</button>
+            <button class="btn btn-ghost btn-xs" onmousedown="event.preventDefault()" onclick="etInsertHR()" title="Horizontal Line"><i class="fas fa-minus"></i> HR</button>
+            <button class="btn btn-ghost btn-xs" onmousedown="event.preventDefault()" onclick="etInsertMarquee()" title="Scrolling text"><i class="fas fa-arrows-alt-h"></i> Marquee</button>
+            <button class="btn btn-ghost btn-xs" onmousedown="event.preventDefault()" onclick="etInsertTable()" title="Insert Table"><i class="fas fa-table"></i> Table</button>
+            <button class="btn btn-ghost btn-xs" onmousedown="event.preventDefault()" onclick="etInsertButton()" title="CTA Button"><i class="fas fa-hand-pointer"></i> Button</button>
             <div style="position:relative;display:inline-block;">
-              <button class="btn btn-ghost btn-xs" onclick="etToggleEmoji(this)" title="Emoji"><i class="fas fa-smile"></i> Emoji</button>
+              <button class="btn btn-ghost btn-xs" onmousedown="event.preventDefault()" onclick="etToggleEmoji(this)" title="Emoji"><i class="fas fa-smile"></i> Emoji</button>
               <div id="et-emoji-picker" class="emoji-picker-popup" style="display:none;top:32px;left:0;">
                 <div class="emoji-tabs" id="et-emoji-tabs">
                   <button class="emoji-tab active" onclick="etShowEmojiCat('smileys',this)" title="Smileys">😀</button>
@@ -5832,9 +6586,9 @@ function etUseInBroadcast() {
                 <div class="emoji-grid" id="et-emoji-grid"></div>
               </div>
             </div>
-            <button class="btn btn-ghost btn-xs" onclick="etInsertSignature()" title="Company Signature"><i class="fas fa-signature"></i> Signature</button>
-            <button class="btn btn-ghost btn-xs" onclick="etPreviewTemplate()" title="Preview"><i class="fas fa-eye"></i> Preview</button>
-            <button class="btn btn-ghost btn-xs" onclick="etUseInBroadcast()" title="Use in Broadcast"><i class="fas fa-paper-plane"></i> Use</button>
+            <button class="btn btn-ghost btn-xs" onmousedown="event.preventDefault()" onclick="etInsertSignature()" title="Company Signature"><i class="fas fa-signature"></i> Signature</button>
+            <button class="btn btn-ghost btn-xs" onmousedown="event.preventDefault()" onclick="etPreviewTemplate()" title="Preview"><i class="fas fa-eye"></i> Preview</button>
+            <button class="btn btn-ghost btn-xs" onmousedown="event.preventDefault()" onclick="etUseInBroadcast()" title="Use in Broadcast"><i class="fas fa-paper-plane"></i> Use</button>
           </div>
 
           <!-- contenteditable editor — replaces Quill, supports all HTML -->
@@ -5890,9 +6644,11 @@ function etUseInBroadcast() {
           <label style="cursor:pointer;display:flex;align-items:center;gap:5px;font-size:12px;"><input type="radio" name="sig-style" value="minimal" onchange="etRefreshSigPreview()"> Minimal (text only)</label>
           <label style="cursor:pointer;display:flex;align-items:center;gap:5px;font-size:12px;"><input type="radio" name="sig-style" value="banner" onchange="etRefreshSigPreview()"> Banner (full width)</label>
           <label style="cursor:pointer;display:flex;align-items:center;gap:5px;font-size:12px;"><input type="radio" name="sig-style" value="card" onchange="etRefreshSigPreview()"> Card (boxed)</label>
+          <label style="cursor:pointer;display:flex;align-items:center;gap:5px;font-size:12px;"><input type="radio" name="sig-style" value="custom" onchange="etRefreshSigPreview();etToggleCustomSig()"> ✏️ Custom (build your own)</label>
         </div>
       </div>
 
+      <div id="sig-std-fields">
       <div class="form-row">
         <div class="form-group">
           <label class="form-label">Your Name</label>
@@ -5940,6 +6696,79 @@ function etUseInBroadcast() {
         <label class="form-label">Logo Image URL <span style="color:var(--muted);font-weight:400;">(optional)</span></label>
         <input class="inp" id="sig-img" placeholder="https://yoursite.com/logo.png" oninput="etRefreshSigPreview()">
       </div>
+      </div><!-- /sig-std-fields -->
+
+      <!-- ── CUSTOM SIGNATURE BUILDER ── -->
+      <div id="sig-custom-section" style="display:none;border:1px solid var(--border2);border-radius:10px;padding:14px;background:rgba(255,255,255,0.02);">
+        <div style="font-size:11px;font-weight:700;color:var(--gold);text-transform:uppercase;letter-spacing:0.6px;margin-bottom:10px;"><i class="fas fa-magic"></i> Custom Signature Builder</div>
+
+        <!-- Row 1: Logo + Contact info side by side -->
+        <div style="font-size:11px;color:var(--muted);margin-bottom:6px;font-weight:600;">ROW 1 — Logo + Contact Info</div>
+        <div class="form-row" style="margin-bottom:8px;">
+          <div>
+            <label class="form-label">Logo</label>
+            <div style="display:flex;gap:6px;align-items:center;">
+              <input class="inp" id="csig-logo" placeholder="https://…/logo.png or pick file →" style="font-size:12px;flex:1;" oninput="etRefreshSigPreview()">
+              <label class="btn btn-ghost btn-xs" style="cursor:pointer;white-space:nowrap;" title="Choose from file system">
+                <i class="fas fa-folder-open"></i>
+                <input type="file" accept="image/*" style="display:none;" onchange="csigFileToBase64(this,'csig-logo')">
+              </label>
+            </div>
+          </div>
+          <div>
+            <label class="form-label">Logo Width (px)</label>
+            <input class="inp" id="csig-logo-w" value="160" type="number" min="40" max="400" style="font-size:12px;" oninput="etRefreshSigPreview()">
+          </div>
+        </div>
+        <div class="form-group" style="margin-bottom:8px;">
+          <label class="form-label">Contact Info Text <span style="color:var(--muted);font-weight:400;">(HTML allowed — use &lt;br&gt; for new lines)</span></label>
+          <textarea class="inp" id="csig-contact" rows="5" style="font-size:12px;font-family:'JetBrains Mono',monospace;" oninput="etRefreshSigPreview()">
+<b>NIDHISHA BADHEL</b><br>
+SALES EXECUTIVE | UNICIRCUIT Engineering Services LLP<br>
+M 09359475770 | P +91 712 2996167 Ext. 21<br>
+E <a href="mailto:sales@unicircuites.com">sales@unicircuites.com</a><br>
+Nagpur, Maharashtra, 440017, India<br>
+<a href="https://www.unicircuites.com">www.unicircuites.com</a> | <a href="#">Social Media page</a></textarea>
+        </div>
+
+        <!-- Row 2: Badge images -->
+        <div style="font-size:11px;color:var(--muted);margin-bottom:6px;font-weight:600;margin-top:8px;">ROW 2 — Badge / Certification Images</div>
+        <div id="csig-badges-list" style="display:flex;flex-direction:column;gap:6px;margin-bottom:6px;"></div>
+        <button type="button" class="btn btn-ghost btn-xs" onmousedown="event.preventDefault()" onclick="csigAddBadge()"><i class="fas fa-plus"></i> Add Badge Image</button>
+
+        <!-- Row 3: Extra block (e.g. Ariba button image) -->
+        <div style="font-size:11px;color:var(--muted);margin-bottom:6px;font-weight:600;margin-top:12px;">ROW 3 — Extra Block (optional)</div>
+        <div class="form-row" style="margin-bottom:0;">
+          <div>
+            <label class="form-label">Image</label>
+            <div style="display:flex;gap:6px;align-items:center;">
+              <input class="inp" id="csig-extra-img" placeholder="https://…/ariba.png or pick file →" style="font-size:12px;flex:1;" oninput="etRefreshSigPreview()">
+              <label class="btn btn-ghost btn-xs" style="cursor:pointer;white-space:nowrap;" title="Choose from file system">
+                <i class="fas fa-folder-open"></i>
+                <input type="file" accept="image/*" style="display:none;" onchange="csigFileToBase64(this,'csig-extra-img')">
+              </label>
+            </div>
+          </div>
+          <div>
+            <label class="form-label">Link URL (optional)</label>
+            <input class="inp" id="csig-extra-link" placeholder="https://…" style="font-size:12px;" oninput="etRefreshSigPreview()">
+          </div>
+        </div>
+        <div class="form-row" style="margin-top:8px;margin-bottom:0;">
+          <div>
+            <label class="form-label">Image Width (px)</label>
+            <input class="inp" id="csig-extra-w" value="160" type="number" min="40" max="400" style="font-size:12px;" oninput="etRefreshSigPreview()">
+          </div>
+          <div>
+            <label class="form-label">Extra Text / Link Label</label>
+            <input class="inp" id="csig-extra-text" placeholder="e.g. Book time to meet with me" style="font-size:12px;" oninput="etRefreshSigPreview()">
+          </div>
+        </div>
+        <div class="form-group" style="margin-top:8px;margin-bottom:0;">
+          <label class="form-label">Extra Text Link URL</label>
+          <input class="inp" id="csig-extra-text-link" placeholder="https://calendly.com/…" style="font-size:12px;" oninput="etRefreshSigPreview()">
+        </div>
+      </div>
 
       <!-- Live preview -->
       <div style="margin:12px 0 4px;font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:0.5px;">Live Preview</div>
@@ -5953,6 +6782,60 @@ function etUseInBroadcast() {
       </div>
     </div>
   </div>
+
+<!-- ██████ MARQUEE INSERT MODAL ██████ -->
+<div class="modal-overlay" id="marquee-modal">
+  <div class="modal" style="max-width:420px;">
+    <div class="modal-title">
+      <span><i class="fas fa-arrows-alt-h" style="color:var(--gold);margin-right:8px;"></i>Insert Scrolling Text</span>
+      <span class="modal-close" onclick="closeModal('marquee-modal')"><i class="fas fa-times"></i></span>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:12px;">
+      <div>
+        <label class="form-label">Scrolling Text *</label>
+        <input class="inp" id="mq-text" placeholder="Breaking News — Special Offer!" style="font-size:13px;" oninput="marqueeUpdatePreview()" />
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+        <div>
+          <label class="form-label">Text Color</label>
+          <div style="display:flex;gap:8px;align-items:center;">
+            <input type="color" id="mq-textcolor" value="#e8820a" style="width:36px;height:32px;padding:2px;border:1px solid var(--border);border-radius:6px;cursor:pointer;" oninput="marqueeUpdatePreview()" onchange="marqueeUpdatePreview()" />
+            <span id="mq-textcolor-hex" style="font-size:12px;color:var(--muted);">#e8820a</span>
+          </div>
+        </div>
+        <div>
+          <label class="form-label">Background Color</label>
+          <div style="display:flex;gap:8px;align-items:center;">
+            <input type="color" id="mq-bgcolor" value="#fff8ee" style="width:36px;height:32px;padding:2px;border:1px solid var(--border);border-radius:6px;cursor:pointer;" oninput="marqueeUpdatePreview()" onchange="marqueeUpdatePreview()" />
+            <span id="mq-bgcolor-hex" style="font-size:12px;color:var(--muted);">#fff8ee</span>
+          </div>
+        </div>
+      </div>
+      <div>
+        <label class="form-label">Speed</label>
+        <div style="display:flex;gap:8px;align-items:center;">
+          <input type="range" id="mq-speed" min="3" max="20" value="6" style="flex:1;" oninput="document.getElementById('mq-speed-val').textContent=this.value;marqueeUpdatePreview()" />
+          <span id="mq-speed-val" style="font-size:13px;font-weight:600;color:var(--gold);min-width:20px;">6</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;font-size:10px;color:var(--muted);margin-top:2px;"><span>Slow</span><span>Fast</span></div>
+      </div>
+      <!-- Live preview -->
+      <div style="border:1px solid var(--border);border-radius:8px;overflow:hidden;background:#fff;">
+        <div id="mq-preview" style="overflow:hidden;padding:6px 0;border-left:3px solid #e8820a;background:#fff8ee;">
+          <marquee id="mq-preview-marquee" behavior="scroll" direction="left" scrollamount="6" style="color:#e8820a;font-weight:bold;font-size:15px;">Breaking News — Special Offer!</marquee>
+        </div>
+      </div>
+      <div style="padding:6px 8px;background:rgba(245,166,35,0.06);border:1px solid rgba(245,166,35,0.15);border-radius:6px;font-size:11px;color:var(--muted2);line-height:1.5;">
+        <i class="fas fa-info-circle" style="color:var(--gold);"></i>
+        <b style="color:var(--gold);">Note:</b> Animation works in Outlook & Apple Mail. Gmail strips CSS animations — recipients will see a <b>static styled banner</b> instead (still looks good).
+      </div>
+      <div style="display:flex;gap:8px;justify-content:flex-end;">
+        <button class="btn btn-ghost" onclick="closeModal('marquee-modal')">Cancel</button>
+        <button class="btn btn-gold" onclick="marqueeConfirmInsert()"><i class="fas fa-plus"></i> Insert</button>
+      </div>
+    </div>
+  </div>
+</div>
 
 <!-- ██████ WA IMPORT CHAT MODAL ██████ -->
 <div id="wa-import-modal" class="modal-overlay" style="display:none;position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,0.7);align-items:center;justify-content:center;backdrop-filter:blur(4px);">
@@ -6032,6 +6915,9 @@ function etUseInBroadcast() {
 
 </body>
 </html>
+
+
+
 
 
 

@@ -193,6 +193,143 @@ net stop postgresql-x64-16; net start postgresql-x64-16
 
 ---
 
+## Outlook Reconnect — Azure se Logout ho gaye / Token expire ho gaya
+
+Yeh tab karna padta hai jab:
+- Dashboard pe Outlook status **"Not Connected"** dikhe
+- Emails load na ho rahe ho
+- Server logs mein `NOT_AUTHENTICATED` ya `Refresh token failed` dikhe
+- Azure pe manually logout kiya ho ya client secret change kiya ho
+
+---
+
+### Step 1 — Check karo kya problem hai
+
+Server logs dekho:
+```powershell
+pm2 logs unicomm --lines 50
+```
+
+Kya dikhe:
+| Log message | Matlab |
+|---|---|
+| `Refresh token failed` | Refresh token expire / revoked — re-login karna padega |
+| `Client credentials failed` | Azure app permissions ya admin consent missing |
+| `NOT_AUTHENTICATED` | Koi bhi token nahi mila — re-login karo |
+| `AADSTS700016` | Client ID is tenant mein registered nahi |
+| `AADSTS7000215` | Client Secret galat ya expire ho gaya |
+| `AADSTS50011` | Redirect URI mismatch — Azure mein check karo |
+
+---
+
+### Step 2 — Dashboard se reconnect karo (sabse pehle yeh try karo)
+
+1. Browser mein kholo: `http://192.168.0.205:8088/dashboard.html`
+2. Login karo (Uniadmin / Uniadmin@123)
+3. **Email / Outlook** tab pe jao
+4. **"Connect Outlook"** button dhundo — click karo
+5. Microsoft login page khulega → `sales@unicircuites.com` se login karo
+6. Permissions accept karo
+7. Redirect hoga back to dashboard — "Outlook Connected!" dikhe
+
+> Agar "Connect Outlook" button nahi dikh raha — status already connected show ho raha hai lekin kaam nahi kar raha — toh Step 3 karo.
+
+---
+
+### Step 3 — DB se purana token delete karo (force re-auth)
+
+```powershell
+psql -U postgres -d unicircuit_db -c "DELETE FROM ms_tokens WHERE user_email = 'sales@unicircuites.com';"
+```
+
+Phir Step 2 dobara karo.
+
+---
+
+### Step 4 — Client Secret expire ho gaya (Azure pe naya banao)
+
+1. **Azure Portal** → https://portal.azure.com
+2. **App registrations** → **UniComm** app dhundo
+3. **Certificates & secrets** → **Client secrets** tab
+4. Purana secret ka expiry date dekho — agar expire ho gaya hai:
+   - **+ New client secret** click karo
+   - Description: `UniComm-2026` (ya koi bhi naam)
+   - Expiry: **24 months** select karo
+   - **Add** click karo
+5. **Value** copy karo (sirf ek baar dikhta hai — abhi copy karo!)
+6. Tower pe `.env` update karo:
+
+```powershell
+# Pehle current value dekho
+Get-Content C:\UniComm\Unicircuit_UniComm-main\backend\.env | Select-String "MS_CLIENT_SECRET"
+
+# Naya secret set karo (PASTE_NEW_SECRET_HERE ki jagah actual value daalo)
+(Get-Content C:\UniComm\Unicircuit_UniComm-main\backend\.env) `
+  -replace 'MS_CLIENT_SECRET=.*', 'MS_CLIENT_SECRET=PASTE_NEW_SECRET_HERE' `
+  | Set-Content C:\UniComm\Unicircuit_UniComm-main\backend\.env -Encoding UTF8
+
+# Server restart karo
+pm2 restart unicomm
+```
+
+7. Phir **Step 2** (Dashboard se reconnect) karo.
+
+---
+
+### Step 5 — Redirect URI mismatch fix karo
+
+Agar Azure login ke baad error aaye: *"The reply URL specified in the request does not match"*
+
+1. Azure Portal → App registrations → UniComm
+2. **Authentication** tab
+3. **Web → Redirect URIs** mein yeh dono hone chahiye:
+   ```
+   http://localhost:8088/auth/callback
+   http://192.168.0.205:8088/auth/callback
+   ```
+4. Agar missing hai → **Add URI** → save karo
+5. Phir Step 2 dobara karo
+
+---
+
+### Step 6 — Admin Consent missing (Client Credentials kaam nahi kar raha)
+
+Agar delegated login ke baad bhi emails nahi aa rahe, ya `Client credentials failed` log mein dikhe:
+
+1. Azure Portal → App registrations → UniComm
+2. **API Permissions** tab
+3. Yeh **Application permissions** hone chahiye (not Delegated):
+   - `Mail.Read` ✅
+   - `Mail.Send` ✅
+   - `Mail.ReadWrite` ✅
+   - `Contacts.Read` ✅
+4. **"Grant admin consent for Unicircuit Engineering Services LLP"** button dabao
+5. Confirm karo — sab permissions ke aage green tick aana chahiye
+
+---
+
+### Quick Reconnect Checklist
+
+```
+[ ] pm2 logs mein error type identify kiya
+[ ] DB se purana token delete kiya (Step 3)
+[ ] Dashboard → Connect Outlook → Microsoft login complete kiya
+[ ] "Outlook Connected!" page dikha
+[ ] Dashboard pe inbox load ho raha hai
+```
+
+Agar yeh sab karne ke baad bhi kaam nahi kar raha:
+```powershell
+# Full debug — server restart with fresh logs
+pm2 stop unicomm
+pm2 flush unicomm
+pm2 start unicomm
+pm2 logs unicomm --lines 100
+```
+Logs mein `[Graph]` aur `[MSAL]` lines dekho — exact error wahan hoga.
+
+---
+
 ## GitHub Repository
 - **URL:** https://github.com/unicircuites/Unicircuit_UniComm
 - **Branch:** `main`

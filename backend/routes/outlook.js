@@ -419,67 +419,122 @@ router.get('/directory-activity', async (req, res) => {
 });
 
 // ── GET /api/outlook/contacts ─────────────────────────────────────────────
+// Always returns DB-imported contacts. If Outlook is connected, also merges
+// live Graph contacts + mail stats. If not connected, DB contacts still show.
 router.get('/contacts', async (req, res) => {
   try {
-    const statsMap = await mailStats.buildDirectoryStatsMap(MS_EMAIL, mailStats.MAIL_SCAN_PAGES);
-    directoryStatsCache = { map: statsMap, at: Date.now(), mailbox: MS_EMAIL };
+    // ── Step 1: Always load DB-imported contacts ──────────────────────────
+    const dbResult = await pool.query(`
+      SELECT id, fname, lname, company, designation, email,
+             phone, avatar_color, avatar_bg, initials, notes
+      FROM contacts
+      ORDER BY score DESC, created_at DESC
+    `);
+    const dbContacts = dbResult.rows.map(c => {
+      const displayName = `${c.fname || ''} ${c.lname || ''}`.trim() || c.company || 'Contact';
+      const primaryEmail = c.email || '';
+      return {
+        id: `db:${c.id}`,
+        _dbId: c.id,
+        displayName,
+        givenName:      c.fname || '',
+        surname:        c.lname || '',
+        emailAddresses: primaryEmail ? [{ address: primaryEmail }] : [],
+        mobilePhone:    c.phone || null,
+        businessPhones: [],
+        companyName:    c.company || null,
+        jobTitle:       c.designation || null,
+        source:         'db',
+        mailStats:      null,
+      };
+    });
 
-    const people = await fetchAllOutlookContactsGraph(MS_EMAIL);
-    const seenNorm = new Set();
-    const merged = [];
+    // ── Step 2: Try to get mail stats from DB cache (no Outlook needed) ───
+    let statsMap = new Map();
+    try {
+      statsMap = await mailStats.buildDirectoryStatsMap(MS_EMAIL, mailStats.MAIL_SCAN_PAGES);
+      directoryStatsCache = { map: statsMap, at: Date.now(), mailbox: MS_EMAIL };
+    } catch (_) { /* stats unavailable — continue without */ }
+
+    // ── Step 3: Try live Graph contacts (only if Outlook connected) ────────
+    let graphContacts = [];
+    let outlookConnected = false;
+    try {
+      graphContacts = await fetchAllOutlookContactsGraph(MS_EMAIL);
+      outlookConnected = true;
+    } catch (_) { /* not connected — skip */ }
+
+    // ── Step 4: Merge — Graph contacts take priority, DB fills the rest ───
+    const seenNorm  = new Set();
+    const seenDbIds = new Set();
+    const merged    = [];
 
     function rawAddr(oc) {
-      const x = (oc.emailAddresses || []).map((e) => e && e.address).filter(Boolean)[0];
-      return x || '';
+      return ((oc.emailAddresses || []).map(e => e && e.address).filter(Boolean)[0]) || '';
     }
 
-    for (const oc of people) {
-      const raw = (oc.emailAddresses || []).map((e) => e && e.address).filter(Boolean)[0];
-      const n = raw ? mailStats.norm(raw) : '';
+    // Add Graph contacts first (with mail stats)
+    for (const oc of graphContacts) {
+      const raw = rawAddr(oc);
+      const n   = raw ? mailStats.norm(raw) : '';
       if (n) seenNorm.add(n);
       const st = n ? statsMap.get(n) : null;
       merged.push({
         ...oc,
         source: 'people',
-        mailStats: st
-          ? {
-              lastEmailAt: st.lastEmailAt,
-              outlookSentToThem: st.sentToThem,
-              outlookReceivedFromThem: st.receivedFromThem,
-            }
-          : null,
+        mailStats: st ? {
+          lastEmailAt:             st.lastEmailAt,
+          outlookSentToThem:       st.sentToThem,
+          outlookReceivedFromThem: st.receivedFromThem,
+        } : null,
       });
     }
 
+    // Add mail-stats-only entries (emails seen in mailbox but not in contacts folder)
     for (const [n, st] of statsMap) {
       if (seenNorm.has(n)) continue;
-      const addr = (st.primaryEmail && mailStats.norm(st.primaryEmail) === n ? st.primaryEmail : n) || n;
+      const addr  = (st.primaryEmail && mailStats.norm(st.primaryEmail) === n ? st.primaryEmail : n) || n;
       const local = addr.includes('@') ? addr.split('@')[0] : addr;
       merged.push({
         id: `mail:${n}`,
         displayName: local || addr,
-        givenName: '',
-        surname: '',
+        givenName: '', surname: '',
         emailAddresses: [{ address: addr }],
-        mobilePhone: null,
-        businessPhones: [],
-        companyName: null,
-        jobTitle: null,
+        mobilePhone: null, businessPhones: [],
+        companyName: null, jobTitle: null,
         source: 'mail',
         mailStats: {
-          lastEmailAt: st.lastEmailAt,
-          outlookSentToThem: st.sentToThem,
+          lastEmailAt:             st.lastEmailAt,
+          outlookSentToThem:       st.sentToThem,
           outlookReceivedFromThem: st.receivedFromThem,
         },
       });
+      seenNorm.add(n);
     }
 
+    // Add DB contacts that aren't already represented by Graph/mail entries
+    for (const dc of dbContacts) {
+      const email = rawAddr(dc);
+      const n     = email ? mailStats.norm(email) : '';
+      if (n && seenNorm.has(n)) continue; // already in merged via Graph or mail stats
+      const st = n ? statsMap.get(n) : null;
+      merged.push({
+        ...dc,
+        mailStats: st ? {
+          lastEmailAt:             st.lastEmailAt,
+          outlookSentToThem:       st.sentToThem,
+          outlookReceivedFromThem: st.receivedFromThem,
+        } : null,
+      });
+    }
+
+    // Sort by last email activity desc, then name
     merged.sort((a, b) => {
-      const ta = a.mailStats && a.mailStats.lastEmailAt ? new Date(a.mailStats.lastEmailAt).getTime() : 0;
-      const tb = b.mailStats && b.mailStats.lastEmailAt ? new Date(b.mailStats.lastEmailAt).getTime() : 0;
+      const ta = a.mailStats?.lastEmailAt ? new Date(a.mailStats.lastEmailAt).getTime() : 0;
+      const tb = b.mailStats?.lastEmailAt ? new Date(b.mailStats.lastEmailAt).getTime() : 0;
       if (tb !== ta) return tb - ta;
-      const na = `${(a.displayName || '').trim() || rawAddr(a) || ''}`;
-      const nb = `${(b.displayName || '').trim() || rawAddr(b) || ''}`;
+      const na = (a.displayName || rawAddr(a) || '').trim();
+      const nb = (b.displayName || rawAddr(b) || '').trim();
       return na.localeCompare(nb, undefined, { sensitivity: 'base' });
     });
 
