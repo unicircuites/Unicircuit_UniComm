@@ -4703,19 +4703,24 @@ function waAppendMessage(msg) {
   var fromMe = msg.fromMe || msg.from_me;
   var body = msg.body || '';
   // Replace @LID_numbers with @Name using waAllChats data
-  body = body.replace(/@(\d{7,20})/g, function(match, num) {
-    // Find chat with this LID number
-    var chat = waAllChats.find(function(c) {
-      return c.id && c.id.startsWith(num + '@');
+  if (body && body.includes('@')) {
+    console.log('[MENTION] body before replace:', body.substring(0,100));
+    console.log('[MENTION] waAllChats count:', waAllChats ? waAllChats.length : 'undefined');
+    body = body.replace(/@(\d{7,20})/g, function(match, num) {
+      var chat = waAllChats ? waAllChats.find(function(ch) {
+        return ch.id && ch.id.startsWith(num + '@');
+      }) : null;
+      console.log('[MENTION] match:', match, '| num:', num, '| chat found:', chat ? (chat.name + ' / ' + chat.phone) : 'NOT FOUND');
+      if (chat && chat.name && !chat.name.startsWith('+')) {
+        return '@' + chat.name;
+      }
+      if (chat && chat.phone) {
+        return '@' + chat.phone;
+      }
+      return match;
     });
-    if (chat && chat.name && !chat.name.startsWith('+')) {
-      return '@' + chat.name;
-    }
-    if (chat && chat.phone) {
-      return '@' + chat.phone;
-    }
-    return match; // keep original if not found
-  });
+    console.log('[MENTION] body after replace:', body.substring(0,100));
+  }
   var type = msg.type || msg.msg_type || 'conversation';
   var senderName = msg.contactName || msg.contact_name || msg.senderName || msg.sender_name || '';
   
