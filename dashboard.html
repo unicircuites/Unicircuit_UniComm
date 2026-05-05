@@ -3411,7 +3411,7 @@ window.addEventListener('DOMContentLoaded', () => {
 
 // ── LOGOUT ──────────────────────────────────────────────────────────────────
 async function doLogout() {
-  const token = localStorage.getItem('uc_token') || sessionStorage.getItem('uc_token');
+  const token = localStorage.getItem('unicomm_token') || sessionStorage.getItem('unicomm_token') || localStorage.getItem('uc_token');
   // Try to call logout API
   try {
     await fetch(`${API_BASE}/auth/logout`, {

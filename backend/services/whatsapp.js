@@ -64,7 +64,10 @@ function toDate(ts) {
 function getContactName(jid, pushName) {
   if (!jid) return '';
   const phone = jid.split('@')[0].split(':')[0];
-  const stored = contactsStore[jid] || contactsStore[phone + '@s.whatsapp.net'];
+  // Check all possible JID formats: exact, @s.whatsapp.net, @lid
+  const stored = contactsStore[jid]
+    || contactsStore[phone + '@s.whatsapp.net']
+    || contactsStore[phone + '@lid'];
   if (stored?.name)   return stored.name;
   if (stored?.notify) return stored.notify;
   if (pushName)       return pushName;
@@ -348,7 +351,14 @@ async function saveMessage(msg) {
 async function loadContactsFromDB() {
   try {
     const res = await pool.query(`SELECT jid, name, notify FROM wa_contacts`);
-    res.rows.forEach(r => { contactsStore[r.jid] = { name: r.name, notify: r.notify }; });
+    res.rows.forEach(r => {
+      contactsStore[r.jid] = { name: r.name, notify: r.notify };
+      // Also index by phone number for cross-format lookup
+      const phone = r.jid.split('@')[0].split(':')[0];
+      if (phone && !contactsStore[phone]) {
+        contactsStore[phone] = { name: r.name, notify: r.notify };
+      }
+    });
     console.log(`[WA] Loaded ${res.rows.length} contacts from DB`);
   } catch (_) {}
 }
@@ -375,7 +385,7 @@ async function startWA() {
     auth:              state,
     printQRInTerminal: false,
     browser:           ['UniComm Pro', 'Chrome', '120.0'],
-    syncFullHistory:   true,
+    syncFullHistory:   false, // false = faster connect, only recent history
     getMessage: async (key) => {
       const res = await pool.query(
         `SELECT body FROM wa_messages WHERE id=$1 AND chat_id=$2`,
@@ -609,16 +619,15 @@ async function updateChatNames() {
     let updated = 0;
     for (const chat of chats.rows) {
       if (chat.is_group) continue;
-      const resolvedName = getContactName(chat.id, null);
       const phone = chat.id.split('@')[0].split(':')[0];
       const displayPhone = '+' + phone;
-      // Update if we have a real name (not just the phone number)
+      // Try to resolve name from contactsStore (includes LID lookup)
+      const resolvedName = getContactName(chat.id, null);
       if (resolvedName && resolvedName !== displayPhone && resolvedName !== phone) {
-        await pool.query(`UPDATE wa_chats SET name=$1 WHERE id=$2`, [resolvedName, chat.id]);
+        await pool.query(`UPDATE wa_chats SET name=$1, phone=$2 WHERE id=$3`, [resolvedName, displayPhone, chat.id]);
         updated++;
-      } else if (chat.name !== displayPhone && !chat.is_group) {
-        // Ensure phone is displayed with + prefix
-        await pool.query(`UPDATE wa_chats SET phone=$1 WHERE id=$2 AND name NOT LIKE '+%'`, [displayPhone, chat.id]);
+      } else if (!chat.phone || chat.phone !== displayPhone) {
+        await pool.query(`UPDATE wa_chats SET phone=$1 WHERE id=$2`, [displayPhone, chat.id]);
       }
     }
     console.log(`[WA] Updated ${updated} chat names`);
