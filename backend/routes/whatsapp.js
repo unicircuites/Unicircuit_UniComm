@@ -18,6 +18,27 @@ router.post('/logout', authenticate, async (req, res) => {
   catch (err) { res.status(500).json({ error: err.message }); }
 });
 
+// GET /api/wa/lid-map — returns LID number -> {name, phone} map for @mention replacement
+router.get('/lid-map', authenticate, async (req, res) => {
+  try {
+    const result = await pool.query(`
+      SELECT
+        split_part(id, '@', 1) AS lid_num,
+        name,
+        phone
+      FROM wa_chats
+      WHERE id LIKE '%@lid'
+        AND phone IS NOT NULL
+        AND phone != ''
+    `);
+    const map = {};
+    result.rows.forEach(r => {
+      map[r.lid_num] = { name: r.name, phone: r.phone };
+    });
+    res.json(map);
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
 router.get('/chats', authenticate, async (req, res) => {
   try {
     const result = await pool.query(`

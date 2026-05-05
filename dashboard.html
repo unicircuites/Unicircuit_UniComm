@@ -4351,6 +4351,7 @@ function searchInbox(val) {
 let waSocket     = null;
 let waActiveJid  = null;
 let waAllChats   = [];
+var waLidMap = {};
 
 function initWASocket() {
   if (waSocket) return;
@@ -4470,6 +4471,16 @@ async function waGetQR() {
   }
 }
 
+async function waLoadLidMap() {
+  try {
+    var res = await fetch(API_BASE + '/wa/lid-map', { headers: getAuthHeaders() });
+    if (res.ok) {
+      waLidMap = await res.json();
+      console.log('[WA] LID map loaded:', Object.keys(waLidMap).length, 'entries');
+    }
+  } catch(_) {}
+}
+
 async function waLoadChats() {
   try {
     const res = await fetch(API_BASE + '/wa/chats', { headers: getAuthHeaders() });
@@ -4481,6 +4492,7 @@ async function waLoadChats() {
     }
     waAllChats = await res.json();
     waRenderChats(waAllChats);
+  waLoadLidMap();
   } catch (_) {}
 }
 
@@ -4704,22 +4716,22 @@ function waAppendMessage(msg) {
   var body = msg.body || '';
   // Replace @LID_numbers with @Name using waAllChats data
   if (body && body.includes('@')) {
-    console.log('[MENTION] body before replace:', body.substring(0,100));
-    console.log('[MENTION] waAllChats count:', waAllChats ? waAllChats.length : 'undefined');
     body = body.replace(/@(\d{7,20})/g, function(match, num) {
+      var entry = waLidMap[num];
+      if (entry && entry.name && !entry.name.startsWith('+')) {
+        return '@' + entry.name;
+      }
+      if (entry && entry.phone) {
+        return '@' + entry.phone;
+      }
+      // fallback: search waAllChats
       var chat = waAllChats ? waAllChats.find(function(ch) {
         return ch.id && ch.id.startsWith(num + '@');
       }) : null;
-      console.log('[MENTION] match:', match, '| num:', num, '| chat found:', chat ? (chat.name + ' / ' + chat.phone) : 'NOT FOUND');
-      if (chat && chat.name && !chat.name.startsWith('+')) {
-        return '@' + chat.name;
-      }
-      if (chat && chat.phone) {
-        return '@' + chat.phone;
-      }
+      if (chat && chat.name && !chat.name.startsWith('+')) return '@' + chat.name;
+      if (chat && chat.phone) return '@' + chat.phone;
       return match;
     });
-    console.log('[MENTION] body after replace:', body.substring(0,100));
   }
   var type = msg.type || msg.msg_type || 'conversation';
   var senderName = msg.contactName || msg.contact_name || msg.senderName || msg.sender_name || '';
