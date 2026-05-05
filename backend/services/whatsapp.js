@@ -367,6 +367,8 @@ async function loadContactsFromDB() {
 async function startWA() {
   await ensureTables();
   await loadContactsFromDB();
+  // Update chat names from contacts on every startup
+  await updateChatNames();
 
   const { state, saveCreds } = await useMultiFileAuthState(AUTH_DIR);
   

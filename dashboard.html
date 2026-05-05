@@ -4386,7 +4386,7 @@ function initWASocket() {
       if (area) area.scrollTop = area.scrollHeight;
     } else {
       var sender = msg.senderName || msg.pushName || cleanJid.split('@')[0];
-      showToast("New WhatsApp from " + sender);
+      notify("New WhatsApp from " + sender, "", "var(--green)", "fab fa-whatsapp");
     }
     waRefreshChatList();
   });

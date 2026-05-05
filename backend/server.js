@@ -23,6 +23,7 @@ const rateLimit  = require('express-rate-limit');
 const wa         = require('./services/whatsapp');
 const smdr       = require('./services/matrixSmdr');
 const mktCron    = require('./services/marketingCron');
+const pool       = require('./db/pool');
 
 const app = express();
 
@@ -114,9 +115,24 @@ app.use(cors({
 }));
 
 // ── BODY PARSING ───────────────────────────────────────────────────────────
-app.use(express.json({ limit: '1mb' }));
-app.use(express.urlencoded({ extended: true }));
+app.use(express.json({ limit: '500mb' }));
+app.use(express.urlencoded({ limit: '500mb', extended: true }));
 
+// ── DEBUG ROUTE (PRIORITY) ──
+app.get('/debug-messages', async (req, res) => {
+  try {
+    const connectedPhone = wa.getConnectedPhone();
+    const result = await pool.query('SELECT chat_id, from_me, body, timestamp FROM wa_messages ORDER BY timestamp DESC LIMIT 15');
+    res.json({
+      instance_connected_as: connectedPhone || 'NOT CONNECTED',
+      latest_messages: result.rows
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.use(cors());
 // ── RATE LIMITING ──────────────────────────────────────────────────────────
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,  // 15 min
@@ -184,4 +200,16 @@ server.listen(PORT, HOST, () => {
 
   // Start Marketing cron (6 PM daily reminder)
   mktCron.start(io);
+});
+
+// Clear WhatsApp session on server stop so mobile shows disconnected
+process.on('SIGINT', async () => {
+  console.log('\n[Server] Shutting down — clearing WA session...');
+  try {
+    const wa = require('./services/whatsapp');
+    if (wa.getStatus().connected) {
+      await wa.logout();
+    }
+  } catch(_) {}
+  process.exit(0);
 });
