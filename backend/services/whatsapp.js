@@ -383,7 +383,7 @@ async function startWA() {
       );
       return res.rows[0] ? { conversation: res.rows[0].body } : { conversation: '' };
     },
-    connectTimeoutMs: 60000,
+    connectTimeoutMs: 20000,
     keepAliveIntervalMs: 10000
   });
 
@@ -420,14 +420,17 @@ async function startWA() {
       console.log('[WA] Disconnected. Code:', code);
       emit('wa:disconnected', { code });
       if (code === DisconnectReason.loggedOut) {
-        // Logged out â€” clear session, restart for fresh QR
         clearSession();
-        setTimeout(startWA, 1000);
+        setTimeout(startWA, 500);
+      } else if (code === 408) {
+        console.log('[WA] QR timeout - waiting for manual scan.');
+      } else {
+        setTimeout(startWA, 5000);
       }
     }
   });
 
-  sock.ev.on('creds.update', saveCreds);
+    sock.ev.on('creds.update', saveCreds);
 
   // â”€â”€ CONTACTS SYNC â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   sock.ev.on('contacts.upsert', async (contacts) => {
@@ -533,14 +536,9 @@ async function startWA() {
         }
       }
       if (!isRealMessage(msg)) continue;
-      // Improved Normalization for @s.whatsapp.net, @g.us, AND @lid
+      const rawJid = msg.key?.remoteJid || '';
       let jid = rawJid.includes(':') ? (rawJid.split(':')[0] + '@' + rawJid.split('@')[1]) : rawJid;
-      
-      // If it's an LID, try to find the mapped phone JID
-      if (jid.endsWith('@lid')) {
-        const contact = Object.values(contactsStore).find(c => c.id === jid && c.phoneJid);
-        if (contact) jid = contact.phoneJid;
-      }
+      if (!jid || jid === 'status@broadcast') continue;
 
       console.log(`[WA] Incoming message from ${jid}: ${getBody(msg).substring(0, 30)}`);
 
@@ -1005,6 +1003,23 @@ function getConnectedPhone() {
   console.log('[WA] mapped:', mapped ? mapped.phoneJid : 'NOT FOUND');
   return mapped ? mapped.phoneJid.split('@')[0] : (phoneNumber || null);
 }
+
+
+// ── SESSION EXPIRE ON SERVER STOP ─────────────────────────────────────────
+// Clear wa_auth when server stops so fresh QR is required on next start
+function _clearSessionOnExit() {
+  try {
+    if (require('fs').existsSync(AUTH_DIR)) {
+      require('fs').readdirSync(AUTH_DIR).forEach(f => {
+        try { require('fs').unlinkSync(require('path').join(AUTH_DIR, f)); } catch(_) {}
+      });
+      console.log('[WA] Session cleared on exit');
+    }
+  } catch(_) {}
+}
+process.on('exit', _clearSessionOnExit);
+process.on('SIGINT', () => { _clearSessionOnExit(); process.exit(0); });
+process.on('SIGTERM', () => { _clearSessionOnExit(); process.exit(0); });
 
 module.exports = { startWA, sendMessage, logout, getStatus, getQR, setIO, getGroupMetadata, downloadMedia, msgCache, importExportedChat, getConnectedPhone };
 

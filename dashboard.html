@@ -4984,12 +4984,18 @@ async function waDoImport() {
     return;
   }
   if (!selectEl || !selectEl.value) {
-    statusEl.innerHTML = '<span style="color:var(--red2);">Please select an existing chat to import into</span>';
+    statusEl.innerHTML = '<span style="color:var(--red2);">Please select a chat or choose "Create new chat"</span>';
     return;
   }
   
   var file = fileEl.files[0];
   var chatJid = selectEl.value;
+  
+  // If creating new chat, generate an import_ JID from the file name
+  if (chatJid === '__new__') {
+    var namePart = file.name.replace(/\.(txt|zip)$/i, '').replace(/^WhatsApp Chat with /i, '').replace(/\s*\(\d+\)$/, '').trim();
+    chatJid = 'import_' + namePart.replace(/[^a-zA-Z0-9_]/g, '_').toLowerCase() + '_' + Date.now();
+  }
   var clearOld = document.getElementById('wa-import-clear') ? document.getElementById('wa-import-clear').checked : false;
   
   statusEl.innerHTML = '<span class="spin-loader"></span> Reading file...';
@@ -5933,9 +5939,10 @@ function etUseInBroadcast() {
 
       <!-- Dropdown: Select Target Chat -->
       <div>
-        <label style="display:block;font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:0.6px;margin-bottom:6px;">Select Existing Chat to Import Into</label>
+        <label style="display:block;font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:0.6px;margin-bottom:6px;">Target Chat</label>
         <select class="inp" id="wa-import-chat-select" style="font-size:13px;background:rgba(0,0,0,0.2);">
           <option value="">-- Select an existing chat --</option>
+          <option value="__new__">➕ Create new chat from file name</option>
         </select>
         <label style="display:flex;align-items:center;gap:6px;margin-top:10px;font-size:12px;color:var(--muted2);cursor:pointer;">
           <input type="checkbox" id="wa-import-clear" checked> Overwrite previous imports (Removes duplicate bubbles)
