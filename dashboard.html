@@ -4388,7 +4388,7 @@ function initWASocket() {
       var sender = msg.senderName || msg.pushName || cleanJid.split('@')[0];
       notify("New WhatsApp from " + sender, "", "var(--green)", "fab fa-whatsapp");
     }
-    waRefreshChatList();
+    waLoadChats();
   });
   waSocket.on('wa:chats_updated', () => waLoadChats());
   waSocket.on('wa:sync_complete', () => {

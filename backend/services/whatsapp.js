@@ -387,7 +387,7 @@ async function startWA() {
     auth:              state,
     printQRInTerminal: false,
     browser:           ['UniComm Pro', 'Chrome', '120.0'],
-    syncFullHistory:   false, // false = faster connect, only recent history
+    syncFullHistory:   true,  // true = full history sync on connect
     logger: require('pino')({ level: 'silent' }), // suppress verbose Baileys logs
     getMessage: async (key) => {
       const res = await pool.query(
