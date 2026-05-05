@@ -4529,7 +4529,11 @@ function waFilterChats(q) {
 
 async function waOpenChat(rawJid, name, phone) {
   // Normalize JID: remove device suffixes like :48
-  var jid = rawJid.includes('@') ? (rawJid.split(':')[0] + '@' + rawJid.split('@')[1]) : rawJid;
+  // Normalize JID: strip device suffix (e.g. 919545073545:48@s.whatsapp.net -> 919545073545@s.whatsapp.net)
+  var jid = rawJid;
+  if (rawJid.includes(':') && rawJid.includes('@')) {
+    jid = rawJid.split(':')[0] + '@' + rawJid.split('@').slice(1).join('@');
+  }
   waActiveJid = jid;
   var isGroup = jid.endsWith('@g.us');
 
