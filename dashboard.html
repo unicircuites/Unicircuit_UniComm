@@ -1110,15 +1110,30 @@ select.inp option{background:#1a2035;color:var(--text);}
               <button class="btn btn-blue btn-xs"  id="btn-ai-reply"  onclick="aiDraftReply()"   style="display:none;"><i class="fas fa-robot"></i> AI Draft</button>
             </div>
           </div>
-          <div id="email-detail-meta" style="padding:10px 16px;border-bottom:1px solid var(--border);font-size:12px;color:var(--muted);display:none;">
-            <b style="color:var(--text);" id="email-detail-from"></b> &nbsp;·&nbsp; <span id="email-detail-time"></span>
+          <!-- Conversation thread view (Outlook-style) -->
+          <div id="email-thread-conversation" style="display:none;flex:1;overflow-y:auto;padding:0;">
+            <div id="email-thread-messages"></div>
           </div>
-          <div id="email-thread-wrap" style="display:none;padding:8px 16px;border-bottom:1px solid var(--border);background:rgba(0,120,212,0.06);max-height:140px;overflow-y:auto;">
-            <div style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:0.04em;margin-bottom:6px;">Conversation</div>
-            <div id="email-thread-list"></div>
-          </div>
-          <div id="email-detail-body">
-            <div style="text-align:center;padding:30px;color:var(--muted);"><i class="fas fa-envelope" style="font-size:32px;opacity:0.12;display:block;margin-bottom:10px;"></i>Select an email to read</div>
+          <!-- Single message view (fallback when no thread) -->
+          <div id="email-single-view" style="display:flex;flex-direction:column;flex:1;overflow:hidden;">
+            <div id="email-detail-meta" style="padding:10px 16px;border-bottom:1px solid var(--border);font-size:12px;color:var(--muted);display:none;flex-shrink:0;">
+              <div style="display:flex;align-items:baseline;gap:6px;flex-wrap:wrap;margin-bottom:3px;">
+                <span style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:0.05em;min-width:28px;">From</span>
+                <b style="color:var(--text);font-size:12.5px;" id="email-detail-from"></b>
+                <span style="margin-left:auto;font-size:11px;color:var(--muted);" id="email-detail-time"></span>
+              </div>
+              <div id="email-detail-to-row" style="display:none;align-items:baseline;gap:6px;flex-wrap:wrap;margin-bottom:2px;">
+                <span style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:0.05em;min-width:28px;">To</span>
+                <span style="color:var(--muted2);font-size:12px;" id="email-detail-to"></span>
+              </div>
+              <div id="email-detail-cc-row" style="display:none;align-items:baseline;gap:6px;flex-wrap:wrap;">
+                <span style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:0.05em;min-width:28px;">Cc</span>
+                <span style="color:var(--muted2);font-size:12px;" id="email-detail-cc"></span>
+              </div>
+            </div>
+            <div id="email-detail-body" style="flex:1;overflow:hidden;">
+              <div style="text-align:center;padding:30px;color:var(--muted);"><i class="fas fa-envelope" style="font-size:32px;opacity:0.12;display:block;margin-bottom:10px;"></i>Select an email to read</div>
+            </div>
           </div>
         </div>
       </div>
@@ -2162,6 +2177,7 @@ async function loadOutlookContactsDirectory() {
     const res = await fetch(`${API_BASE}/outlook/contacts`, { headers: getAuthHeaders() });
     if (!res.ok) throw new Error('request failed');
     outlookContactsCache = await res.json();
+    ContactResolver.buildCache(outlookContactsCache);
     filterContacts();
     // Show a soft hint if Outlook is not connected (no 'people' source entries)
     const hasLive = outlookContactsCache.some(c => c.source === 'people');
@@ -2187,9 +2203,20 @@ function renderOutlookContactsList(list) {
     const title = outlookDisplayTitle(oc);
     const email = outlookPrimaryEmail(oc);
     const sub = email || '—';
+    const hasName = !!(oc.displayName || oc.givenName || oc.surname || '').trim();
     const srcBadge = oc.source === 'mail'
       ? '<span class="badge b-blue" style="font-size:9px;opacity:0.9;">Mail</span>'
       : '<span class="badge b-blue" style="font-size:9px;">Outlook</span>';
+    // Show provider badge (Gmail/Yahoo/etc.) based on email domain, not source
+    const primaryEmail = email || '';
+    const providerInfo = primaryEmail ? ContactResolver.getProviderCategory(primaryEmail) : null;
+    const providerBadge = providerInfo && providerInfo.label !== 'Outlook'
+      ? `<span class="badge ${providerInfo.badgeClass}" style="font-size:9px;margin-left:4px;">${escHtml(providerInfo.label)}</span>`
+      : '';
+    const noNameLabel = !hasName && email
+      ? `<div style="font-size:10.5px;color:var(--muted);margin-top:2px;font-style:italic;">No name saved</div>
+         <button class="btn btn-xs btn-gold" style="margin-top:5px;font-size:10px;" onclick="event.stopPropagation();openQuickSaveModal('${email.replace(/'/g,"\\'")}', '${String(oc.id || '').replace(/'/g,"\\'")}', '')"><i class="fa fa-user-plus"></i> Add Name</button>`
+      : '';
     return `
     <div class="contact-card" onclick='showOutlookDirectoryDetail(${JSON.stringify(oc.id)}, this)'>
       <div style="display:flex;align-items:center;gap:11px;">
@@ -2197,8 +2224,9 @@ function renderOutlookContactsList(list) {
         <div style="flex:1;min-width:0;">
           <div style="font-weight:700;font-size:13.5px;color:var(--text);">${escHtml(title)}</div>
           <div style="font-size:11.5px;color:var(--muted);margin-top:1px;">${escHtml(sub)}</div>
+          ${noNameLabel}
         </div>
-        ${srcBadge}
+        ${srcBadge}${providerBadge}
       </div>
     </div>`;
   }).join('');
@@ -2298,6 +2326,7 @@ function showOutlookDirectoryDetail(graphId, cardEl) {
         <div style="display:flex;gap:8px;flex-wrap:wrap;">
           ${email ? `<button class="btn btn-gold btn-sm" onclick="draftEmailTo('${escHtml(email)}')"><i class="fas fa-envelope"></i> Draft Email</button>` : ''}
           ${email ? `<a class="btn btn-blue btn-sm" href="https://teams.microsoft.com/l/chat/0/0?users=${encodeURIComponent(email)}" target="_blank" rel="noopener" style="text-decoration:none;"><i class="fab fa-microsoft"></i> Teams Chat</a>` : ''}
+          ${email ? `<button class="btn btn-ghost btn-sm" onclick="openQuickSaveModal('${escHtml(email)}', '${escHtml(String(graphId))}', '${escHtml(title === email ? '' : title)}')"><i class="fa fa-pen"></i> ${title === email ? 'Add Name' : 'Edit Contact'}</button>` : ''}
         </div>
       </div>
     </div>`;
@@ -4275,22 +4304,26 @@ async function quickCallSummaryById(id, btn) {
   }
 }
 
-function pbxOnConnected() {
+function pbxOnConnected(data) {
   var dot = document.getElementById('pbx-dot');
   var txt = document.getElementById('pbx-status-text');
   var badge = document.getElementById('pbx-live-badge');
   if (dot) { dot.style.background = 'var(--green)'; }
   if (txt) { txt.textContent = 'Matrix PBX Connected · SMDR Live'; txt.style.color = 'var(--green2)'; }
   if (badge) badge.style.display = 'inline-flex';
+  console.log('[PBX] ✅ CONNECTED — Matrix PBX SMDR socket established', data || '');
+  console.log('[PBX]    Status bar updated → green dot, SMDR Live badge shown');
 }
 
-function pbxOnDisconnected() {
+function pbxOnDisconnected(data) {
   var dot = document.getElementById('pbx-dot');
   var txt = document.getElementById('pbx-status-text');
   var badge = document.getElementById('pbx-live-badge');
   if (dot) dot.style.background = 'var(--red2)';
   if (txt) { txt.textContent = 'Matrix PBX · Disconnected — Reconnecting...'; txt.style.color = 'var(--red2)'; }
   if (badge) badge.style.display = 'none';
+  console.warn('[PBX] ❌ DISCONNECTED — Matrix PBX dropped the SMDR connection', data || '');
+  console.warn('[PBX]    Check: PBX at 192.168.0.81 → SMDR Settings → TCP Server enabled?');
 }
 
 function renderCallLogs() { loadCallLogs(); }
@@ -4439,12 +4472,212 @@ async function createCampaign() {
 }
 
 // ── OUTLOOK / MICROSOFT GRAPH ────────────────────────────────────────────────
-let inboxCurrentPage = 0;
-let inboxPageSize    = 25;
-let inboxFolder      = 'inbox';
-let activeMessageId  = null;
-let searchQuery      = '';
-let searchTimer      = null;
+
+// ── ContactResolver ──────────────────────────────────────────────────────────
+const ContactResolver = (() => {
+  let _cache = new Map();
+
+  function _norm(email) {
+    return String(email || '').trim().toLowerCase();
+  }
+
+  function buildCache(contacts) {
+    _cache = new Map();
+    for (const c of (contacts || [])) {
+      const addrs = (c.emailAddresses || []).map(e => e && e.address).filter(Boolean);
+      const dn    = (c.displayName || '').trim();
+      for (const addr of addrs) {
+        const key = _norm(addr);
+        if (key) _cache.set(key, dn);
+      }
+    }
+  }
+
+  function isUnknownSender(email) {
+    const key = _norm(email);
+    if (!key) return true;
+    if (!_cache.has(key)) return true;
+    const dn = _cache.get(key);
+    return !dn;
+  }
+
+  function getProviderCategory(email) {
+    const domain = _norm(email).split('@')[1] || '';
+    if (domain === 'gmail.com' || domain === 'googlemail.com')
+      return { label: 'Gmail', badgeClass: 'b-blue' };
+    if (['yahoo.com','yahoo.in','yahoo.co.in','ymail.com'].includes(domain))
+      return { label: 'Yahoo', badgeClass: 'b-purple' };
+    if (['outlook.com','hotmail.com','hotmail.in','live.com','live.in','msn.com'].includes(domain))
+      return { label: 'Outlook', badgeClass: 'b-blue' };
+    if (['icloud.com','me.com','mac.com'].includes(domain))
+      return { label: 'iCloud', badgeClass: 'b-gray' };
+    if (domain === 'protonmail.com' || domain === 'proton.me')
+      return { label: 'ProtonMail', badgeClass: 'b-green' };
+    if (domain === 'zoho.com' || domain === 'zohomail.com')
+      return { label: 'Zoho', badgeClass: 'b-green' };
+    if (domain === 'rediffmail.com')
+      return { label: 'Rediff', badgeClass: 'b-gold' };
+    return { label: 'Other', badgeClass: 'b-gray' };
+  }
+
+  return { buildCache, isUnknownSender, getProviderCategory };
+})();
+// ── End ContactResolver ──────────────────────────────────────────────────────
+
+// ── escHtml helper ────────────────────────────────────────────────────────
+function escHtml(s) {
+  return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+}
+
+// ── renderSenderCell (inbox) ──────────────────────────────────────────────
+function renderSenderCell(email, displayName) {
+  if (!email) return `<span style="color:var(--muted);">—</span>`;
+  if (ContactResolver.isUnknownSender(email)) {
+    // Unknown — show email in muted style, no badge/button (handled in mail body)
+    return `<span style="color:var(--muted2);">${escHtml(email)}</span>`;
+  }
+  const name = displayName || email;
+  return `<span>${escHtml(name)}</span>`;
+}
+
+// ── renderRecipientCell (sent) ────────────────────────────────────────────
+function renderRecipientCell(toAddresses, ccAddresses) {
+  const all = [...(toAddresses || []), ...(ccAddresses || [])];
+  if (!all.length) return `<span style="color:var(--muted);">—</span>`;
+  // Show first 2 recipients only to keep row clean; rest shown in mail body
+  const shown = all.slice(0, 2);
+  const extra = all.length - shown.length;
+  const parts = shown.map(addr => {
+    const email = addr.emailAddress?.address || addr.address || String(addr);
+    const dn    = addr.emailAddress?.name    || addr.name    || '';
+    if (!email) return '';
+    if (ContactResolver.isUnknownSender(email)) {
+      return `<span style="color:var(--muted2);">${escHtml(email)}</span>`;
+    }
+    return `<span>${escHtml(dn || email)}</span>`;
+  }).filter(Boolean);
+  if (extra > 0) parts.push(`<span style="color:var(--muted);font-size:10.5px;">+${extra} more</span>`);
+  return parts.join(`<span style="color:var(--muted);margin:0 3px;">·</span>`);
+}
+
+// ── Quick Save Contact Modal ──────────────────────────────────────────────
+let _qsGraphId = null; // stores Graph contact ID when editing existing contact
+
+function openQuickSaveModal(email, graphId, existingName) {
+  _qsGraphId = (graphId && !String(graphId).startsWith('mail:')) ? graphId : null;
+  document.getElementById('qs-email').value        = email || '';
+  document.getElementById('qs-displayname').value  = existingName || '';
+  document.getElementById('qs-firstname').value    = '';
+  document.getElementById('qs-lastname').value     = '';
+  document.getElementById('qs-dn-error').style.display  = 'none';
+  document.getElementById('qs-api-error').style.display = 'none';
+  const btn = document.getElementById('qs-submit-btn');
+  btn.disabled  = false;
+  btn.innerHTML = _qsGraphId
+    ? '<i class="fa fa-pen"></i> Update Contact'
+    : '<i class="fa fa-save"></i> Save Contact';
+
+  // Update modal title
+  const titleEl = document.querySelector('#qs-modal-overlay .modal-title span:first-child');
+  if (titleEl) titleEl.innerHTML = _qsGraphId
+    ? '<i class="fa fa-pen" style="color:var(--gold);margin-right:8px;"></i>Edit Outlook Contact'
+    : '<i class="fa fa-user-plus" style="color:var(--gold);margin-right:8px;"></i>Add to Outlook Contacts';
+
+  const sourceGroup = document.getElementById('qs-source-group');
+  if (email && !_qsGraphId && ContactResolver.isUnknownSender(email)) {
+    const { label } = ContactResolver.getProviderCategory(email);
+    document.getElementById('qs-source').value = label + ' contact';
+    sourceGroup.style.display = 'block';
+  } else {
+    document.getElementById('qs-source').value = '';
+    sourceGroup.style.display = 'none';
+  }
+
+  document.getElementById('qs-modal-overlay').classList.add('open');
+  setTimeout(() => document.getElementById('qs-displayname').focus(), 80);
+}
+
+function closeQuickSaveModal() {
+  document.getElementById('qs-modal-overlay').classList.remove('open');
+}
+
+async function submitQuickSave() {
+  const email       = document.getElementById('qs-email').value.trim();
+  const displayName = document.getElementById('qs-displayname').value.trim();
+  const givenName   = document.getElementById('qs-firstname').value.trim();
+  const surname     = document.getElementById('qs-lastname').value.trim();
+
+  if (!displayName) {
+    document.getElementById('qs-dn-error').style.display = 'block';
+    document.getElementById('qs-displayname').focus();
+    return;
+  }
+  document.getElementById('qs-dn-error').style.display = 'none';
+
+  const emailRe = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  if (!emailRe.test(email)) {
+    document.getElementById('qs-api-error').textContent = 'Enter a valid email address';
+    document.getElementById('qs-api-error').style.display = 'block';
+    return;
+  }
+
+  const btn = document.getElementById('qs-submit-btn');
+  btn.disabled  = true;
+  btn.innerHTML = '<span style="display:inline-block;width:14px;height:14px;border:2px solid #fff;border-top-color:transparent;border-radius:50%;animation:spin 0.7s linear infinite;vertical-align:middle;margin-right:6px;"></span> Saving…';
+  document.getElementById('qs-api-error').style.display = 'none';
+
+  try {
+    const payload = { displayName, email };
+    if (givenName) payload.givenName = givenName;
+    if (surname)   payload.surname   = surname;
+
+    let res;
+    if (_qsGraphId) {
+      // Update existing Graph contact
+      const patchPayload = { displayName };
+      if (givenName) patchPayload.givenName = givenName;
+      if (surname)   patchPayload.surname   = surname;
+      res = await fetch(`${API_BASE}/outlook/contacts/${encodeURIComponent(_qsGraphId)}`, {
+        method:  'PATCH',
+        headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
+        body:    JSON.stringify(patchPayload),
+      });
+    } else {
+      // Create new contact
+      res = await fetch(`${API_BASE}/outlook/contacts`, {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
+        body:    JSON.stringify(payload),
+      });
+    }
+
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.error || `HTTP ${res.status}`);
+    }
+
+    closeQuickSaveModal();
+    notify(_qsGraphId ? 'Contact updated in Outlook' : 'Contact saved to Outlook', 'success');
+    await loadOutlookContactsDirectory();
+    // Re-render active mail list so unknown-sender indicators update immediately
+    loadInbox();
+
+  } catch (err) {
+    btn.disabled  = false;
+    btn.innerHTML = '<i class="fa fa-save"></i> Save Contact';
+    document.getElementById('qs-api-error').textContent = err.message;
+    document.getElementById('qs-api-error').style.display = 'block';
+  }
+}
+// ── End Quick Save Contact Modal ──────────────────────────────────────────
+
+let inboxCurrentPage    = 0;
+let inboxPageSize       = 25;
+let inboxFolder         = 'inbox';
+let activeMessageId     = null;
+let searchQuery         = '';
+let searchTimer         = null;
+let outlookConnectedEmail = '';
 
 async function checkOutlookStatus() {
   console.log('[OUTLOOK] Checking status...');
@@ -4459,6 +4692,7 @@ async function checkOutlookStatus() {
     const banner = document.getElementById('outlook-connect-banner');
     if (data.connected) {
       console.log('[OUTLOOK] ✅ Connected');
+      outlookConnectedEmail = data.email || '';
       if (dot) { dot.className = 'badge b-green'; dot.textContent = '✅ Connected'; }
       if (banner) banner.style.display = 'none';
       const pill = document.querySelector('.pill-tag i.fa-envelope');
@@ -4599,21 +4833,46 @@ async function loadInbox(forceRefresh) {
     const badge  = document.getElementById('inbox-unread-badge');
     if (badge) { badge.textContent = unread; badge.style.display = unread ? 'inline-flex' : 'none'; }
 
-    listEl.innerHTML = msgs.map(m => {
-      const from    = m.from?.emailAddress?.name || m.from?.emailAddress?.address || 'Unknown';
+    // Group by conversationId — show only latest message per conversation (Outlook style)
+    const convMap = new Map();
+    msgs.forEach(m => {
+      const cid = m.conversationId || m.id;
+      const existing = convMap.get(cid);
+      const mTime = new Date(m.receivedDateTime || m.sentDateTime || 0).getTime();
+      if (!existing) {
+        convMap.set(cid, { ...m, _count: 1 });
+      } else {
+        const eTime = new Date(existing.receivedDateTime || existing.sentDateTime || 0).getTime();
+        if (mTime > eTime) {
+          convMap.set(cid, { ...m, _count: existing._count + 1 });
+        } else {
+          existing._count++;
+        }
+      }
+    });
+    const grouped = Array.from(convMap.values());
+
+    listEl.innerHTML = grouped.map(m => {
+      const fromEmail = m.from?.emailAddress?.address || '';
+      const fromName  = m.from?.emailAddress?.name || '';
+      const isSent    = inboxFolder === 'sent';
+      const senderCell = isSent
+        ? renderRecipientCell(m.toRecipients, m.ccRecipients)
+        : renderSenderCell(fromEmail, fromName);
       const time    = m.receivedDateTime || m.sentDateTime
         ? new Date(m.receivedDateTime || m.sentDateTime).toLocaleString('en-IN', { day:'2-digit', month:'short', hour:'2-digit', minute:'2-digit' })
         : '';
       const unreadDot = !m.isRead ? `<span style="width:7px;height:7px;border-radius:50%;background:var(--blue);flex-shrink:0;margin-top:4px;"></span>` : `<span style="width:7px;height:7px;flex-shrink:0;"></span>`;
       const importanceIcon = m.importance === 'high' ? `<i class="fas fa-exclamation" style="color:var(--red2);font-size:10px;margin-left:4px;"></i>` : '';
       const attachIcon = m.hasAttachments ? `<i class="fas fa-paperclip" style="color:var(--muted);font-size:10px;margin-left:4px;"></i>` : '';
+      const countBadge = m._count > 1 ? `<span style="font-size:10px;color:var(--muted);background:rgba(255,255,255,0.08);border-radius:10px;padding:1px 6px;margin-left:4px;">${m._count}</span>` : '';
       return `
         <div onclick="openEmail('${m.id}')" style="padding:11px 14px;border-bottom:1px solid var(--border);cursor:pointer;transition:background 0.1s;display:flex;gap:10px;align-items:flex-start;"
              onmouseover="this.style.background='rgba(255,255,255,0.03)'" onmouseout="this.style.background=''" id="email-row-${m.id}">
           ${unreadDot}
           <div style="flex:1;min-width:0;">
             <div style="display:flex;justify-content:space-between;align-items:center;gap:6px;">
-              <span style="font-size:12.5px;font-weight:${m.isRead?'500':'700'};color:${m.isRead?'var(--muted2)':'var(--text)'};white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:160px;">${from}</span>
+              <span style="font-size:12.5px;font-weight:${m.isRead?'500':'700'};color:${m.isRead?'var(--muted2)':'var(--text)'};display:flex;align-items:center;flex-wrap:wrap;gap:2px;min-width:0;">${senderCell}${countBadge}</span>
               <span style="font-size:10.5px;color:var(--muted);flex-shrink:0;">${time}</span>
             </div>
             <div style="font-size:12px;color:var(--text);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${m.subject || '(no subject)'}${importanceIcon}${attachIcon}</div>
@@ -4679,60 +4938,155 @@ async function outlookEmbedInlineCids(html, messageId, attachments) {
   return out;
 }
 
+// ── Outlook-style conversation thread renderer ────────────────────────────
+function getInitials(name) {
+  if (!name) return '?';
+  const parts = name.trim().split(/\s+/);
+  return (parts[0][0] + (parts[1] ? parts[1][0] : '')).toUpperCase();
+}
+function avatarColor(name) {
+  const colors = ['#0078d4','#107c10','#d83b01','#8764b8','#038387','#c239b3','#ca5010'];
+  let h = 0;
+  for (let i = 0; i < (name||'').length; i++) h = (h * 31 + name.charCodeAt(i)) & 0xffffffff;
+  return colors[Math.abs(h) % colors.length];
+}
+
 async function loadEmailThread(conversationId, currentId) {
-  const wrap = document.getElementById('email-thread-wrap');
-  const listEl = document.getElementById('email-thread-list');
-  if (!wrap || !listEl) return;
+  const oldWrap    = document.getElementById('email-thread-wrap');
+  if (oldWrap) oldWrap.style.display = 'none';
+  const threadConv = document.getElementById('email-thread-conversation');
+  const threadMsgs = document.getElementById('email-thread-messages');
+  const singleView = document.getElementById('email-single-view');
+
   if (!conversationId) {
-    wrap.style.display = 'none';
+    if (threadConv) threadConv.style.display = 'none';
+    if (singleView) singleView.style.display = 'flex';
     return;
   }
   try {
-    const res = await fetch(
-      `${API_BASE}/outlook/thread?conversationId=${encodeURIComponent(conversationId)}`,
-      { headers: getAuthHeaders() }
-    );
+    const res  = await fetch(`${API_BASE}/outlook/thread?conversationId=${encodeURIComponent(conversationId)}`, { headers: getAuthHeaders() });
     const data = await res.json();
     const msgs = data.messages || [];
+
     if (msgs.length <= 1) {
-      wrap.style.display = 'none';
+      if (threadConv) threadConv.style.display = 'none';
+      if (singleView) singleView.style.display = 'flex';
       return;
     }
-    wrap.style.display = 'block';
-    listEl.innerHTML = msgs
-      .map((m) => {
-        const isCur = m.id === currentId;
-        const from = m.from?.emailAddress?.name || m.from?.emailAddress?.address || '';
-        const when = m.receivedDateTime
-          ? new Date(m.receivedDateTime).toLocaleString('en-IN', { dateStyle: 'short', timeStyle: 'short' })
-          : '';
-        const subj = (m.subject || '(no subject)').replace(/</g, '&lt;');
-        const fromEsc = from.replace(/</g, '&lt;');
-        return (
-          '<button type="button" class="email-thread-item" data-email-id="' +
-          outlookEscapeAttr(m.id) +
-          '" style="display:block;width:100%;text-align:left;padding:6px 8px;margin-bottom:4px;border-radius:6px;border:1px solid var(--border);background:' +
-          (isCur ? 'rgba(245,166,35,0.12)' : 'var(--card)') +
-          ';cursor:pointer;font-size:11.5px;color:var(--text);">' +
-          '<span style="font-weight:' +
-          (isCur ? '700' : '500') +
-          ';">' +
-          subj +
-          '</span>' +
-          '<div style="color:var(--muted);font-size:10.5px;margin-top:2px;">' +
-          fromEsc +
-          ' · ' +
-          when +
-          '</div></button>'
-        );
-      })
-      .join('');
-    listEl.querySelectorAll('.email-thread-item').forEach((btn) => {
-      btn.onclick = () => openEmail(btn.getAttribute('data-email-id'));
-    });
-  } catch (_) {
-    wrap.style.display = 'none';
+
+    if (singleView) singleView.style.display = 'none';
+    if (threadConv) threadConv.style.display = 'block';
+    if (!threadMsgs) return;
+
+    threadMsgs.innerHTML = msgs.map((m, idx) => {
+      const isLast   = idx === msgs.length - 1;
+      const isCur    = m.id === currentId;
+      const expanded = isLast || isCur;
+      const from     = m.from?.emailAddress?.name || m.from?.emailAddress?.address || 'Unknown';
+      const fromAddr = m.from?.emailAddress?.address || '';
+      const fromDisp = from + (fromAddr && fromAddr !== from ? ' <' + fromAddr + '>' : '');
+      function _renderThreadAddr(recipients) {
+        return (recipients || []).map(r => {
+          const n = r.emailAddress?.name || ''; const a = r.emailAddress?.address || '';
+          if (!a) return '';
+          if (ContactResolver.isUnknownSender(a)) {
+            const { label, badgeClass } = ContactResolver.getProviderCategory(a);
+            const safeA = a.replace(/'/g, "\\'");
+            return `<span style="display:inline-flex;align-items:center;gap:3px;margin-right:4px;">` +
+              `<span>${escHtml(a)}</span>` +
+              `<span class="badge ${badgeClass}" style="font-size:9px;">${escHtml(label)}</span>` +
+              `<button class="btn btn-xs btn-gold" style="font-size:10px;padding:1px 6px;" onclick="openQuickSaveModal('${safeA}')" title="Add to Contacts"><i class="fa fa-user-plus"></i></button>` +
+              `</span>`;
+          }
+          return `<span style="margin-right:4px;">${escHtml(n && n !== a ? n + ' <' + a + '>' : a)}</span>`;
+        }).filter(Boolean).join('');
+      }
+      const toList = _renderThreadAddr(m.toRecipients);
+      const ccList = _renderThreadAddr(m.ccRecipients);
+      const time     = m.receivedDateTime ? new Date(m.receivedDateTime).toLocaleString('en-IN', { day:'2-digit', month:'short', year:'numeric', hour:'2-digit', minute:'2-digit' }) : '';
+      const preview  = (m.bodyPreview || '').slice(0, 120);
+      const initials = getInitials(from);
+      const bgColor  = avatarColor(from);
+      const msgId    = outlookEscapeAttr(m.id);
+      return `<div class="thread-msg-item" id="tmsg-${msgId}" style="border-bottom:1px solid var(--border);">
+        <div class="thread-msg-header" onclick="toggleThreadMsg('${msgId}')" style="display:flex;align-items:center;gap:10px;padding:10px 16px;cursor:pointer;transition:background 0.1s;" onmouseover="this.style.background='rgba(255,255,255,0.03)'" onmouseout="this.style.background=''">
+          <div style="width:32px;height:32px;border-radius:50%;background:${bgColor};display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:#fff;flex-shrink:0;">${initials}</div>
+          <div style="flex:1;min-width:0;">
+            <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;">
+              <span style="font-size:12.5px;font-weight:700;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:260px;">${escHtml(from)}${fromAddr && fromAddr !== from ? ' <span style="font-weight:400;color:var(--muted);">&lt;'+escHtml(fromAddr)+'&gt;</span>' : ''}</span>
+              <span style="font-size:10.5px;color:var(--muted);flex-shrink:0;">${time}</span>
+            </div>
+            <div class="thread-msg-preview" style="font-size:11.5px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;${expanded?'display:none;':''}">${escHtml(preview)}</div>
+          </div>
+          <i class="fas fa-chevron-${expanded?'up':'down'} thread-msg-chevron" style="font-size:10px;color:var(--muted);flex-shrink:0;"></i>
+        </div>
+        <div class="thread-msg-body" id="tbody-${msgId}" style="${expanded?'':'display:none;'}">
+          ${(toList||ccList) ? `<div style="padding:4px 16px 6px 58px;font-size:11.5px;color:var(--muted);border-bottom:1px solid rgba(255,255,255,0.04);">
+            ${toList ? `<div style="display:flex;align-items:baseline;gap:4px;flex-wrap:wrap;"><span style="font-weight:700;text-transform:uppercase;font-size:10px;letter-spacing:0.05em;margin-right:6px;flex-shrink:0;">To</span>${toList}</div>` : ''}
+            ${ccList ? `<div style="display:flex;align-items:baseline;gap:4px;flex-wrap:wrap;"><span style="font-weight:700;text-transform:uppercase;font-size:10px;letter-spacing:0.05em;margin-right:6px;flex-shrink:0;">Cc</span>${ccList}</div>` : ''}
+          </div>` : ''}
+          <div id="tbody-content-${msgId}" style="padding:0 16px 0 58px;min-height:60px;"><div style="text-align:center;padding:16px;"><div class="spin-loader" style="margin:0 auto;"></div></div></div>
+          <div style="padding:8px 16px 12px 58px;display:flex;gap:8px;">
+            <button class="btn btn-ghost btn-xs" onclick="openReplyForMsg('${msgId}',false)"><i class="fas fa-reply"></i> Reply</button>
+            <button class="btn btn-ghost btn-xs" onclick="openReplyForMsg('${msgId}',true)"><i class="fas fa-reply-all"></i> Reply All</button>
+          </div>
+        </div>
+      </div>`;
+    }).join('');
+
+    msgs.forEach((m, idx) => { if (idx === msgs.length-1 || m.id === currentId) loadThreadMsgBody(m.id); });
+    setTimeout(() => {
+      const t = document.getElementById(`tmsg-${outlookEscapeAttr(currentId || msgs[msgs.length-1].id)}`);
+      if (t) t.scrollIntoView({ behavior:'smooth', block:'start' });
+    }, 150);
+  } catch (err) {
+    console.error('[Thread] Error:', err.message);
+    if (threadConv) threadConv.style.display = 'none';
+    if (singleView) singleView.style.display = 'flex';
   }
+}
+
+function toggleThreadMsg(msgId) {
+  const body    = document.getElementById(`tbody-${msgId}`);
+  const item    = document.getElementById(`tmsg-${msgId}`);
+  if (!body || !item) return;
+  const preview = item.querySelector('.thread-msg-preview');
+  const chevron = item.querySelector('.thread-msg-chevron');
+  const isOpen  = body.style.display !== 'none';
+  body.style.display = isOpen ? 'none' : 'block';
+  if (preview) preview.style.display = isOpen ? '' : 'none';
+  if (chevron) { chevron.classList.toggle('fa-chevron-down', isOpen); chevron.classList.toggle('fa-chevron-up', !isOpen); }
+  if (!isOpen) loadThreadMsgBody(msgId);
+}
+
+async function loadThreadMsgBody(msgId) {
+  const el = document.getElementById(`tbody-content-${msgId}`);
+  if (!el || el.dataset.loaded) return;
+  el.dataset.loaded = '1';
+  try {
+    const res = await fetch(`${API_BASE}/outlook/message/${msgId}`, { headers: getAuthHeaders() });
+    const msg = await res.json();
+    if (!res.ok) throw new Error(msg.error || 'Failed');
+    const bodyPick = msg.uniqueBody?.content ? msg.uniqueBody : (msg.body?.content ? msg.body : null);
+    const raw   = bodyPick?.content || msg.body?.content || msg.bodyPreview || '';
+    const ctype = String(bodyPick?.contentType || msg.body?.contentType || 'text').toLowerCase();
+    if (ctype === 'html' && raw) {
+      let htmlSrc = await outlookEmbedInlineCids(raw, msg.id, msg.attachments || []);
+      const wrapped = '<!DOCTYPE html><html><head><meta charset="UTF-8"><style>html,body{height:100%;margin:0;padding:12px;box-sizing:border-box;background:#ffffff!important;color:#1a1a1a;font-family:\'Segoe UI\',sans-serif;font-size:13px;line-height:1.65;overflow-x:hidden;}img{max-width:100%;height:auto;}</style></head><body>' + htmlSrc + '</body></html>';
+      const blob = new Blob([wrapped], { type: 'text/html;charset=utf-8' });
+      const blobUrl = URL.createObjectURL(blob);
+      el.innerHTML = `<iframe sandbox="allow-same-origin" src="${blobUrl}" style="width:100%;min-height:200px;border:none;display:block;" onload="this.style.height=(this.contentDocument.body.scrollHeight+24)+'px'"></iframe>`;
+    } else {
+      el.innerHTML = `<pre style="white-space:pre-wrap;font-family:'Outfit',sans-serif;font-size:13px;color:var(--text);margin:12px 0;">${escHtml(raw)}</pre>`;
+    }
+  } catch (err) {
+    el.innerHTML = `<div style="color:var(--red2);padding:12px;font-size:12px;">${err.message}</div>`;
+  }
+}
+
+function openReplyForMsg(msgId, replyAll) {
+  activeMessageId = msgId;
+  openReply(replyAll);
 }
 
 let outlookEmailBlobUrl = null;
@@ -4765,8 +5119,66 @@ async function openEmail(id) {
     const from = msg.from?.emailAddress?.name || msg.from?.emailAddress?.address || '';
     const time = msg.receivedDateTime ? new Date(msg.receivedDateTime).toLocaleString('en-IN') : '';
     if (metaEl) {
-      document.getElementById('email-detail-from').textContent = from;
+      const fromEmail = msg.from?.emailAddress?.address || '';
+      const fromName  = msg.from?.emailAddress?.name || '';
+      const fromEl    = document.getElementById('email-detail-from');
+      if (fromEl) {
+        if (fromEmail && ContactResolver.isUnknownSender(fromEmail)) {
+          const { label, badgeClass } = ContactResolver.getProviderCategory(fromEmail);
+          const safeE = fromEmail.replace(/'/g, "\\'");
+          fromEl.innerHTML =
+            `${escHtml(fromEmail)}` +
+            `<span class="badge ${badgeClass}" style="margin-left:6px;font-size:9px;vertical-align:middle;">${escHtml(label)}</span>` +
+            `<button class="btn btn-xs btn-gold" style="margin-left:6px;font-size:10px;padding:2px 8px;" onclick="openQuickSaveModal('${safeE}')" title="Add to Outlook Contacts"><i class="fa fa-user-plus"></i> Add Contact</button>`;
+        } else {
+          fromEl.textContent = from;
+        }
+      }
       document.getElementById('email-detail-time').textContent = time;
+
+      // Helper: render address list with Add Contact buttons for unknowns
+      function renderAddrList(recipients) {
+        return recipients.map(r => {
+          const addr = r.emailAddress?.address || '';
+          const name = r.emailAddress?.name || '';
+          if (!addr) return '';
+          if (ContactResolver.isUnknownSender(addr)) {
+            const { label, badgeClass } = ContactResolver.getProviderCategory(addr);
+            const safeE = addr.replace(/'/g, "\\'");
+            return `<span style="display:inline-flex;align-items:center;gap:4px;flex-wrap:wrap;margin-right:6px;">` +
+              `<span>${escHtml(addr)}</span>` +
+              `<span class="badge ${badgeClass}" style="font-size:9px;">${escHtml(label)}</span>` +
+              `<button class="btn btn-xs btn-gold" style="font-size:10px;padding:2px 7px;" onclick="openQuickSaveModal('${safeE}')" title="Add to Outlook Contacts"><i class="fa fa-user-plus"></i></button>` +
+              `</span>`;
+          }
+          return `<span style="margin-right:6px;">${escHtml(name && name !== addr ? name + ' <' + addr + '>' : addr)}</span>`;
+        }).filter(Boolean).join('');
+      }
+
+      // To field
+      const toEl2   = document.getElementById('email-detail-to');
+      const toRow   = document.getElementById('email-detail-to-row');
+      if (toEl2 && toRow) {
+        if ((msg.toRecipients || []).length) {
+          toEl2.innerHTML = renderAddrList(msg.toRecipients || []);
+          toRow.style.display = 'flex';
+        } else {
+          toRow.style.display = 'none';
+        }
+      }
+
+      // Cc field
+      const ccEl    = document.getElementById('email-detail-cc');
+      const ccRow   = document.getElementById('email-detail-cc-row');
+      if (ccEl && ccRow) {
+        if ((msg.ccRecipients || []).length) {
+          ccEl.innerHTML = renderAddrList(msg.ccRecipients || []);
+          ccRow.style.display = 'flex';
+        } else {
+          ccRow.style.display = 'none';
+        }
+      }
+
       metaEl.style.display = 'block';
     }
 
@@ -4872,6 +5284,31 @@ function closeComposeEmailModal() {
   closeModal('compose-email-modal');
 }
 
+// ── Compose To — unknown sender hint ─────────────────────────────────────
+(function() {
+  function updateComposeHint() {
+    const toEl   = document.getElementById('compose-to');
+    const hint   = document.getElementById('compose-unknown-hint');
+    if (!toEl || !hint) return;
+    const raw    = toEl.value.trim();
+    // Take the last token (user may be typing multiple addresses)
+    const parts  = raw.split(/[,;]/).map(s => s.trim()).filter(Boolean);
+    const email  = parts[parts.length - 1] || '';
+    const emailRe = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (email && emailRe.test(email) && ContactResolver.isUnknownSender(email)) {
+      const safeEmail = email.replace(/'/g, "\\'");
+      hint.innerHTML = `Not in Outlook Contacts — <a href="#" onclick="openQuickSaveModal('${safeEmail}');return false;" style="color:var(--gold);text-decoration:underline;">Add Contact</a>`;
+      hint.style.display = 'block';
+    } else {
+      hint.style.display = 'none';
+    }
+  }
+  document.addEventListener('DOMContentLoaded', function() {
+    const toEl = document.getElementById('compose-to');
+    if (toEl) toEl.addEventListener('input', updateComposeHint);
+  });
+})();
+
 async function loadComposeTemplates() {
   const sel = document.getElementById('compose-template-select');
   if (!sel) return;
@@ -4920,11 +5357,96 @@ function resetComposeForm() {
   if (s) s.style.display = 'none';
 }
 
+// ── injectReplyUnknownBanner ──────────────────────────────────────────────
+function injectReplyUnknownBanner(senderEmail, isSentMessage) {
+  const modal = document.getElementById('compose-email-modal');
+  if (!modal) return;
+  // Remove any existing banner
+  const existing = modal.querySelector('.reply-unknown-banner');
+  if (existing) existing.remove();
+  if (!senderEmail || !ContactResolver.isUnknownSender(senderEmail)) return;
+
+  const label = isSentMessage ? 'Recipient not in Outlook Contacts' : 'Sender not in Outlook Contacts';
+  const safeEmail = senderEmail.replace(/'/g, "\\'");
+  const banner = document.createElement('div');
+  banner.className = 'reply-unknown-banner';
+  banner.style.cssText = 'background:rgba(245,166,35,0.08);border:1px solid rgba(245,166,35,0.2);border-radius:8px;padding:9px 14px;margin-bottom:10px;display:flex;align-items:center;gap:10px;font-size:12.5px;';
+  banner.innerHTML =
+    `<i class="fa fa-circle-exclamation" style="color:var(--gold);flex-shrink:0;"></i>` +
+    `<span style="flex:1;color:var(--muted2);">${label}</span>` +
+    `<button class="btn btn-xs btn-gold" onclick="openQuickSaveModal('${safeEmail}')">` +
+    `<i class="fa fa-user-plus"></i> Add Contact</button>` +
+    `<button class="btn btn-xs btn-ghost" onclick="this.closest('.reply-unknown-banner').remove()" title="Dismiss">` +
+    `<i class="fa fa-times"></i></button>`;
+  // Insert at top of modal content (after modal-title)
+  const modalTitle = modal.querySelector('.modal-title');
+  if (modalTitle && modalTitle.nextSibling) {
+    modal.querySelector('.modal').insertBefore(banner, modalTitle.nextSibling);
+  } else {
+    modal.querySelector('.modal').prepend(banner);
+  }
+}
+
 function openReply(replyAll) {
   if (!activeMessageId) return;
   document.getElementById('compose-title').textContent = replyAll ? 'Reply All' : 'Reply';
   openModal('compose-email-modal');
-  setTimeout(() => { const b = document.getElementById('compose-body'); if (b) b.focus(); }, 100);
+
+  // Fetch message details to pre-fill To/Cc/Subject
+  fetch(`${API_BASE}/outlook/message/${activeMessageId}`, { headers: getAuthHeaders() })
+    .then(r => r.json())
+    .then(msg => {
+      // Subject: add Re: prefix if not already there
+      const subj = msg.subject || '';
+      const reSubj = subj.toLowerCase().startsWith('re:') ? subj : 'Re: ' + subj;
+      const subjEl = document.getElementById('compose-subject');
+      if (subjEl) subjEl.value = reSubj;
+
+      // To: reply to sender — but if WE sent the original, reply to original recipients
+      const senderAddr = msg.from?.emailAddress?.address || '';
+      const myEmail    = (outlookConnectedEmail || '').toLowerCase();
+      const isSentByMe = senderAddr.toLowerCase() === myEmail;
+      const toEl = document.getElementById('compose-to');
+
+      // Inject unknown-sender banner
+      if (isSentByMe) {
+        // Replying to a sent message — check first recipient
+        const firstRecip = (msg.toRecipients || [])[0]?.emailAddress?.address || '';
+        injectReplyUnknownBanner(firstRecip, true);
+      } else {
+        injectReplyUnknownBanner(senderAddr, false);
+      }
+
+      if (replyAll) {
+        // Reply All: To = original recipients (minus self) + sender (if not self)
+        const toAddrs = (msg.toRecipients || [])
+          .map(r => r.emailAddress?.address || '')
+          .filter(a => a && a.toLowerCase() !== myEmail);
+        const ccAddrs = (msg.ccRecipients || [])
+          .map(r => r.emailAddress?.address || '')
+          .filter(Boolean);
+        // Add sender only if not self
+        const allTo = isSentByMe
+          ? toAddrs
+          : [senderAddr, ...toAddrs].filter((v,i,a) => v && a.indexOf(v)===i);
+        if (toEl) toEl.value = allTo.join('; ');
+        const ccEl = document.getElementById('compose-cc');
+        if (ccEl && ccAddrs.length) ccEl.value = ccAddrs.join('; ');
+      } else {
+        // Reply: if WE sent it → reply to original To recipients; else reply to sender
+        if (isSentByMe) {
+          const toAddrs = (msg.toRecipients || [])
+            .map(r => r.emailAddress?.address || '')
+            .filter(Boolean);
+          if (toEl) toEl.value = toAddrs.join('; ');
+        } else {
+          if (toEl) toEl.value = senderAddr;
+        }
+      }
+    })
+    .catch(() => {});
+
+  setTimeout(() => { const b = document.getElementById('compose-body'); if (b) b.focus(); }, 200);
 }
 
 async function aiDraftReply() {
@@ -4953,31 +5475,63 @@ async function sendEmail() {
   const body    = bodyEl ? bodyEl.innerHTML.trim() : '';
   const statusEl = document.getElementById('compose-status');
 
+  const btn = document.getElementById('send-btn');
+  // Guard against double-send
+  if (btn && btn.disabled) return;
+
   // Split comma/semicolon separated emails
   const parseEmails = (raw) => (raw || '').split(/[,;]+/).map(e => e.trim()).filter(e => e.includes('@'));
   const to = parseEmails(toRaw);
   const cc = parseEmails(ccRaw);
 
-  if (!to.length || !subject || !body || body === '<br>') {
-    notify('Missing fields', 'To, Subject and Message are required', 'var(--red)', 'fas fa-exclamation-circle');
-    return;
+  // Determine if this is a reply or new compose
+  const isReply = !!activeMessageId;
+  const composeTitle = document.getElementById('compose-title')?.textContent || '';
+  const replyAll = composeTitle.toLowerCase().includes('all');
+
+  if (isReply) {
+    // Reply — only body required (To/Subject pre-filled but not used by /reply endpoint)
+    if (!body || body === '<br>') {
+      notify('Missing fields', 'Message body is required', 'var(--red)', 'fas fa-exclamation-circle');
+      return;
+    }
+  } else {
+    // New compose — To, Subject, Body all required
+    if (!to.length || !subject || !body || body === '<br>') {
+      notify('Missing fields', 'To, Subject and Message are required', 'var(--red)', 'fas fa-exclamation-circle');
+      return;
+    }
   }
 
-  const btn = document.getElementById('send-btn');
-  btn.disabled = true;
-  btn.innerHTML = '<span class="spin-loader"></span> Sending…';
+  if (btn) { btn.disabled = true; btn.innerHTML = '<span class="spin-loader"></span> Sending…'; }
 
   try {
-    const res  = await fetch(`${API_BASE}/outlook/send`, {
-      method:  'POST',
-      headers: getAuthHeaders(),
-      body:    JSON.stringify({ to, cc: cc.length ? cc : undefined, subject, body }),
-    });
-    const data = await res.json();
+    let res, data;
+
+    if (isReply) {
+      // Use Graph reply endpoint — keeps same conversation/thread
+      res  = await fetch(`${API_BASE}/outlook/reply/${encodeURIComponent(activeMessageId)}`, {
+        method:  'POST',
+        headers: getAuthHeaders(),
+        body:    JSON.stringify({ body, replyAll }),
+      });
+      data = await res.json();
+    } else {
+      // New email — use send endpoint
+      res  = await fetch(`${API_BASE}/outlook/send`, {
+        method:  'POST',
+        headers: getAuthHeaders(),
+        body:    JSON.stringify({ to, cc: cc.length ? cc : undefined, subject, body }),
+      });
+      data = await res.json();
+    }
+
     if (res.ok) {
-      notify('Email sent!', `To: ${to.join(', ')}`, 'var(--green)', 'fas fa-paper-plane');
+      notify('Email sent!', isReply ? 'Reply sent in same conversation' : `To: ${to.join(', ')}`, 'var(--green)', 'fas fa-paper-plane');
       clearCompose();
       if (statusEl) { statusEl.style.display='block'; statusEl.style.color='var(--green2)'; statusEl.textContent='✓ Email sent successfully via Outlook.'; }
+      // Refresh inbox to show the reply
+      setTimeout(() => loadInbox(), 1500);
     } else {
       if (data.error === 'NOT_AUTHENTICATED') {
         notify('Not connected', 'Please connect Outlook first', 'var(--red)', 'fab fa-microsoft');
@@ -4989,8 +5543,7 @@ async function sendEmail() {
   } catch (err) {
     notify('Error', err.message, 'var(--red)', 'fas fa-exclamation-circle');
   }
-  btn.disabled = false;
-  btn.innerHTML = '<i class="fas fa-paper-plane"></i> Send via Outlook';
+  if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fas fa-paper-plane"></i> Send via Outlook'; }
 }
 
 function clearCompose() {
@@ -5080,9 +5633,19 @@ function initWASocket() {
   });
 
   // PBX real-time events
-  waSocket.on('pbx:connected', () => { pbxOnConnected(); });
-  waSocket.on('pbx:disconnected', () => { pbxOnDisconnected(); });
+  console.log('[PBX] 🔌 Registering Socket.IO listeners: pbx:connected, pbx:disconnected, pbx:call');
+  console.log('[PBX]    Waiting for Matrix PBX (192.168.0.81) to push SMDR data on port 5000...');
+  console.log('[PBX]    If this log appears but no pbx:connected ever fires → firewall or PBX config issue');
+  waSocket.on('pbx:connected', (data) => {
+    console.log('[PBX] 📡 Socket.IO event received: pbx:connected', data);
+    pbxOnConnected(data);
+  });
+  waSocket.on('pbx:disconnected', (data) => {
+    console.warn('[PBX] 📡 Socket.IO event received: pbx:disconnected', data);
+    pbxOnDisconnected(data);
+  });
   waSocket.on('pbx:call', (call) => {
+    console.log('[PBX] 📞 New call record received via Socket.IO:', call);
     notify('New Call: ' + (call.call_type||'') + ' ' + (call.caller||'') + ' → ' + (call.destination||''), call.duration||'', 'var(--gold)', 'fas fa-phone-alt');
     loadCallLogs();
   });
@@ -6517,20 +7080,35 @@ function composeInsertButton() {
   document.getElementById('compose-body')?.focus();
 }
 function composeInsertSignature() {
+  // Save cursor position BEFORE opening modal (modal open loses focus/selection)
+  var ed = document.getElementById('compose-body');
+  var savedRange = null;
+  if (ed) {
+    ed.focus();
+    var sel = window.getSelection();
+    if (sel && sel.rangeCount > 0 && ed.contains(sel.getRangeAt(0).commonAncestorContainer)) {
+      savedRange = sel.getRangeAt(0).cloneRange();
+    } else {
+      // No cursor in editor — place at end
+      savedRange = document.createRange();
+      savedRange.selectNodeContents(ed);
+      savedRange.collapse(false);
+    }
+  }
+
   openModal('et-sig-modal');
+
   // Override the Insert button to target compose editor instead of et-html-editor
   var insertBtn = document.querySelector('#et-sig-modal .btn-gold');
   if (insertBtn) {
     insertBtn.onclick = function() {
       var sig = '<br>' + etBuildSigHTML();
-      var ed = document.getElementById('compose-body');
       if (!ed) return;
+      // Restore saved cursor position
       ed.focus();
-      var sel = window.getSelection();
-      if (!sel.rangeCount || !ed.contains(sel.getRangeAt(0).commonAncestorContainer)) {
-        var range = document.createRange(); range.selectNodeContents(ed); range.collapse(false);
-        sel.removeAllRanges(); sel.addRange(range);
-      }
+      var sel2 = window.getSelection();
+      sel2.removeAllRanges();
+      if (savedRange) sel2.addRange(savedRange);
       document.execCommand('insertHTML', false, sig);
       closeModal('et-sig-modal');
       // Restore original onclick for template editor
@@ -6914,7 +7492,8 @@ function etUseInBroadcast() {
           </select>
           <button type="button" class="btn btn-blue btn-xs" onclick="composeLoadFromGroup()"><i class="fas fa-users"></i> Load</button>
         </div>
-        <input class="inp" id="compose-to" placeholder="a@gmail.com, b@company.com, c@yahoo.com" style="font-size:12.5px;" autocomplete="off" /></div>
+        <input class="inp" id="compose-to" placeholder="a@gmail.com, b@company.com, c@yahoo.com" style="font-size:12.5px;" autocomplete="off" />
+        <div id="compose-unknown-hint" style="font-size:11.5px;color:var(--muted2);margin-top:4px;display:none;"></div></div>
         <div><label class="form-label" style="display:flex;align-items:center;gap:6px;">CC <span style="color:var(--muted);font-weight:400;">(optional)</span>
           <span style="position:relative;display:inline-flex;align-items:center;" onmouseenter="this.querySelector('.tt').style.display='block'" onmouseleave="this.querySelector('.tt').style.display='none'">
             <i class="fas fa-info-circle" style="font-size:11px;color:var(--muted);cursor:default;"></i>
@@ -7609,6 +8188,46 @@ Nagpur, Maharashtra, 440017, India<br>
         <button class="btn btn-ghost" onclick="closeModal('wa-import-modal')">Cancel</button>
         <button class="btn btn-green" onclick="waDoImport()"><i class="fas fa-file-import"></i> Import Chat</button>
       </div>
+    </div>
+  </div>
+</div>
+
+<!-- Quick Save Contact Modal -->
+<div class="modal-overlay" id="qs-modal-overlay">
+  <div class="modal" style="max-width:420px;">
+    <div class="modal-title">
+      <span><i class="fa fa-user-plus" style="color:var(--gold);margin-right:8px;"></i>Add to Outlook Contacts</span>
+      <span class="modal-close" onclick="closeQuickSaveModal()"><i class="fa fa-times"></i></span>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Email Address</label>
+      <input id="qs-email" class="inp" type="email" readonly style="opacity:0.7;cursor:default;">
+    </div>
+    <div class="form-group" id="qs-source-group" style="display:none;">
+      <label class="form-label">Source <span style="color:var(--muted);">(detected)</span></label>
+      <input id="qs-source" class="inp" type="text" readonly style="opacity:0.6;cursor:default;">
+    </div>
+    <div class="form-group">
+      <label class="form-label">Display Name <span style="color:var(--red2);">*</span></label>
+      <input id="qs-displayname" class="inp" type="text" placeholder="e.g. Vibha Sharma" autocomplete="off">
+      <div id="qs-dn-error" style="color:var(--red2);font-size:11.5px;margin-top:4px;display:none;">Display name is required</div>
+    </div>
+    <div style="display:flex;gap:12px;">
+      <div class="form-group" style="flex:1;margin-bottom:0;">
+        <label class="form-label">First Name <span style="color:var(--muted);">(optional)</span></label>
+        <input id="qs-firstname" class="inp" type="text" placeholder="Vibha">
+      </div>
+      <div class="form-group" style="flex:1;margin-bottom:0;">
+        <label class="form-label">Last Name <span style="color:var(--muted);">(optional)</span></label>
+        <input id="qs-lastname" class="inp" type="text" placeholder="Sharma">
+      </div>
+    </div>
+    <div id="qs-api-error" style="color:var(--red2);font-size:12px;margin-top:10px;display:none;"></div>
+    <div style="display:flex;gap:10px;margin-top:18px;justify-content:flex-end;">
+      <button class="btn btn-ghost" onclick="closeQuickSaveModal()">Cancel</button>
+      <button class="btn btn-gold" id="qs-submit-btn" onclick="submitQuickSave()">
+        <i class="fa fa-save"></i> Save Contact
+      </button>
     </div>
   </div>
 </div>

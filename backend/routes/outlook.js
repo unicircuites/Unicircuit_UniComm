@@ -14,6 +14,7 @@
  * GET  /api/outlook/folders         — list mail folders
  * GET  /api/outlook/contacts           — People folder (paginated) + Sent/Inbox-derived addresses & mailStats
  * GET  /api/outlook/directory-activity — mail stats + broadcast count by email (for People directory detail)
+ * POST /api/outlook/contacts           — create a new Outlook contact (displayName + email required)
  * POST /api/outlook/contacts/import    — import all into CRM contacts (skip duplicate email / same Graph id)
  */
 const express  = require('express');
@@ -177,28 +178,51 @@ router.get('/auth', async (req, res) => {
 
 // ── GET /api/outlook/inbox ────────────────────────────────────────────────
 router.get('/inbox', async (req, res) => {
-  const top    = parseInt(req.query.top    || '25');
-  const skip   = parseInt(req.query.skip   || '0');
   const filter = req.query.filter || '';
+  const top    = parseInt(req.query.top  || '50');
+  const skip   = parseInt(req.query.skip || '0');
 
-  let endpoint = `/me/mailFolders/inbox/messages?$top=${top}&$skip=${skip}`
-    + `&$select=id,subject,from,receivedDateTime,isRead,bodyPreview,hasAttachments,importance`
-    + `&$orderby=receivedDateTime desc`;
+  console.log('[Outlook] GET /inbox — top:', top, 'skip:', skip, 'filter:', JSON.stringify(filter));
 
-  if (filter) endpoint += `&$search="${encodeURIComponent(filter)}"`;
+  let endpoint;
+  
+  if (filter) {
+    // Use Graph $search for full mailbox search (server-side, searches all emails)
+    // NOTE: $search cannot be combined with $orderby — results come in relevance order
+    const kql = filter.trim();
+    endpoint = `/me/mailFolders/inbox/messages?$top=${top}`
+      + `&$select=id,conversationId,subject,from,toRecipients,ccRecipients,receivedDateTime,isRead,bodyPreview,hasAttachments,importance`
+      + `&$search="${encodeURIComponent(kql)}"`;
+    console.log('[Outlook] Using Graph $search (server-side, full mailbox):', kql);
+  } else {
+    // Normal inbox fetch with chronological order
+    endpoint = `/me/mailFolders/inbox/messages?$top=${top}&$skip=${skip}`
+      + `&$select=id,conversationId,subject,from,toRecipients,ccRecipients,receivedDateTime,isRead,bodyPreview,hasAttachments,importance`
+      + `&$orderby=receivedDateTime desc`;
+  }
+
+  console.log('[Outlook] Graph endpoint:', endpoint);
 
   try {
+    console.log('[Outlook] Calling graph.graphGet...');
     const data = await graph.graphGet(endpoint, MS_EMAIL);
+    console.log('[Outlook] Graph response received — message count:', (data.value || []).length);
+    
+    const messages = data.value || [];
+    console.log('[Outlook] Returning', messages.length, 'messages');
+    
     return res.json({
-      messages: data.value || [],
+      messages,
       nextLink: data['@odata.nextLink'] || null,
-      total:    data['@odata.count']    || null,
+      total:    messages.length,
     });
   } catch (err) {
+    console.error('[Outlook] ❌ Inbox fetch error:', err.message);
+    console.error('[Outlook] Error stack:', err.stack);
     if (err.message === 'NOT_AUTHENTICATED') {
       return res.status(401).json({ error: 'NOT_AUTHENTICATED', message: 'Outlook not connected. Please authenticate.' });
     }
-    return res.status(500).json({ error: err.message });
+    return res.status(500).json({ error: err.message, stack: err.stack });
   }
 });
 
@@ -211,12 +235,24 @@ router.get('/thread', async (req, res) => {
   const escaped = cid.replace(/'/g, "''");
   const filter = encodeURIComponent(`conversationId eq '${escaped}'`);
   try {
+    // Use /me/messages which searches ALL folders (inbox + sent + drafts)
+    // NOTE: $filter and $orderby cannot be combined in Graph API — sort client-side
     const data = await graph.graphGet(
-      `/me/messages?$filter=${filter}&$top=50&$orderby=receivedDateTime asc`
-      + `&$select=id,subject,from,receivedDateTime,bodyPreview,isRead`,
+      `/me/messages?$filter=${filter}&$top=50`
+      + `&$select=id,subject,from,toRecipients,ccRecipients,receivedDateTime,bodyPreview,isRead,sentDateTime`,
       MS_EMAIL
     );
-    return res.json({ messages: data.value || [] });
+    // Sort by date ascending (oldest first) client-side
+    // Deduplicate by message ID (same message can appear in inbox + sent folders)
+    const seen = new Set();
+    const messages = (data.value || [])
+      .filter(m => { if (seen.has(m.id)) return false; seen.add(m.id); return true; })
+      .sort((a, b) => {
+        const ta = new Date(a.receivedDateTime || a.sentDateTime || 0).getTime();
+        const tb = new Date(b.receivedDateTime || b.sentDateTime || 0).getTime();
+        return ta - tb;
+      });
+    return res.json({ messages });
   } catch (err) {
     if (err.message === 'NOT_AUTHENTICATED') return res.status(401).json({ error: 'NOT_AUTHENTICATED' });
     return res.status(500).json({ error: err.message });
@@ -351,7 +387,6 @@ router.post('/reply/:id', async (req, res) => {
   try {
     await graph.graphPost(endpoint, {
       message: { body: { contentType: 'HTML', content: body } },
-      comment: body,
     }, MS_EMAIL);
     return res.json({ success: true });
   } catch (err) {
@@ -542,6 +577,69 @@ router.get('/contacts', async (req, res) => {
   } catch (err) {
     if (err.message === 'NOT_AUTHENTICATED') return res.status(401).json({ error: 'NOT_AUTHENTICATED' });
     return res.status(500).json({ error: err.message });
+  }
+});
+
+// ── POST /api/outlook/contacts ────────────────────────────────────────────
+router.post('/contacts', async (req, res) => {
+  const { displayName, email, givenName, surname, mobilePhone, companyName } = req.body;
+
+  if (!displayName || !email) {
+    return res.status(400).json({ error: 'displayName and email are required' });
+  }
+
+  const body = {
+    displayName,
+    emailAddresses: [{ address: email, name: displayName }],
+    ...(givenName   ? { givenName }   : {}),
+    ...(surname     ? { surname }     : {}),
+    ...(mobilePhone ? { mobilePhone } : {}),
+    ...(companyName ? { companyName } : {}),
+  };
+
+  try {
+    const created = await graph.graphPost('/me/contacts', body, MS_EMAIL);
+    return res.status(201).json({
+      id:             created.id,
+      displayName:    created.displayName,
+      emailAddresses: created.emailAddresses,
+    });
+  } catch (err) {
+    if (err.message === 'NOT_AUTHENTICATED') {
+      return res.status(401).json({ error: 'NOT_AUTHENTICATED' });
+    }
+    return res.status(502).json({ error: err.message });
+  }
+});
+
+// ── PATCH /api/outlook/contacts/:id ──────────────────────────────────────
+router.patch('/contacts/:id', async (req, res) => {
+  const { id } = req.params;
+  const { displayName, givenName, surname, mobilePhone, companyName } = req.body;
+
+  if (!displayName) {
+    return res.status(400).json({ error: 'displayName is required' });
+  }
+  if (!id || id.startsWith('mail:')) {
+    return res.status(400).json({ error: 'Cannot update a mail-derived contact. Use POST to create a new one.' });
+  }
+
+  const body = {
+    displayName,
+    ...(givenName   ? { givenName }   : {}),
+    ...(surname     ? { surname }     : {}),
+    ...(mobilePhone ? { mobilePhone } : {}),
+    ...(companyName ? { companyName } : {}),
+  };
+
+  try {
+    const updated = await graph.graphPatch(`/me/contacts/${encodeURIComponent(id)}`, body, MS_EMAIL);
+    return res.status(200).json({ success: true, displayName: updated.displayName || displayName });
+  } catch (err) {
+    if (err.message === 'NOT_AUTHENTICATED') {
+      return res.status(401).json({ error: 'NOT_AUTHENTICATED' });
+    }
+    return res.status(502).json({ error: err.message });
   }
 });
 
