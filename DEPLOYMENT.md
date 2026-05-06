@@ -166,6 +166,54 @@ net stop postgresql-x64-16; net start postgresql-x64-16
 
 ---
 
+## PBX SMDR Setup
+
+### Architecture
+```
+Matrix PBX (192.168.0.81)
+    ↓ TCP SMDR push to whichever server is set in PBX
+Dev Machine (192.168.0.149:5001)  OR  Tower (192.168.0.205:5001)
+    ↓
+Tower PostgreSQL DB (192.168.0.205:5432)  ← both use same DB
+```
+
+### PBX Settings (SMDR Online page)
+Advanced Settings → SMDR → SMDR Online  
+All three sections (Outgoing / Incoming / Internal):
+
+| Field | Dev Testing | Tower Production |
+|---|---|---|
+| Destination IP | `192.168.0.149` | `192.168.0.205` |
+| Port | `5001` | `5001` |
+| Mode | Ethernet | Ethernet |
+
+### Dev Machine .env
+```
+DB_HOST=192.168.0.205
+DB_PORT=5432
+DB_NAME=unicircuit_db
+DB_USER=postgres
+DB_PASSWORD=Unicircuit@2026
+SMDR_PORT=5001
+PBX_HOST=192.168.0.81
+```
+
+### Tower .env
+```
+DB_HOST=localhost
+SMDR_PORT=5001
+PBX_HOST=192.168.0.81
+```
+
+### Tower PostgreSQL Remote Access (run ONCE on tower)
+```powershell
+Add-Content "C:\Program Files\PostgreSQL\16\data\pg_hba.conf" "`nhost    all             all             192.168.0.0/24          scram-sha-256"
+(Get-Content "C:\Program Files\PostgreSQL\16\data\postgresql.conf") -replace "#listen_addresses = 'localhost'", "listen_addresses = '*'" | Set-Content "C:\Program Files\PostgreSQL\16\data\postgresql.conf"
+net stop postgresql-x64-16; net start postgresql-x64-16
+```
+
+---
+
 ## Outlook / Microsoft Graph — Azure Setup
 
 ### Application Permissions (user login ke bina kaam kare)
@@ -186,10 +234,20 @@ net stop postgresql-x64-16; net start postgresql-x64-16
 | Tenant ID | `407ec761-e4ad-4d41-9ea4-6ae7fe391047` |
 | Client ID | `d6224f70-6728-4f68-93aa-75a91f4adaa8` |
 | Redirect URI (Web) | `http://localhost:8088/auth/callback` |
-| Redirect URI (Web) | `http://192.168.0.205:8088/auth/callback` |
+| Redirect URI (Web) | `https://192.168.0.205:8088/auth/callback` |
 | Mailbox | `sales@unicircuites.com` |
 
-> **Important:** Client Secret expire hone pe Azure → Certificates & secrets → New client secret banao aur `.env` mein `MS_CLIENT_SECRET` update karo.
+> **Azure Redirect URI Rules (important):**
+> - `http://` — sirf `localhost` ke saath allowed hai
+> - `http://` — kisi bhi IP/domain ke saath **NOT allowed**
+> - `https://` — kisi bhi IP/domain ke saath allowed hai
+>
+> **Matlab:** Tower server pe Outlook connect karne ke liye **HTTPS** mandatory hai.
+> SSL certificate setup karo (self-signed bhi chalega) aur `.env` mein update karo:
+> ```
+> MS_REDIRECT_URI=https://192.168.0.205:8088/auth/callback
+> APP_PUBLIC_URL=https://192.168.0.205:8088
+> ```
 
 ---
 
