@@ -3420,6 +3420,15 @@ async function groupsShowDetail(id) {
             <i class="fas fa-paper-plane"></i> Use in Broadcast
           </button>
         </div>
+        <!-- Manual email add -->
+        <div style="margin-top:12px;border-top:1px solid var(--border);padding-top:12px;">
+          <div style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:6px;">Add Email Manually</div>
+          <div style="display:flex;gap:6px;">
+            <input class="inp" id="grp-manual-email-${id}" placeholder="name@company.com or Name &lt;email&gt;" style="font-size:12.5px;flex:1;" onkeydown="if(event.key==='Enter')groupsAddManualEmail(${id})">
+            <button class="btn btn-blue btn-sm" onclick="groupsAddManualEmail(${id})"><i class="fas fa-plus"></i> Add</button>
+          </div>
+          <div style="font-size:10.5px;color:var(--muted);margin-top:4px;">Paste multiple: separate with comma or newline</div>
+        </div>
       </div>`;
   } catch(e) { det.innerHTML = '<div style="color:var(--red2);padding:16px;">' + e.message + '</div>'; }
 }
@@ -3432,6 +3441,29 @@ function groupsFilterAdd(q, groupId) {
     var text = row.textContent.toLowerCase();
     row.style.display = (!q || text.includes(q.toLowerCase())) ? '' : 'none';
   });
+}
+
+async function groupsAddManualEmail(groupId) {
+  var inp = document.getElementById('grp-manual-email-' + groupId);
+  if (!inp || !inp.value.trim()) return;
+  var raw = inp.value.trim();
+  // Split by comma or newline
+  var emails = raw.split(/[,\n]+/).map(function(e){ return e.trim(); }).filter(Boolean);
+  if (!emails.length) return;
+  try {
+    var res = await fetch(API_BASE + '/groups/' + groupId + '/members', {
+      method: 'POST', headers: getAuthHeaders(),
+      body: JSON.stringify({ emails: emails })
+    });
+    var data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Failed');
+    inp.value = '';
+    notify('Added ' + data.added + ' email(s)', 'Group now has ' + data.member_count + ' contacts', 'var(--green)', 'fas fa-check');
+    // Refresh detail view
+    await groupsShowDetail(groupId);
+    await groupsLoadList();
+    bcLoadGroupsDropdown();
+  } catch(e) { notify('Error', e.message, 'var(--red)', 'fas fa-exclamation-circle'); }
 }
 
 async function groupsAddMember(groupId, contactId, btn) {

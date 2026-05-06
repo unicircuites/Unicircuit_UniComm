@@ -118,19 +118,56 @@ router.delete('/:id', async (req, res) => {
 
 // ── POST /api/groups/:id/members — add contacts ───────────────────────────
 router.post('/:id/members', async (req, res) => {
-  const { contact_ids } = req.body;
-  if (!Array.isArray(contact_ids) || !contact_ids.length)
-    return res.status(400).json({ error: 'contact_ids array required' });
+  const { contact_ids, emails } = req.body;
+
   try {
-    const vals = contact_ids.map((cid, i) => `($1, $${i+2})`).join(',');
+    let allContactIds = Array.isArray(contact_ids) ? [...contact_ids] : [];
+
+    // Handle raw email addresses — find or create minimal contact records
+    if (Array.isArray(emails) && emails.length) {
+      for (const raw of emails) {
+        const emailMatch = raw.match(/([a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,})/);
+        if (!emailMatch) continue;
+        const email = emailMatch[1].toLowerCase().trim();
+        // Extract name if "Name <email>" format
+        const nameMatch = raw.match(/^(.+?)\s*</);
+        const fname = nameMatch ? nameMatch[1].trim().split(' ')[0] : email.split('@')[0];
+        const lname = nameMatch ? (nameMatch[1].trim().split(' ').slice(1).join(' ') || '-') : '-';
+
+        // Find existing contact by email
+        let existing = await pool.query(
+          `SELECT id FROM contacts WHERE LOWER(TRIM(email)) = $1`, [email]
+        );
+        let contactId;
+        if (existing.rowCount) {
+          contactId = existing.rows[0].id;
+        } else {
+          // Create minimal contact
+          const initials = (fname[0] || 'E').toUpperCase();
+          const palettes = [['#1d4ed8','rgba(29,78,216,0.15)'],['#d97706','rgba(217,119,6,0.15)'],['#7c3aed','rgba(124,58,237,0.15)'],['#059669','rgba(5,150,105,0.15)']];
+          const [avatar_color, avatar_bg] = palettes[Math.floor(Math.random() * palettes.length)];
+          const r = await pool.query(
+            `INSERT INTO contacts (fname,lname,company,email,segment,score,avatar_color,avatar_bg,initials,last_contact)
+             VALUES ($1,$2,'—',$3,'Prospect',50,$4,$5,$6,'—') RETURNING id`,
+            [fname, lname, email, avatar_color, avatar_bg, initials]
+          );
+          contactId = r.rows[0].id;
+        }
+        allContactIds.push(contactId);
+      }
+    }
+
+    if (!allContactIds.length) return res.status(400).json({ error: 'No valid contacts or emails provided' });
+
+    const vals = allContactIds.map((cid, i) => `($1, $${i+2})`).join(',');
     await pool.query(
       `INSERT INTO recipient_group_members (group_id, contact_id) VALUES ${vals} ON CONFLICT DO NOTHING`,
-      [req.params.id, ...contact_ids]
+      [req.params.id, ...allContactIds]
     );
     const count = await pool.query(
       `SELECT COUNT(*)::int AS n FROM recipient_group_members WHERE group_id=$1`, [req.params.id]
     );
-    res.json({ success: true, member_count: count.rows[0].n });
+    res.json({ success: true, member_count: count.rows[0].n, added: allContactIds.length });
   } catch(e) { res.status(500).json({ error: e.message }); }
 });
 
