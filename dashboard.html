@@ -405,6 +405,8 @@ select.inp option{background:#1a2035;color:var(--text);}
 .card.email-detail-stack .email-plain-scroll{flex:1;min-height:0;overflow-y:auto;-webkit-overflow-scrolling:touch;}
 #compose-body:empty:before{content:attr(placeholder);color:#aaa;pointer-events:none;}
 #compose-body ol, #compose-body ul{padding-left:24px;margin:4px 0;}
+#bc-html:empty:before{content:attr(placeholder);color:#aaa;pointer-events:none;}
+#bc-html ol, #bc-html ul{padding-left:24px;margin:4px 0;}
 
 /* PROGRESS */
 .prog-bar{height:4px;background:rgba(255,255,255,0.06);border-radius:2px;}
@@ -1430,7 +1432,7 @@ select.inp option{background:#1a2035;color:var(--text);}
           <div style="display:flex;gap:6px;align-items:center;">
             <span id="smtp-status" class="badge b-gray" style="font-size:10px;">SMTP: Unchecked</span>
             <button class="btn btn-ghost btn-xs" onclick="verifySmtp()"><i class="fas fa-plug"></i> Test SMTP</button>
-            <button class="btn btn-blue btn-sm" onclick="openModal('broadcast-modal')"><i class="fas fa-plus"></i> New Broadcast</button>
+            <button class="btn btn-blue btn-sm" onclick="openModal('broadcast-modal');bcLoadTemplates();"><i class="fas fa-plus"></i> New Broadcast</button>
             <button class="btn btn-ghost btn-sm" onclick="openEmailTemplates()"><i class="fas fa-file-alt"></i> Templates</button>
           </div>
         </div>
@@ -1447,10 +1449,19 @@ select.inp option{background:#1a2035;color:var(--text);}
 
     <!-- Broadcast Modal -->
     <div class="modal-overlay" id="broadcast-modal">
-      <div class="modal" style="max-width:700px;">
+      <div class="modal" style="max-width:760px;">
         <div class="modal-title">
           <span><i class="fas fa-paper-plane" style="color:var(--blue2);margin-right:8px;"></i>Create Email Broadcast</span>
           <span class="modal-close" onclick="closeModal('broadcast-modal')"><i class="fas fa-times"></i></span>
+        </div>
+
+        <!-- Template picker -->
+        <div style="display:flex;gap:8px;align-items:center;padding:8px 10px;background:rgba(59,130,246,0.06);border:1px solid rgba(59,130,246,0.15);border-radius:8px;margin-bottom:10px;">
+          <i class="fas fa-file-alt" style="color:var(--blue2);font-size:12px;flex-shrink:0;"></i>
+          <select class="inp" id="bc-template-select" style="font-size:12px;padding:5px 8px;flex:1;background:transparent;border:none;outline:none;">
+            <option value="">— Use a saved template —</option>
+          </select>
+          <button type="button" class="btn btn-blue btn-xs" onclick="bcApplyTemplate()"><i class="fas fa-check"></i> Apply</button>
         </div>
 
         <div class="form-group">
@@ -1459,11 +1470,82 @@ select.inp option{background:#1a2035;color:var(--text);}
         </div>
 
         <div class="form-group">
-          <label class="form-label" style="display:flex;justify-content:space-between;">
-            <span>Email Body (HTML supported) *</span>
-            <button class="btn btn-ghost btn-xs" onclick="bcGenerateAI()"><i class="fas fa-robot"></i> AI Generate</button>
+          <label class="form-label" style="display:flex;justify-content:space-between;align-items:center;">
+            <span>Email Body *</span>
+            <button class="btn btn-ghost btn-xs" onmousedown="bcToolbarMousedown(event)" onclick="bcGenerateAI()"><i class="fas fa-robot"></i> AI Generate</button>
           </label>
-          <textarea class="inp" id="bc-html" rows="8" placeholder="Write your email here... HTML is supported. Use {{name}} for personalization."></textarea>
+          <!-- Rich editor toolbar -->
+          <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;padding:6px 10px;background:var(--card2);border:1px solid var(--border2);border-radius:8px 8px 0 0;border-bottom:none;">
+            <select id="bc-font-select" onmousedown="bcSaveSelection()" onchange="bcSetFont(this.value);this.value=''" style="font-size:11px;padding:3px 4px;background:var(--card2);border:1px solid var(--border);border-radius:5px;color:var(--text);cursor:pointer;max-width:120px;" title="Font family — select text first">
+              <option value="">Font</option>
+              <optgroup label="── Word Defaults ──">
+                <option value="Calibri">Calibri</option><option value="Calibri Light">Calibri Light</option>
+                <option value="Cambria">Cambria</option><option value="Aptos">Aptos</option>
+                <option value="Segoe UI">Segoe UI</option><option value="Times New Roman">Times New Roman</option>
+                <option value="Arial">Arial</option><option value="Verdana">Verdana</option>
+                <option value="Tahoma">Tahoma</option><option value="Georgia">Georgia</option>
+                <option value="Garamond">Garamond</option><option value="Helvetica">Helvetica</option>
+              </optgroup>
+              <optgroup label="── Monospace ──">
+                <option value="Courier New">Courier New</option><option value="Consolas">Consolas</option>
+              </optgroup>
+            </select>
+            <select id="bc-size-select" onmousedown="bcSaveSelection()" onchange="bcSetSize(this.value);this.value=''" style="font-size:11px;padding:3px 4px;background:var(--card2);border:1px solid var(--border);border-radius:5px;color:var(--text);cursor:pointer;" title="Font size — select text first">
+              <option value="">Size</option>
+              <option value="10px">10</option><option value="11px">11</option><option value="12px">12</option>
+              <option value="13px">13</option><option value="14px">14</option><option value="16px">16</option>
+              <option value="18px">18</option><option value="20px">20</option><option value="24px">24</option>
+              <option value="28px">28</option><option value="32px">32</option><option value="36px">36</option>
+              <option value="48px">48</option><option value="72px">72</option>
+            </select>
+            <button type="button" id="bc-btn-bold"      class="btn btn-ghost btn-xs" onmousedown="bcToolbarMousedown(event)" onclick="bcExecCmd('bold');bcUpdateActiveButtons()"         title="Bold"><b>B</b></button>
+            <button type="button" id="bc-btn-italic"    class="btn btn-ghost btn-xs" onmousedown="bcToolbarMousedown(event)" onclick="bcExecCmd('italic');bcUpdateActiveButtons()"       title="Italic"><i>I</i></button>
+            <button type="button" id="bc-btn-underline" class="btn btn-ghost btn-xs" onmousedown="bcToolbarMousedown(event)" onclick="bcExecCmd('underline');bcUpdateActiveButtons()"    title="Underline"><u>U</u></button>
+            <button type="button" id="bc-btn-strike"    class="btn btn-ghost btn-xs" onmousedown="bcToolbarMousedown(event)" onclick="bcExecCmd('strikeThrough');bcUpdateActiveButtons()" title="Strike"><s>S</s></button>
+            <!-- Text color -->
+            <div style="position:relative;display:inline-block;">
+              <button type="button" id="bc-fgcolor-btn" onmousedown="bcToolbarMousedown(event)" onclick="bcToggleColorPicker('fg')" title="Text color" style="display:flex;align-items:center;gap:3px;padding:3px 7px;font-size:11px;background:var(--card2);border:1px solid var(--border);border-radius:5px;cursor:pointer;color:var(--text);">
+                <span style="font-size:10px;font-weight:700;">A</span>
+                <span id="bc-fgcolor-swatch" style="display:inline-block;width:14px;height:4px;border-radius:2px;background:#000000;"></span>
+              </button>
+              <div id="bc-fgcolor-popup" style="display:none;position:absolute;top:34px;left:0;z-index:999;background:var(--card);border:1px solid var(--border2);border-radius:8px;padding:10px;box-shadow:0 4px 20px rgba(0,0,0,0.4);min-width:160px;">
+                <div style="font-size:10px;color:var(--muted);margin-bottom:6px;font-weight:600;">TEXT COLOR</div>
+                <div style="display:flex;flex-wrap:wrap;gap:5px;margin-bottom:8px;">
+                  <span onclick="bcPickColor('fg','#000000')" style="width:20px;height:20px;border-radius:4px;background:#000000;cursor:pointer;border:2px solid transparent;"></span>
+                  <span onclick="bcPickColor('fg','#ffffff')" style="width:20px;height:20px;border-radius:4px;background:#ffffff;cursor:pointer;border:1px solid #ccc;"></span>
+                  <span onclick="bcPickColor('fg','#e8820a')" style="width:20px;height:20px;border-radius:4px;background:#e8820a;cursor:pointer;"></span>
+                  <span onclick="bcPickColor('fg','#dc2626')" style="width:20px;height:20px;border-radius:4px;background:#dc2626;cursor:pointer;"></span>
+                  <span onclick="bcPickColor('fg','#16a34a')" style="width:20px;height:20px;border-radius:4px;background:#16a34a;cursor:pointer;"></span>
+                  <span onclick="bcPickColor('fg','#2563eb')" style="width:20px;height:20px;border-radius:4px;background:#2563eb;cursor:pointer;"></span>
+                  <span onclick="bcPickColor('fg','#7c3aed')" style="width:20px;height:20px;border-radius:4px;background:#7c3aed;cursor:pointer;"></span>
+                  <span onclick="bcPickColor('fg','#374151')" style="width:20px;height:20px;border-radius:4px;background:#374151;cursor:pointer;"></span>
+                </div>
+                <div style="display:flex;gap:6px;align-items:center;">
+                  <input type="color" id="bc-fgcolor-custom" value="#000000" style="width:32px;height:28px;padding:1px;border:1px solid var(--border);border-radius:4px;cursor:pointer;flex-shrink:0;">
+                  <span style="font-size:10px;color:var(--muted);">Custom</span>
+                  <button type="button" class="btn btn-gold btn-xs" style="margin-left:auto;" onclick="bcPickColor('fg',document.getElementById('bc-fgcolor-custom').value)">Apply</button>
+                </div>
+              </div>
+            </div>
+            <div style="width:1px;height:18px;background:var(--border);margin:0 2px;"></div>
+            <button type="button" class="btn btn-ghost btn-xs" onmousedown="bcToolbarMousedown(event)" onclick="bcExecCmd('justifyLeft')"   title="Left"><i class="fas fa-align-left"></i></button>
+            <button type="button" class="btn btn-ghost btn-xs" onmousedown="bcToolbarMousedown(event)" onclick="bcExecCmd('justifyCenter')" title="Center"><i class="fas fa-align-center"></i></button>
+            <button type="button" class="btn btn-ghost btn-xs" onmousedown="bcToolbarMousedown(event)" onclick="bcExecCmd('justifyRight')"  title="Right"><i class="fas fa-align-right"></i></button>
+            <button type="button" class="btn btn-ghost btn-xs" onmousedown="bcToolbarMousedown(event)" onclick="bcExecCmd('insertOrderedList')"   title="Numbered list"><i class="fas fa-list-ol"></i></button>
+            <button type="button" class="btn btn-ghost btn-xs" onmousedown="bcToolbarMousedown(event)" onclick="bcExecCmd('insertUnorderedList')" title="Bullet list"><i class="fas fa-list-ul"></i></button>
+            <div style="width:1px;height:18px;background:var(--border);margin:0 2px;"></div>
+            <button type="button" class="btn btn-ghost btn-xs" onmousedown="bcToolbarMousedown(event)" onclick="bcInsertHR()"       title="HR"><i class="fas fa-minus"></i> HR</button>
+            <button type="button" class="btn btn-ghost btn-xs" onmousedown="bcToolbarMousedown(event)" onclick="bcInsertMarquee()" title="Scrolling text"><i class="fas fa-arrows-alt-h"></i> Marquee</button>
+            <button type="button" class="btn btn-ghost btn-xs" onmousedown="bcToolbarMousedown(event)" onclick="bcInsertTable()"   title="Table"><i class="fas fa-table"></i> Table</button>
+            <button type="button" class="btn btn-ghost btn-xs" onmousedown="bcToolbarMousedown(event)" onclick="bcInsertButton()"  title="CTA Button"><i class="fas fa-hand-pointer"></i> Button</button>
+          </div>
+          <div id="bc-html"
+               contenteditable="true"
+               style="min-height:180px;max-height:320px;overflow-y:auto;background:#fff;color:#222;font-family:Calibri,Arial,sans-serif;font-size:14px;line-height:1.6;padding:10px 12px 10px 28px;border:1px solid var(--border2);border-radius:0 0 8px 8px;outline:none;"
+               placeholder="Write your email here… Use {{name}} for personalization."
+               onmouseup="bcSaveSelection();bcUpdateActiveButtons()"
+               onkeyup="bcSaveSelection();bcUpdateActiveButtons()">
+          </div>
         </div>
 
         <div class="form-group">
@@ -3111,7 +3193,8 @@ async function bcLoadFromContacts() {
 async function bcSendTest() {
   var to = (document.getElementById('bc-test-email')||{}).value.trim();
   var subject = (document.getElementById('bc-subject')||{}).value.trim();
-  var html = (document.getElementById('bc-html')||{}).value.trim();
+  var bcEl = document.getElementById('bc-html');
+  var html = bcEl ? bcEl.innerHTML.trim() : '';
   var statusEl = document.getElementById('bc-status');
   if (!to || !subject || !html) { if (statusEl) statusEl.innerHTML = '<span style="color:var(--red2);">Fill subject, body and test email first</span>'; return; }
   if (statusEl) statusEl.innerHTML = '<span class="spin-loader"></span> Sending test...';
@@ -3124,7 +3207,8 @@ async function bcSendTest() {
 
 async function bcSendBroadcast() {
   var subject = (document.getElementById('bc-subject')||{}).value.trim();
-  var htmlBody = (document.getElementById('bc-html')||{}).value.trim();
+  var bcEl = document.getElementById('bc-html');
+  var htmlBody = bcEl ? bcEl.innerHTML.trim() : '';
   var raw = (document.getElementById('bc-recipients')||{}).value.trim();
   var delayVal  = parseInt((document.getElementById('bc-delay-val')||{}).value  || 3);
   var delayUnit = parseInt((document.getElementById('bc-delay-unit')||{}).value || 60000);
@@ -3251,11 +3335,130 @@ async function bcGenerateAI() {
   var subject = (document.getElementById('bc-subject')||{}).value || '';
   var el = document.getElementById('bc-html');
   if (!el) return;
-  el.value = 'Generating...';
+  el.innerHTML = 'Generating...';
   try {
     var text = await callClaude('Write a professional HTML email for Unicircuit Engineering Services LLP' + (subject ? ' about: ' + subject : '') + '. Use {{name}} for personalization. Under 200 words. Return only HTML body content.');
-    el.value = text.trim();
-  } catch(err) { el.value = ''; }
+    el.innerHTML = text.trim();
+  } catch(err) { el.innerHTML = ''; }
+}
+
+// ── BROADCAST RICH EDITOR HELPERS ─────────────────────────────────────────
+var _bcSavedSel = null;
+function bcToolbarMousedown(event) { bcSaveSelection(); event.preventDefault(); }
+function bcSaveSelection() {
+  var sel = window.getSelection();
+  if (sel.rangeCount) _bcSavedSel = sel.getRangeAt(0).cloneRange();
+}
+function _bcRestoreFocus() {
+  var ed = document.getElementById('bc-html');
+  if (!ed) return false;
+  ed.focus();
+  if (_bcSavedSel) {
+    try { var sel = window.getSelection(); sel.removeAllRanges(); sel.addRange(_bcSavedSel); } catch(_) {}
+  } else {
+    var sel2 = window.getSelection();
+    var r = document.createRange(); r.selectNodeContents(ed); r.collapse(false);
+    sel2.removeAllRanges(); sel2.addRange(r);
+  }
+  return true;
+}
+function bcExecCmd(cmd) { if (!_bcRestoreFocus()) return; document.execCommand(cmd, false, null); }
+function bcSetFont(font) {
+  if (!font || !_bcRestoreFocus()) return;
+  try { document.execCommand('styleWithCSS', false, true); } catch(_) {}
+  document.execCommand('fontName', false, font);
+}
+function bcSetSize(size) {
+  if (!size || !_bcRestoreFocus()) return;
+  var sel = window.getSelection();
+  if (sel.rangeCount && !sel.isCollapsed) {
+    try { var r = sel.getRangeAt(0); var sp = document.createElement('span'); sp.style.fontSize = size; r.surroundContents(sp); } catch(_) {}
+  } else {
+    document.execCommand('insertHTML', false, '<span style="font-size:' + size + '">&#8203;</span>');
+  }
+}
+function bcToggleColorPicker(type) {
+  var pop = document.getElementById('bc-fgcolor-popup');
+  if (!pop) return;
+  pop.style.display = pop.style.display === 'none' ? 'block' : 'none';
+  setTimeout(function() {
+    document.addEventListener('click', function close(e) {
+      if (!e.target.closest('#bc-fgcolor-popup') && !e.target.closest('#bc-fgcolor-btn')) {
+        if (pop) pop.style.display = 'none';
+        document.removeEventListener('click', close);
+      }
+    });
+  }, 10);
+}
+function bcPickColor(type, color) {
+  var swatch = document.getElementById('bc-fgcolor-swatch');
+  if (swatch) swatch.style.background = color;
+  var pop = document.getElementById('bc-fgcolor-popup');
+  if (pop) pop.style.display = 'none';
+  var ed = document.getElementById('bc-html');
+  if (!ed) return;
+  ed.focus();
+  if (_bcSavedSel) { var sel = window.getSelection(); sel.removeAllRanges(); sel.addRange(_bcSavedSel); }
+  document.execCommand('foreColor', false, color);
+}
+function bcUpdateActiveButtons() {
+  var map = { 'bc-btn-bold': 'bold', 'bc-btn-italic': 'italic', 'bc-btn-underline': 'underline', 'bc-btn-strike': 'strikeThrough' };
+  Object.keys(map).forEach(function(id) {
+    var el = document.getElementById(id); if (!el) return;
+    var on = document.queryCommandState(map[id]);
+    el.style.background = on ? 'rgba(245,166,35,0.18)' : '';
+    el.style.color = on ? 'var(--gold)' : '';
+    el.style.borderColor = on ? 'rgba(245,166,35,0.4)' : '';
+  });
+}
+function bcInsertHR() { document.execCommand('insertHTML', false, '<hr style="border:none;border-top:1px solid #ccc;margin:10px 0;"><br>'); }
+function bcInsertMarquee() { _marqueeTarget = 'bc'; marqueeOpenModal('bc'); }
+function bcInsertTable() {
+  var rows = parseInt(prompt('Rows:', '3') || '3');
+  var cols = parseInt(prompt('Columns:', '3') || '3');
+  var html = '<table style="border-collapse:collapse;width:100%;margin:10px 0;">';
+  for (var r = 0; r < rows; r++) { html += '<tr>'; for (var c = 0; c < cols; c++) { html += '<td style="border:1px solid #ccc;padding:8px;">' + (r===0?'<b>Header '+(c+1)+'</b>':'Cell') + '</td>'; } html += '</tr>'; }
+  html += '</table><br>';
+  if (!_bcRestoreFocus()) return;
+  document.execCommand('insertHTML', false, html);
+}
+function bcInsertButton() {
+  var label = prompt('Button text:', 'Click Here') || 'Click Here';
+  var url   = prompt('Button URL:', 'https://') || '#';
+  if (!_bcRestoreFocus()) return;
+  document.execCommand('insertHTML', false, '<a href="' + url + '" style="display:inline-block;padding:10px 24px;background:#f5a623;color:#fff;font-weight:700;border-radius:6px;text-decoration:none;font-size:14px;margin:8px 0;">' + label + '</a><br>');
+}
+
+async function bcLoadTemplates() {
+  var sel = document.getElementById('bc-template-select');
+  if (!sel) return;
+  sel.innerHTML = '<option value="">— Use a saved template —</option>';
+  try {
+    var res = await fetch(API_BASE + '/templates', { headers: getAuthHeaders() });
+    if (!res.ok) return;
+    var templates = await res.json();
+    templates.forEach(function(t) {
+      var opt = document.createElement('option');
+      opt.value = t.id;
+      opt.textContent = t.name + (t.subject ? ' — ' + t.subject : '');
+      sel.appendChild(opt);
+    });
+  } catch(_) {}
+}
+
+function bcApplyTemplate() {
+  var sel = document.getElementById('bc-template-select');
+  if (!sel || !sel.value) return;
+  fetch(API_BASE + '/templates/' + sel.value, { headers: getAuthHeaders() })
+    .then(function(r) { return r.ok ? r.json() : null; })
+    .then(function(t) {
+      if (!t) return;
+      var subj = document.getElementById('bc-subject');
+      var body = document.getElementById('bc-html');
+      if (subj && t.subject) subj.value = t.subject;
+      if (body && t.html_body) body.innerHTML = t.html_body;
+      notify('Template applied', t.name, 'var(--blue)', 'fas fa-file-alt');
+    }).catch(function() {});
 }
 
 // MARKETING MODULE
@@ -5725,6 +5928,17 @@ function marqueeConfirmInsert() {
     }
     document.execCommand('insertHTML', false, html);
     ed.focus();
+  } else if (_marqueeTarget === 'bc') {
+    var ed2 = document.getElementById('bc-html');
+    if (!ed2) return;
+    ed2.focus();
+    var sel2 = window.getSelection();
+    if (!sel2.rangeCount || !ed2.contains(sel2.getRangeAt(0).commonAncestorContainer)) {
+      var r2 = document.createRange(); r2.selectNodeContents(ed2); r2.collapse(false);
+      sel2.removeAllRanges(); sel2.addRange(r2);
+    }
+    document.execCommand('insertHTML', false, html);
+    ed2.focus();
   } else {
     etInsertHTML(html);
   }
@@ -6219,7 +6433,7 @@ function etUseInBroadcast() {
     var subEl = document.getElementById('bc-subject');
     var bodyEl = document.getElementById('bc-html');
     if (subEl && subject) subEl.value = subject;
-    if (bodyEl) bodyEl.value = html_body;
+    if (bodyEl) bodyEl.innerHTML = html_body;
     notify('Template loaded into broadcast', '', 'var(--gold)', 'fas fa-check');
   }, 300);
 }
