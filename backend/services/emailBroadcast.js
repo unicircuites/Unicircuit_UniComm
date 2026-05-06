@@ -42,7 +42,7 @@ async function sendOne(to, subject, html, text) {
 // recipients: [{email, name}] or ['email1', 'email2']
 // onProgress: callback(sent, failed, current) for real-time updates
 async function sendBroadcast(recipients, subject, html, onProgress, delayMs = 2000) {
-  const results = { sent: 0, failed: 0, errors: [] };
+  const results = { sent: 0, failed: 0, errors: [], deliveries: [] };
 
   for (let i = 0; i < recipients.length; i++) {
     const r = recipients[i];
@@ -52,6 +52,7 @@ async function sendBroadcast(recipients, subject, html, onProgress, delayMs = 20
     if (!email || !email.includes('@')) {
       results.failed++;
       results.errors.push({ email, error: 'Invalid email' });
+      results.deliveries.push({ email, name, status: 'failed', error: 'Invalid email', sent_at: new Date().toISOString() });
       if (onProgress) onProgress(results.sent, results.failed, email);
       continue;
     }
@@ -59,13 +60,16 @@ async function sendBroadcast(recipients, subject, html, onProgress, delayMs = 20
     // Personalise HTML — replace {{name}} placeholder
     const personalHtml = html.replace(/\{\{name\}\}/gi, name || email.split('@')[0]);
 
+    const sentAt = new Date().toISOString();
     try {
       await sendOne(email, subject, personalHtml);
       results.sent++;
-      console.log(`[Broadcast] Sent ${i+1}/${recipients.length} → ${email}`);
+      results.deliveries.push({ email, name, status: 'sent', sent_at: sentAt });
+      console.log(`[Broadcast] Sent ${i+1}/${recipients.length} → ${email} @ ${sentAt}`);
     } catch (err) {
       results.failed++;
       results.errors.push({ email, error: err.message });
+      results.deliveries.push({ email, name, status: 'failed', error: err.message, sent_at: sentAt });
       console.error(`[Broadcast] Failed → ${email}:`, err.message);
     }
 

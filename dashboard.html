@@ -3170,17 +3170,38 @@ async function openBroadcastPreview(id) {
     var fromEl = document.getElementById('bp-from');
     if (fromEl) fromEl.textContent = 'noreply@unicircuites.live';
 
-    // Recipients list
+    // Recipients list — show with delivery timestamp if available
     var rcpEl = document.getElementById('bp-recipients-list');
     if (rcpEl) {
       var rcps = b.recipients || [];
       if (typeof rcps === 'string') { try { rcps = JSON.parse(rcps); } catch(_) { rcps = []; } }
+
+      // Build delivery map from deliveries array
+      var deliveries = b.deliveries || [];
+      if (typeof deliveries === 'string') { try { deliveries = JSON.parse(deliveries); } catch(_) { deliveries = []; } }
+      var deliveryMap = {};
+      deliveries.forEach(function(d) { if (d.email) deliveryMap[d.email] = d; });
+
       if (rcps.length) {
         rcpEl.innerHTML = rcps.map(function(r) {
           var email = typeof r === 'string' ? r : (r.email || '');
           var name  = typeof r === 'object' ? (r.name || '') : '';
-          return '<div style="padding:4px 0;border-bottom:1px solid rgba(255,255,255,0.05);font-size:12px;color:var(--muted2);">' +
-            (name ? '<b style="color:var(--text);">' + name + '</b> &lt;' + email + '&gt;' : email) +
+          var d     = deliveryMap[email];
+          var statusBadge = '';
+          var timeStr = '';
+          if (d) {
+            statusBadge = d.status === 'sent'
+              ? '<span style="font-size:9px;color:var(--green2);margin-left:6px;">✓ sent</span>'
+              : '<span style="font-size:9px;color:var(--red2);margin-left:6px;">✗ failed</span>';
+            timeStr = d.sent_at
+              ? '<span style="font-size:10px;color:var(--muted);margin-left:6px;">' +
+                new Date(d.sent_at).toLocaleString('en-IN',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'}) +
+                '</span>'
+              : '';
+          }
+          return '<div style="padding:5px 0;border-bottom:1px solid rgba(255,255,255,0.05);font-size:12px;color:var(--muted2);display:flex;align-items:center;flex-wrap:wrap;gap:2px;">' +
+            (name ? '<b style="color:var(--text);">' + name + '</b>&nbsp;&lt;' + email + '&gt;' : email) +
+            statusBadge + timeStr +
           '</div>';
         }).join('');
       } else {

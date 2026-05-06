@@ -23,11 +23,13 @@ async function ensureTable() {
       failed       INT DEFAULT 0,
       status       VARCHAR(20) DEFAULT 'draft',
       errors       JSONB DEFAULT '[]',
+      deliveries   JSONB DEFAULT '[]',
       created_at   TIMESTAMPTZ DEFAULT NOW(),
       sent_at      TIMESTAMPTZ
     )
   `);
   await pool.query(`ALTER TABLE email_broadcasts ADD COLUMN IF NOT EXISTS from_email VARCHAR(200)`);
+  await pool.query(`ALTER TABLE email_broadcasts ADD COLUMN IF NOT EXISTS deliveries JSONB DEFAULT '[]'`);
 }
 ensureTable().catch(e => console.error('[Broadcast] Table init error:', e.message));
 
@@ -101,8 +103,8 @@ router.post('/send', async (req, res) => {
   eb.sendBroadcast(recipients, subject, html, null, delay)
     .then(async (results) => {
       await pool.query(
-        `UPDATE email_broadcasts SET sent=$1, failed=$2, status='sent', sent_at=NOW(), errors=$3 WHERE id=$4`,
-        [results.sent, results.failed, JSON.stringify(results.errors), broadcastId]
+        `UPDATE email_broadcasts SET sent=$1, failed=$2, status='sent', sent_at=NOW(), errors=$3, deliveries=$4 WHERE id=$5`,
+        [results.sent, results.failed, JSON.stringify(results.errors), JSON.stringify(results.deliveries), broadcastId]
       );
       console.log(`[Broadcast #${broadcastId}] Done — sent:${results.sent} failed:${results.failed}`);
     })
