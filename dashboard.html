@@ -3476,11 +3476,10 @@ async function groupsAddMember(groupId, contactId, btn) {
       method: 'POST', headers: getAuthHeaders(),
       body: JSON.stringify({ contact_ids: [contactId] })
     });
-    if (!res.ok) throw new Error('Failed');
-    var row = document.getElementById('grp-add-c-' + groupId + '-' + contactId);
-    if (row) row.remove();
-    btn.innerHTML = '<i class="fas fa-check"></i>';
-    btn.disabled = true;
+    var data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Failed');
+    // Refresh the whole detail panel so members list updates
+    await groupsShowDetail(groupId);
     await groupsLoadList();
     bcLoadGroupsDropdown();
   } catch(e) { notify('Error', e.message, 'var(--red)', 'fas fa-exclamation-circle'); }
@@ -3492,8 +3491,7 @@ async function groupsRemoveMember(groupId, contactId, btn) {
       method: 'DELETE', headers: getAuthHeaders(),
       body: JSON.stringify({ contact_ids: [contactId] })
     });
-    var row = btn.closest('[style*="display:flex"]');
-    if (row) row.remove();
+    await groupsShowDetail(groupId);
     await groupsLoadList();
     bcLoadGroupsDropdown();
   } catch(e) { notify('Error', e.message, 'var(--red)', 'fas fa-exclamation-circle'); }
