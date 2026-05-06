@@ -15,10 +15,10 @@ const crtFile = path.join(certsDir, 'server.crt');
 // Try node-forge — most reliable, pure JS
 function tryForge() {
   let forge;
-  try { forge = require('node-forge'); } catch(_) {
+  try { forge = require(path.join(__dirname, '../node_modules/node-forge')); } catch(_) {
     console.log('[SSL] Installing node-forge...');
     execSync('npm install node-forge', { cwd: path.join(__dirname, '..'), stdio: 'inherit' });
-    forge = require('node-forge');
+    forge = require(path.join(__dirname, '../node_modules/node-forge'));
   }
   console.log('[SSL] Generating with node-forge...');
   const keys = forge.pki.rsa.generateKeyPair(2048);
