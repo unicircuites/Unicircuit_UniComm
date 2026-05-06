@@ -1527,6 +1527,30 @@ select.inp option{background:#1a2035;color:var(--text);}
                 </div>
               </div>
             </div>
+            <!-- Highlight color -->
+            <div style="position:relative;display:inline-block;">
+              <button type="button" id="bc-bgcolor-btn" onmousedown="bcToolbarMousedown(event)" onclick="bcToggleColorPicker('bg')" title="Highlight color" style="display:flex;align-items:center;gap:3px;padding:3px 7px;font-size:11px;background:var(--card2);border:1px solid var(--border);border-radius:5px;cursor:pointer;color:var(--text);">
+                <span style="font-size:10px;">BG</span>
+                <span id="bc-bgcolor-swatch" style="display:inline-block;width:14px;height:4px;border-radius:2px;background:#ffff00;"></span>
+              </button>
+              <div id="bc-bgcolor-popup" style="display:none;position:absolute;top:34px;left:0;z-index:999;background:var(--card);border:1px solid var(--border2);border-radius:8px;padding:10px;box-shadow:0 4px 20px rgba(0,0,0,0.4);min-width:160px;">
+                <div style="font-size:10px;color:var(--muted);margin-bottom:6px;font-weight:600;">HIGHLIGHT COLOR</div>
+                <div style="display:flex;flex-wrap:wrap;gap:5px;margin-bottom:8px;">
+                  <span onclick="bcPickColor('bg','transparent')" style="width:20px;height:20px;border-radius:4px;background:transparent;cursor:pointer;border:1px solid #ccc;font-size:9px;display:flex;align-items:center;justify-content:center;color:#999;">✕</span>
+                  <span onclick="bcPickColor('bg','#fef08a')" style="width:20px;height:20px;border-radius:4px;background:#fef08a;cursor:pointer;"></span>
+                  <span onclick="bcPickColor('bg','#bbf7d0')" style="width:20px;height:20px;border-radius:4px;background:#bbf7d0;cursor:pointer;"></span>
+                  <span onclick="bcPickColor('bg','#bfdbfe')" style="width:20px;height:20px;border-radius:4px;background:#bfdbfe;cursor:pointer;"></span>
+                  <span onclick="bcPickColor('bg','#fecaca')" style="width:20px;height:20px;border-radius:4px;background:#fecaca;cursor:pointer;"></span>
+                  <span onclick="bcPickColor('bg','#e9d5ff')" style="width:20px;height:20px;border-radius:4px;background:#e9d5ff;cursor:pointer;"></span>
+                  <span onclick="bcPickColor('bg','#fed7aa')" style="width:20px;height:20px;border-radius:4px;background:#fed7aa;cursor:pointer;"></span>
+                </div>
+                <div style="display:flex;gap:6px;align-items:center;">
+                  <input type="color" id="bc-bgcolor-custom" value="#ffff00" style="width:32px;height:28px;padding:1px;border:1px solid var(--border);border-radius:4px;cursor:pointer;flex-shrink:0;">
+                  <span style="font-size:10px;color:var(--muted);">Custom</span>
+                  <button type="button" class="btn btn-gold btn-xs" style="margin-left:auto;" onclick="bcPickColor('bg',document.getElementById('bc-bgcolor-custom').value)">Apply</button>
+                </div>
+              </div>
+            </div>
             <div style="width:1px;height:18px;background:var(--border);margin:0 2px;"></div>
             <button type="button" class="btn btn-ghost btn-xs" onmousedown="bcToolbarMousedown(event)" onclick="bcExecCmd('justifyLeft')"   title="Left"><i class="fas fa-align-left"></i></button>
             <button type="button" class="btn btn-ghost btn-xs" onmousedown="bcToolbarMousedown(event)" onclick="bcExecCmd('justifyCenter')" title="Center"><i class="fas fa-align-center"></i></button>
@@ -1538,6 +1562,24 @@ select.inp option{background:#1a2035;color:var(--text);}
             <button type="button" class="btn btn-ghost btn-xs" onmousedown="bcToolbarMousedown(event)" onclick="bcInsertMarquee()" title="Scrolling text"><i class="fas fa-arrows-alt-h"></i> Marquee</button>
             <button type="button" class="btn btn-ghost btn-xs" onmousedown="bcToolbarMousedown(event)" onclick="bcInsertTable()"   title="Table"><i class="fas fa-table"></i> Table</button>
             <button type="button" class="btn btn-ghost btn-xs" onmousedown="bcToolbarMousedown(event)" onclick="bcInsertButton()"  title="CTA Button"><i class="fas fa-hand-pointer"></i> Button</button>
+            <div style="position:relative;display:inline-block;">
+              <button type="button" class="btn btn-ghost btn-xs" onmousedown="bcToolbarMousedown(event)" onclick="bcToggleEmoji(this)" title="Emoji"><i class="fas fa-smile"></i> Emoji</button>
+              <div id="bc-emoji-picker" class="emoji-picker-popup" style="display:none;top:32px;left:0;">
+                <div class="emoji-tabs" id="bc-emoji-tabs">
+                  <button class="emoji-tab active" onclick="bcShowEmojiCat('smileys',this)">😀</button>
+                  <button class="emoji-tab" onclick="bcShowEmojiCat('people',this)">👋</button>
+                  <button class="emoji-tab" onclick="bcShowEmojiCat('nature',this)">🌿</button>
+                  <button class="emoji-tab" onclick="bcShowEmojiCat('food',this)">🍕</button>
+                  <button class="emoji-tab" onclick="bcShowEmojiCat('travel',this)">✈️</button>
+                  <button class="emoji-tab" onclick="bcShowEmojiCat('objects',this)">💡</button>
+                  <button class="emoji-tab" onclick="bcShowEmojiCat('symbols',this)">❤️</button>
+                  <button class="emoji-tab" onclick="bcShowEmojiCat('business',this)">💼</button>
+                </div>
+                <div class="emoji-search"><input id="bc-emoji-search" placeholder="Search emoji..." oninput="bcSearchEmoji(this.value)" /></div>
+                <div class="emoji-grid" id="bc-emoji-grid"></div>
+              </div>
+            </div>
+            <button type="button" class="btn btn-ghost btn-xs" onmousedown="bcToolbarMousedown(event)" onclick="bcInsertSignature()" title="Signature"><i class="fas fa-signature"></i> Signature</button>
           </div>
           <div id="bc-html"
                contenteditable="true"
@@ -3378,28 +3420,96 @@ function bcSetSize(size) {
   }
 }
 function bcToggleColorPicker(type) {
-  var pop = document.getElementById('bc-fgcolor-popup');
-  if (!pop) return;
-  pop.style.display = pop.style.display === 'none' ? 'block' : 'none';
+  var fgPop = document.getElementById('bc-fgcolor-popup');
+  var bgPop = document.getElementById('bc-bgcolor-popup');
+  if (type === 'fg') {
+    var isOpen = fgPop && fgPop.style.display !== 'none';
+    if (fgPop) fgPop.style.display = isOpen ? 'none' : 'block';
+    if (bgPop) bgPop.style.display = 'none';
+  } else {
+    var isOpen2 = bgPop && bgPop.style.display !== 'none';
+    if (bgPop) bgPop.style.display = isOpen2 ? 'none' : 'block';
+    if (fgPop) fgPop.style.display = 'none';
+  }
   setTimeout(function() {
     document.addEventListener('click', function close(e) {
-      if (!e.target.closest('#bc-fgcolor-popup') && !e.target.closest('#bc-fgcolor-btn')) {
-        if (pop) pop.style.display = 'none';
+      if (!e.target.closest('#bc-fgcolor-popup') && !e.target.closest('#bc-fgcolor-btn') &&
+          !e.target.closest('#bc-bgcolor-popup') && !e.target.closest('#bc-bgcolor-btn')) {
+        if (fgPop) fgPop.style.display = 'none';
+        if (bgPop) bgPop.style.display = 'none';
         document.removeEventListener('click', close);
       }
     });
   }, 10);
 }
 function bcPickColor(type, color) {
-  var swatch = document.getElementById('bc-fgcolor-swatch');
-  if (swatch) swatch.style.background = color;
-  var pop = document.getElementById('bc-fgcolor-popup');
+  var swatchId = type === 'fg' ? 'bc-fgcolor-swatch' : 'bc-bgcolor-swatch';
+  var popId    = type === 'fg' ? 'bc-fgcolor-popup'  : 'bc-bgcolor-popup';
+  var swatch = document.getElementById(swatchId);
+  if (swatch) swatch.style.background = color === 'transparent' ? 'linear-gradient(135deg,#fff 45%,#f00 45%,#f00 55%,#fff 55%)' : color;
+  var pop = document.getElementById(popId);
   if (pop) pop.style.display = 'none';
   var ed = document.getElementById('bc-html');
   if (!ed) return;
   ed.focus();
   if (_bcSavedSel) { var sel = window.getSelection(); sel.removeAllRanges(); sel.addRange(_bcSavedSel); }
-  document.execCommand('foreColor', false, color);
+  document.execCommand(type === 'fg' ? 'foreColor' : 'hiliteColor', false, color === 'transparent' ? 'inherit' : color);
+}
+
+// Emoji
+var _bcEmojiCat = 'smileys';
+function bcToggleEmoji(btn) {
+  var picker = document.getElementById('bc-emoji-picker');
+  if (!picker) return;
+  if (picker.style.display === 'none') {
+    picker.style.display = 'flex';
+    bcShowEmojiCat('smileys', document.querySelector('#bc-emoji-tabs .emoji-tab'));
+    var s = document.getElementById('bc-emoji-search'); if (s) s.value = '';
+    bcSaveSelection();
+  } else { picker.style.display = 'none'; }
+}
+function bcShowEmojiCat(cat, tabEl) {
+  _bcEmojiCat = cat;
+  document.querySelectorAll('#bc-emoji-tabs .emoji-tab').forEach(function(t){ t.classList.remove('active'); });
+  if (tabEl) tabEl.classList.add('active');
+  var grid = document.getElementById('bc-emoji-grid');
+  if (!grid) return;
+  var emojis = (etEmojiData && etEmojiData[cat]) ? etEmojiData[cat] : [];
+  grid.innerHTML = emojis.map(function(e){ return '<span onclick="bcInsertEmoji(\'' + e + '\')">' + e + '</span>'; }).join('');
+}
+function bcSearchEmoji(q) {
+  if (!q) { bcShowEmojiCat(_bcEmojiCat, null); return; }
+  var all = []; if (etEmojiData) Object.values(etEmojiData).forEach(function(a){ all = all.concat(a); });
+  var grid = document.getElementById('bc-emoji-grid');
+  if (grid) grid.innerHTML = all.filter(function(e){ return e.includes(q); }).map(function(e){ return '<span onclick="bcInsertEmoji(\'' + e + '\')">' + e + '</span>'; }).join('');
+}
+function bcInsertEmoji(emoji) {
+  var ed = document.getElementById('bc-html'); if (!ed) return;
+  ed.focus();
+  if (_bcSavedSel) { var sel = window.getSelection(); sel.removeAllRanges(); sel.addRange(_bcSavedSel); }
+  document.execCommand('insertText', false, emoji);
+  document.getElementById('bc-emoji-picker').style.display = 'none';
+}
+
+// Signature — reuse et-sig-modal
+function bcInsertSignature() {
+  openModal('et-sig-modal');
+  var insertBtn = document.querySelector('#et-sig-modal .btn-gold');
+  if (insertBtn) {
+    insertBtn.onclick = function() {
+      var sig = '<br>' + etBuildSigHTML();
+      var ed = document.getElementById('bc-html'); if (!ed) return;
+      ed.focus();
+      var sel = window.getSelection();
+      if (!sel.rangeCount || !ed.contains(sel.getRangeAt(0).commonAncestorContainer)) {
+        var r = document.createRange(); r.selectNodeContents(ed); r.collapse(false); sel.removeAllRanges(); sel.addRange(r);
+      }
+      document.execCommand('insertHTML', false, sig);
+      closeModal('et-sig-modal');
+      insertBtn.onclick = function() { etApplySignature(); };
+    };
+  }
+  setTimeout(etRefreshSigPreview, 80);
 }
 function bcUpdateActiveButtons() {
   var map = { 'bc-btn-bold': 'bold', 'bc-btn-italic': 'italic', 'bc-btn-underline': 'underline', 'bc-btn-strike': 'strikeThrough' };
