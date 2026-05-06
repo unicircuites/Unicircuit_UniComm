@@ -165,7 +165,8 @@ app.use('/api/eb',        apiLimiter,  require('./routes/engagebay'));
 app.use('/api/marketing', apiLimiter,  require('./routes/marketing'));
 app.use('/api/broadcast', apiLimiter,  require('./routes/broadcast'));
 app.use('/api/templates', apiLimiter,  require('./routes/emailTemplates'));
-app.use('/api/marquee',  require('./routes/marquee')); // public — no auth, no rate limit
+app.use('/api/marquee',  require('./routes/marquee'));
+app.use('/api/groups',   apiLimiter,  require('./routes/recipientGroups'));
 
 // OAuth2 callback — must be at root level to match redirect URI
 app.use('/auth',          require('./routes/outlook'));

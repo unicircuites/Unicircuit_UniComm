@@ -1432,7 +1432,7 @@ select.inp option{background:#1a2035;color:var(--text);}
           <div style="display:flex;gap:6px;align-items:center;">
             <span id="smtp-status" class="badge b-gray" style="font-size:10px;">SMTP: Unchecked</span>
             <button class="btn btn-ghost btn-xs" onclick="verifySmtp()"><i class="fas fa-plug"></i> Test SMTP</button>
-            <button class="btn btn-blue btn-sm" onclick="openModal('broadcast-modal');bcLoadTemplates();"><i class="fas fa-plus"></i> New Broadcast</button>
+            <button class="btn btn-blue btn-sm" onclick="openModal('broadcast-modal');bcLoadTemplates();bcLoadGroupsDropdown();"><i class="fas fa-plus"></i> New Broadcast</button>
             <button class="btn btn-ghost btn-sm" onclick="openEmailTemplates()"><i class="fas fa-file-alt"></i> Templates</button>
           </div>
         </div>
@@ -1595,6 +1595,14 @@ select.inp option{background:#1a2035;color:var(--text);}
             <span>Recipients *</span>
             <span style="font-size:10.5px;color:var(--muted);">One per line: email or Name &lt;email&gt;</span>
           </label>
+          <!-- Group picker -->
+          <div style="display:flex;gap:6px;align-items:center;margin-bottom:8px;flex-wrap:wrap;">
+            <select id="bc-group-select" class="inp" style="font-size:12px;padding:5px 8px;flex:1;min-width:160px;">
+              <option value="">— Load from a group —</option>
+            </select>
+            <button type="button" class="btn btn-blue btn-xs" onclick="bcLoadFromGroup()"><i class="fas fa-users"></i> Load Group</button>
+            <button type="button" class="btn btn-ghost btn-xs" onclick="openGroupsManager()"><i class="fas fa-cog"></i> Manage Groups</button>
+          </div>
           <textarea class="inp" id="bc-recipients" rows="5" placeholder="john@company.com&#10;Jane Doe &lt;jane@company.com&gt;&#10;sales@client.in"></textarea>
           <div style="margin-top:5px;display:flex;gap:8px;align-items:center;">
             <span id="bc-recipient-count" style="font-size:11px;color:var(--muted);">0 recipients</span>
@@ -3230,6 +3238,260 @@ async function bcLoadFromContacts() {
     if (el) { el.value = lines.join('\n'); bcUpdateCount(); }
     notify('Loaded ' + lines.length + ' contacts', '', 'var(--cyan)', 'fas fa-address-book');
   } catch(err) { notify('Error', err.message, 'var(--red)', 'fas fa-exclamation-circle'); }
+}
+
+// ── RECIPIENT GROUPS ──────────────────────────────────────────────────────
+async function bcLoadGroupsDropdown() {
+  var sel = document.getElementById('bc-group-select');
+  if (!sel) return;
+  sel.innerHTML = '<option value="">— Load from a group —</option>';
+  try {
+    var res = await fetch(API_BASE + '/groups', { headers: getAuthHeaders() });
+    if (!res.ok) return;
+    var groups = await res.json();
+    groups.forEach(function(g) {
+      var opt = document.createElement('option');
+      opt.value = g.id;
+      opt.textContent = g.name + ' (' + g.member_count + ' contacts)';
+      sel.appendChild(opt);
+    });
+  } catch(_) {}
+}
+
+async function bcLoadFromGroup() {
+  var sel = document.getElementById('bc-group-select');
+  if (!sel || !sel.value) { notify('Select a group first', '', 'var(--red)', 'fas fa-exclamation-circle'); return; }
+  try {
+    var res = await fetch(API_BASE + '/groups/' + sel.value, { headers: getAuthHeaders() });
+    var data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Failed');
+    var members = data.members || [];
+    var lines = members.filter(function(c){ return c.email; }).map(function(c){
+      var name = ((c.fname||'') + ' ' + (c.lname||'')).trim() || c.company || '';
+      return name ? name + ' <' + c.email + '>' : c.email;
+    });
+    var el = document.getElementById('bc-recipients');
+    if (el) { el.value = lines.join('\n'); bcUpdateCount(); }
+    notify('Loaded group: ' + data.name, lines.length + ' recipients', 'var(--green)', 'fas fa-users');
+  } catch(err) { notify('Error', err.message, 'var(--red)', 'fas fa-exclamation-circle'); }
+}
+
+async function openGroupsManager() {
+  openModal('groups-modal');
+  await groupsLoadList();
+}
+
+var _groupsAllContacts = [];
+async function groupsLoadList() {
+  var el = document.getElementById('groups-list');
+  if (!el) return;
+  try {
+    var res = await fetch(API_BASE + '/groups', { headers: getAuthHeaders() });
+    var groups = await res.json();
+    if (!groups.length) {
+      el.innerHTML = '<div style="text-align:center;padding:20px;color:var(--muted);font-size:12px;">No groups yet.<br>Click + New Group to create one.</div>';
+      return;
+    }
+    el.innerHTML = groups.map(function(g) {
+      return '<div class="template-card" style="cursor:pointer;position:relative;" onclick="groupsShowDetail(' + g.id + ')">' +
+        '<div style="font-size:13px;font-weight:600;color:var(--text);">' + escHtml(g.name) + '</div>' +
+        '<div style="font-size:11px;color:var(--muted);margin-top:2px;">' + g.member_count + ' contacts</div>' +
+        (g.description ? '<div style="font-size:10.5px;color:var(--muted);margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + escHtml(g.description) + '</div>' : '') +
+        '<button onclick="event.stopPropagation();groupsDelete(' + g.id + ',\'' + escHtml(g.name).replace(/'/g,"\\'") + '\')" style="position:absolute;top:6px;right:6px;background:none;border:none;cursor:pointer;color:var(--muted);font-size:11px;padding:2px 5px;" onmouseover="this.style.color=\'var(--red2)\'" onmouseout="this.style.color=\'var(--muted)\'"><i class="fas fa-trash"></i></button>' +
+      '</div>';
+    }).join('');
+  } catch(e) { el.innerHTML = '<div style="color:var(--red2);padding:10px;font-size:12px;">' + e.message + '</div>'; }
+}
+
+function groupsShowCreate() {
+  var det = document.getElementById('groups-detail');
+  if (!det) return;
+  det.innerHTML = `
+    <div>
+      <div style="font-size:13px;font-weight:700;color:var(--text);margin-bottom:12px;">Create New Group</div>
+      <div class="form-group">
+        <label class="form-label">Group Name *</label>
+        <input class="inp" id="grp-name" placeholder="e.g. Electrical Contractors Mumbai" style="font-size:13px;">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Description <span style="color:var(--muted);font-weight:400;">(optional)</span></label>
+        <input class="inp" id="grp-desc" placeholder="e.g. All contractors in Mumbai region" style="font-size:13px;">
+      </div>
+      <div style="display:flex;gap:8px;margin-top:4px;">
+        <button class="btn btn-gold" onclick="groupsCreate()"><i class="fas fa-save"></i> Create Group</button>
+        <button class="btn btn-ghost" onclick="groupsShowEmpty()">Cancel</button>
+      </div>
+      <div id="grp-status" style="margin-top:8px;font-size:12px;"></div>
+    </div>`;
+  setTimeout(function(){ var n = document.getElementById('grp-name'); if(n) n.focus(); }, 100);
+}
+
+async function groupsCreate() {
+  var name = (document.getElementById('grp-name')||{}).value.trim();
+  var desc = (document.getElementById('grp-desc')||{}).value.trim();
+  var statusEl = document.getElementById('grp-status');
+  if (!name) { if(statusEl) statusEl.innerHTML = '<span style="color:var(--red2);">Group name required</span>'; return; }
+  if(statusEl) statusEl.innerHTML = '<span class="spin-loader"></span>';
+  try {
+    var res = await fetch(API_BASE + '/groups', { method:'POST', headers: getAuthHeaders(), body: JSON.stringify({ name, description: desc }) });
+    var data = await res.json();
+    if (!res.ok) throw new Error(data.error);
+    notify('Group created', name, 'var(--green)', 'fas fa-users');
+    await groupsLoadList();
+    groupsShowDetail(data.id);
+    bcLoadGroupsDropdown();
+  } catch(e) { if(statusEl) statusEl.innerHTML = '<span style="color:var(--red2);">' + e.message + '</span>'; }
+}
+
+async function groupsShowDetail(id) {
+  var det = document.getElementById('groups-detail');
+  if (!det) return;
+  det.innerHTML = '<div style="text-align:center;padding:20px;"><div class="spin-loader" style="margin:0 auto;"></div></div>';
+  try {
+    var res = await fetch(API_BASE + '/groups/' + id, { headers: getAuthHeaders() });
+    var g = await res.json();
+    if (!res.ok) throw new Error(g.error);
+
+    // Load all contacts for adding
+    if (!_groupsAllContacts.length) {
+      var cr = await fetch(API_BASE + '/contacts?limit=1000', { headers: getAuthHeaders() });
+      var cd = await cr.json();
+      _groupsAllContacts = (cd.contacts || cd || []).filter(function(c){ return c.email; });
+    }
+
+    var memberIds = new Set((g.members||[]).map(function(m){ return m.id; }));
+    var nonMembers = _groupsAllContacts.filter(function(c){ return !memberIds.has(c.id); });
+
+    det.innerHTML = `
+      <div>
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;">
+          <div style="flex:1;">
+            <div style="font-size:15px;font-weight:700;color:var(--text);">${escHtml(g.name)}</div>
+            ${g.description ? '<div style="font-size:12px;color:var(--muted);margin-top:2px;">' + escHtml(g.description) + '</div>' : ''}
+          </div>
+          <span class="badge b-blue">${(g.members||[]).length} contacts</span>
+        </div>
+
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+          <!-- Current members -->
+          <div>
+            <div style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:6px;">Members</div>
+            <div style="max-height:280px;overflow-y:auto;border:1px solid var(--border);border-radius:8px;">
+              ${(g.members||[]).length === 0
+                ? '<div style="padding:16px;text-align:center;color:var(--muted);font-size:12px;">No members yet</div>'
+                : (g.members||[]).map(function(m) {
+                    var name = ((m.fname||'') + ' ' + (m.lname||'')).trim() || m.company || m.email;
+                    return '<div style="display:flex;align-items:center;gap:8px;padding:7px 10px;border-bottom:1px solid var(--border);">' +
+                      '<div style="width:28px;height:28px;border-radius:50%;background:' + (m.avatar_bg||'rgba(59,130,246,0.15)') + ';color:' + (m.avatar_color||'#3b82f6') + ';display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;flex-shrink:0;">' + escHtml(m.initials||'?') + '</div>' +
+                      '<div style="flex:1;min-width:0;"><div style="font-size:12px;font-weight:600;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + escHtml(name) + '</div>' +
+                      '<div style="font-size:10.5px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + escHtml(m.email||'') + '</div></div>' +
+                      '<button onclick="groupsRemoveMember(' + id + ',' + m.id + ',this)" style="background:none;border:none;cursor:pointer;color:var(--muted);font-size:11px;padding:2px 4px;" onmouseover="this.style.color=\'var(--red2)\'" onmouseout="this.style.color=\'var(--muted)\'"><i class="fas fa-times"></i></button>' +
+                    '</div>';
+                  }).join('')
+              }
+            </div>
+          </div>
+
+          <!-- Add contacts -->
+          <div>
+            <div style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:6px;">Add Contacts</div>
+            <div class="search-box" style="padding:5px 8px;margin-bottom:6px;">
+              <i class="fas fa-search" style="font-size:10px;"></i>
+              <input placeholder="Search contacts..." style="font-size:12px;" oninput="groupsFilterAdd(this.value, ${id})">
+            </div>
+            <div id="grp-add-list-${id}" style="max-height:240px;overflow-y:auto;border:1px solid var(--border);border-radius:8px;">
+              ${nonMembers.length === 0
+                ? '<div style="padding:16px;text-align:center;color:var(--muted);font-size:12px;">All contacts already in group</div>'
+                : nonMembers.map(function(c) {
+                    var name = ((c.fname||'') + ' ' + (c.lname||'')).trim() || c.company || c.email;
+                    return '<div style="display:flex;align-items:center;gap:8px;padding:7px 10px;border-bottom:1px solid var(--border);" id="grp-add-c-' + id + '-' + c.id + '">' +
+                      '<div style="flex:1;min-width:0;"><div style="font-size:12px;font-weight:600;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + escHtml(name) + '</div>' +
+                      '<div style="font-size:10.5px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + escHtml(c.email||'') + '</div></div>' +
+                      '<button onclick="groupsAddMember(' + id + ',' + c.id + ',this)" class="btn btn-green btn-xs" style="flex-shrink:0;"><i class="fas fa-plus"></i></button>' +
+                    '</div>';
+                  }).join('')
+              }
+            </div>
+          </div>
+        </div>
+
+        <div style="margin-top:12px;display:flex;gap:8px;">
+          <button class="btn btn-gold btn-sm" onclick="bcLoadGroupIntoRecipients(${id}, '${escHtml(g.name).replace(/'/g,"\\'")}');closeModal('groups-modal');">
+            <i class="fas fa-paper-plane"></i> Use in Broadcast
+          </button>
+        </div>
+      </div>`;
+  } catch(e) { det.innerHTML = '<div style="color:var(--red2);padding:16px;">' + e.message + '</div>'; }
+}
+
+function groupsFilterAdd(q, groupId) {
+  var list = document.getElementById('grp-add-list-' + groupId);
+  if (!list) return;
+  var rows = list.querySelectorAll('[id^="grp-add-c-"]');
+  rows.forEach(function(row) {
+    var text = row.textContent.toLowerCase();
+    row.style.display = (!q || text.includes(q.toLowerCase())) ? '' : 'none';
+  });
+}
+
+async function groupsAddMember(groupId, contactId, btn) {
+  try {
+    var res = await fetch(API_BASE + '/groups/' + groupId + '/members', {
+      method: 'POST', headers: getAuthHeaders(),
+      body: JSON.stringify({ contact_ids: [contactId] })
+    });
+    if (!res.ok) throw new Error('Failed');
+    var row = document.getElementById('grp-add-c-' + groupId + '-' + contactId);
+    if (row) row.remove();
+    btn.innerHTML = '<i class="fas fa-check"></i>';
+    btn.disabled = true;
+    await groupsLoadList();
+    bcLoadGroupsDropdown();
+  } catch(e) { notify('Error', e.message, 'var(--red)', 'fas fa-exclamation-circle'); }
+}
+
+async function groupsRemoveMember(groupId, contactId, btn) {
+  try {
+    await fetch(API_BASE + '/groups/' + groupId + '/members', {
+      method: 'DELETE', headers: getAuthHeaders(),
+      body: JSON.stringify({ contact_ids: [contactId] })
+    });
+    var row = btn.closest('[style*="display:flex"]');
+    if (row) row.remove();
+    await groupsLoadList();
+    bcLoadGroupsDropdown();
+  } catch(e) { notify('Error', e.message, 'var(--red)', 'fas fa-exclamation-circle'); }
+}
+
+async function groupsDelete(id, name) {
+  if (!confirm('Delete group "' + name + '"? Contacts will NOT be deleted.')) return;
+  try {
+    await fetch(API_BASE + '/groups/' + id, { method: 'DELETE', headers: getAuthHeaders() });
+    notify('Group deleted', name, 'var(--red)', 'fas fa-trash');
+    await groupsLoadList();
+    bcLoadGroupsDropdown();
+    groupsShowEmpty();
+  } catch(e) { notify('Error', e.message, 'var(--red)', 'fas fa-exclamation-circle'); }
+}
+
+function groupsShowEmpty() {
+  var det = document.getElementById('groups-detail');
+  if (det) det.innerHTML = '<div style="text-align:center;padding:40px;color:var(--muted);"><i class="fas fa-users" style="font-size:32px;opacity:0.15;display:block;margin-bottom:10px;"></i>Select a group or create a new one</div>';
+}
+
+async function bcLoadGroupIntoRecipients(groupId, groupName) {
+  try {
+    var res = await fetch(API_BASE + '/groups/' + groupId, { headers: getAuthHeaders() });
+    var data = await res.json();
+    var members = data.members || [];
+    var lines = members.filter(function(c){ return c.email; }).map(function(c){
+      var name = ((c.fname||'') + ' ' + (c.lname||'')).trim() || c.company || '';
+      return name ? name + ' <' + c.email + '>' : c.email;
+    });
+    var el = document.getElementById('bc-recipients');
+    if (el) { el.value = lines.join('\n'); bcUpdateCount(); }
+    notify('Loaded: ' + groupName, lines.length + ' recipients', 'var(--green)', 'fas fa-users');
+  } catch(e) { notify('Error', e.message, 'var(--red)', 'fas fa-exclamation-circle'); }
 }
 
 async function bcSendTest() {
@@ -7177,6 +7439,32 @@ Nagpur, Maharashtra, 440017, India<br>
       <div style="display:flex;gap:8px;justify-content:flex-end;">
         <button class="btn btn-ghost" onclick="closeModal('marquee-modal')">Cancel</button>
         <button class="btn btn-gold" onclick="marqueeConfirmInsert()"><i class="fas fa-plus"></i> Insert</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ██████ RECIPIENT GROUPS MANAGER MODAL ██████ -->
+<div class="modal-overlay" id="groups-modal">
+  <div class="modal" style="max-width:860px;width:96vw;max-height:90vh;overflow-y:auto;">
+    <div class="modal-title">
+      <span><i class="fas fa-users" style="color:var(--gold);margin-right:8px;"></i>Recipient Groups</span>
+      <span class="modal-close" onclick="closeModal('groups-modal')"><i class="fas fa-times"></i></span>
+    </div>
+    <div style="display:grid;grid-template-columns:260px 1fr;gap:16px;min-height:420px;">
+      <!-- Left: Groups list -->
+      <div style="display:flex;flex-direction:column;gap:8px;">
+        <button class="btn btn-gold btn-xs" style="justify-content:center;" onclick="groupsShowCreate()"><i class="fas fa-plus"></i> New Group</button>
+        <div id="groups-list" style="flex:1;overflow-y:auto;display:flex;flex-direction:column;gap:5px;max-height:460px;">
+          <div style="text-align:center;padding:20px;color:var(--muted);font-size:12px;">Loading...</div>
+        </div>
+      </div>
+      <!-- Right: Group detail / create -->
+      <div id="groups-detail" style="display:flex;flex-direction:column;gap:12px;">
+        <div style="text-align:center;padding:40px;color:var(--muted);">
+          <i class="fas fa-users" style="font-size:32px;opacity:0.15;display:block;margin-bottom:10px;"></i>
+          Select a group or create a new one
+        </div>
       </div>
     </div>
   </div>
