@@ -3369,8 +3369,7 @@ async function groupsShowDetail(id) {
             <div style="font-size:15px;font-weight:700;color:var(--text);">${escHtml(g.name)}</div>
             ${g.description ? '<div style="font-size:12px;color:var(--muted);margin-top:2px;">' + escHtml(g.description) + '</div>' : ''}
           </div>
-          <span class="badge b-blue">${(g.members||[]).length} contacts</span>
-        </div>
+          <span class="badge b-blue">${(g.members||[]).length} contacts</span>        </div>
 
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
           <!-- Current members -->
@@ -3380,7 +3379,9 @@ async function groupsShowDetail(id) {
               ${(g.members||[]).length === 0
                 ? '<div style="padding:16px;text-align:center;color:var(--muted);font-size:12px;">No members yet</div>'
                 : (g.members||[]).map(function(m) {
-                    var name = ((m.fname||'') + ' ' + (m.lname||'')).trim() || m.company || m.email;
+                    var fname = (m.fname && m.fname !== 'null') ? m.fname : '';
+                    var lname = (m.lname && m.lname !== 'null' && m.lname !== '-') ? m.lname : '';
+                    var name = (fname + ' ' + lname).trim() || m.company || m.email;
                     return '<div style="display:flex;align-items:center;gap:8px;padding:7px 10px;border-bottom:1px solid var(--border);">' +
                       '<div style="width:28px;height:28px;border-radius:50%;background:' + (m.avatar_bg||'rgba(59,130,246,0.15)') + ';color:' + (m.avatar_color||'#3b82f6') + ';display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;flex-shrink:0;">' + escHtml(m.initials||'?') + '</div>' +
                       '<div style="flex:1;min-width:0;"><div style="font-size:12px;font-weight:600;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + escHtml(name) + '</div>' +
@@ -3403,9 +3404,12 @@ async function groupsShowDetail(id) {
               ${nonMembers.length === 0
                 ? '<div style="padding:16px;text-align:center;color:var(--muted);font-size:12px;">All contacts already in group</div>'
                 : nonMembers.map(function(c) {
-                    var name = ((c.fname||'') + ' ' + (c.lname||'')).trim() || c.company || c.email;
+                    var fname = (c.fname && c.fname !== 'null') ? c.fname : '';
+                    var lname = (c.lname && c.lname !== 'null' && c.lname !== '-') ? c.lname : '';
+                    var name = (fname + ' ' + lname).trim() || c.company || '';
+                    var display = name || c.email;
                     return '<div style="display:flex;align-items:center;gap:8px;padding:7px 10px;border-bottom:1px solid var(--border);" id="grp-add-c-' + id + '-' + c.id + '">' +
-                      '<div style="flex:1;min-width:0;"><div style="font-size:12px;font-weight:600;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + escHtml(name) + '</div>' +
+                      '<div style="flex:1;min-width:0;"><div style="font-size:12px;font-weight:600;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + escHtml(display) + '</div>' +
                       '<div style="font-size:10.5px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + escHtml(c.email||'') + '</div></div>' +
                       '<button onclick="groupsAddMember(' + id + ',' + c.id + ',this)" class="btn btn-green btn-xs" style="flex-shrink:0;"><i class="fas fa-plus"></i></button>' +
                     '</div>';
