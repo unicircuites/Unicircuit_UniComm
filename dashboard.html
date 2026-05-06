@@ -1868,7 +1868,7 @@ select.inp option{background:#1a2035;color:var(--text);}
 <!-- NOTIFICATION -->
 <div class="notif" id="notif">
   <div class="notif-icon" id="notif-icon-el"></div>
-  <div><div id="notif-title" style="font-weight:700;font-size:13px;color:#fff;"></div><div id="notif-sub" style="font-size:11.5px;color:var(--muted);margin-top:1px;"></div></div>
+  <div><div id="notif-title" style="font-weight:700;font-size:13px;color:var(--text);"></div><div id="notif-sub" style="font-size:11.5px;color:var(--muted);margin-top:1px;"></div></div>
 </div>
 
 <script>
@@ -4813,12 +4813,49 @@ async function openEmail(id) {
   }
 }
 
+async function composeLoadGroupsDropdown() {
+  var sel = document.getElementById('compose-group-select');
+  if (!sel) return;
+  sel.innerHTML = '<option value="">— Or load To from a group —</option>';
+  try {
+    var res = await fetch(API_BASE + '/groups', { headers: getAuthHeaders() });
+    if (!res.ok) return;
+    var groups = await res.json();
+    groups.forEach(function(g) {
+      var opt = document.createElement('option');
+      opt.value = g.id;
+      opt.textContent = g.name + ' (' + g.member_count + ')';
+      sel.appendChild(opt);
+    });
+  } catch(_) {}
+}
+
+async function composeLoadFromGroup() {
+  var sel = document.getElementById('compose-group-select');
+  if (!sel || !sel.value) { notify('Select a group first', '', 'var(--red)', 'fas fa-exclamation-circle'); return; }
+  try {
+    var res = await fetch(API_BASE + '/groups/' + sel.value, { headers: getAuthHeaders() });
+    var data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Failed');
+    var emails = (data.members || []).filter(function(m){ return m.email; }).map(function(m){
+      var fname = (m.fname && m.fname !== 'null') ? m.fname : '';
+      var lname = (m.lname && m.lname !== 'null' && m.lname !== '-') ? m.lname : '';
+      var name = (fname + ' ' + lname).trim() || m.company || '';
+      return name ? name + ' <' + m.email + '>' : m.email;
+    });
+    var toEl = document.getElementById('compose-to');
+    if (toEl) toEl.value = emails.join(', ');
+    notify('Loaded: ' + data.name, emails.length + ' recipients in To field', 'var(--green)', 'fas fa-users');
+  } catch(e) { notify('Error', e.message, 'var(--red)', 'fas fa-exclamation-circle'); }
+}
+
 function openComposeEmailModal() {
   document.getElementById('compose-title').textContent = 'Compose Email';
   resetComposeForm();
   activeMessageId = null;
   openModal('compose-email-modal');
   loadComposeTemplates();
+  composeLoadGroupsDropdown();
 }
 
 function draftEmailTo(email) {
@@ -6869,7 +6906,15 @@ function etUseInBroadcast() {
               <span style="color:var(--muted);font-size:10.5px;">e.g. a@gmail.com, b@company.com; c@yahoo.com</span>
             </span>
           </span>
-        </label><input class="inp" id="compose-to" placeholder="a@gmail.com, b@company.com, c@yahoo.com" style="font-size:12.5px;" autocomplete="off" /></div>
+        </label>
+        <!-- Group loader for compose -->
+        <div style="display:flex;gap:6px;align-items:center;margin-bottom:6px;">
+          <select id="compose-group-select" class="inp" style="font-size:12px;padding:5px 8px;flex:1;background:transparent;">
+            <option value="">— Or load To from a group —</option>
+          </select>
+          <button type="button" class="btn btn-blue btn-xs" onclick="composeLoadFromGroup()"><i class="fas fa-users"></i> Load</button>
+        </div>
+        <input class="inp" id="compose-to" placeholder="a@gmail.com, b@company.com, c@yahoo.com" style="font-size:12.5px;" autocomplete="off" /></div>
         <div><label class="form-label" style="display:flex;align-items:center;gap:6px;">CC <span style="color:var(--muted);font-weight:400;">(optional)</span>
           <span style="position:relative;display:inline-flex;align-items:center;" onmouseenter="this.querySelector('.tt').style.display='block'" onmouseleave="this.querySelector('.tt').style.display='none'">
             <i class="fas fa-info-circle" style="font-size:11px;color:var(--muted);cursor:default;"></i>
