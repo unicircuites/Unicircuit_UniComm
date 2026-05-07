@@ -5013,6 +5013,126 @@ function oaShowSub(id) {
     if (el) el.style.display = s === id ? 'block' : 'none';
     if (btn) btn.classList.toggle('oa-sub-active', s === id);
   });
+  // Load live data when tab is opened
+  if (id === 'shared')     oaLoadShared();
+  if (id === 'auto-reply') oaLoadAutoReply();
+  if (id === 'categories') oaLoadCategories();
+  if (id === 'storage')    oaLoadStorage();
+}
+
+async function oaLoadShared() {
+  const el = document.getElementById('oa-shared-list');
+  if (!el) return;
+  el.innerHTML = '<div class="spin-loader" style="margin:20px auto;"></div>';
+  try {
+    const res = await fetch(`${API_BASE}/outlook/settings/shared`, { headers: getAuthHeaders() });
+    if (!res.ok) throw new Error('Not connected');
+    const folders = await res.json();
+    if (!folders.length) {
+      el.innerHTML = '<div style="color:var(--muted);font-size:13px;padding:20px 0;">No shared mailboxes found.</div>';
+      return;
+    }
+    el.innerHTML = folders.map(f => `
+      <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 14px;background:var(--card2);border-radius:8px;border:1px solid var(--border);margin-bottom:8px;">
+        <div><div style="font-size:13px;font-weight:600;color:var(--text);">${escHtml(f.displayName)}</div>
+        <div style="font-size:11px;color:var(--muted);">${f.totalItemCount || 0} items · ${f.unreadItemCount || 0} unread</div></div>
+      </div>`).join('');
+  } catch(e) {
+    el.innerHTML = `<div style="color:var(--muted);font-size:12.5px;">${e.message === 'Not connected' ? 'Connect Outlook to view shared mailboxes.' : e.message}</div>`;
+  }
+}
+
+async function oaLoadAutoReply() {
+  const el = document.getElementById('oa-auto-reply-content');
+  if (!el) return;
+  el.innerHTML = '<div class="spin-loader" style="margin:20px auto;"></div>';
+  try {
+    const res = await fetch(`${API_BASE}/outlook/settings/auto-reply`, { headers: getAuthHeaders() });
+    if (!res.ok) throw new Error('Not connected');
+    const d = await res.json();
+    const isOn = d.status === 'alwaysEnabled' || d.status === 'scheduled';
+    el.innerHTML = `
+      <div style="display:flex;align-items:center;gap:12px;padding:14px 16px;background:var(--card2);border-radius:8px;border:1px solid var(--border);margin-bottom:14px;">
+        <div style="width:40px;height:22px;border-radius:11px;background:${isOn?'var(--green)':'var(--border2)'};position:relative;cursor:pointer;" onclick="oaToggleAutoReply(${!isOn})">
+          <div style="width:18px;height:18px;border-radius:50%;background:#fff;position:absolute;top:2px;${isOn?'right:2px':'left:2px'};transition:all 0.2s;"></div>
+        </div>
+        <span style="font-size:13.5px;color:var(--text);font-weight:500;">Turn on automatic replies</span>
+        <span class="badge ${isOn?'b-green':'b-gray'}" style="margin-left:auto;">${isOn?'ON':'OFF'}</span>
+      </div>
+      ${d.internalReplyMessage ? `<div style="padding:12px 16px;background:var(--card2);border-radius:8px;border:1px solid var(--border);margin-bottom:10px;"><div style="font-size:11px;color:var(--muted);margin-bottom:6px;text-transform:uppercase;letter-spacing:0.05em;">Internal reply message</div><div style="font-size:12.5px;color:var(--text);">${escHtml(d.internalReplyMessage)}</div></div>` : ''}
+      ${d.externalReplyMessage ? `<div style="padding:12px 16px;background:var(--card2);border-radius:8px;border:1px solid var(--border);"><div style="font-size:11px;color:var(--muted);margin-bottom:6px;text-transform:uppercase;letter-spacing:0.05em;">External reply message</div><div style="font-size:12.5px;color:var(--text);">${escHtml(d.externalReplyMessage)}</div></div>` : ''}`;
+  } catch(e) {
+    el.innerHTML = `<div style="color:var(--muted);font-size:12.5px;">${e.message === 'Not connected' ? 'Connect Outlook to manage automatic replies.' : e.message}</div>`;
+  }
+}
+
+async function oaToggleAutoReply(enable) {
+  try {
+    await fetch(`${API_BASE}/outlook/settings/auto-reply`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
+      body: JSON.stringify({ status: enable ? 'alwaysEnabled' : 'disabled' }),
+    });
+    oaLoadAutoReply();
+  } catch(e) { notify('Error', e.message, 'var(--red2)', 'fas fa-exclamation-triangle'); }
+}
+
+async function oaLoadCategories() {
+  const el = document.getElementById('oa-categories-list');
+  if (!el) return;
+  el.innerHTML = '<div class="spin-loader" style="margin:20px auto;"></div>';
+  try {
+    const res = await fetch(`${API_BASE}/outlook/settings/categories`, { headers: getAuthHeaders() });
+    if (!res.ok) throw new Error('Not connected');
+    const cats = await res.json();
+    if (!cats.length) {
+      el.innerHTML = '<div style="color:var(--muted);font-size:12.5px;">No categories found.</div>';
+      return;
+    }
+    const colorMap = { preset0:'#e74856', preset1:'#ff8c00', preset2:'#ffb900', preset3:'#fff100', preset4:'#16c60c', preset5:'#00b7c3', preset6:'#0078d4', preset7:'#8764b8', preset8:'#b146c2', preset9:'#e3008c', preset10:'#ef6950', preset11:'#bad80a', preset12:'#0099bc', none:'var(--muted)' };
+    el.innerHTML = `<div style="border:1px solid var(--border);border-radius:8px;overflow:hidden;">
+      <div style="display:grid;grid-template-columns:1fr auto;padding:8px 14px;font-size:10.5px;color:var(--muted);text-transform:uppercase;letter-spacing:0.05em;border-bottom:1px solid var(--border);background:var(--bg2);">
+        <span>Category name</span>
+      </div>
+      ${cats.map(c => `<div style="display:flex;align-items:center;gap:12px;padding:10px 14px;border-bottom:1px solid var(--border);">
+        <div style="width:14px;height:14px;border-radius:50%;background:${colorMap[c.color]||'var(--muted)'};flex-shrink:0;"></div>
+        <span style="font-size:13px;color:var(--text);flex:1;">${escHtml(c.displayName)}</span>
+      </div>`).join('')}
+    </div>`;
+  } catch(e) {
+    el.innerHTML = `<div style="color:var(--muted);font-size:12.5px;">${e.message === 'Not connected' ? 'Connect Outlook to view categories.' : e.message}</div>`;
+  }
+}
+
+async function oaLoadStorage() {
+  const el = document.getElementById('oa-storage-content');
+  if (!el) return;
+  el.innerHTML = '<div class="spin-loader" style="margin:20px auto;"></div>';
+  try {
+    const res = await fetch(`${API_BASE}/outlook/settings/storage`, { headers: getAuthHeaders() });
+    if (!res.ok) throw new Error('Not connected');
+    const d = await res.json();
+    const folders = d.folders || [];
+    const fmtSize = b => b > 1073741824 ? (b/1073741824).toFixed(2)+' GB' : b > 1048576 ? (b/1048576).toFixed(2)+' MB' : b > 1024 ? (b/1024).toFixed(1)+' KB' : (b||0)+' B';
+    const totalUsed = folders.reduce((s,f) => s + (f.sizeInBytes||0), 0);
+    el.innerHTML = `
+      <div style="padding:14px 16px;background:var(--card2);border-radius:8px;border:1px solid var(--border);margin-bottom:16px;">
+        <div style="font-size:13px;color:var(--muted);margin-bottom:6px;">Total used</div>
+        <div style="font-size:20px;font-weight:700;color:var(--text);">${fmtSize(totalUsed)}</div>
+      </div>
+      <div style="border:1px solid var(--border);border-radius:8px;overflow:hidden;">
+        <div style="display:grid;grid-template-columns:1fr auto auto;padding:8px 14px;font-size:10.5px;color:var(--muted);text-transform:uppercase;letter-spacing:0.05em;border-bottom:1px solid var(--border);background:var(--bg2);">
+          <span>Folder</span><span>Size</span><span>Messages</span>
+        </div>
+        ${folders.map(f => `<div style="display:grid;grid-template-columns:1fr auto auto;align-items:center;padding:10px 14px;border-bottom:1px solid var(--border);gap:12px;">
+          <span style="font-size:13px;color:var(--text);">${escHtml(f.displayName)}</span>
+          <span style="font-size:12px;color:var(--muted2);">${fmtSize(f.sizeInBytes||0)}</span>
+          <span style="font-size:12px;color:var(--muted);">${f.totalItemCount||0}</span>
+        </div>`).join('')}
+      </div>`;
+  } catch(e) {
+    el.innerHTML = `<div style="color:var(--muted);font-size:12.5px;">${e.message === 'Not connected' ? 'Connect Outlook to view storage information.' : e.message}</div>`;
+  }
 }
 
 function downloadOutlookEmails() {
@@ -8693,19 +8813,37 @@ Nagpur, Maharashtra, 440017, India<br>
               </div>
             </div>
           </div>
-          <div id="oa-sub-shared" style="display:none;"><div style="color:var(--muted);font-size:13px;padding:20px 0;">No shared mailboxes configured.</div></div>
+          <div id="oa-sub-shared" style="display:none;">
+            <div style="font-size:16px;font-weight:700;color:var(--text);margin-bottom:16px;">Shared with me</div>
+            <div style="font-size:12.5px;color:var(--muted);margin-bottom:14px;">View and manage all shared email accounts you have access to.</div>
+            <div id="oa-shared-list"><div class="spin-loader" style="margin:20px auto;"></div></div>
+          </div>
           <div id="oa-sub-auto-reply" style="display:none;">
-            <div style="font-size:13.5px;color:var(--text);margin-bottom:12px;font-weight:600;">Automatic replies</div>
-            <div style="color:var(--muted);font-size:12.5px;">Configure automatic replies via Microsoft 365 admin portal.</div>
+            <div style="font-size:16px;font-weight:700;color:var(--text);margin-bottom:16px;">Automatic replies</div>
+            <div style="font-size:12.5px;color:var(--muted);margin-bottom:16px;">Use automatic replies to let others know you're on vacation or aren't available to respond to email.</div>
+            <div id="oa-auto-reply-content"><div class="spin-loader" style="margin:20px auto;"></div></div>
           </div>
           <div id="oa-sub-signatures" style="display:none;">
-            <div style="font-size:13.5px;color:var(--text);margin-bottom:12px;font-weight:600;">Email Signatures</div>
-            <div style="color:var(--muted);font-size:12.5px;">Manage signatures in the compose window or via Outlook web.</div>
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+              <div style="font-size:16px;font-weight:700;color:var(--text);">Signatures</div>
+              <a href="https://outlook.office.com/mail/options/mail/messageContent" target="_blank" class="btn btn-blue btn-sm"><i class="fas fa-external-link-alt"></i> Manage in Outlook</a>
+            </div>
+            <div style="font-size:12.5px;color:var(--muted);margin-bottom:14px;">You can add and modify signatures that can be added to your emails.</div>
+            <div style="padding:16px;background:var(--card2);border-radius:8px;border:1px solid var(--border);text-align:center;color:var(--muted);font-size:12.5px;">
+              <i class="fas fa-signature" style="font-size:24px;margin-bottom:8px;display:block;opacity:0.4;"></i>
+              Signatures are managed directly in Outlook Web. Click "Manage in Outlook" to add or edit signatures.
+            </div>
           </div>
-          <div id="oa-sub-categories" style="display:none;"><div style="color:var(--muted);font-size:12.5px;padding:8px 0;">No categories configured.</div></div>
+          <div id="oa-sub-categories" style="display:none;">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+              <div style="font-size:16px;font-weight:700;color:var(--text);">Categories</div>
+              <button class="btn btn-blue btn-sm" onclick="oaLoadCategories()"><i class="fas fa-sync-alt"></i> Refresh</button>
+            </div>
+            <div id="oa-categories-list"><div class="spin-loader" style="margin:20px auto;"></div></div>
+          </div>
           <div id="oa-sub-storage" style="display:none;">
-            <div style="font-size:13.5px;color:var(--text);margin-bottom:12px;font-weight:600;">Storage</div>
-            <div style="color:var(--muted);font-size:12.5px;">Storage information is managed via Microsoft 365 admin portal.</div>
+            <div style="font-size:16px;font-weight:700;color:var(--text);margin-bottom:16px;">Storage</div>
+            <div id="oa-storage-content"><div class="spin-loader" style="margin:20px auto;"></div></div>
           </div>
         </div>
         <!-- General section -->

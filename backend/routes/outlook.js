@@ -778,4 +778,74 @@ router.get('/sync-status', async (req, res) => {
   }
 });
 
+// ── GET /api/outlook/settings/auto-reply ─────────────────────────────────
+router.get('/settings/auto-reply', async (req, res) => {
+  try {
+    const data = await graph.graphGet('/me/mailboxSettings/automaticRepliesSetting', MS_EMAIL);
+    return res.json(data);
+  } catch (err) {
+    if (err.message === 'NOT_AUTHENTICATED') return res.status(401).json({ error: 'NOT_AUTHENTICATED' });
+    return res.status(500).json({ error: err.message });
+  }
+});
+
+// ── PATCH /api/outlook/settings/auto-reply ────────────────────────────────
+router.patch('/settings/auto-reply', async (req, res) => {
+  try {
+    const data = await graph.graphPatch('/me/mailboxSettings', { automaticRepliesSetting: req.body }, MS_EMAIL);
+    return res.json(data);
+  } catch (err) {
+    if (err.message === 'NOT_AUTHENTICATED') return res.status(401).json({ error: 'NOT_AUTHENTICATED' });
+    return res.status(500).json({ error: err.message });
+  }
+});
+
+// ── GET /api/outlook/settings/categories ─────────────────────────────────
+router.get('/settings/categories', async (req, res) => {
+  try {
+    const data = await graph.graphGet('/me/outlook/masterCategories', MS_EMAIL);
+    return res.json(data.value || []);
+  } catch (err) {
+    if (err.message === 'NOT_AUTHENTICATED') return res.status(401).json({ error: 'NOT_AUTHENTICATED' });
+    return res.status(500).json({ error: err.message });
+  }
+});
+
+// ── GET /api/outlook/settings/storage ────────────────────────────────────
+router.get('/settings/storage', async (req, res) => {
+  try {
+    const data = await graph.graphGet(
+      '/me/mailboxSettings',
+      MS_EMAIL
+    );
+    // Get folder sizes
+    const folders = await graph.graphGet(
+      '/me/mailFolders?$select=displayName,totalItemCount,sizeInBytes&$top=20',
+      MS_EMAIL
+    );
+    return res.json({
+      mailboxSettings: data,
+      folders: folders.value || [],
+    });
+  } catch (err) {
+    if (err.message === 'NOT_AUTHENTICATED') return res.status(401).json({ error: 'NOT_AUTHENTICATED' });
+    return res.status(500).json({ error: err.message });
+  }
+});
+
+// ── GET /api/outlook/settings/shared ─────────────────────────────────────
+router.get('/settings/shared', async (req, res) => {
+  try {
+    // Get shared mailboxes the user has access to
+    const data = await graph.graphGet(
+      '/me/mailFolders?$filter=isHidden eq false&$select=displayName,totalItemCount,unreadItemCount&$top=50',
+      MS_EMAIL
+    );
+    return res.json(data.value || []);
+  } catch (err) {
+    if (err.message === 'NOT_AUTHENTICATED') return res.status(401).json({ error: 'NOT_AUTHENTICATED' });
+    return res.status(500).json({ error: err.message });
+  }
+});
+
 module.exports = router;
