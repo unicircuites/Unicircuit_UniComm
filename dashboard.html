@@ -6006,7 +6006,20 @@ function initWASocket() {
 
   // System health events
   waSocket.on('system:service_online',  e => { updateServiceIndicator(e.service, true);  prependLogEvent({ ...e, type: 'online',  message: `${e.service} connected` }); notifyService(e.service, true); });
-  waSocket.on('system:service_offline', e => { updateServiceIndicator(e.service, false); prependLogEvent({ ...e, type: 'offline', message: `${e.service} disconnected: ${e.reason || ''}` }); notifyService(e.service, false, e.reason); });
+  waSocket.on('system:service_offline', e => {
+    updateServiceIndicator(e.service, false);
+    prependLogEvent({ ...e, type: 'offline', message: `${e.service} disconnected: ${e.reason || ''}` });
+    notifyService(e.service, false, e.reason);
+    // If Outlook disconnected — show connect button in toast area
+    if (e.service === 'outlook') {
+      const reason = e.reason || '';
+      const needsMFA = reason.toLowerCase().includes('full re-auth') || reason.toLowerCase().includes('no token');
+      const toastSub = needsMFA
+        ? 'Full re-authentication required (MFA needed) — click Connect Outlook'
+        : 'Token expired — click Connect Outlook to fix (no MFA needed)';
+      notifyService('outlook', false, toastSub);
+    }
+  });
   waSocket.on('system:log_snapshot', function(data) {
     // Store snapshot for when panel opens — events already loaded via API on open
     // Also prepend any events that arrive while panel is open

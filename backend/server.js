@@ -191,11 +191,29 @@ const dbProbeMs      = parseInt(process.env.DB_PROBE_INTERVAL_MS, 10)      || 30
 
 async function probeOutlook() {
   try {
+    const token = await msGraph.getAccessToken(process.env.MS_USER_EMAIL);
+    if (!token) {
+      // No token at all — needs full re-auth (MFA likely required)
+      if (serviceState.outlook.status !== 'offline') {
+        markOffline('outlook', 'No token — full re-authentication required (MFA may be needed)');
+      }
+      return;
+    }
+    // Token exists — verify it actually works
     const auth = await msGraph.isAuthenticated();
-    if (auth && serviceState.outlook.status !== 'online')  markOnline('outlook');
-    else if (!auth && serviceState.outlook.status !== 'offline') markOffline('outlook', 'Outlook token expired or revoked');
+    if (auth) {
+      if (serviceState.outlook.status !== 'online') markOnline('outlook');
+    } else {
+      // Token exists but rejected — likely expired/revoked, can re-auth without MFA
+      if (serviceState.outlook.status !== 'offline') {
+        markOffline('outlook', 'Token expired — click Connect Outlook to re-authenticate (no MFA needed)');
+      }
+    }
   } catch (err) {
     console.error('[System] Outlook probe error:', err.message);
+    if (serviceState.outlook.status !== 'offline') {
+      markOffline('outlook', `Outlook probe error: ${err.message}`);
+    }
   }
 }
 
