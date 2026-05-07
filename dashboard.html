@@ -4690,16 +4690,45 @@ async function openActivityLog() {
       `<span style="margin-left:6px;">${escHtml(user.email || '')}</span>`;
   } catch(_) {}
 
-  // Load events from API
+  const list = document.getElementById('alp-list');
+  if (list) list.innerHTML = '<div style="text-align:center;padding:20px;color:var(--muted);font-size:12px;"><div class="spin-loader" style="margin:0 auto 8px;"></div>Loading...</div>';
+
+  // First: load current service status snapshot
+  const statusRows = [];
+  try {
+    const sRes = await fetch(`${API_BASE}/system/status`, { headers: getAuthHeaders() });
+    if (sRes.ok) {
+      const sData = await sRes.json();
+      const svcLabels = { whatsapp: '📱 WhatsApp', pbx: '📞 Matrix PBX', outlook: '📧 Outlook', postgres: '🗄️ PostgreSQL' };
+      const now = new Date().toISOString();
+      Object.entries(sData).forEach(([svc, info]) => {
+        const online = info.status === 'online';
+        statusRows.push(renderLogEvent({
+          seq: 0,
+          type: online ? 'online' : 'offline',
+          service: svc,
+          message: `${svcLabels[svc] || svc}: ${online ? 'Connected ✅' : 'Disconnected ❌'}${info.lastConnected ? ' (last connected: ' + new Date(info.lastConnected).toLocaleTimeString('en-GB') + ')' : ''}`,
+          timestamp: now,
+        }));
+      });
+    }
+  } catch(_) {}
+
+  // Then: load recent events from API
   try {
     const res = await fetch(`${API_BASE}/system/log?limit=100`, { headers: getAuthHeaders() });
     if (res.ok) {
       const data = await res.json();
-      const list = document.getElementById('alp-list');
       if (list) {
         const events = (data.events || []).filter(e => e.seq && e.type && e.service && e.message && e.timestamp);
-        list.innerHTML = events.map(renderLogEvent).join('');
-        _alpEventCount = events.length;
+        // Show status snapshot at top, then recent events below
+        const divider = statusRows.length
+          ? `<div style="padding:6px 18px;font-size:10.5px;color:var(--muted);background:rgba(255,255,255,0.03);border-bottom:1px solid var(--border);letter-spacing:0.05em;text-transform:uppercase;">── Current Status ──</div>`
+          + statusRows.join('')
+          + `<div style="padding:6px 18px;font-size:10.5px;color:var(--muted);background:rgba(255,255,255,0.03);border-bottom:1px solid var(--border);letter-spacing:0.05em;text-transform:uppercase;">── Recent Events ──</div>`
+          : '';
+        if (list) list.innerHTML = divider + events.map(renderLogEvent).join('');
+        _alpEventCount = events.length + statusRows.length;
         const countEl = document.getElementById('alp-count');
         if (countEl) countEl.textContent = `(${_alpEventCount})`;
       }
