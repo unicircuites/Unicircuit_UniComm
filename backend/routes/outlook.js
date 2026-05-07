@@ -369,6 +369,11 @@ router.post('/send', async (req, res) => {
       [req.user.id, 'EMAIL_SENT', 'outlook', `To: ${Array.isArray(to)?to.join(','):to} | Subject: ${subject}`]
     ).catch(() => {});
 
+    // Activity log
+    try {
+      activityLog.append({ type: 'info', service: 'outlook', message: `Email sent to ${Array.isArray(to)?to.join(', '):to} — "${subject}"`, timestamp: new Date().toISOString() });
+    } catch(_) {}
+
     return res.json({ success: true, message: 'Email sent successfully.' });
   } catch (err) {
     if (err.message === 'NOT_AUTHENTICATED') return res.status(401).json({ error: 'NOT_AUTHENTICATED' });
