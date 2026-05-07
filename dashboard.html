@@ -5110,28 +5110,30 @@ async function oaLoadStorage() {
   el.innerHTML = '<div class="spin-loader" style="margin:20px auto;"></div>';
   try {
     const res = await fetch(`${API_BASE}/outlook/settings/storage`, { headers: getAuthHeaders() });
-    if (!res.ok) throw new Error('Not connected');
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.error || `HTTP ${res.status}`);
+    }
     const d = await res.json();
     const folders = d.folders || [];
-    const fmtSize = b => b > 1073741824 ? (b/1073741824).toFixed(2)+' GB' : b > 1048576 ? (b/1048576).toFixed(2)+' MB' : b > 1024 ? (b/1024).toFixed(1)+' KB' : (b||0)+' B';
-    const totalUsed = folders.reduce((s,f) => s + (f.sizeInBytes||0), 0);
     el.innerHTML = `
       <div style="padding:14px 16px;background:var(--card2);border-radius:8px;border:1px solid var(--border);margin-bottom:16px;">
-        <div style="font-size:13px;color:var(--muted);margin-bottom:6px;">Total used</div>
-        <div style="font-size:20px;font-weight:700;color:var(--text);">${fmtSize(totalUsed)}</div>
+        <div style="font-size:12px;color:var(--muted);margin-bottom:4px;">Mailbox</div>
+        <div style="font-size:15px;font-weight:700;color:var(--text);">${escHtml(process?.env?.MS_USER_EMAIL || 'sales@unicircuites.com')}</div>
+        <div style="font-size:11.5px;color:var(--muted);margin-top:2px;">Microsoft 365</div>
       </div>
       <div style="border:1px solid var(--border);border-radius:8px;overflow:hidden;">
         <div style="display:grid;grid-template-columns:1fr auto auto;padding:8px 14px;font-size:10.5px;color:var(--muted);text-transform:uppercase;letter-spacing:0.05em;border-bottom:1px solid var(--border);background:var(--bg2);">
-          <span>Folder</span><span>Size</span><span>Messages</span>
+          <span>Folder</span><span style="text-align:right;">Messages</span><span style="text-align:right;padding-left:16px;">Unread</span>
         </div>
         ${folders.map(f => `<div style="display:grid;grid-template-columns:1fr auto auto;align-items:center;padding:10px 14px;border-bottom:1px solid var(--border);gap:12px;">
           <span style="font-size:13px;color:var(--text);">${escHtml(f.displayName)}</span>
-          <span style="font-size:12px;color:var(--muted2);">${fmtSize(f.sizeInBytes||0)}</span>
-          <span style="font-size:12px;color:var(--muted);">${f.totalItemCount||0}</span>
+          <span style="font-size:12px;color:var(--muted2);text-align:right;">${f.totalItemCount||0}</span>
+          <span style="font-size:12px;color:${(f.unreadItemCount||0)>0?'var(--blue2)':'var(--muted)'};text-align:right;padding-left:16px;font-weight:${(f.unreadItemCount||0)>0?'700':'400'};">${f.unreadItemCount||0}</span>
         </div>`).join('')}
       </div>`;
   } catch(e) {
-    el.innerHTML = `<div style="color:var(--muted);font-size:12.5px;">${e.message === 'Not connected' ? 'Connect Outlook to view storage information.' : e.message}</div>`;
+    el.innerHTML = `<div style="color:var(--red2);font-size:12.5px;padding:12px 0;"><i class="fas fa-exclamation-circle" style="margin-right:6px;"></i>${escHtml(e.message)}</div>`;
   }
 }
 

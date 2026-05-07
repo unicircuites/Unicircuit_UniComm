@@ -814,17 +814,20 @@ router.get('/settings/categories', async (req, res) => {
 // ── GET /api/outlook/settings/storage ────────────────────────────────────
 router.get('/settings/storage', async (req, res) => {
   try {
-    const data = await graph.graphGet(
-      '/me/mailboxSettings',
-      MS_EMAIL
-    );
-    // Get folder sizes
+    // Get folder list with available fields (sizeInBytes not available in basic tier)
     const folders = await graph.graphGet(
-      '/me/mailFolders?$select=displayName,totalItemCount,sizeInBytes&$top=20',
+      '/me/mailFolders?$select=displayName,totalItemCount,unreadItemCount,childFolderCount&$top=20',
       MS_EMAIL
     );
+    // Try to get quota info from mailbox settings
+    let quota = null;
+    try {
+      const settings = await graph.graphGet('/me/mailboxSettings', MS_EMAIL);
+      quota = settings;
+    } catch(_) {}
+
     return res.json({
-      mailboxSettings: data,
+      quota,
       folders: folders.value || [],
     });
   } catch (err) {
