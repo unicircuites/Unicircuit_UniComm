@@ -78,6 +78,7 @@ function markOnline(service) {
   serviceState[service].lastConnected = _now();
   const ev = activityLog.append({ type: 'online', service, message: `${service} connected`, timestamp: _now() });
   try { _origEmit('system:service_online', { service, timestamp: ev.timestamp, seq: ev.seq }); } catch(_) {}
+  try { _origEmit('system:activity', ev); } catch(_) {}
 }
 
 function markOffline(service, reason) {
@@ -86,6 +87,7 @@ function markOffline(service, reason) {
   const msg = reason ? `${service} disconnected: ${reason}` : `${service} disconnected`;
   const ev = activityLog.append({ type: 'offline', service, message: msg, timestamp: _now() });
   try { _origEmit('system:service_offline', { service, timestamp: ev.timestamp, reason: reason || 'Connection lost', seq: ev.seq }); } catch(_) {}
+  try { _origEmit('system:activity', ev); } catch(_) {}
 }
 
 function systemBridge(event, data) {
@@ -187,8 +189,7 @@ pool.on('error', (err) => {
 const outlookProbeMs = parseInt(process.env.OUTLOOK_PROBE_INTERVAL_MS, 10) || 60000;
 const dbProbeMs      = parseInt(process.env.DB_PROBE_INTERVAL_MS, 10)      || 30000;
 
-// Outlook probe
-setInterval(async () => {
+async function probeOutlook() {
   try {
     const auth = await msGraph.isAuthenticated();
     if (auth && serviceState.outlook.status !== 'online')  markOnline('outlook');
@@ -196,17 +197,25 @@ setInterval(async () => {
   } catch (err) {
     console.error('[System] Outlook probe error:', err.message);
   }
-}, outlookProbeMs);
+}
 
-// PostgreSQL probe
-setInterval(async () => {
+async function probePostgres() {
   try {
     await pool.query('SELECT 1');
     if (serviceState.postgres.status !== 'online') markOnline('postgres');
   } catch (err) {
     if (serviceState.postgres.status !== 'offline') markOffline('postgres', err.message);
   }
-}, dbProbeMs);
+}
+
+// Run initial probes after 3s (give server time to fully start)
+setTimeout(() => { probeOutlook(); probePostgres(); }, 3000);
+
+// Outlook probe
+setInterval(probeOutlook, outlookProbeMs);
+
+// PostgreSQL probe
+setInterval(probePostgres, dbProbeMs);
 
 // ── SERVE STATIC HTML FILES — after socket.io path is registered ──────────
 app.use(express.static(path.join(__dirname, '..'), {
