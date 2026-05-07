@@ -394,12 +394,13 @@ select.inp option{background:#1a2035;color:var(--text);}
 /* Outlook: right column fills height; message body scrolls inside card */
 .sec-email-read-col{display:flex;flex-direction:column;min-height:calc(100vh - 140px);max-height:calc(100vh - 140px);min-width:0;}
 /* ── Outlook-style menu bar ── */
-.outlook-menu-item{position:relative;padding:5px 12px;font-size:12.5px;color:var(--text);cursor:pointer;border-radius:4px;user-select:none;white-space:nowrap;}
-.outlook-menu-item:hover,.outlook-menu-item.active{background:rgba(0,120,212,0.12);color:#0078d4;}
-.outlook-dropdown{position:absolute;top:100%;left:0;min-width:210px;background:var(--card);border:1px solid var(--border2);border-radius:6px;box-shadow:0 6px 24px rgba(0,0,0,0.25);z-index:9999;padding:4px 0;margin-top:2px;}
-.outlook-dd-item{padding:7px 16px;font-size:12.5px;color:var(--text);cursor:pointer;display:flex;align-items:center;gap:10px;white-space:nowrap;}
+.outlook-menu-item{position:relative;padding:6px 14px;font-size:12.5px;font-weight:500;color:var(--muted2);cursor:pointer;border-radius:4px;user-select:none;white-space:nowrap;transition:background 0.1s,color 0.1s;}
+.outlook-menu-item:hover{background:rgba(0,120,212,0.1);color:var(--text);}
+.outlook-menu-item.active{background:rgba(0,120,212,0.15);color:#0078d4;}
+.outlook-dropdown{position:absolute;top:calc(100% + 4px);left:0;min-width:220px;background:var(--card);border:1px solid var(--border2);border-radius:6px;box-shadow:0 8px 28px rgba(0,0,0,0.35);z-index:9999;padding:4px 0;}
+.outlook-dd-item{padding:8px 16px;font-size:12.5px;color:var(--text);cursor:pointer;display:flex;align-items:center;gap:10px;white-space:nowrap;transition:background 0.1s;}
 .outlook-dd-item:hover{background:rgba(0,120,212,0.1);color:#0078d4;}
-.outlook-dd-divider{height:1px;background:var(--border);margin:3px 0;}
+.outlook-dd-divider{height:1px;background:var(--border);margin:4px 0;}
 .card.email-detail-stack{display:flex;flex-direction:column;flex:1;min-height:0;overflow:hidden;}
 /* One scroll: outer pane does not scroll; iframe (or plain-text wrap) scrolls internally */
 .card.email-detail-stack #email-detail-body{
@@ -1088,7 +1089,7 @@ select.inp option{background:#1a2035;color:var(--text);}
   <div class="section-view fu" id="sec-email">
 
     <!-- Outlook-style menu toolbar -->
-    <div id="outlook-menu-bar" style="display:flex;align-items:center;gap:0;background:var(--card2);border:1px solid var(--border);border-radius:8px 8px 0 0;border-bottom:none;padding:0 4px;margin-bottom:0;flex-shrink:0;position:relative;z-index:10;">
+    <div id="outlook-menu-bar" style="display:flex;align-items:center;gap:0;background:var(--bg2);border:1px solid var(--border2);border-radius:8px 8px 0 0;border-bottom:2px solid #0078d4;padding:0 8px;margin-bottom:0;flex-shrink:0;position:relative;z-index:10;min-height:32px;">
       <!-- File menu -->
       <div class="outlook-menu-item" onclick="toggleOutlookMenu('menu-file')" id="menu-btn-file">
         <span>File</span>
@@ -1145,7 +1146,7 @@ select.inp option{background:#1a2035;color:var(--text);}
     </div>
 
     <!-- Connect banner (shown when not authenticated) -->
-    <div id="outlook-connect-banner" style="display:none;margin-bottom:14px;margin-top:8px;">
+    <div id="outlook-connect-banner" style="display:none;margin-bottom:14px;margin-top:10px;">
       <div style="background:rgba(0,120,212,0.08);border:1px solid rgba(0,120,212,0.25);border-radius:10px;padding:14px 18px;display:flex;align-items:center;gap:14px;flex-wrap:wrap;">
         <i class="fas fa-envelope" style="font-size:22px;color:#0078d4;"></i>
         <div style="flex:1;">
@@ -1156,7 +1157,7 @@ select.inp option{background:#1a2035;color:var(--text);}
       </div>
     </div>
 
-    <div class="col-4060">
+    <div class="col-4060" style="margin-top:10px;">
       <!-- INBOX LIST -->
       <div class="card" style="display:flex;flex-direction:column;max-height:calc(100vh - 140px);">
         <div class="card-header">
