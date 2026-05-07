@@ -516,6 +516,16 @@ select.inp option{background:#1a2035;color:var(--text);}
 }
 .db-dot{width:6px;height:6px;border-radius:50%;background:var(--green);flex-shrink:0;}
 .db-dot.offline{background:var(--red2);}
+
+/* ── ACTIVITY LOG PANEL ── */
+#activity-log-panel.alp-open { transform: translateX(0) !important; }
+.alp-row { display:flex;align-items:flex-start;gap:10px;padding:8px 18px;border-bottom:1px solid var(--border);font-size:12px; }
+.alp-row:hover { background:rgba(255,255,255,0.02); }
+.alp-icon { font-size:14px;flex-shrink:0;margin-top:1px; }
+.alp-body { flex:1;min-width:0; }
+.alp-service { font-weight:700;color:var(--text);text-transform:capitalize;margin-right:6px; }
+.alp-msg { color:var(--muted2); }
+.alp-ts { font-size:10.5px;color:var(--muted);flex-shrink:0;white-space:nowrap; }
 </style>
 <!-- Quill Rich Text Editor -->
 <link href="https://cdn.quilljs.com/1.3.7/quill.snow.css" rel="stylesheet">
@@ -814,10 +824,24 @@ select.inp option{background:#1a2035;color:var(--text);}
     </div>
     <div class="topbar-actions">
       <div class="pill-tag" id="topbar-clock" style="font-family:'JetBrains Mono',monospace;font-size:11.5px;min-width:220px;justify-content:center;"></div>
-      <div class="pill-tag"><span style="width:6px;height:6px;border-radius:50%;background:var(--green);"></span> Matrix PBX</div>
-      <div class="pill-tag"><i class="fab fa-whatsapp" style="color:#25D366;"></i> WA Business</div>
-      <div class="pill-tag"><i class="fas fa-envelope" style="color:#0078d4;"></i> Outlook</div>
+      <!-- PostgreSQL -->
+      <div class="pill-tag" id="svc-postgres" style="cursor:default;">
+        <span class="svc-dot" id="dot-postgres" style="display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--muted);margin-right:4px;vertical-align:middle;"></span>PostgreSQL
+      </div>
+      <!-- Matrix PBX -->
+      <div class="pill-tag" id="svc-pbx" style="cursor:default;">
+        <span class="svc-dot" id="dot-pbx" style="display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--muted);margin-right:4px;vertical-align:middle;"></span>Matrix PBX
+      </div>
+      <!-- WA Business -->
+      <div class="pill-tag" id="svc-whatsapp" style="cursor:default;">
+        <i class="fab fa-whatsapp" id="dot-whatsapp" style="font-size:11px;color:var(--muted);margin-right:4px;"></i>WA Business
+      </div>
+      <!-- Outlook -->
+      <div class="pill-tag" id="svc-outlook" style="cursor:default;">
+        <i class="fas fa-envelope" id="dot-outlook" style="font-size:11px;color:var(--muted);margin-right:4px;"></i>Outlook
+      </div>
       <button type="button" class="btn btn-gold btn-sm" id="topbar-compose-email" style="display:none;" onclick="openComposeEmailModal()"><i class="fas fa-pen"></i> Compose</button>
+      <button class="btn btn-ghost btn-sm" id="activity-log-btn" onclick="openActivityLog()" title="System Activity Log"><i class="fas fa-list-alt"></i> Activity Log</button>
       <button class="btn btn-gold btn-sm" onclick="openModal('contact-modal')"><i class="fas fa-user-plus"></i> Add Contact</button>
       <button class="btn btn-ghost btn-sm" onclick="nav('ai',null)"><i class="fas fa-robot"></i> Ask AI</button>
       <button class="theme-btn" id="themeToggle" onclick="toggleTheme()" title="Toggle light/dark mode"><i class="fas fa-moon" id="themeIcon"></i></button>
@@ -1971,6 +1995,39 @@ function notify(title, sub, color = 'var(--gold)', icon = 'fas fa-check-circle')
   n.classList.add('show');
   clearTimeout(notifTimer);
   notifTimer = setTimeout(() => n.classList.remove('show'), 3400);
+}
+
+// ── Service offline/online toasts ─────────────────────────────────────────
+const _svcToastTimers = new Map(); // per-service dedup
+
+function notifyService(service, online, reason) {
+  const duration = online ? 4000 : 8000;
+  const color    = online ? 'var(--green)' : 'var(--red2)';
+  const icon     = online ? 'fas fa-check-circle' : 'fas fa-exclamation-triangle';
+  const title    = online
+    ? `${service.charAt(0).toUpperCase() + service.slice(1)} reconnected`
+    : `${service.charAt(0).toUpperCase() + service.slice(1)} went offline`;
+  const sub = online ? 'Service is back online' : (reason || 'Connection lost');
+
+  // Clear existing timer for this service (dedup — update in place)
+  if (_svcToastTimers.has(service)) {
+    clearTimeout(_svcToastTimers.get(service));
+    _svcToastTimers.delete(service);
+  }
+
+  // Use existing notify() infrastructure
+  notify(title, sub, color, icon);
+
+  // Override the auto-dismiss timer with our custom duration
+  clearTimeout(window.notifTimer);
+  const tid = setTimeout(() => {
+    const n = document.getElementById('notif');
+    if (n) n.classList.remove('show');
+    _svcToastTimers.delete(service);
+  }, duration);
+  window.notifTimer = tid;
+  notifTimer = tid;
+  _svcToastTimers.set(service, tid);
 }
 
 // ── MODAL ──
@@ -4059,6 +4116,7 @@ window.addEventListener('DOMContentLoaded', () => {
 
   // ── LOAD DATA FROM API (with fallback to local data) ────────────────────
   loadDashboardData();
+  initSystemStatus();
 
   // Render all sections
   renderWAList();
@@ -4105,6 +4163,7 @@ async function apiFetch(url, options) {
   const res = await fetch(url, options);
   if (res.status === 401) {
     console.warn('[AUTH] 401 received — token expired, redirecting to login');
+    appendLocalLogEvent('system', 'error', 'Session expired — please log in again');
     localStorage.clear(); sessionStorage.clear();
     window.location.href = 'login.html';
     return res;
@@ -4161,10 +4220,10 @@ async function loadDashboardData() {
     }
 
     // Show DB connected badge
-    showDbStatus(true);
+    // showDbStatus(true);  // replaced by initSystemStatus() / PostgreSQL health indicator
   } catch(err) {
     console.warn('API not available, using local data:', err.message);
-    showDbStatus(false);
+    // showDbStatus(false);  // replaced by initSystemStatus() / PostgreSQL health indicator
   }
 }
 
@@ -4470,6 +4529,145 @@ async function createCampaign() {
     notify('Campaign saved locally', name + ' (offline)', 'var(--gold)', 'fas fa-bullhorn');
   }
 }
+
+// ── System Health Indicators ──────────────────────────────────────────────
+function updateServiceIndicator(service, online) {
+  const colors = {
+    whatsapp: { on: '#25D366', off: 'var(--red)' },
+    outlook:  { on: '#0078d4', off: 'var(--red)' },
+    pbx:      { on: 'var(--green)', off: 'var(--red)' },
+    postgres: { on: 'var(--green)', off: 'var(--red)' },
+  };
+  const c = colors[service] || { on: 'var(--green)', off: 'var(--red)' };
+  const color = online ? c.on : c.off;
+  const dotEl = document.getElementById('dot-' + service);
+  if (!dotEl) return;
+  if (dotEl.tagName === 'SPAN') {
+    dotEl.style.background = color;
+  } else {
+    dotEl.style.color = color;
+  }
+}
+
+async function initSystemStatus() {
+  try {
+    const res = await fetch(`${API_BASE}/system/status`, { headers: getAuthHeaders() });
+    if (!res.ok) return;
+    const data = await res.json();
+    ['whatsapp', 'pbx', 'outlook', 'postgres'].forEach(svc => {
+      if (data[svc]) updateServiceIndicator(svc, data[svc].status === 'online');
+    });
+  } catch (err) {
+    console.warn('[System] initSystemStatus failed:', err.message);
+  }
+}
+
+// ── Activity Log Panel ────────────────────────────────────────────────────
+let _alpOpen = false;
+let _alpEventCount = 0;
+
+function renderLogEvent(ev) {
+  const icons = { online: '🟢', offline: '🔴', error: '🟡', user_login: '🔵' };
+  const ts = new Date(ev.timestamp);
+  const formatted = ts.toLocaleTimeString('en-GB', { hour12: false }) + ' ' +
+    ts.toLocaleDateString('en-GB', { day:'2-digit', month:'short', year:'2-digit' });
+  const icon = icons[ev.type] || '⚪';
+  return `<div class="alp-row">
+    <span class="alp-icon">${icon}</span>
+    <div class="alp-body">
+      <span class="alp-service">${escHtml(ev.service || '')}</span>
+      <span class="alp-msg">${escHtml(ev.message || '')}</span>
+    </div>
+    <span class="alp-ts">${formatted}</span>
+  </div>`;
+}
+
+function prependLogEvent(ev) {
+  if (!_alpOpen) return;
+  const list = document.getElementById('alp-list');
+  if (!list) return;
+  const div = document.createElement('div');
+  div.innerHTML = renderLogEvent(ev);
+  list.insertBefore(div.firstElementChild, list.firstChild);
+  _alpEventCount++;
+  const countEl = document.getElementById('alp-count');
+  if (countEl) countEl.textContent = `(${_alpEventCount})`;
+}
+
+function appendLocalLogEvent(service, type, message) {
+  prependLogEvent({ service, type, message, timestamp: new Date().toISOString(), seq: 0 });
+}
+
+async function openActivityLog() {
+  _alpOpen = true;
+  const overlay = document.getElementById('activity-log-overlay');
+  const panel   = document.getElementById('activity-log-panel');
+  if (!overlay || !panel) return;
+  overlay.style.display = 'block';
+  panel.style.display   = 'flex';
+  requestAnimationFrame(() => panel.classList.add('alp-open'));
+
+  // Populate user info
+  try {
+    const user = JSON.parse(localStorage.getItem('uc_user') || '{}');
+    const infoEl = document.getElementById('alp-user-info');
+    if (infoEl) infoEl.innerHTML =
+      `<i class="fas fa-user" style="margin-right:5px;color:var(--gold);"></i>` +
+      `<b style="color:var(--text);">${escHtml(user.name || user.username || 'Unknown')}</b>` +
+      `<span style="margin-left:6px;">${escHtml(user.email || '')}</span>`;
+  } catch(_) {}
+
+  // Load events from API
+  try {
+    const res = await fetch(`${API_BASE}/system/log?limit=100`, { headers: getAuthHeaders() });
+    if (res.ok) {
+      const data = await res.json();
+      const list = document.getElementById('alp-list');
+      if (list) {
+        const events = (data.events || []).filter(e => e.seq && e.type && e.service && e.message && e.timestamp);
+        list.innerHTML = events.map(renderLogEvent).join('');
+        _alpEventCount = events.length;
+        const countEl = document.getElementById('alp-count');
+        if (countEl) countEl.textContent = `(${_alpEventCount})`;
+      }
+    }
+  } catch (err) {
+    console.warn('[ActivityLog] Failed to load:', err.message);
+  }
+
+  // Focus trap
+  const panel2 = document.getElementById('activity-log-panel');
+  const focusable = panel2 ? panel2.querySelectorAll('button, [tabindex]:not([tabindex="-1"])') : [];
+  if (focusable.length) focusable[0].focus();
+}
+
+function closeActivityLog() {
+  _alpOpen = false;
+  const overlay = document.getElementById('activity-log-overlay');
+  const panel   = document.getElementById('activity-log-panel');
+  if (!panel) return;
+  panel.classList.remove('alp-open');
+  setTimeout(() => {
+    if (overlay) overlay.style.display = 'none';
+    panel.style.display = 'none';
+  }, 260);
+  // Restore focus to trigger button
+  const btn = document.getElementById('activity-log-btn');
+  if (btn) btn.focus();
+}
+
+function clearActivityLog() {
+  const list = document.getElementById('alp-list');
+  if (list) list.innerHTML = '';
+  _alpEventCount = 0;
+  const countEl = document.getElementById('alp-count');
+  if (countEl) countEl.textContent = '(0)';
+}
+
+// Keyboard: Escape closes the panel
+document.addEventListener('keydown', function(e) {
+  if (e.key === 'Escape' && _alpOpen) closeActivityLog();
+});
 
 // ── OUTLOOK / MICROSOFT GRAPH ────────────────────────────────────────────────
 
@@ -5648,6 +5846,14 @@ function initWASocket() {
     console.log('[PBX] 📞 New call record received via Socket.IO:', call);
     notify('New Call: ' + (call.call_type||'') + ' ' + (call.caller||'') + ' → ' + (call.destination||''), call.duration||'', 'var(--gold)', 'fas fa-phone-alt');
     loadCallLogs();
+  });
+
+  // System health events
+  waSocket.on('system:service_online',  e => { updateServiceIndicator(e.service, true);  prependLogEvent({ ...e, type: 'online',  message: `${e.service} connected` }); notifyService(e.service, true); });
+  waSocket.on('system:service_offline', e => { updateServiceIndicator(e.service, false); prependLogEvent({ ...e, type: 'offline', message: `${e.service} disconnected: ${e.reason || ''}` }); notifyService(e.service, false, e.reason); });
+  waSocket.on('system:log_snapshot', function(data) {
+    // Store snapshot for when panel opens — events already loaded via API on open
+    // Also prepend any events that arrive while panel is open
   });
 
   // Marketing 6 PM reminder
@@ -8242,6 +8448,19 @@ Nagpur, Maharashtra, 440017, India<br>
       <i class="fas fa-download"></i> Download Image
     </a>
   </div>
+</div>
+
+<!-- ── ACTIVITY LOG PANEL ──────────────────────────────────────────────── -->
+<div id="activity-log-overlay" onclick="closeActivityLog()" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.45);z-index:9000;backdrop-filter:blur(2px);"></div>
+<div id="activity-log-panel" style="display:none;position:fixed;top:0;right:0;width:420px;max-width:95vw;height:100vh;background:var(--card);border-left:1px solid var(--border2);z-index:9001;display:flex;flex-direction:column;box-shadow:-4px 0 24px rgba(0,0,0,0.3);transform:translateX(100%);transition:transform 0.25s cubic-bezier(0.4,0,0.2,1);">
+  <div style="padding:14px 18px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px;flex-shrink:0;">
+    <i class="fas fa-list-alt" style="color:var(--gold);"></i>
+    <span style="font-weight:700;font-size:14px;color:var(--text);flex:1;">Activity Log <span id="alp-count" style="font-size:11px;color:var(--muted);font-weight:400;">(0)</span></span>
+    <button class="btn btn-ghost btn-xs" id="alp-clear-btn" onclick="clearActivityLog()" title="Clear log view"><i class="fas fa-trash-alt"></i></button>
+    <button class="btn btn-ghost btn-xs" id="alp-close-btn" onclick="closeActivityLog()" title="Close"><i class="fas fa-times"></i></button>
+  </div>
+  <div id="alp-user-info" style="padding:8px 18px;border-bottom:1px solid var(--border);font-size:11.5px;color:var(--muted);flex-shrink:0;"></div>
+  <div id="alp-list" style="flex:1;overflow-y:auto;padding:8px 0;"></div>
 </div>
 
 </body>

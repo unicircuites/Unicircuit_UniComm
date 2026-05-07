@@ -24,6 +24,10 @@ const wa         = require('./services/whatsapp');
 const smdr       = require('./services/matrixSmdr');
 const mktCron    = require('./services/marketingCron');
 const pool       = require('./db/pool');
+const activityLog  = require('./services/activityLog');
+const systemRoutes = require('./routes/system');
+const { serviceState } = systemRoutes;
+const msGraph      = require('./services/msGraph');
 
 const app = express();
 
@@ -64,6 +68,80 @@ const io = new Server(server, {
 // Inject Socket.IO into WhatsApp service for real-time push
 wa.setIO(io);
 smdr.setIO(io);
+
+// ── SYSTEM BRIDGE & PROBES ─────────────────────────────────────────────────
+
+function _now() { return new Date().toISOString(); }
+
+function markOnline(service) {
+  serviceState[service].status = 'online';
+  serviceState[service].lastConnected = _now();
+  const ev = activityLog.append({ type: 'online', service, message: `${service} connected`, timestamp: _now() });
+  try { _origEmit('system:service_online', { service, timestamp: ev.timestamp, seq: ev.seq }); } catch(_) {}
+}
+
+function markOffline(service, reason) {
+  serviceState[service].status = 'offline';
+  serviceState[service].lastDisconnected = _now();
+  const msg = reason ? `${service} disconnected: ${reason}` : `${service} disconnected`;
+  const ev = activityLog.append({ type: 'offline', service, message: msg, timestamp: _now() });
+  try { _origEmit('system:service_offline', { service, timestamp: ev.timestamp, reason: reason || 'Connection lost', seq: ev.seq }); } catch(_) {}
+}
+
+function systemBridge(event, data) {
+  try {
+    if (event === 'wa:connected')         markOnline('whatsapp');
+    else if (event === 'wa:disconnected') markOffline('whatsapp', data?.reason || data?.lastDisconnect?.error?.output?.statusCode);
+    else if (event === 'pbx:connected')   markOnline('pbx');
+    else if (event === 'pbx:disconnected') markOffline('pbx', data?.reason);
+  } catch (err) {
+    console.error('[SystemBridge] Error:', err.message);
+  }
+}
+
+// Wrap io.emit to intercept wa:* and pbx:* events for the system bridge
+const _origEmit = io.emit.bind(io);
+io.emit = function(event, ...args) {
+  _origEmit(event, ...args);
+  systemBridge(event, args[0]);
+};
+
+// Send activity log snapshot to newly connected Socket.IO clients
+io.on('connection', (socket) => {
+  socket.emit('system:log_snapshot', { events: activityLog.getRecent(100) });
+});
+
+// PostgreSQL pool error → mark offline
+pool.on('error', (err) => {
+  if (serviceState.postgres.status !== 'offline') {
+    markOffline('postgres', err.message);
+  }
+});
+
+// Periodic probes
+const outlookProbeMs = parseInt(process.env.OUTLOOK_PROBE_INTERVAL_MS, 10) || 60000;
+const dbProbeMs      = parseInt(process.env.DB_PROBE_INTERVAL_MS, 10)      || 30000;
+
+// Outlook probe
+setInterval(async () => {
+  try {
+    const auth = await msGraph.isAuthenticated();
+    if (auth && serviceState.outlook.status !== 'online')  markOnline('outlook');
+    else if (!auth && serviceState.outlook.status !== 'offline') markOffline('outlook', 'Outlook token expired or revoked');
+  } catch (err) {
+    console.error('[System] Outlook probe error:', err.message);
+  }
+}, outlookProbeMs);
+
+// PostgreSQL probe
+setInterval(async () => {
+  try {
+    await pool.query('SELECT 1');
+    if (serviceState.postgres.status !== 'online') markOnline('postgres');
+  } catch (err) {
+    if (serviceState.postgres.status !== 'offline') markOffline('postgres', err.message);
+  }
+}, dbProbeMs);
 
 // ── SERVE STATIC HTML FILES — after socket.io path is registered ──────────
 app.use(express.static(path.join(__dirname, '..'), {
@@ -167,6 +245,7 @@ app.use('/api/broadcast', apiLimiter,  require('./routes/broadcast'));
 app.use('/api/templates', apiLimiter,  require('./routes/emailTemplates'));
 app.use('/api/marquee',  require('./routes/marquee'));
 app.use('/api/groups',   apiLimiter,  require('./routes/recipientGroups'));
+app.use('/api/system',  apiLimiter,  require('./routes/system'));
 
 // OAuth2 callback — must be at root level to match redirect URI
 app.use('/auth',          require('./routes/outlook'));
