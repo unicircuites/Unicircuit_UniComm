@@ -69,6 +69,9 @@ const io = new Server(server, {
 wa.setIO(io);
 smdr.setIO(io);
 
+// Initialize activity log with DB persistence (load previous events)
+activityLog.init(pool).catch(err => console.warn('[ActivityLog] Init error:', err.message));
+
 // ── SYSTEM BRIDGE & PROBES ─────────────────────────────────────────────────
 
 function _now() { return new Date().toISOString(); }

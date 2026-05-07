@@ -2,6 +2,7 @@ const express = require('express');
 const pool    = require('../db/pool');
 const mailStore  = require('../services/outlookMailStore');
 const { authenticate } = require('../middleware/auth');
+const activityLog = require('../services/activityLog');
 
 const router = express.Router();
 router.use(authenticate);
@@ -155,6 +156,10 @@ router.post('/', async (req, res) => {
         [req.user.id, 'CREATE', 'contacts', result.rows[0].id, `Created ${fname} ${lname}`]
       );
     } catch (_) {}
+
+    try {
+      activityLog.append({ type: 'info', service: 'system', message: `CRM contact created: ${fname} ${lname} (${email || 'no email'})`, timestamp: new Date().toISOString() });
+    } catch(_) {}
 
     return res.status(201).json(result.rows[0]);
   } catch (err) {

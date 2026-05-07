@@ -25,6 +25,7 @@ const mailStats  = require('../services/outlookContactMailStats');
 const statsCache = require('../services/outlookStatsCache');
 const mailStore  = require('../services/outlookMailStore');
 const { authenticate } = require('../middleware/auth');
+const activityLog = require('../services/activityLog');
 
 const router = express.Router();
 const MS_EMAIL = process.env.MS_USER_EMAIL;
@@ -599,6 +600,9 @@ router.post('/contacts', async (req, res) => {
 
   try {
     const created = await graph.graphPost('/me/contacts', body, MS_EMAIL);
+    try {
+      activityLog.append({ type: 'info', service: 'outlook', message: `Contact saved to Outlook: ${displayName} (${email})`, timestamp: new Date().toISOString() });
+    } catch(_) {}
     return res.status(201).json({
       id:             created.id,
       displayName:    created.displayName,
@@ -634,6 +638,9 @@ router.patch('/contacts/:id', async (req, res) => {
 
   try {
     const updated = await graph.graphPatch(`/me/contacts/${encodeURIComponent(id)}`, body, MS_EMAIL);
+    try {
+      activityLog.append({ type: 'info', service: 'outlook', message: `Contact updated in Outlook: ${displayName}`, timestamp: new Date().toISOString() });
+    } catch(_) {}
     return res.status(200).json({ success: true, displayName: updated.displayName || displayName });
   } catch (err) {
     if (err.message === 'NOT_AUTHENTICATED') {
@@ -712,6 +719,9 @@ router.post('/contacts/import', async (req, res) => {
 router.post('/sync-messages', async (req, res) => {
   try {
     const result = await mailStore.quickSync(MS_EMAIL);
+    try {
+      activityLog.append({ type: 'info', service: 'outlook', message: `Mail sync completed — ${result.first_batch || 0} messages synced`, timestamp: new Date().toISOString() });
+    } catch(_) {}
     return res.json({
       ok: true,
       first_batch:  result.first_batch,
@@ -737,6 +747,9 @@ router.get('/sync-progress', async (req, res) => {
 router.post('/sync-stats', async (req, res) => {
   try {
     const result = await mailStore.quickSync(MS_EMAIL);
+    try {
+      activityLog.append({ type: 'info', service: 'outlook', message: `Mail stats sync completed — ${result.first_batch || 0} records updated`, timestamp: new Date().toISOString() });
+    } catch(_) {}
     return res.json({
       ok: true,
       upserted: result.first_batch,
