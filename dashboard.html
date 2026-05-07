@@ -1094,12 +1094,12 @@ select.inp option{background:#1a2035;color:var(--text);}
       <div class="outlook-menu-item" onclick="toggleOutlookMenu('menu-file')" id="menu-btn-file">
         <span>File</span>
         <div class="outlook-dropdown" id="menu-file" style="display:none;">
-          <div class="outlook-dd-item" onclick="openComposeEmailModal()"><i class="fas fa-pen" style="width:16px;color:#0078d4;"></i> New Email</div>
-          <div class="outlook-dd-item" onclick="loadInbox(true)"><i class="fas fa-sync-alt" style="width:16px;color:var(--muted);"></i> Sync Inbox</div>
+          <div class="outlook-dd-item" onclick="showOutlookAccountInfo()"><i class="fas fa-user-circle" style="width:16px;color:var(--muted);"></i> Account info</div>
           <div class="outlook-dd-divider"></div>
-          <div class="outlook-dd-item" onclick="connectOutlook()"><i class="fab fa-microsoft" style="width:16px;color:#0078d4;"></i> Connect / Re-authenticate</div>
+          <div class="outlook-dd-item" onclick="downloadOutlookEmails()"><i class="fas fa-save" style="width:16px;color:var(--muted);"></i> Download <span style="margin-left:auto;color:var(--muted);font-size:11px;">›</span></div>
+          <div class="outlook-dd-item" onclick="window.print()"><i class="fas fa-print" style="width:16px;color:var(--muted);"></i> Print</div>
           <div class="outlook-dd-divider"></div>
-          <div class="outlook-dd-item" onclick="nav('dashboard',null)"><i class="fas fa-home" style="width:16px;color:var(--muted);"></i> Go to Dashboard</div>
+          <div class="outlook-dd-item" onclick="openOutlookSettings()"><i class="fas fa-cog" style="width:16px;color:var(--muted);"></i> Settings</div>
         </div>
       </div>
       <!-- Home menu -->
@@ -4945,6 +4945,31 @@ let searchTimer         = null;
 let outlookConnectedEmail = '';
 
 // ── Outlook menu bar ─────────────────────────────────────────────────────
+function showOutlookAccountInfo() {
+  const email = (typeof outlookConnectedEmail !== 'undefined' && outlookConnectedEmail) || 'Not connected';
+  notify('Outlook Account', email, '#0078d4', 'fab fa-microsoft');
+}
+
+function downloadOutlookEmails() {
+  // Export current inbox as JSON download
+  fetch(`${API_BASE}/outlook/inbox?top=100`, { headers: getAuthHeaders() })
+    .then(r => r.json())
+    .then(data => {
+      const msgs = data.messages || [];
+      const blob = new Blob([JSON.stringify(msgs, null, 2)], { type: 'application/json' });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = `outlook-inbox-${new Date().toISOString().slice(0,10)}.json`;
+      a.click();
+      URL.revokeObjectURL(a.href);
+    })
+    .catch(err => notify('Download failed', err.message, 'var(--red2)', 'fas fa-exclamation-triangle'));
+}
+
+function openOutlookSettings() {
+  // Show a simple settings info modal using notify
+  notify('Outlook Settings', 'Manage via Azure Portal → App Registrations', '#0078d4', 'fas fa-cog');
+}
 function toggleOutlookMenu(id) {
   const all = ['menu-file','menu-home','menu-view','menu-help'];
   all.forEach(m => {
