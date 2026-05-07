@@ -393,6 +393,13 @@ select.inp option{background:#1a2035;color:var(--text);}
 .col-4060{display:grid;grid-template-columns:1fr 1.4fr;gap:16px;align-items:stretch;}
 /* Outlook: right column fills height; message body scrolls inside card */
 .sec-email-read-col{display:flex;flex-direction:column;min-height:calc(100vh - 140px);max-height:calc(100vh - 140px);min-width:0;}
+/* ── Outlook-style menu bar ── */
+.outlook-menu-item{position:relative;padding:5px 12px;font-size:12.5px;color:var(--text);cursor:pointer;border-radius:4px;user-select:none;white-space:nowrap;}
+.outlook-menu-item:hover,.outlook-menu-item.active{background:rgba(0,120,212,0.12);color:#0078d4;}
+.outlook-dropdown{position:absolute;top:100%;left:0;min-width:210px;background:var(--card);border:1px solid var(--border2);border-radius:6px;box-shadow:0 6px 24px rgba(0,0,0,0.25);z-index:9999;padding:4px 0;margin-top:2px;}
+.outlook-dd-item{padding:7px 16px;font-size:12.5px;color:var(--text);cursor:pointer;display:flex;align-items:center;gap:10px;white-space:nowrap;}
+.outlook-dd-item:hover{background:rgba(0,120,212,0.1);color:#0078d4;}
+.outlook-dd-divider{height:1px;background:var(--border);margin:3px 0;}
 .card.email-detail-stack{display:flex;flex-direction:column;flex:1;min-height:0;overflow:hidden;}
 /* One scroll: outer pane does not scroll; iframe (or plain-text wrap) scrolls internally */
 .card.email-detail-stack #email-detail-body{
@@ -1080,8 +1087,65 @@ select.inp option{background:#1a2035;color:var(--text);}
     <!-- ██████ EMAIL ██████ -->
   <div class="section-view fu" id="sec-email">
 
+    <!-- Outlook-style menu toolbar -->
+    <div id="outlook-menu-bar" style="display:flex;align-items:center;gap:0;background:var(--card2);border:1px solid var(--border);border-radius:8px 8px 0 0;border-bottom:none;padding:0 4px;margin-bottom:0;flex-shrink:0;position:relative;z-index:10;">
+      <!-- File menu -->
+      <div class="outlook-menu-item" onclick="toggleOutlookMenu('menu-file')" id="menu-btn-file">
+        <span>File</span>
+        <div class="outlook-dropdown" id="menu-file" style="display:none;">
+          <div class="outlook-dd-item" onclick="openComposeEmailModal()"><i class="fas fa-pen" style="width:16px;color:#0078d4;"></i> New Email</div>
+          <div class="outlook-dd-item" onclick="loadInbox(true)"><i class="fas fa-sync-alt" style="width:16px;color:var(--muted);"></i> Sync Inbox</div>
+          <div class="outlook-dd-divider"></div>
+          <div class="outlook-dd-item" onclick="connectOutlook()"><i class="fab fa-microsoft" style="width:16px;color:#0078d4;"></i> Connect / Re-authenticate</div>
+          <div class="outlook-dd-divider"></div>
+          <div class="outlook-dd-item" onclick="nav('dashboard',null)"><i class="fas fa-home" style="width:16px;color:var(--muted);"></i> Go to Dashboard</div>
+        </div>
+      </div>
+      <!-- Home menu -->
+      <div class="outlook-menu-item" onclick="toggleOutlookMenu('menu-home')" id="menu-btn-home">
+        <span>Home</span>
+        <div class="outlook-dropdown" id="menu-home" style="display:none;">
+          <div class="outlook-dd-item" onclick="openComposeEmailModal()"><i class="fas fa-pen" style="width:16px;color:#0078d4;"></i> New Email</div>
+          <div class="outlook-dd-item" onclick="openReply(false)" id="menu-reply-btn"><i class="fas fa-reply" style="width:16px;color:var(--muted);"></i> Reply</div>
+          <div class="outlook-dd-item" onclick="openReply(true)"><i class="fas fa-reply-all" style="width:16px;color:var(--muted);"></i> Reply All</div>
+          <div class="outlook-dd-item" onclick="aiDraftReply()"><i class="fas fa-robot" style="width:16px;color:var(--blue2);"></i> AI Draft Reply</div>
+          <div class="outlook-dd-divider"></div>
+          <div class="outlook-dd-item" onclick="switchFolder('inbox', document.getElementById('tab-inbox'))"><i class="fas fa-inbox" style="width:16px;color:#0078d4;"></i> Inbox</div>
+          <div class="outlook-dd-item" onclick="switchFolder('sent', document.getElementById('tab-sent'))"><i class="fas fa-paper-plane" style="width:16px;color:var(--muted);"></i> Sent Items</div>
+          <div class="outlook-dd-divider"></div>
+          <div class="outlook-dd-item" onclick="syncOutlookStats()"><i class="fas fa-database" style="width:16px;color:var(--muted);"></i> Sync Mail Stats</div>
+        </div>
+      </div>
+      <!-- View menu -->
+      <div class="outlook-menu-item" onclick="toggleOutlookMenu('menu-view')" id="menu-btn-view">
+        <span>View</span>
+        <div class="outlook-dropdown" id="menu-view" style="display:none;">
+          <div class="outlook-dd-item" onclick="switchFolder('inbox', document.getElementById('tab-inbox'))"><i class="fas fa-inbox" style="width:16px;color:#0078d4;"></i> Inbox</div>
+          <div class="outlook-dd-item" onclick="switchFolder('sent', document.getElementById('tab-sent'))"><i class="fas fa-paper-plane" style="width:16px;color:var(--muted);"></i> Sent Items</div>
+          <div class="outlook-dd-divider"></div>
+          <div class="outlook-dd-item" onclick="inboxPage(-1)"><i class="fas fa-chevron-left" style="width:16px;color:var(--muted);"></i> Previous Page</div>
+          <div class="outlook-dd-item" onclick="inboxPage(1)"><i class="fas fa-chevron-right" style="width:16px;color:var(--muted);"></i> Next Page</div>
+          <div class="outlook-dd-divider"></div>
+          <div class="outlook-dd-item" onclick="nav('contacts',null)"><i class="fas fa-address-book" style="width:16px;color:var(--muted);"></i> Contacts Directory</div>
+        </div>
+      </div>
+      <!-- Help menu -->
+      <div class="outlook-menu-item" onclick="toggleOutlookMenu('menu-help')" id="menu-btn-help">
+        <span>Help</span>
+        <div class="outlook-dropdown" id="menu-help" style="display:none;">
+          <div class="outlook-dd-item" onclick="nav('ai',null)"><i class="fas fa-robot" style="width:16px;color:var(--blue2);"></i> Ask AI Assistant</div>
+          <div class="outlook-dd-divider"></div>
+          <div class="outlook-dd-item" style="color:var(--muted);cursor:default;font-size:11px;"><i class="fas fa-info-circle" style="width:16px;"></i> UniComm Pro v3.0</div>
+        </div>
+      </div>
+      <div style="flex:1;"></div>
+      <!-- Quick action buttons in toolbar -->
+      <button class="btn btn-blue btn-xs" style="margin:4px 3px;" onclick="openComposeEmailModal()"><i class="fas fa-pen"></i> New Email</button>
+      <button class="btn btn-ghost btn-xs" style="margin:4px 3px;" onclick="loadInbox(true)"><i class="fas fa-sync-alt"></i> Sync</button>
+    </div>
+
     <!-- Connect banner (shown when not authenticated) -->
-    <div id="outlook-connect-banner" style="display:none;margin-bottom:14px;">
+    <div id="outlook-connect-banner" style="display:none;margin-bottom:14px;margin-top:8px;">
       <div style="background:rgba(0,120,212,0.08);border:1px solid rgba(0,120,212,0.25);border-radius:10px;padding:14px 18px;display:flex;align-items:center;gap:14px;flex-wrap:wrap;">
         <i class="fas fa-envelope" style="font-size:22px;color:#0078d4;"></i>
         <div style="flex:1;">
@@ -4878,6 +4942,34 @@ let activeMessageId     = null;
 let searchQuery         = '';
 let searchTimer         = null;
 let outlookConnectedEmail = '';
+
+// ── Outlook menu bar ─────────────────────────────────────────────────────
+function toggleOutlookMenu(id) {
+  const all = ['menu-file','menu-home','menu-view','menu-help'];
+  all.forEach(m => {
+    const el = document.getElementById(m);
+    const btn = document.getElementById('menu-btn-' + m.replace('menu-',''));
+    if (m === id) {
+      const isOpen = el && el.style.display !== 'none';
+      if (el) el.style.display = isOpen ? 'none' : 'block';
+      if (btn) btn.classList.toggle('active', !isOpen);
+    } else {
+      if (el) el.style.display = 'none';
+      if (btn) btn.classList.remove('active');
+    }
+  });
+}
+// Close menus when clicking outside
+document.addEventListener('click', function(e) {
+  if (!e.target.closest('.outlook-menu-item')) {
+    ['menu-file','menu-home','menu-view','menu-help'].forEach(m => {
+      const el = document.getElementById(m);
+      const btn = document.getElementById('menu-btn-' + m.replace('menu-',''));
+      if (el) el.style.display = 'none';
+      if (btn) btn.classList.remove('active');
+    });
+  }
+});
 
 async function checkOutlookStatus() {
   console.log('[OUTLOOK] Checking status...');
