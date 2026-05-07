@@ -90,10 +90,75 @@ function markOffline(service, reason) {
 
 function systemBridge(event, data) {
   try {
-    if (event === 'wa:connected')         markOnline('whatsapp');
-    else if (event === 'wa:disconnected') markOffline('whatsapp', data?.reason || data?.lastDisconnect?.error?.output?.statusCode);
-    else if (event === 'pbx:connected')   markOnline('pbx');
-    else if (event === 'pbx:disconnected') markOffline('pbx', data?.reason);
+    // ── Service connect/disconnect ──────────────────────────────────────
+    if      (event === 'wa:connected')      markOnline('whatsapp');
+    else if (event === 'wa:disconnected')   markOffline('whatsapp', data?.reason || (data?.code ? `code ${data.code}` : null));
+    else if (event === 'pbx:connected')     markOnline('pbx');
+    else if (event === 'pbx:disconnected')  markOffline('pbx', data?.reason);
+
+    // ── WhatsApp activity ───────────────────────────────────────────────
+    else if (event === 'wa:message') {
+      const who  = data?.fromMe ? 'You' : (data?.senderName || data?.chatId || 'Unknown');
+      const chat = data?.chatName || data?.chatId || '';
+      const body = (data?.body || '').slice(0, 60);
+      const msg  = data?.fromMe
+        ? `WA sent to ${chat}: ${body}`
+        : `WA received from ${who} (${chat}): ${body}`;
+      activityLog.append({ type: 'info', service: 'whatsapp', message: msg, timestamp: _now() });
+    }
+    else if (event === 'wa:sync_complete') {
+      activityLog.append({ type: 'info', service: 'whatsapp', message: 'WhatsApp history sync complete', timestamp: _now() });
+    }
+    else if (event === 'wa:qr') {
+      activityLog.append({ type: 'info', service: 'whatsapp', message: 'WhatsApp QR code generated — waiting for scan', timestamp: _now() });
+    }
+
+    // ── PBX call ────────────────────────────────────────────────────────
+    else if (event === 'pbx:call') {
+      const d = data || {};
+      const type = d.call_type || 'Call';
+      const caller = d.caller || '?';
+      const dest   = d.destination || d.extension || '?';
+      const dur    = d.duration || '';
+      activityLog.append({
+        type: 'info', service: 'pbx',
+        message: `PBX ${type}: ${caller} → ${dest}${dur ? ' (' + dur + ')' : ''}`,
+        timestamp: _now(),
+      });
+    }
+
+    // ── Outlook mail sync ───────────────────────────────────────────────
+    else if (event === 'outlook:mail_synced') {
+      const count = data?.count || 0;
+      activityLog.append({ type: 'info', service: 'outlook', message: `Outlook synced ${count} new mail(s)`, timestamp: _now() });
+    }
+    else if (event === 'outlook:unread_update') {
+      activityLog.append({ type: 'info', service: 'outlook', message: `Outlook unread: ${data?.unread ?? '?'}`, timestamp: _now() });
+    }
+
+    // ── Marketing cron ──────────────────────────────────────────────────
+    else if (event === 'marketing:sync_reminder') {
+      activityLog.append({ type: 'info', service: 'system', message: `Marketing reminder: ${data?.message || 'Time to sync EngageBay stats'}`, timestamp: _now() });
+    }
+
+    // ── User login (emitted from auth route) ────────────────────────────
+    else if (event === 'system:user_login') {
+      const user = data?.name || data?.email || 'Unknown user';
+      activityLog.append({ type: 'user_login', service: 'system', message: `User logged in: ${user}`, timestamp: _now() });
+      try { _origEmit('system:activity', { type: 'user_login', service: 'system', message: `User logged in: ${user}`, timestamp: _now() }); } catch(_) {}
+    }
+    else if (event === 'system:user_logout') {
+      const user = data?.name || data?.email || 'Unknown user';
+      activityLog.append({ type: 'user_login', service: 'system', message: `User logged out: ${user}`, timestamp: _now() });
+    }
+
+    // ── Emit generic activity event for all non-connect/disconnect events ─
+    if (!['wa:connected','wa:disconnected','pbx:connected','pbx:disconnected'].includes(event)) {
+      const last = activityLog.getRecent(1)[0];
+      if (last) {
+        try { _origEmit('system:activity', last); } catch(_) {}
+      }
+    }
   } catch (err) {
     console.error('[SystemBridge] Error:', err.message);
   }

@@ -4567,15 +4567,17 @@ let _alpOpen = false;
 let _alpEventCount = 0;
 
 function renderLogEvent(ev) {
-  const icons = { online: '🟢', offline: '🔴', error: '🟡', user_login: '🔵' };
+  const icons = { online: '🟢', offline: '🔴', error: '🟡', user_login: '🔵', info: '⚪' };
+  const serviceIcons = { whatsapp: '📱', pbx: '📞', outlook: '📧', postgres: '🗄️', system: '⚙️' };
   const ts = new Date(ev.timestamp);
   const formatted = ts.toLocaleTimeString('en-GB', { hour12: false }) + ' ' +
     ts.toLocaleDateString('en-GB', { day:'2-digit', month:'short', year:'2-digit' });
   const icon = icons[ev.type] || '⚪';
+  const svcIcon = serviceIcons[ev.service] || '';
   return `<div class="alp-row">
     <span class="alp-icon">${icon}</span>
     <div class="alp-body">
-      <span class="alp-service">${escHtml(ev.service || '')}</span>
+      <span class="alp-service">${svcIcon} ${escHtml(ev.service || '')}</span>
       <span class="alp-msg">${escHtml(ev.message || '')}</span>
     </div>
     <span class="alp-ts">${formatted}</span>
@@ -5855,6 +5857,9 @@ function initWASocket() {
     // Store snapshot for when panel opens — events already loaded via API on open
     // Also prepend any events that arrive while panel is open
   });
+
+  // Generic activity events (WA messages, PBX calls, etc.)
+  waSocket.on('system:activity', e => prependLogEvent(e));
 
   // Marketing 6 PM reminder
   waSocket.on('marketing:sync_reminder', function(data) {

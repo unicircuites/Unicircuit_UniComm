@@ -3,6 +3,7 @@ const bcrypt  = require('bcryptjs');
 const jwt     = require('jsonwebtoken');
 const pool    = require('../db/pool');
 const { authenticate } = require('../middleware/auth');
+const activityLog = require('../services/activityLog');
 
 const router = express.Router();
 
@@ -60,6 +61,11 @@ router.post('/login', async (req, res) => {
       process.env.JWT_SECRET || 'unicomm_secret',
       { expiresIn: process.env.JWT_EXPIRES || '8h' }
     );
+
+    // Log user login to activity log
+    try {
+      activityLog.append({ type: 'user_login', service: 'system', message: `User logged in: ${user.name} (${user.email})`, timestamp: new Date().toISOString() });
+    } catch (_) {}
 
     return res.json({ token, user: payload });
 
