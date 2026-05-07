@@ -283,9 +283,37 @@ async function graphPatch(endpoint, body, email) {
 
 // ── CHECK AUTH STATUS ──────────────────────────────────────────────────────
 // Actually verify mailbox access — not just token existence
+// IMPORTANT: Only checks delegated (user) token, NOT client credentials
 async function isAuthenticated(email) {
   try {
-    const token = await getAccessToken(email || process.env.MS_USER_EMAIL);
+    const stored = await getStoredTokens(email || process.env.MS_USER_EMAIL);
+    // No stored token at all
+    if (!stored || (!stored.access_token && !stored.refresh_token)) return false;
+
+    // Try to get a delegated token (will use refresh token if access token expired)
+    // We bypass client credentials by checking stored tokens directly
+    const expiresAt = stored.expires_at ? new Date(stored.expires_at) : null;
+    let token = null;
+
+    if (expiresAt && expiresAt > new Date(Date.now() + 5 * 60 * 1000)) {
+      // Access token still valid
+      token = stored.access_token;
+    } else if (stored.refresh_token) {
+      // Try refresh
+      try {
+        const result = await cca.acquireTokenByRefreshToken({
+          refreshToken: stored.refresh_token,
+          scopes: SCOPES,
+        });
+        await saveTokens(email || process.env.MS_USER_EMAIL, result);
+        token = result.accessToken;
+      } catch (_) {
+        return false; // Refresh failed — user needs to re-auth
+      }
+    } else {
+      return false;
+    }
+
     if (!token) return false;
 
     // Do a real Graph call to verify mailbox access works

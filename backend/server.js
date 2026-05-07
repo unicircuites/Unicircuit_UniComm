@@ -191,20 +191,27 @@ const dbProbeMs      = parseInt(process.env.DB_PROBE_INTERVAL_MS, 10)      || 30
 
 async function probeOutlook() {
   try {
-    const token = await msGraph.getAccessToken(process.env.MS_USER_EMAIL);
-    if (!token) {
-      // No token at all — needs full re-auth (MFA likely required)
+    // Check if user has a valid delegated token (not client credentials)
+    const stored = await require('./db/pool').query(
+      `SELECT access_token, refresh_token, expires_at FROM ms_tokens WHERE user_email = $1`,
+      [process.env.MS_USER_EMAIL]
+    ).catch(() => ({ rows: [] }));
+
+    const row = stored.rows && stored.rows[0];
+    if (!row || (!row.access_token && !row.refresh_token)) {
+      // No delegated token at all — needs full re-auth
       if (serviceState.outlook.status !== 'offline') {
         markOffline('outlook', 'No token — full re-authentication required (MFA may be needed)');
       }
       return;
     }
-    // Token exists — verify it actually works
+
+    // Token exists — verify it actually works with a real Graph call
     const auth = await msGraph.isAuthenticated();
     if (auth) {
       if (serviceState.outlook.status !== 'online') markOnline('outlook');
     } else {
-      // Token exists but rejected — likely expired/revoked, can re-auth without MFA
+      // Token exists but rejected — likely expired, can re-auth without MFA
       if (serviceState.outlook.status !== 'offline') {
         markOffline('outlook', 'Token expired — click Connect Outlook to re-authenticate (no MFA needed)');
       }
