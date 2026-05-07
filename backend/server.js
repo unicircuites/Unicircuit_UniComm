@@ -229,6 +229,22 @@ async function probePostgres() {
 // Run initial probes after 3s (give server time to fully start)
 setTimeout(() => { probeOutlook(); probePostgres(); }, 3000);
 
+// ── Token keepalive — refresh token every 6h to prevent expiry ────────────
+// Microsoft refresh tokens expire after 90 days of inactivity.
+// This lightweight call every 6h keeps the token alive indefinitely.
+const tokenKeepaliveMs = parseInt(process.env.TOKEN_KEEPALIVE_MS, 10) || (6 * 60 * 60 * 1000); // 6 hours
+setInterval(async () => {
+  try {
+    const token = await msGraph.getAccessToken(process.env.MS_USER_EMAIL);
+    if (token) {
+      console.log('[System] ✅ Outlook token keepalive — token refreshed');
+      activityLog.append({ type: 'info', service: 'outlook', message: 'Outlook token keepalive — token refreshed successfully', timestamp: new Date().toISOString() });
+    }
+  } catch (err) {
+    console.warn('[System] Token keepalive failed:', err.message);
+  }
+}, tokenKeepaliveMs);
+
 // Outlook probe
 setInterval(probeOutlook, outlookProbeMs);
 
