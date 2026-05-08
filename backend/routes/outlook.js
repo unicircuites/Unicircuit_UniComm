@@ -390,8 +390,8 @@ async function setSignatureDefault(kind, id) {
 async function fetchAllOutlookContactsGraph(email) {
   const token = await graph.getAccessToken(email);
   if (!token) throw new Error('NOT_AUTHENTICATED');
-  // homePhones and otherPhones added — many contacts store phone there instead of mobilePhone
-  const sel = 'id,displayName,givenName,surname,emailAddresses,businessPhones,mobilePhone,homePhones,otherPhones,companyName,jobTitle';
+  // homePhones added — many contacts store phone there instead of mobilePhone
+  const sel = 'id,displayName,givenName,surname,emailAddresses,businessPhones,mobilePhone,homePhones,companyName,jobTitle';
   const rows = [];
 
   async function readPages(firstUrl) {
@@ -427,7 +427,7 @@ async function fetchAllOutlookContactsGraph(email) {
   // Deep debug log — shows exactly what Graph returned for each contact
   console.log(`[Outlook Contacts] fetchAllOutlookContactsGraph — total fetched: ${rows.length}`);
   rows.forEach((c, i) => {
-    const hasPhone = c.mobilePhone || (c.businessPhones && c.businessPhones.length) || (c.homePhones && c.homePhones.length) || (c.otherPhones && c.otherPhones.length);
+    const hasPhone = c.mobilePhone || (c.businessPhones && c.businessPhones.length) || (c.homePhones && c.homePhones.length);
     if (hasPhone || i < 5) { // log first 5 + any with phone
       console.log(`[Outlook Contacts][${i}] "${c.displayName}" | mobile="${c.mobilePhone}" | business=${JSON.stringify(c.businessPhones)} | home=${JSON.stringify(c.homePhones)} | other=${JSON.stringify(c.otherPhones)} | email=${JSON.stringify((c.emailAddresses||[]).map(e=>e.address))}`);
     }
@@ -445,11 +445,10 @@ function mapOutlookContactToDirectoryItem(contact) {
     || email
     || 'Outlook contact';
 
-  // Resolve best phone: mobilePhone > businessPhones > homePhones > otherPhones
+  // Resolve best phone: mobilePhone > businessPhones > homePhones
   const resolvedPhone = contact.mobilePhone
     || (Array.isArray(contact.businessPhones) && contact.businessPhones.find(Boolean))
     || (Array.isArray(contact.homePhones) && contact.homePhones.find(Boolean))
-    || (Array.isArray(contact.otherPhones) && contact.otherPhones.find(Boolean))
     || null;
 
   return {
