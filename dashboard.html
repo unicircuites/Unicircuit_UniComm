@@ -5703,7 +5703,8 @@ function removeAssignee(index) {
 // Open assignee picker from task modal
 function openAssigneePickerForTask() {
   openModal('assignee-picker-overlay');
-  switchAssignSource('users');
+  // Use setTimeout to ensure the modal's 'open' class is applied before loading
+  setTimeout(function() { switchAssignSource('users'); }, 0);
 }
 
 // Called from confirmAssigneePick — adds to list instead of replacing
@@ -6038,33 +6039,54 @@ async function switchAssignSource(src) {
       select.innerHTML = opts || '<option value="">No contacts with email found</option>';
 
     } else if (src === 'whatsapp') {
+      // Load WA contacts from DB (synced) — individual chats only, no groups
       if (!waAllChats.length) {
         const res = await fetch(API_BASE + '/wa/chats', { headers: getAuthHeaders() });
         if (res.ok) waAllChats = await res.json();
       }
-      const chats = waAllChats.filter(function(c) { return c.name || c.phone; });
-      if (!chats.length) { select.innerHTML = '<option value="">No WhatsApp contacts found</option>'; return; }
-      select._assignSourceData = chats;
-      select.innerHTML = chats.map(function(c) {
-        var label = (c.name || c.phone || c.id || '');
-        if (c.phone && c.name && c.phone !== c.name) label += ' · ' + c.phone;
-        return '<option value="' + escAttr(c.id || c.phone || '') + '" data-name="' + escAttr(c.name||'') + '" data-email="" data-phone="' + escAttr(c.phone||'') + '">'
+      // Filter to individual contacts only (not groups, not imports)
+      const contacts = waAllChats.filter(function(c) {
+        return !c.is_group && c.id && !String(c.id).startsWith('import_') && (c.name || c.phone);
+      });
+      if (!contacts.length) { select.innerHTML = '<option value="">No WhatsApp contacts found</option>'; return; }
+      select._assignSourceData = contacts;
+      select.innerHTML = contacts.map(function(c) {
+        // Extract phone number from JID (e.g. "919545073545@s.whatsapp.net" → "+919545073545")
+        var jidPhone = String(c.id || '').split('@')[0];
+        var phone = c.phone || (jidPhone ? '+' + jidPhone : '');
+        var name  = c.name || phone || c.id || '';
+        var label = name + (phone && phone !== name ? ' · ' + phone : '');
+        return '<option value="' + escAttr(c.id || '') + '" data-name="' + escAttr(name) + '" data-email="" data-phone="' + escAttr(phone) + '">'
           + escHtml(label) + '</option>';
       }).join('');
 
     } else if (src === 'group') {
+      // Load contact groups and show members to pick from
       const gsel = document.getElementById('assign-group-select');
       if (gsel && gsel.options.length <= 1) {
         const res = await fetch(API_BASE + '/groups', { headers: getAuthHeaders() });
         if (res.ok) {
           const groups = await res.json();
+          if (!groups.length) {
+            select.innerHTML = '<option value="">No groups found</option>';
+            return;
+          }
           groups.forEach(function(g) {
             const opt = document.createElement('option');
             opt.value = g.id;
             opt.textContent = g.name + ' (' + (g.member_count || 0) + ')';
             gsel.appendChild(opt);
           });
+          // Auto-load first group's members
+          if (groups.length) {
+            gsel.value = groups[0].id;
+            await assignLoadFromGroup();
+            return;
+          }
         }
+      } else if (gsel && gsel.value) {
+        await assignLoadFromGroup();
+        return;
       }
       select.innerHTML = '<option value="">— Load a group first —</option>';
     }
