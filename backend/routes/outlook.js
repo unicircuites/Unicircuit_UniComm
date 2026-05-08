@@ -390,7 +390,8 @@ async function setSignatureDefault(kind, id) {
 async function fetchAllOutlookContactsGraph(email) {
   const token = await graph.getAccessToken(email);
   if (!token) throw new Error('NOT_AUTHENTICATED');
-  const sel = 'id,displayName,givenName,surname,emailAddresses,businessPhones,mobilePhone,companyName,jobTitle';
+  // homePhones and otherPhones added — many contacts store phone there instead of mobilePhone
+  const sel = 'id,displayName,givenName,surname,emailAddresses,businessPhones,mobilePhone,homePhones,otherPhones,companyName,jobTitle';
   const rows = [];
 
   async function readPages(firstUrl) {
@@ -426,8 +427,13 @@ async function fetchAllOutlookContactsGraph(email) {
   // Deep debug log — shows exactly what Graph returned for each contact
   console.log(`[Outlook Contacts] fetchAllOutlookContactsGraph — total fetched: ${rows.length}`);
   rows.forEach((c, i) => {
-    console.log(`[Outlook Contacts][${i}] id=${c.id} | displayName="${c.displayName}" | givenName="${c.givenName}" | surname="${c.surname}" | mobilePhone="${c.mobilePhone}" | businessPhones=${JSON.stringify(c.businessPhones)} | emailAddresses=${JSON.stringify(c.emailAddresses)}`);
+    const hasPhone = c.mobilePhone || (c.businessPhones && c.businessPhones.length) || (c.homePhones && c.homePhones.length) || (c.otherPhones && c.otherPhones.length);
+    if (hasPhone || i < 5) { // log first 5 + any with phone
+      console.log(`[Outlook Contacts][${i}] "${c.displayName}" | mobile="${c.mobilePhone}" | business=${JSON.stringify(c.businessPhones)} | home=${JSON.stringify(c.homePhones)} | other=${JSON.stringify(c.otherPhones)} | email=${JSON.stringify((c.emailAddresses||[]).map(e=>e.address))}`);
+    }
   });
+  const withPhone = rows.filter(c => c.mobilePhone || (c.businessPhones && c.businessPhones.length) || (c.homePhones && c.homePhones.length));
+  console.log(`[Outlook Contacts] Contacts WITH any phone number: ${withPhone.length} / ${rows.length}`);
 
   return rows;
 }
@@ -438,9 +444,18 @@ function mapOutlookContactToDirectoryItem(contact) {
     || [contact.givenName, contact.surname].filter(Boolean).join(' ')
     || email
     || 'Outlook contact';
+
+  // Resolve best phone: mobilePhone > businessPhones > homePhones > otherPhones
+  const resolvedPhone = contact.mobilePhone
+    || (Array.isArray(contact.businessPhones) && contact.businessPhones.find(Boolean))
+    || (Array.isArray(contact.homePhones) && contact.homePhones.find(Boolean))
+    || (Array.isArray(contact.otherPhones) && contact.otherPhones.find(Boolean))
+    || null;
+
   return {
     ...contact,
     displayName,
+    mobilePhone: resolvedPhone || contact.mobilePhone || null,
     source: 'outlook-contacts',
     outlookPeopleUrl: `https://outlook.cloud.microsoft/people/?q=${encodeURIComponent(email || displayName)}`,
   };
