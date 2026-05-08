@@ -6008,113 +6008,93 @@ async function switchAssignSource(src) {
   // Target the visible select — new picker modal or old assign modal
   const pickerOverlay = document.getElementById('assignee-picker-overlay');
   const isNewPicker = pickerOverlay && pickerOverlay.classList.contains('open');
-  const select = isNewPicker
-    ? document.getElementById('assignee-picker-list')
-    : document.getElementById('mail-task-assignee');
-  if (!select) return;
-  select.innerHTML = '<option value="">Loading…</option>';
 
-  // Store source data for confirmAssigneePick
-  select._assignSource = src;
-  select._assignSourceData = [];
+  // For old assign modal (mail-task-assignee), keep using select
+  if (!isNewPicker) {
+    const select = document.getElementById('mail-task-assignee');
+    if (!select) return;
+    select.innerHTML = '<option value="">Loading…</option>';
+    select._assignSource = src;
+    // (old modal logic — minimal, just populate select)
+    try {
+      if (src === 'users') {
+        const users = await loadMailTaskUsers();
+        select.innerHTML = users.map(function(u) {
+          return '<option value="' + u.id + '">' + escHtml(u.name || u.email) + (u.role ? ' · ' + escHtml(u.role) : '') + '</option>';
+        }).join('') || '<option value="">No users found</option>';
+      }
+    } catch (err) { select.innerHTML = '<option value="">Error: ' + escHtml(err.message) + '</option>'; }
+    return;
+  }
+
+  // ── New picker modal: render checkbox list ────────────────────────────────
+  const listContainer = document.getElementById('assignee-cb-list');
+  const countEl       = document.getElementById('assignee-cb-count');
+  if (!listContainer) return;
+  listContainer.innerHTML = '<div style="padding:14px;text-align:center;"><div class="spin-loader" style="margin:0 auto;"></div></div>';
+  if (countEl) countEl.textContent = '0 selected';
+
+  function renderCbList(items) {
+    // items: [{name, email, phone, userId, label}]
+    if (!items.length) { listContainer.innerHTML = '<div style="padding:14px;color:var(--muted);font-size:12.5px;text-align:center;">No contacts found</div>'; return; }
+    listContainer.innerHTML = items.map(function(item, i) {
+      var uid = 'apick-' + src + '-' + i;
+      return '<label style="display:flex;align-items:center;gap:9px;padding:7px 10px;cursor:pointer;border-radius:6px;transition:background 0.1s;" onmouseover="this.style.background=\'rgba(255,255,255,0.04)\'" onmouseout="this.style.background=\'\'">'
+        + '<input type="checkbox" id="' + escAttr(uid) + '" class="assignee-cb" style="accent-color:var(--gold);width:14px;height:14px;flex-shrink:0;" onchange="updateAssigneeCbCount()"'
+        + ' data-name="' + escAttr(item.name || '') + '" data-email="' + escAttr(item.email || '') + '" data-phone="' + escAttr(item.phone || '') + '" data-userid="' + escAttr(String(item.userId || '')) + '">'
+        + '<span style="font-size:12.5px;color:var(--text);min-width:0;">' + escHtml(item.label || item.name || item.email || '') + '</span>'
+        + '</label>';
+    }).join('');
+  }
 
   try {
     if (src === 'users') {
       const users = await loadMailTaskUsers();
-      if (!users.length) { select.innerHTML = '<option value="">No users found</option>'; return; }
-      select._assignSourceData = users;
-      select.innerHTML = users.map(function(u) {
-        return '<option value="' + u.id + '" data-name="' + escAttr(u.name||u.email) + '" data-email="' + escAttr(u.email||'') + '" data-phone="">'
-          + escHtml(u.name || u.email) + (u.role ? ' · ' + escHtml(u.role) : '') + '</option>';
-      }).join('');
+      renderCbList(users.map(function(u) {
+        return { name: u.name || u.email, email: u.email || '', phone: '', userId: u.id,
+          label: (u.name || u.email) + (u.role ? ' · ' + escHtml(u.role) : '') };
+      }));
 
     } else if (src === 'outlook') {
       const res = await fetch(API_BASE + '/outlook/contacts?_=' + Date.now(), { headers: getAuthHeaders(), cache: 'no-store' });
       const raw = await res.json();
       const contacts = Array.isArray(raw) ? raw : (raw.contacts || []);
-      if (!res.ok) { select.innerHTML = '<option value="">Outlook error: ' + escHtml(raw.error || raw.message || 'Unknown') + '</option>'; return; }
-      if (!contacts.length) { select.innerHTML = '<option value="">No Outlook contacts found</option>'; return; }
-      select._assignSourceData = contacts;
-      const opts = contacts.map(function(c) {
+      if (!res.ok) { listContainer.innerHTML = '<div style="padding:12px;color:var(--red2);font-size:12.5px;">Outlook error: ' + escHtml(raw.error || 'Unknown') + '</div>'; return; }
+      renderCbList(contacts.map(function(c) {
         var email = (c.emailAddresses && c.emailAddresses[0] && c.emailAddresses[0].address) || c.email || '';
         var phone = c.mobilePhone || (c.businessPhones && c.businessPhones[0]) || '';
         var name  = c.displayName || c.name || email;
-        if (!name && !email) return null;
         var label = name + (email && email !== name ? ' <' + email + '>' : '');
-        return '<option value="' + escAttr(email || c.id || '') + '" data-name="' + escAttr(name) + '" data-email="' + escAttr(email) + '" data-phone="' + escAttr(phone) + '">'
-          + escHtml(label.trim()) + '</option>';
-      }).filter(Boolean).join('');
-      select.innerHTML = opts || '<option value="">No contacts with email found</option>';
+        return { name, email, phone, userId: null, label: label.trim() };
+      }).filter(function(c) { return c.name || c.email; }));
 
     } else if (src === 'whatsapp') {
-      // Check WA connection status first
       try {
         const statusRes = await fetch(API_BASE + '/wa/status', { headers: getAuthHeaders() });
         const statusData = statusRes.ok ? await statusRes.json() : {};
         if (!statusData.connected) {
-          select.innerHTML = '<option value="">WhatsApp not connected — scan QR first</option>';
-          const prev = document.getElementById('assignee-pick-preview');
-          if (prev) prev.innerHTML = '<span style="color:var(--gold);"><i class="fas fa-exclamation-triangle"></i> WhatsApp is not connected. Go to WhatsApp section and scan the QR code first.</span>';
+          listContainer.innerHTML = '<div style="padding:14px;color:var(--gold);font-size:12.5px;text-align:center;"><i class="fas fa-exclamation-triangle"></i> WhatsApp not connected — scan QR first</div>';
           return;
         }
       } catch (_) {}
-
-      // Load WA contacts from DB (synced) — individual chats only, no groups
       if (!waAllChats.length) {
         const res = await fetch(API_BASE + '/wa/chats', { headers: getAuthHeaders() });
         if (res.ok) waAllChats = await res.json();
       }
-      // Filter to individual contacts only (not groups, not imports)
       const contacts = waAllChats.filter(function(c) {
         return !c.is_group && c.id && !String(c.id).startsWith('import_') && (c.name || c.phone);
       });
-      if (!contacts.length) { select.innerHTML = '<option value="">No WhatsApp contacts found</option>'; return; }
-      select._assignSourceData = contacts;
-      select.innerHTML = contacts.map(function(c) {
-        // Extract phone number from JID (e.g. "919545073545@s.whatsapp.net" → "+919545073545")
+      renderCbList(contacts.map(function(c) {
         var jidPhone = String(c.id || '').split('@')[0];
         var phone = c.phone || (jidPhone ? '+' + jidPhone : '');
         var name  = c.name || phone || c.id || '';
         var label = name + (phone && phone !== name ? ' · ' + phone : '');
-        return '<option value="' + escAttr(c.id || '') + '" data-name="' + escAttr(name) + '" data-email="" data-phone="' + escAttr(phone) + '">'
-          + escHtml(label) + '</option>';
-      }).join('');
-
-    } else if (src === 'group') {
-      // Show accordion view, hide normal list
-      const normalPane = document.getElementById('assignee-picker-normal');
-      const groupPane  = document.getElementById('assignee-picker-groups');
-      if (normalPane) normalPane.style.display = 'none';
-      if (groupPane)  groupPane.style.display  = 'block';
-
-      const accordion = document.getElementById('group-accordion-list');
-      if (!accordion) return;
-      accordion.innerHTML = '<div style="padding:14px;text-align:center;"><div class="spin-loader" style="margin:0 auto;"></div></div>';
-
-      try {
-        const res = await fetch(API_BASE + '/groups', { headers: getAuthHeaders() });
-        if (!res.ok) { accordion.innerHTML = '<div style="padding:12px;color:var(--red2);font-size:12.5px;">Failed to load groups</div>'; return; }
-        const groups = await res.json();
-        if (!groups.length) { accordion.innerHTML = '<div style="padding:14px;color:var(--muted);font-size:12.5px;text-align:center;">No groups found</div>'; return; }
-        accordion.innerHTML = groups.map(function(g) {
-          return '<div class="group-accordion-item" id="gai-' + g.id + '" style="border-bottom:1px solid var(--border);">'
-            + '<div style="display:flex;align-items:center;gap:8px;padding:10px 12px;cursor:pointer;" onclick="toggleGroupAccordion(' + g.id + ')">'
-            + '<i class="fas fa-users" style="color:var(--cyan);font-size:12px;flex-shrink:0;"></i>'
-            + '<span style="flex:1;font-size:13px;font-weight:600;color:var(--text);">' + escHtml(g.name) + '</span>'
-            + '<span style="font-size:11px;color:var(--muted);">' + (g.member_count || 0) + ' members</span>'
-            + '<i class="fas fa-chevron-down" id="gai-icon-' + g.id + '" style="color:var(--muted);font-size:11px;transition:transform 0.2s;margin-left:6px;"></i>'
-            + '</div>'
-            + '<div id="gai-members-' + g.id + '" style="display:none;padding:0 12px 8px 32px;"></div>'
-            + '</div>';
-        }).join('');
-        updateGroupSelectedCount();
-      } catch (err) {
-        accordion.innerHTML = '<div style="padding:12px;color:var(--red2);font-size:12.5px;">' + escHtml(err.message) + '</div>';
-      }
-      return; // Don't fall through to normal select logic
+        return { name, email: '', phone, userId: null, label };
+      }));
     }
   } catch (err) {
-    select.innerHTML = '<option value="">Error: ' + escHtml(err.message) + '</option>';
+    const lc = document.getElementById('assignee-cb-list');
+    if (lc) lc.innerHTML = '<div style="padding:12px;color:var(--red2);font-size:12.5px;">Error: ' + escHtml(err.message) + '</div>';
     console.error('[switchAssignSource]', src, err);
   }
 }
@@ -6132,6 +6112,7 @@ function previewAssigneePick() {
 }
 
 function confirmAssigneePick() {
+  // Legacy — kept for old assign modal
   const sel = document.getElementById('assignee-picker-list');
   if (!sel || !sel.value) { notify('Select a contact first', '', 'var(--red)', 'fas fa-exclamation-circle'); return; }
   const opt = sel.options[sel.selectedIndex];
@@ -6141,6 +6122,41 @@ function confirmAssigneePick() {
   const src   = sel._assignSource || 'users';
   const userId = src === 'users' ? (parseInt(sel.value, 10) || null) : null;
   selectAssigneeForTask(name, email, phone, userId);
+}
+
+function updateAssigneeCbCount() {
+  const cbs = document.querySelectorAll('.assignee-cb:checked');
+  const el  = document.getElementById('assignee-cb-count');
+  if (el) el.textContent = cbs.length + ' selected';
+}
+
+function filterAssigneeCbList(query) {
+  const q = (query || '').toLowerCase();
+  const labels = document.querySelectorAll('#assignee-cb-list label');
+  labels.forEach(function(lbl) {
+    const text = lbl.textContent.toLowerCase();
+    lbl.style.display = (!q || text.includes(q)) ? '' : 'none';
+  });
+}
+
+function confirmAssigneeCbPick() {
+  const cbs = document.querySelectorAll('.assignee-cb:checked');
+  if (!cbs.length) { notify('Select at least one contact', '', 'var(--red)', 'fas fa-exclamation-circle'); return; }
+  cbs.forEach(function(cb) {
+    const name   = cb.getAttribute('data-name')   || '';
+    const email  = cb.getAttribute('data-email')  || '';
+    const phone  = cb.getAttribute('data-phone')  || '';
+    const userId = cb.getAttribute('data-userid') ? (parseInt(cb.getAttribute('data-userid'), 10) || null) : null;
+    const isDupe = taskModalAssignees.some(function(a) {
+      return (email && a.email === email) || (userId && a.userId === userId);
+    });
+    if (!isDupe) {
+      taskModalAssignees.push({ name, email, phone, userId });
+    }
+  });
+  renderAssigneeChips();
+  closeModal('assignee-picker-overlay');
+  notify(cbs.length + ' contact' + (cbs.length > 1 ? 's' : '') + ' added', '', 'var(--gold)', 'fas fa-user-check');
 }
 
 // ── Group Accordion ───────────────────────────────────────────────────────────
@@ -6199,7 +6215,6 @@ function updateGroupSelectedCount() {
   const el  = document.getElementById('group-selected-count');
   if (el) el.textContent = cbs.length + ' selected';
 }
-
 function confirmGroupPick() {
   const cbs = document.querySelectorAll('.group-member-cb:checked');
   if (!cbs.length) { notify('Select at least one member', '', 'var(--red)', 'fas fa-exclamation-circle'); return; }
@@ -10518,11 +10533,19 @@ function etUseInBroadcast() {
       <div id="assign-group-row" style="display:none;"></div>
       <!-- Normal assignee list (Users / Outlook / WhatsApp) -->
       <div id="assignee-picker-normal" style="display:block;">
-        <select id="assignee-picker-list" class="inp" size="8" style="height:200px;overflow-y:auto;" onchange="previewAssigneePick()"></select>
-        <div id="assignee-pick-preview" style="font-size:11.5px;color:var(--muted2);margin-top:6px;min-height:16px;"></div>
-        <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:10px;">
-          <button class="btn btn-ghost btn-sm" onclick="closeModal('assignee-picker-overlay')">Cancel</button>
-          <button class="btn btn-gold btn-sm"  onclick="confirmAssigneePick()"><i class="fas fa-check"></i> Select</button>
+        <!-- Search box -->
+        <div class="search-box" style="margin-bottom:8px;">
+          <i class="fas fa-search"></i>
+          <input type="text" placeholder="Search…" oninput="filterAssigneeCbList(this.value)" style="background:none;border:none;outline:none;color:var(--text);font-size:13px;font-family:'Outfit';flex:1;">
+        </div>
+        <!-- Checkbox list -->
+        <div id="assignee-cb-list" style="max-height:240px;overflow-y:auto;border:1px solid var(--border);border-radius:8px;"></div>
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-top:10px;">
+          <span id="assignee-cb-count" style="font-size:12px;color:var(--muted2);">0 selected</span>
+          <div style="display:flex;gap:8px;">
+            <button class="btn btn-ghost btn-sm" onclick="closeModal('assignee-picker-overlay')">Cancel</button>
+            <button class="btn btn-gold btn-sm" onclick="confirmAssigneeCbPick()"><i class="fas fa-check"></i> Add Selected</button>
+          </div>
         </div>
       </div>
       <!-- Group accordion (shown only for Group tab) -->
