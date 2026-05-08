@@ -1470,6 +1470,7 @@ select.inp option{background:#1a2035;color:var(--text);}
           <div id="contacts-tools-outlook" style="display:none;gap:8px;flex-wrap:wrap;align-items:center;">
             <button type="button" class="btn btn-ghost btn-sm" onclick="loadOutlookContactsDirectory()"><i class="fas fa-sync-alt"></i> Refresh</button>
             <button type="button" class="btn btn-blue btn-sm outlook-import-btn" data-import-label="<i class=&quot;fab fa-microsoft&quot;></i> Import to CRM" onclick="importOutlookContactsToCRM()"><i class="fab fa-microsoft"></i> Import to CRM</button>
+            <button type="button" class="btn btn-ghost btn-sm" style="color:var(--green2);border-color:rgba(52,211,153,0.3);" id="outlook-sync-btn" onclick="syncOutlookContactsWithCRM()"><i class="fas fa-arrows-rotate"></i> Sync with Outlook</button>
             <button type="button" class="btn btn-ghost btn-sm" onclick="nav('email', null)"><i class="fas fa-envelope"></i> Mail</button>
           </div>
           <div id="contacts-tools-wa" style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
@@ -4589,6 +4590,35 @@ async function importOutlookContactsToCRM() {
       const def = b.getAttribute('data-import-label');
       b.innerHTML = def || '<i class="fab fa-microsoft"></i> Import';
     });
+  }
+}
+
+async function syncOutlookContactsWithCRM() {
+  const btn = document.getElementById('outlook-sync-btn');
+  if (btn) { btn.disabled = true; btn.innerHTML = '<span class="spin-loader"></span> Syncing…'; }
+  try {
+    const res = await fetch(`${API_BASE}/outlook/contacts/sync`, { method: 'POST', headers: getAuthHeaders() });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      if (data.error === 'NOT_AUTHENTICATED') {
+        notify('Outlook not connected', 'Open Email / Outlook and connect your mailbox first.', 'var(--red)', 'fab fa-microsoft');
+      } else {
+        notify('Sync failed', data.error || res.statusText, 'var(--red)', 'fas fa-exclamation-circle');
+      }
+      return;
+    }
+    notify(
+      'Outlook sync complete',
+      `Added ${data.imported} · Updated ${data.updated} · Removed ${data.deleted} · ${data.total} in Outlook`,
+      'var(--green)',
+      'fas fa-arrows-rotate'
+    );
+    await loadDashboardData();
+    filterContacts();
+  } catch (e) {
+    notify('Sync error', e.message, 'var(--red)', 'fas fa-exclamation-circle');
+  } finally {
+    if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fas fa-arrows-rotate"></i> Sync with Outlook'; }
   }
 }
 

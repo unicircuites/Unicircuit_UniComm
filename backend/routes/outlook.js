@@ -1018,6 +1018,130 @@ router.patch('/contacts/:id', async (req, res) => {
   }
 });
 
+// ── POST /api/outlook/contacts/sync ───────────────────────────────────────
+// Full two-way sync: add new Outlook contacts, update phone numbers, delete contacts
+// that exist in UniComm CRM but are NOT in Outlook (i.e. were removed from Outlook).
+router.post('/contacts/sync', async (req, res) => {
+  const palettes = [
+    ['#1d4ed8', 'rgba(29,78,216,0.15)'], ['#d97706', 'rgba(217,119,6,0.15)'],
+    ['#7c3aed', 'rgba(124,58,237,0.15)'], ['#059669', 'rgba(5,150,105,0.15)'],
+    ['#dc2626', 'rgba(220,38,38,0.15)'], ['#0891b2', 'rgba(8,145,178,0.15)'],
+    ['#65a30d', 'rgba(101,163,13,0.15)'], ['#9333ea', 'rgba(147,51,234,0.15)'],
+  ];
+  try {
+    // 1. Fetch all Outlook contacts
+    const outlookContacts = await fetchAllOutlookContactsGraph(MS_EMAIL);
+
+    // Build a set of Outlook emails (lowercase) and Graph IDs for fast lookup
+    const outlookEmailSet = new Set();
+    const outlookGraphIdSet = new Set();
+    for (const oc of outlookContacts) {
+      const email = (oc.emailAddresses || []).map(e => e.address).filter(Boolean)[0] || null;
+      if (email) outlookEmailSet.add(email.trim().toLowerCase());
+      if (oc.id) outlookGraphIdSet.add(oc.id);
+    }
+
+    // 2. Fetch all CRM contacts that were imported from Outlook (have Graph ID in notes)
+    //    OR have an email that matches an Outlook contact
+    const crmResult = await pool.query(`SELECT id, email, notes, fname, lname FROM contacts`);
+    const crmContacts = crmResult.rows;
+
+    // 3. Delete CRM contacts that are NOT in Outlook
+    //    Only delete contacts that were originally imported from Outlook (notes contains "Graph ID:")
+    let deleted = 0;
+    for (const crm of crmContacts) {
+      const isOutlookImported = crm.notes && crm.notes.includes('Graph ID:');
+      if (!isOutlookImported) continue; // skip manually added CRM contacts
+
+      const crmEmail = crm.email ? crm.email.trim().toLowerCase() : null;
+      // Extract Graph ID from notes
+      const graphIdMatch = crm.notes && crm.notes.match(/Graph ID:\s*([^\s,\n]+)/);
+      const crmGraphId = graphIdMatch ? graphIdMatch[1].trim() : null;
+
+      const inOutlookByEmail = crmEmail && outlookEmailSet.has(crmEmail);
+      const inOutlookById = crmGraphId && outlookGraphIdSet.has(crmGraphId);
+
+      if (!inOutlookByEmail && !inOutlookById) {
+        await pool.query(`DELETE FROM contacts WHERE id = $1`, [crm.id]);
+        deleted++;
+      }
+    }
+
+    // 4. Add new contacts and update phone numbers for existing ones
+    let imported = 0;
+    let updated = 0;
+    let skipped = 0;
+
+    for (const oc of outlookContacts) {
+      const primaryEmail = (oc.emailAddresses || []).map(e => e.address).filter(Boolean)[0] || null;
+      const graphMarker = `Outlook contact · Graph ID: ${oc.id}`;
+
+      let phone = (oc.mobilePhone && String(oc.mobilePhone).trim()) || null;
+      if (!phone && Array.isArray(oc.businessPhones) && oc.businessPhones.length) {
+        phone = String(oc.businessPhones[0]).trim() || null;
+      }
+
+      // Check if already in CRM by email or Graph ID
+      let existing = null;
+      if (primaryEmail) {
+        const r = await pool.query(
+          `SELECT id, phone FROM contacts WHERE email IS NOT NULL AND LOWER(TRIM(email)) = LOWER(TRIM($1))`,
+          [primaryEmail]
+        );
+        if (r.rowCount) existing = r.rows[0];
+      }
+      if (!existing) {
+        const r = await pool.query(`SELECT id, phone FROM contacts WHERE notes LIKE $1`, [`%Graph ID: ${oc.id}%`]);
+        if (r.rowCount) existing = r.rows[0];
+      }
+
+      if (existing) {
+        // Update phone if Outlook has one and CRM doesn't (or CRM phone is different)
+        if (phone && (!existing.phone || existing.phone.trim() !== phone)) {
+          await pool.query(`UPDATE contacts SET phone = $1, notes = $2 WHERE id = $3`, [phone, graphMarker, existing.id]);
+          updated++;
+        } else {
+          skipped++;
+        }
+        continue;
+      }
+
+      // Insert new contact
+      const { fname, lname } = splitOutlookContactName(oc);
+      const company = (oc.companyName && String(oc.companyName).trim()) || '-';
+      const designation = (oc.jobTitle && String(oc.jobTitle).trim()) || null;
+      const [avatar_color, avatar_bg] = palettes[Math.floor(Math.random() * palettes.length)];
+      let initials = `${(fname[0] || '?')}${lname && lname !== '-' ? lname[0] : ''}`.toUpperCase();
+      if (initials.length < 2) initials = (fname.slice(0, 2) || 'UC').toUpperCase();
+
+      await pool.query(
+        `INSERT INTO contacts
+          (fname,lname,company,designation,dept,phone,wa,email,segment,score,products,city,notes,avatar_color,avatar_bg,initials,last_contact)
+         VALUES ($1,$2,$3,$4,null,$5,null,$6,'Prospect',50,null,null,$7,$8,$9,$10,'—')`,
+        [fname, lname, company, designation, phone, primaryEmail, graphMarker, avatar_color, avatar_bg, initials]
+      );
+      imported++;
+    }
+
+    try {
+      await pool.query(
+        `INSERT INTO audit_log (user_id,action,entity,detail) VALUES ($1,$2,$3,$4)`,
+        [req.user.id, 'SYNC', 'contacts', `Outlook sync: added ${imported}, updated ${updated}, deleted ${deleted}, skipped ${skipped}, total Outlook ${outlookContacts.length}`]
+      );
+    } catch (_) {}
+
+    try {
+      activityLog.append({ type: 'info', service: 'outlook', message: `Outlook contacts synced — added ${imported}, updated ${updated}, deleted ${deleted}`, timestamp: new Date().toISOString() });
+    } catch (_) {}
+
+    return res.json({ ok: true, imported, updated, deleted, skipped, total: outlookContacts.length });
+  } catch (err) {
+    if (err.message === 'NOT_AUTHENTICATED') return res.status(401).json({ error: 'NOT_AUTHENTICATED' });
+    console.error('[Outlook] contacts/sync', err.message);
+    return res.status(500).json({ error: err.message });
+  }
+});
+
 // ── POST /api/outlook/contacts/import ─────────────────────────────────────
 router.post('/contacts/import', async (req, res) => {
   const palettes = [
