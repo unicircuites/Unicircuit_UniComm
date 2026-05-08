@@ -5997,6 +5997,14 @@ async function switchAssignSource(src) {
   const groupRow = document.getElementById('assign-group-row');
   if (groupRow) groupRow.style.display = src === 'group' ? 'flex' : 'none';
 
+  // Show/hide normal vs group accordion pane
+  const normalPane = document.getElementById('assignee-picker-normal');
+  const groupPane  = document.getElementById('assignee-picker-groups');
+  if (src !== 'group') {
+    if (normalPane) normalPane.style.display = 'block';
+    if (groupPane)  groupPane.style.display  = 'none';
+  }
+
   // Target the visible select — new picker modal or old assign modal
   const pickerOverlay = document.getElementById('assignee-picker-overlay');
   const isNewPicker = pickerOverlay && pickerOverlay.classList.contains('open');
@@ -6073,34 +6081,37 @@ async function switchAssignSource(src) {
       }).join('');
 
     } else if (src === 'group') {
-      // Load contact groups and show members to pick from
-      const gsel = document.getElementById('assign-group-select');
-      if (gsel && gsel.options.length <= 1) {
+      // Show accordion view, hide normal list
+      const normalPane = document.getElementById('assignee-picker-normal');
+      const groupPane  = document.getElementById('assignee-picker-groups');
+      if (normalPane) normalPane.style.display = 'none';
+      if (groupPane)  groupPane.style.display  = 'block';
+
+      const accordion = document.getElementById('group-accordion-list');
+      if (!accordion) return;
+      accordion.innerHTML = '<div style="padding:14px;text-align:center;"><div class="spin-loader" style="margin:0 auto;"></div></div>';
+
+      try {
         const res = await fetch(API_BASE + '/groups', { headers: getAuthHeaders() });
-        if (res.ok) {
-          const groups = await res.json();
-          if (!groups.length) {
-            select.innerHTML = '<option value="">No groups found</option>';
-            return;
-          }
-          groups.forEach(function(g) {
-            const opt = document.createElement('option');
-            opt.value = g.id;
-            opt.textContent = g.name + ' (' + (g.member_count || 0) + ')';
-            gsel.appendChild(opt);
-          });
-          // Auto-load first group's members
-          if (groups.length) {
-            gsel.value = groups[0].id;
-            await assignLoadFromGroup();
-            return;
-          }
-        }
-      } else if (gsel && gsel.value) {
-        await assignLoadFromGroup();
-        return;
+        if (!res.ok) { accordion.innerHTML = '<div style="padding:12px;color:var(--red2);font-size:12.5px;">Failed to load groups</div>'; return; }
+        const groups = await res.json();
+        if (!groups.length) { accordion.innerHTML = '<div style="padding:14px;color:var(--muted);font-size:12.5px;text-align:center;">No groups found</div>'; return; }
+        accordion.innerHTML = groups.map(function(g) {
+          return '<div class="group-accordion-item" id="gai-' + g.id + '" style="border-bottom:1px solid var(--border);">'
+            + '<div style="display:flex;align-items:center;gap:8px;padding:10px 12px;cursor:pointer;" onclick="toggleGroupAccordion(' + g.id + ')">'
+            + '<i class="fas fa-users" style="color:var(--cyan);font-size:12px;flex-shrink:0;"></i>'
+            + '<span style="flex:1;font-size:13px;font-weight:600;color:var(--text);">' + escHtml(g.name) + '</span>'
+            + '<span style="font-size:11px;color:var(--muted);">' + (g.member_count || 0) + ' members</span>'
+            + '<i class="fas fa-chevron-down" id="gai-icon-' + g.id + '" style="color:var(--muted);font-size:11px;transition:transform 0.2s;margin-left:6px;"></i>'
+            + '</div>'
+            + '<div id="gai-members-' + g.id + '" style="display:none;padding:0 12px 8px 32px;"></div>'
+            + '</div>';
+        }).join('');
+        updateGroupSelectedCount();
+      } catch (err) {
+        accordion.innerHTML = '<div style="padding:12px;color:var(--red2);font-size:12.5px;">' + escHtml(err.message) + '</div>';
       }
-      select.innerHTML = '<option value="">— Load a group first —</option>';
+      return; // Don't fall through to normal select logic
     }
   } catch (err) {
     select.innerHTML = '<option value="">Error: ' + escHtml(err.message) + '</option>';
@@ -6130,6 +6141,83 @@ function confirmAssigneePick() {
   const src   = sel._assignSource || 'users';
   const userId = src === 'users' ? (parseInt(sel.value, 10) || null) : null;
   selectAssigneeForTask(name, email, phone, userId);
+}
+
+// ── Group Accordion ───────────────────────────────────────────────────────────
+async function toggleGroupAccordion(groupId) {
+  const membersDiv = document.getElementById('gai-members-' + groupId);
+  const icon       = document.getElementById('gai-icon-'    + groupId);
+  if (!membersDiv) return;
+
+  const isOpen = membersDiv.style.display !== 'none';
+  if (isOpen) {
+    membersDiv.style.display = 'none';
+    if (icon) icon.style.transform = '';
+    return;
+  }
+
+  // Open — load members if not already loaded
+  if (icon) icon.style.transform = 'rotate(180deg)';
+  if (!membersDiv.dataset.loaded) {
+    membersDiv.innerHTML = '<div style="padding:8px 0;"><div class="spin-loader" style="width:12px;height:12px;display:inline-block;"></div></div>';
+    membersDiv.style.display = 'block';
+    try {
+      const res  = await fetch(API_BASE + '/groups/' + groupId, { headers: getAuthHeaders() });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed');
+      const members = (data.members || []).filter(function(m) { return m.email || m.fname || m.lname || m.phone; });
+      if (!members.length) {
+        membersDiv.innerHTML = '<div style="font-size:12px;color:var(--muted);padding:6px 0;">No members</div>';
+      } else {
+        membersDiv.innerHTML = members.map(function(m) {
+          const fname = (m.fname && m.fname !== 'null') ? m.fname : '';
+          const lname = (m.lname && m.lname !== 'null' && m.lname !== '-') ? m.lname : '';
+          const name  = (fname + ' ' + lname).trim() || m.company || m.email || '';
+          const email = m.email || '';
+          const phone = m.phone || '';
+          const uid   = 'gm-' + groupId + '-' + (m.id || m.email || Math.random());
+          return '<label style="display:flex;align-items:center;gap:8px;padding:6px 4px;cursor:pointer;border-radius:6px;transition:background 0.1s;" onmouseover="this.style.background=\'rgba(255,255,255,0.04)\'" onmouseout="this.style.background=\'\'">'
+            + '<input type="checkbox" id="' + escAttr(uid) + '" class="group-member-cb" style="accent-color:var(--gold);width:14px;height:14px;flex-shrink:0;" onchange="updateGroupSelectedCount()"'
+            + ' data-name="' + escAttr(name) + '" data-email="' + escAttr(email) + '" data-phone="' + escAttr(phone) + '">'
+            + '<span style="font-size:12.5px;color:var(--text);">' + escHtml(name || email)
+            + (email ? '<span style="color:var(--muted);font-size:11px;margin-left:4px;">&lt;' + escHtml(email) + '&gt;</span>' : '')
+            + (phone ? '<span style="color:var(--muted2);font-size:11px;margin-left:4px;">· ' + escHtml(phone) + '</span>' : '')
+            + '</span></label>';
+        }).join('');
+      }
+      membersDiv.dataset.loaded = '1';
+    } catch (err) {
+      membersDiv.innerHTML = '<div style="font-size:12px;color:var(--red2);padding:6px 0;">' + escHtml(err.message) + '</div>';
+    }
+  } else {
+    membersDiv.style.display = 'block';
+  }
+}
+
+function updateGroupSelectedCount() {
+  const cbs = document.querySelectorAll('.group-member-cb:checked');
+  const el  = document.getElementById('group-selected-count');
+  if (el) el.textContent = cbs.length + ' selected';
+}
+
+function confirmGroupPick() {
+  const cbs = document.querySelectorAll('.group-member-cb:checked');
+  if (!cbs.length) { notify('Select at least one member', '', 'var(--red)', 'fas fa-exclamation-circle'); return; }
+  cbs.forEach(function(cb) {
+    const name  = cb.getAttribute('data-name')  || '';
+    const email = cb.getAttribute('data-email') || '';
+    const phone = cb.getAttribute('data-phone') || '';
+    // selectAssigneeForTask handles deduplication
+    const isDupe = taskModalAssignees.some(function(a) {
+      return (email && a.email === email);
+    });
+    if (!isDupe) {
+      taskModalAssignees.push({ name: name, email: email, phone: phone, userId: null });
+    }
+  });
+  renderAssigneeChips();
+  closeModal('assignee-picker-overlay');
+  notify(cbs.length + ' member' + (cbs.length > 1 ? 's' : '') + ' added', '', 'var(--gold)', 'fas fa-users');
 }
 
 async function assignLoadFromGroup() {
@@ -10414,7 +10502,7 @@ function etUseInBroadcast() {
 
   <!-- ══ ASSIGNEE PICKER MODAL ══ -->
   <div class="modal-overlay" id="assignee-picker-overlay">
-    <div class="modal" style="max-width:480px;">
+    <div class="modal" style="max-width:500px;">
       <div class="modal-title">
         <span><i class="fas fa-user-plus" style="color:var(--gold);margin-right:8px;"></i>Select Assignee</span>
         <span class="modal-close" onclick="closeModal('assignee-picker-overlay')"><i class="fas fa-times"></i></span>
@@ -10426,19 +10514,27 @@ function etUseInBroadcast() {
         <button type="button" id="assign-src-whatsapp" class="btn btn-ghost btn-xs" onclick="switchAssignSource('whatsapp')"><i class="fab fa-whatsapp" style="color:#25D366;"></i> WhatsApp</button>
         <button type="button" id="assign-src-group"    class="btn btn-ghost btn-xs" onclick="switchAssignSource('group')"><i class="fas fa-users" style="color:var(--cyan);"></i> Group</button>
       </div>
-      <!-- Group picker row -->
-      <div id="assign-group-row" style="display:none;gap:6px;margin-bottom:8px;align-items:center;">
-        <select id="assign-group-select" class="inp" style="font-size:12px;padding:5px 8px;flex:1;">
-          <option value="">— Select a group —</option>
-        </select>
-        <button type="button" class="btn btn-blue btn-xs" onclick="assignLoadFromGroup()"><i class="fas fa-sync-alt"></i> Load</button>
+      <!-- Group picker row (hidden for group tab — replaced by accordion) -->
+      <div id="assign-group-row" style="display:none;"></div>
+      <!-- Normal assignee list (Users / Outlook / WhatsApp) -->
+      <div id="assignee-picker-normal" style="display:block;">
+        <select id="assignee-picker-list" class="inp" size="8" style="height:200px;overflow-y:auto;" onchange="previewAssigneePick()"></select>
+        <div id="assignee-pick-preview" style="font-size:11.5px;color:var(--muted2);margin-top:6px;min-height:16px;"></div>
+        <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:10px;">
+          <button class="btn btn-ghost btn-sm" onclick="closeModal('assignee-picker-overlay')">Cancel</button>
+          <button class="btn btn-gold btn-sm"  onclick="confirmAssigneePick()"><i class="fas fa-check"></i> Select</button>
+        </div>
       </div>
-      <!-- Assignee list -->
-      <select id="assignee-picker-list" class="inp" size="8" style="height:200px;overflow-y:auto;" onchange="previewAssigneePick()"></select>
-      <div id="assignee-pick-preview" style="font-size:11.5px;color:var(--muted2);margin-top:6px;min-height:16px;"></div>
-      <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:10px;">
-        <button class="btn btn-ghost btn-sm" onclick="closeModal('assignee-picker-overlay')">Cancel</button>
-        <button class="btn btn-gold btn-sm"  onclick="confirmAssigneePick()"><i class="fas fa-check"></i> Select</button>
+      <!-- Group accordion (shown only for Group tab) -->
+      <div id="assignee-picker-groups" style="display:none;">
+        <div id="group-accordion-list" style="max-height:320px;overflow-y:auto;border:1px solid var(--border);border-radius:8px;"></div>
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-top:10px;">
+          <span id="group-selected-count" style="font-size:12px;color:var(--muted2);">0 selected</span>
+          <div style="display:flex;gap:8px;">
+            <button class="btn btn-ghost btn-sm" onclick="closeModal('assignee-picker-overlay')">Cancel</button>
+            <button class="btn btn-gold btn-sm"  onclick="confirmGroupPick()"><i class="fas fa-check"></i> Add Selected</button>
+          </div>
+        </div>
       </div>
     </div>
   </div>
