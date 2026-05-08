@@ -2414,6 +2414,30 @@ async function loadOutlookContactsDirectory() {
   try {
     const res = await fetch(`${API_BASE}/outlook/contacts?_=${Date.now()}`, { headers: getAuthHeaders(), cache: 'no-store' });
     const data = await res.json();
+
+    console.group('📋 [Outlook Contacts] loadOutlookContactsDirectory');
+    console.log('HTTP status:', res.status);
+    console.log('Total contacts received:', Array.isArray(data) ? data.length : 'NOT AN ARRAY', data);
+
+    if (Array.isArray(data)) {
+      console.group('📞 Phone number audit — all contacts');
+      data.forEach((oc, i) => {
+        const phone = outlookPrimaryPhone(oc);
+        console.log(`[${i}] ${oc.displayName || oc.givenName || oc.id}`, {
+          id: oc.id,
+          source: oc.source,
+          mobilePhone: oc.mobilePhone,
+          businessPhones: oc.businessPhones,
+          phone: oc.phone,
+          resolvedPhone: phone,
+          emailAddresses: oc.emailAddresses,
+          rawObject: oc
+        });
+      });
+      console.groupEnd();
+    }
+    console.groupEnd();
+
     if (!res.ok) {
       if (data && (data.error === 'OUTLOOK_PEOPLE_PERMISSION_REQUIRED' || data.error === 'OUTLOOK_CONTACTS_PERMISSION_REQUIRED')) {
         outlookContactsCache = [];
@@ -2439,6 +2463,7 @@ async function loadOutlookContactsDirectory() {
     }
   } catch (err) {
     outlookContactsCache = [];
+    console.error('❌ [Outlook Contacts] loadOutlookContactsDirectory error:', err);
     el.innerHTML = '<div style="padding:24px;color:var(--red2);font-size:12.5px;">Could not load contacts: ' + err.message + '</div>';
   }
 }
@@ -2524,6 +2549,19 @@ function showOutlookDirectoryDetail(graphId, cardEl) {
   }
   const oc = outlookContactsCache.find(o => o.id === graphId);
   if (!oc) return;
+
+  console.group('🔍 [Outlook Contact Detail] showOutlookDirectoryDetail');
+  console.log('graphId:', graphId);
+  console.log('Full contact object:', JSON.parse(JSON.stringify(oc)));
+  console.log('mobilePhone:', oc.mobilePhone);
+  console.log('businessPhones:', oc.businessPhones);
+  console.log('phone:', oc.phone);
+  console.log('emailAddresses:', oc.emailAddresses);
+  console.log('source:', oc.source);
+  const resolvedPhone = outlookPrimaryPhone(oc);
+  console.log('outlookPrimaryPhone() result:', resolvedPhone);
+  console.groupEnd();
+
   const title = outlookDisplayTitle(oc);
   const email = outlookPrimaryEmail(oc);
   const phone = outlookPrimaryPhone(oc);
@@ -4599,6 +4637,12 @@ async function syncOutlookContactsWithCRM() {
   try {
     const res = await fetch(`${API_BASE}/outlook/contacts/sync`, { method: 'POST', headers: getAuthHeaders() });
     const data = await res.json().catch(() => ({}));
+
+    console.group('🔄 [Outlook Sync] syncOutlookContactsWithCRM');
+    console.log('HTTP status:', res.status);
+    console.log('Response:', data);
+    console.groupEnd();
+
     if (!res.ok) {
       if (data.error === 'NOT_AUTHENTICATED') {
         notify('Outlook not connected', 'Open Email / Outlook and connect your mailbox first.', 'var(--red)', 'fab fa-microsoft');
@@ -4616,6 +4660,7 @@ async function syncOutlookContactsWithCRM() {
     await loadDashboardData();
     filterContacts();
   } catch (e) {
+    console.error('❌ [Outlook Sync] error:', e);
     notify('Sync error', e.message, 'var(--red)', 'fas fa-exclamation-circle');
   } finally {
     if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fas fa-arrows-rotate"></i> Sync with Outlook'; }

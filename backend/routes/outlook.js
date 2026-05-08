@@ -423,6 +423,12 @@ async function fetchAllOutlookContactsGraph(email) {
     await readPages(meUrl);
   }
 
+  // Deep debug log — shows exactly what Graph returned for each contact
+  console.log(`[Outlook Contacts] fetchAllOutlookContactsGraph — total fetched: ${rows.length}`);
+  rows.forEach((c, i) => {
+    console.log(`[Outlook Contacts][${i}] id=${c.id} | displayName="${c.displayName}" | givenName="${c.givenName}" | surname="${c.surname}" | mobilePhone="${c.mobilePhone}" | businessPhones=${JSON.stringify(c.businessPhones)} | emailAddresses=${JSON.stringify(c.emailAddresses)}`);
+  });
+
   return rows;
 }
 
@@ -1032,6 +1038,8 @@ router.post('/contacts/sync', async (req, res) => {
     // 1. Fetch all Outlook contacts
     const outlookContacts = await fetchAllOutlookContactsGraph(MS_EMAIL);
 
+    console.log(`[Outlook Sync] Total Outlook contacts: ${outlookContacts.length}`);
+
     // Build a set of Outlook emails (lowercase) and Graph IDs for fast lookup
     const outlookEmailSet = new Set();
     const outlookGraphIdSet = new Set();
@@ -1041,17 +1049,29 @@ router.post('/contacts/sync', async (req, res) => {
       if (oc.id) outlookGraphIdSet.add(oc.id);
     }
 
+    console.log(`[Outlook Sync] Outlook email set (${outlookEmailSet.size}):`, [...outlookEmailSet]);
+    console.log(`[Outlook Sync] Outlook Graph ID set (${outlookGraphIdSet.size}):`, [...outlookGraphIdSet]);
+
     // 2. Fetch all CRM contacts that were imported from Outlook (have Graph ID in notes)
     //    OR have an email that matches an Outlook contact
     const crmResult = await pool.query(`SELECT id, email, notes, fname, lname FROM contacts`);
     const crmContacts = crmResult.rows;
+
+    console.log(`[Outlook Sync] Total CRM contacts: ${crmContacts.length}`);
+    crmContacts.forEach(c => {
+      const isOutlookImported = c.notes && c.notes.includes('Graph ID:');
+      console.log(`[Outlook Sync][CRM] id=${c.id} name="${c.fname} ${c.lname}" email="${c.email}" outlookImported=${isOutlookImported} notes="${c.notes}"`);
+    });
 
     // 3. Delete CRM contacts that are NOT in Outlook
     //    Only delete contacts that were originally imported from Outlook (notes contains "Graph ID:")
     let deleted = 0;
     for (const crm of crmContacts) {
       const isOutlookImported = crm.notes && crm.notes.includes('Graph ID:');
-      if (!isOutlookImported) continue; // skip manually added CRM contacts
+      if (!isOutlookImported) {
+        console.log(`[Outlook Sync][SKIP DELETE] id=${crm.id} "${crm.fname} ${crm.lname}" — not an Outlook import (no Graph ID in notes)`);
+        continue; // skip manually added CRM contacts
+      }
 
       const crmEmail = crm.email ? crm.email.trim().toLowerCase() : null;
       // Extract Graph ID from notes
@@ -1061,7 +1081,10 @@ router.post('/contacts/sync', async (req, res) => {
       const inOutlookByEmail = crmEmail && outlookEmailSet.has(crmEmail);
       const inOutlookById = crmGraphId && outlookGraphIdSet.has(crmGraphId);
 
+      console.log(`[Outlook Sync][DELETE CHECK] id=${crm.id} "${crm.fname} ${crm.lname}" email="${crmEmail}" graphId="${crmGraphId}" inOutlookByEmail=${inOutlookByEmail} inOutlookById=${inOutlookById}`);
+
       if (!inOutlookByEmail && !inOutlookById) {
+        console.log(`[Outlook Sync][DELETING] id=${crm.id} "${crm.fname} ${crm.lname}" — not found in Outlook`);
         await pool.query(`DELETE FROM contacts WHERE id = $1`, [crm.id]);
         deleted++;
       }
@@ -1098,15 +1121,18 @@ router.post('/contacts/sync', async (req, res) => {
       if (existing) {
         // Update phone if Outlook has one and CRM doesn't (or CRM phone is different)
         if (phone && (!existing.phone || existing.phone.trim() !== phone)) {
+          console.log(`[Outlook Sync][UPDATE PHONE] id=${existing.id} — old="${existing.phone}" new="${phone}"`);
           await pool.query(`UPDATE contacts SET phone = $1, notes = $2 WHERE id = $3`, [phone, graphMarker, existing.id]);
           updated++;
         } else {
+          console.log(`[Outlook Sync][SKIP UPDATE] id=${existing.id} — phone unchanged or Outlook has no phone. outlookPhone="${phone}" crmPhone="${existing.phone}"`);
           skipped++;
         }
         continue;
       }
 
       // Insert new contact
+      console.log(`[Outlook Sync][INSERT] "${oc.displayName}" email="${primaryEmail}" phone="${phone}"`);
       const { fname, lname } = splitOutlookContactName(oc);
       const company = (oc.companyName && String(oc.companyName).trim()) || '-';
       const designation = (oc.jobTitle && String(oc.jobTitle).trim()) || null;
