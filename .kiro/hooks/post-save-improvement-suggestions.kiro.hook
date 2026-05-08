@@ -1,0 +1,18 @@
+{
+  "enabled": true,
+  "name": "Code Improvement Suggester",
+  "description": "After you save any JS, HTML, or backend file, this agent reviews the changes and gives you a prioritized list of improvement suggestions — security, performance, UX, code quality, and missing features.",
+  "version": "1",
+  "when": {
+    "type": "fileEdited",
+    "patterns": [
+      "*.js",
+      "*.html",
+      "backend/**/*.js"
+    ]
+  },
+  "then": {
+    "type": "askAgent",
+    "prompt": "A file was just saved. Review the recent changes to this file and provide a concise, prioritized list of improvement suggestions. Focus on:\n1. 🔴 Critical — security issues, bugs, data loss risks\n2. 🟡 Important — performance, error handling gaps, missing validations\n3. 🟢 Nice to have — UX improvements, code quality, refactoring opportunities, missing features that would complement what was just built\n\nKeep suggestions specific and actionable. Format as a numbered list grouped by priority. Be brief — max 2 sentences per suggestion. Only suggest things relevant to what was actually changed, not the entire codebase."
+  }
+}

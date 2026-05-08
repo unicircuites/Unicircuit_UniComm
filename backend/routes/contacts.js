@@ -1,6 +1,8 @@
 const express = require('express');
+const fetch = require('node-fetch');
 const pool    = require('../db/pool');
 const mailStore  = require('../services/outlookMailStore');
+const graph = require('../services/msGraph');
 const { authenticate } = require('../middleware/auth');
 const activityLog = require('../services/activityLog');
 
@@ -27,6 +29,68 @@ async function countBroadcastsForEmail(email) {
     return r.rows[0].n;
   } catch (_) {
     return 0;
+  }
+}
+
+function contactDisplayName(row) {
+  return [row.fname, row.lname].map(v => String(v || '').trim()).filter(Boolean).join(' ').trim()
+    || String(row.email || '').trim()
+    || 'CRM contact';
+}
+
+function outlookBodyFromCrmContact(row) {
+  const email = String(row.email || '').trim();
+  const phone = String(row.phone || row.wa || '').trim();
+  const body = {
+    displayName: contactDisplayName(row),
+    givenName: String(row.fname || '').trim() || undefined,
+    surname: String(row.lname || '').trim() || undefined,
+    companyName: String(row.company || '').trim() || undefined,
+    jobTitle: String(row.designation || '').trim() || undefined,
+    mobilePhone: phone || undefined,
+  };
+  if (email) body.emailAddresses = [{ address: email, name: body.displayName }];
+  Object.keys(body).forEach(k => body[k] === undefined && delete body[k]);
+  return body;
+}
+
+async function findOutlookContactByEmail(email) {
+  const wanted = String(email || '').trim().toLowerCase();
+  if (!wanted) return null;
+
+  const data = await graph.graphGet('/me/contacts?$top=500&$select=id,emailAddresses', process.env.MS_USER_EMAIL);
+  let rows = data.value || [];
+  let next = data['@odata.nextLink'] || '';
+  while (next && rows.length < 5000) {
+    const token = await graph.getAccessToken(process.env.MS_USER_EMAIL);
+    if (!token) break;
+    const res = await fetch(next, { headers: { Authorization: `Bearer ${token}` } });
+    if (!res.ok) break;
+    const page = await res.json();
+    rows = rows.concat(page.value || []);
+    next = page['@odata.nextLink'] || '';
+  }
+
+  return rows.find(c => (c.emailAddresses || []).some(e => String(e && e.address || '').trim().toLowerCase() === wanted)) || null;
+}
+
+async function upsertOutlookContactFromCrm(row) {
+  const email = String(row.email || '').trim();
+  if (!email) return { skipped: true, reason: 'NO_EMAIL' };
+
+  const body = outlookBodyFromCrmContact(row);
+  try {
+    const existing = await findOutlookContactByEmail(email);
+    if (existing && existing.id) {
+      await graph.graphPatch(`/me/contacts/${encodeURIComponent(existing.id)}`, body, process.env.MS_USER_EMAIL);
+      return { action: 'updated', id: existing.id };
+    }
+    const created = await graph.graphPost('/me/contacts', body, process.env.MS_USER_EMAIL);
+    return { action: 'created', id: created.id };
+  } catch (err) {
+    if (err.message === 'NOT_AUTHENTICATED') return { skipped: true, reason: 'OUTLOOK_NOT_CONNECTED' };
+    console.warn('[Contacts] Outlook sync skipped:', err.message);
+    return { skipped: true, reason: err.message };
   }
 }
 
@@ -161,7 +225,14 @@ router.post('/', async (req, res) => {
       activityLog.append({ type: 'info', service: 'system', message: `CRM contact created: ${fname} ${lname} (${email || 'no email'})`, timestamp: new Date().toISOString() });
     } catch(_) {}
 
-    return res.status(201).json(result.rows[0]);
+    const outlookSync = await upsertOutlookContactFromCrm(result.rows[0]);
+    if (!outlookSync.skipped) {
+      try {
+        activityLog.append({ type: 'info', service: 'outlook', message: `Outlook contact ${outlookSync.action}: ${contactDisplayName(result.rows[0])}`, timestamp: new Date().toISOString() });
+      } catch(_) {}
+    }
+
+    return res.status(201).json({ ...result.rows[0], outlookSync });
   } catch (err) {
     console.error('[Contacts] POST error:', err.message);
     return res.status(500).json({ error: 'Failed to create contact.' });
@@ -183,7 +254,13 @@ router.put('/:id', async (req, res) => {
         segment, score, products, city, notes, req.params.id]);
 
     if (result.rowCount === 0) return res.status(404).json({ error: 'Contact not found.' });
-    return res.json(result.rows[0]);
+    const outlookSync = await upsertOutlookContactFromCrm(result.rows[0]);
+    if (!outlookSync.skipped) {
+      try {
+        activityLog.append({ type: 'info', service: 'outlook', message: `Outlook contact ${outlookSync.action}: ${contactDisplayName(result.rows[0])}`, timestamp: new Date().toISOString() });
+      } catch(_) {}
+    }
+    return res.json({ ...result.rows[0], outlookSync });
   } catch (err) {
     return res.status(500).json({ error: 'Failed to update contact.' });
   }

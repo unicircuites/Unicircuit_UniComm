@@ -19,6 +19,8 @@
  */
 const express  = require('express');
 const fetch    = require('node-fetch');
+const fs       = require('fs');
+const path     = require('path');
 const graph    = require('../services/msGraph');
 const pool     = require('../db/pool');
 const mailStats  = require('../services/outlookContactMailStats');
@@ -32,23 +34,473 @@ const MS_EMAIL = process.env.MS_USER_EMAIL;
 
 const APP_PUBLIC_URL = (process.env.APP_PUBLIC_URL || `http://localhost:${process.env.PORT || 8088}`).replace(/\/$/, '');
 const GRAPH_ROOT = 'https://graph.microsoft.com/v1.0';
+const MESSAGE_SIZE_PROPS = ['Integer 0x0E08', 'Long 0x0E08'];
+const STORAGE_SCAN_CACHE_MS = 5 * 60 * 1000;
+let storageScanCache = null;
+const STORAGE_SNAPSHOT_PATH = path.join(__dirname, '..', 'config', 'outlookStorageSnapshot.json');
+
+function clearStorageScanCache() {
+  storageScanCache = null;
+}
+
+function sendOutlookSettingsError(res, err) {
+  if (err.message === 'NOT_AUTHENTICATED') {
+    return res.status(401).json({ error: 'NOT_AUTHENTICATED' });
+  }
+
+  const code = String(err.code || '');
+  const message = String(err.message || '');
+  if (err.status === 403 || /access is denied|ErrorAccessDenied|Authorization_RequestDenied/i.test(`${code} ${message}`)) {
+    return res.status(403).json({
+      error: 'Outlook permission denied. Grant Microsoft Graph MailboxSettings.ReadWrite and reconnect Outlook.',
+      code: code || 'ACCESS_DENIED',
+    });
+  }
+
+  return res.status(500).json({ error: err.message });
+}
+
+function isGraphAccessDenied(err) {
+  const code = String(err && err.code || '');
+  const message = String(err && err.message || '');
+  return err && (err.status === 403 || /access is denied|ErrorAccessDenied|Authorization_RequestDenied/i.test(`${code} ${message}`));
+}
+
+async function graphSettingsFetch(endpoint, options = {}) {
+  try {
+    if (options.method === 'POST') {
+      return await graph.graphPost(endpoint, options.body || {}, MS_EMAIL);
+    }
+    if (options.method === 'PATCH') {
+      return await graph.graphPatch(endpoint, options.body || {}, MS_EMAIL);
+    }
+    return await graph.graphGet(endpoint, MS_EMAIL);
+  } catch (err) {
+    if (!isGraphAccessDenied(err)) throw err;
+  }
+
+  const token = await graph.getClientCredentialsToken(true);
+  if (!token) throw new Error('NOT_AUTHENTICATED');
+
+  const url = `${GRAPH_ROOT}${endpoint.replace(/^\/me(\/|$)/, `/users/${encodeURIComponent(MS_EMAIL)}$1`)}`;
+  const fetchOptions = {
+    method: options.method || 'GET',
+    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+  };
+  if (options.body !== undefined) fetchOptions.body = JSON.stringify(options.body);
+
+  const res = await fetch(url, fetchOptions);
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    const graphErr = new Error(err.error?.message || `Graph API error ${res.status}`);
+    graphErr.status = res.status;
+    graphErr.code = err.error?.code;
+    throw graphErr;
+  }
+  if (res.status === 202 || res.status === 204) return { success: true };
+  return res.json().catch(() => ({ success: true }));
+}
+
+function csvCell(line) {
+  const cells = [];
+  let cell = '';
+  let quoted = false;
+  for (let i = 0; i < String(line || '').length; i++) {
+    const ch = line[i];
+    if (ch === '"' && line[i + 1] === '"') {
+      cell += '"';
+      i++;
+    } else if (ch === '"') {
+      quoted = !quoted;
+    } else if (ch === ',' && !quoted) {
+      cells.push(cell);
+      cell = '';
+    } else {
+      cell += ch;
+    }
+  }
+  cells.push(cell);
+  return cells;
+}
+
+function parseMailboxUsageCsv(csv, mailbox) {
+  const lines = String(csv || '').trim().split(/\r?\n/).filter(Boolean);
+  if (lines.length < 2) return null;
+  const headers = csvCell(lines[0]);
+  const wanted = String(mailbox || '').trim().toLowerCase();
+  let fallback = null;
+  for (const line of lines.slice(1)) {
+    const values = csvCell(line);
+    const row = {};
+    headers.forEach((h, i) => { row[h] = values[i]; });
+    const parsed = {
+      reportRefreshDate: row['Report Refresh Date'] || null,
+      reportPeriod: row['Report Period'] || null,
+      itemCount: Number(row['Item Count'] || 0),
+      storageUsedBytes: Number(row['Storage Used (Byte)'] || 0),
+      issueWarningQuotaBytes: Number(row['Issue Warning Quota (Byte)'] || 0),
+      prohibitSendQuotaBytes: Number(row['Prohibit Send Quota (Byte)'] || 0),
+      prohibitSendReceiveQuotaBytes: Number(row['Prohibit Send/Receive Quota (Byte)'] || 0),
+      deletedItemCount: Number(row['Deleted Item Count'] || 0),
+      deletedItemSizeBytes: Number(row['Deleted Item Size (Byte)'] || 0),
+      deletedItemQuotaBytes: Number(row['Deleted Item Quota (Byte)'] || 0),
+      hasArchive: String(row['Has Archive'] || '').toLowerCase() === 'true',
+    };
+    fallback = fallback || parsed;
+    const upn = String(row['User Principal Name'] || '').trim().toLowerCase();
+    if (!wanted || upn === wanted) return parsed;
+  }
+  if (lines.length === 2 && fallback) return fallback;
+  throw new Error('Mailbox usage report loaded, but target mailbox row was not visible. Check Microsoft 365 Reports concealed user names setting.');
+}
+
+function friendlyMailboxUsageError(err) {
+  const raw = String(err && err.message ? err.message : err || '');
+  let code = '';
+  let message = raw;
+
+  try {
+    const parsed = JSON.parse(raw);
+    code = parsed.error?.code || parsed.code || '';
+    message = parsed.error?.message || parsed.message || raw;
+  } catch (_) {}
+
+  if (/S2SUnauthorized|Invalid permission|Reports\.Read\.All|permission|privilege|authorization|access/i.test(`${code} ${message}`)) {
+    return {
+      code: code || 'REPORTS_PERMISSION_MISSING',
+      message: 'Exact storage quota needs Microsoft Graph Reports.Read.All admin consent. Showing folder counts for now.',
+    };
+  }
+
+  return {
+    code: code || 'REPORT_UNAVAILABLE',
+    message: message || 'Storage usage report is unavailable. Showing folder counts for now.',
+  };
+}
+
+async function downloadMailboxUsageReport(token) {
+  if (!token) throw new Error('NOT_AUTHENTICATED');
+
+  const reportUrl = `${GRAPH_ROOT}/reports/getMailboxUsageDetail(period='D7')`;
+  const reportRes = await fetch(reportUrl, {
+    redirect: 'manual',
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (reportRes.status === 302) {
+    const location = reportRes.headers.get('location');
+    if (!location) throw new Error('Mailbox usage report did not return a download URL');
+    const csvRes = await fetch(location);
+    if (!csvRes.ok) throw new Error(`Mailbox usage report download failed ${csvRes.status}`);
+    return csvRes.text();
+  }
+  if (!reportRes.ok) {
+    const raw = await reportRes.text().catch(() => '');
+    let err = {};
+    try { err = raw ? JSON.parse(raw) : {}; } catch (_) {}
+    throw new Error(err.error?.message || raw || `Mailbox usage report error ${reportRes.status}`);
+  }
+  return reportRes.text();
+}
+
+async function getMailboxUsageReport(email) {
+  let token = (await graph.getClientCredentialsToken().catch(() => null))
+    || await graph.getAccessToken(email);
+  try {
+    return parseMailboxUsageCsv(await downloadMailboxUsageReport(token), email);
+  } catch (err) {
+    const shouldRefresh = /401|403|privilege|permission|authorization|access/i.test(err.message || '');
+    if (!shouldRefresh) throw err;
+    token = (await graph.getClientCredentialsToken(true).catch(() => null)) || token;
+    return parseMailboxUsageCsv(await downloadMailboxUsageReport(token), email);
+  }
+}
+
+function folderStorageKind(displayName) {
+  const name = String(displayName || '').trim().toLowerCase();
+  if (name === 'inbox') return 'inbox';
+  if (name === 'sent items' || name === 'sentitems') return 'sent';
+  if (name === 'deleted items' || name === 'deleteditems') return 'deleted';
+  if (name === 'junk email' || name === 'junkemail') return 'junk';
+  if (name === 'drafts') return 'drafts';
+  if (name === 'archive') return 'archive';
+  return 'other';
+}
+
+function readMessageSize(message) {
+  const props = message.singleValueExtendedProperties || [];
+  const wanted = new Set(MESSAGE_SIZE_PROPS.map(p => p.toLowerCase()));
+  const prop = props.find(p => wanted.has(String(p.id || '').toLowerCase()));
+  const n = Number(prop && prop.value);
+  return Number.isFinite(n) && n > 0 ? n : 0;
+}
+
+async function fetchJsonWithGraphToken(url, token) {
+  const res = await fetch(url, {
+    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error?.message || `Graph API error ${res.status}`);
+  }
+  return res.json();
+}
+
+async function scanFolderMessageSizes(folder, token, email) {
+  const propFilter = MESSAGE_SIZE_PROPS.map(p => `id eq '${p}'`).join(' or ');
+  const params = new URLSearchParams({
+    '$top': '999',
+    '$select': 'id',
+    '$expand': `singleValueExtendedProperties($filter=${propFilter})`,
+  });
+  let url = `${GRAPH_ROOT}/users/${encodeURIComponent(email)}/mailFolders/${encodeURIComponent(folder.id)}/messages?${params}`;
+  let bytes = 0;
+  let scanned = 0;
+  let sized = 0;
+
+  while (url) {
+    const data = await fetchJsonWithGraphToken(url, token);
+    const messages = data.value || [];
+    for (const message of messages) {
+      const size = readMessageSize(message);
+      bytes += size;
+      if (size > 0) sized++;
+      scanned++;
+    }
+    url = data['@odata.nextLink'] || '';
+  }
+
+  return {
+    folderId: folder.id,
+    displayName: folder.displayName,
+    bytes,
+    scanned,
+    sized,
+    kind: folderStorageKind(folder.displayName),
+  };
+}
+
+async function getLiveFolderStorageStats(folders, email) {
+  const cacheKey = `${email}:${folders.map(f => `${f.id}:${f.totalItemCount || 0}`).join('|')}`;
+  if (
+    storageScanCache &&
+    storageScanCache.key === cacheKey &&
+    storageScanCache.expiresAt > Date.now()
+  ) {
+    return storageScanCache.value;
+  }
+
+  const token = await graph.getAccessToken(email);
+  if (!token) throw new Error('NOT_AUTHENTICATED');
+
+  const scanFolders = (folders || [])
+    .filter(f => f && f.id && Number(f.totalItemCount || 0) > 0);
+  const results = [];
+  let index = 0;
+  const concurrency = Math.min(3, Math.max(1, scanFolders.length));
+
+  async function worker() {
+    while (index < scanFolders.length) {
+      const folder = scanFolders[index++];
+      results.push(await scanFolderMessageSizes(folder, token, email));
+    }
+  }
+  await Promise.all(Array.from({ length: concurrency }, worker));
+
+  const folderBytesById = {};
+  const buckets = { inbox: 0, sent: 0, deleted: 0, junk: 0, drafts: 0, archive: 0, other: 0 };
+  let totalBytes = 0;
+  let scannedMessages = 0;
+  let sizedMessages = 0;
+  for (const item of results) {
+    folderBytesById[item.folderId] = item.bytes;
+    buckets[item.kind] = (buckets[item.kind] || 0) + item.bytes;
+    totalBytes += item.bytes;
+    scannedMessages += item.scanned;
+    sizedMessages += item.sized;
+  }
+
+  const value = {
+    source: 'message-scan',
+    totalBytes,
+    scannedMessages,
+    sizedMessages,
+    folderBytesById,
+    buckets,
+    scannedAt: new Date().toISOString(),
+  };
+  storageScanCache = { key: cacheKey, expiresAt: Date.now() + STORAGE_SCAN_CACHE_MS, value };
+  return value;
+}
+
+function readOutlookStorageSnapshot() {
+  try {
+    if (!fs.existsSync(STORAGE_SNAPSHOT_PATH)) return null;
+    return JSON.parse(fs.readFileSync(STORAGE_SNAPSHOT_PATH, 'utf8'));
+  } catch (err) {
+    console.warn('[Outlook Storage] Snapshot read failed:', err.message);
+    return null;
+  }
+}
+
+function storageFolderKey(name) {
+  return String(name || '').trim().toLowerCase().replace(/[^a-z0-9]+/g, '');
+}
+
+async function ensureSignatureTable() {
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS outlook_signatures (
+      id                SERIAL PRIMARY KEY,
+      user_email        VARCHAR(200) NOT NULL,
+      name              VARCHAR(200) NOT NULL,
+      html_body         TEXT NOT NULL,
+      is_default_new    BOOLEAN DEFAULT FALSE,
+      is_default_reply  BOOLEAN DEFAULT FALSE,
+      created_at        TIMESTAMPTZ DEFAULT NOW(),
+      updated_at        TIMESTAMPTZ DEFAULT NOW()
+    )
+  `);
+  await pool.query(`CREATE INDEX IF NOT EXISTS idx_outlook_signatures_email ON outlook_signatures (user_email)`);
+}
+
+async function getSignatureRows() {
+  await ensureSignatureTable();
+  const r = await pool.query(
+    `SELECT id, name, html_body, is_default_new, is_default_reply, created_at, updated_at
+     FROM outlook_signatures
+     WHERE user_email = $1
+     ORDER BY created_at ASC, id ASC`,
+    [MS_EMAIL]
+  );
+  return r.rows;
+}
+
+async function setSignatureDefault(kind, id) {
+  await ensureSignatureTable();
+  const column = kind === 'reply' ? 'is_default_reply' : 'is_default_new';
+  await pool.query(`UPDATE outlook_signatures SET ${column}=FALSE WHERE user_email=$1`, [MS_EMAIL]);
+  if (id) {
+    const r = await pool.query(
+      `UPDATE outlook_signatures SET ${column}=TRUE, updated_at=NOW() WHERE user_email=$1 AND id=$2 RETURNING id`,
+      [MS_EMAIL, id]
+    );
+    if (!r.rows.length) throw new Error('Signature not found');
+  }
+}
 
 async function fetchAllOutlookContactsGraph(email) {
   const token = await graph.getAccessToken(email);
   if (!token) throw new Error('NOT_AUTHENTICATED');
   const sel = 'id,displayName,givenName,surname,emailAddresses,businessPhones,mobilePhone,companyName,jobTitle';
-  let url = `${GRAPH_ROOT}/me/contacts?$top=500&$select=${encodeURIComponent(sel)}`;
   const rows = [];
-  for (let page = 0; page < 100 && url; page++) {
+
+  async function readPages(firstUrl) {
+    let url = firstUrl;
+    for (let page = 0; page < 100 && url; page++) {
+      const res = await fetch(url, {
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        const graphErr = new Error(err.error?.message || `Graph API error ${res.status}`);
+        graphErr.status = res.status;
+        graphErr.code = err.error?.code;
+        throw graphErr;
+      }
+      const data = await res.json();
+      rows.push(...(data.value || []));
+      url = data['@odata.nextLink'] || null;
+    }
+  }
+
+  const userUrl = `${GRAPH_ROOT}/users/${encodeURIComponent(email)}/contacts?$top=500&$select=${encodeURIComponent(sel)}`;
+  const meUrl = `${GRAPH_ROOT}/me/contacts?$top=500&$select=${encodeURIComponent(sel)}`;
+
+  try {
+    await readPages(userUrl);
+  } catch (err) {
+    if (![400, 401, 403].includes(Number(err.status))) throw err;
+    rows.length = 0;
+    await readPages(meUrl);
+  }
+
+  return rows;
+}
+
+function mapOutlookContactToDirectoryItem(contact) {
+  const email = (contact.emailAddresses || []).map(e => e && e.address).filter(Boolean)[0] || '';
+  const displayName = contact.displayName
+    || [contact.givenName, contact.surname].filter(Boolean).join(' ')
+    || email
+    || 'Outlook contact';
+  return {
+    ...contact,
+    displayName,
+    source: 'outlook-contacts',
+    outlookPeopleUrl: `https://outlook.cloud.microsoft/people/?q=${encodeURIComponent(email || displayName)}`,
+  };
+}
+
+async function fetchAllOutlookPeopleGraphSafe(email) {
+  try {
+    return await fetchAllOutlookPeopleGraph(email);
+  } catch (_) {
+    return [];
+  }
+}
+
+function mapOutlookPersonToContact(person) {
+  const scored = Array.isArray(person.scoredEmailAddresses) ? person.scoredEmailAddresses : [];
+  const email = scored.map(e => e && e.address).filter(Boolean)[0]
+    || person.userPrincipalName
+    || '';
+  const phones = Array.isArray(person.phones) ? person.phones : [];
+  const mobile = phones.find(p => /mobile/i.test(String(p.type || '')));
+  const phone = (mobile && mobile.number) || (phones.find(p => p && p.number) || {}).number || '';
+  const displayName = person.displayName || email || 'Outlook contact';
+  const nameParts = String(displayName).trim().split(/\s+/).filter(Boolean);
+  return {
+    id: `person:${person.id}`,
+    outlookPersonId: person.id,
+    displayName,
+    givenName: person.givenName || nameParts[0] || '',
+    surname: person.surname || (nameParts.length > 1 ? nameParts.slice(1).join(' ') : ''),
+    emailAddresses: email ? [{ name: displayName, address: email }] : [],
+    mobilePhone: phone || null,
+    businessPhones: phone ? [phone] : [],
+    companyName: person.companyName || null,
+    jobTitle: person.jobTitle || null,
+    source: 'outlook-people',
+    outlookPeopleUrl: `https://outlook.cloud.microsoft/people/?q=${encodeURIComponent(email || displayName)}`,
+  };
+}
+
+async function fetchAllOutlookPeopleGraph(email) {
+  const token = await graph.getAccessTokenForScopes(email, [
+    'https://graph.microsoft.com/Mail.Read',
+    'https://graph.microsoft.com/Mail.Send',
+    'https://graph.microsoft.com/Mail.ReadWrite',
+    'https://graph.microsoft.com/Contacts.ReadWrite',
+    'https://graph.microsoft.com/MailboxSettings.ReadWrite',
+    'https://graph.microsoft.com/People.Read',
+    'offline_access',
+  ]);
+  if (!token) throw new Error('NOT_AUTHENTICATED');
+  const sel = 'id,displayName,givenName,surname,scoredEmailAddresses,phones,companyName,jobTitle,userPrincipalName';
+  let url = `${GRAPH_ROOT}/me/people?$top=1000&$select=${encodeURIComponent(sel)}`;
+  const rows = [];
+  for (let page = 0; page < 20 && url; page++) {
     const res = await fetch(url, {
       headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
     });
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
-      throw new Error(err.error?.message || `Graph API error ${res.status}`);
+      const graphErr = new Error(err.error?.message || `Graph API error ${res.status}`);
+      graphErr.status = res.status;
+      graphErr.code = err.error?.code;
+      throw graphErr;
     }
     const data = await res.json();
-    rows.push(...(data.value || []));
+    rows.push(...(data.value || []).map(mapOutlookPersonToContact));
     url = data['@odata.nextLink'] || null;
   }
   return rows;
@@ -374,6 +826,7 @@ router.post('/send', async (req, res) => {
       activityLog.append({ type: 'info', service: 'outlook', message: `Email sent to ${Array.isArray(to)?to.join(', '):to} — "${subject}"`, timestamp: new Date().toISOString() });
     } catch(_) {}
 
+    clearStorageScanCache();
     return res.json({ success: true, message: 'Email sent successfully.' });
   } catch (err) {
     if (err.message === 'NOT_AUTHENTICATED') return res.status(401).json({ error: 'NOT_AUTHENTICATED' });
@@ -394,6 +847,7 @@ router.post('/reply/:id', async (req, res) => {
     await graph.graphPost(endpoint, {
       message: { body: { contentType: 'HTML', content: body } },
     }, MS_EMAIL);
+    clearStorageScanCache();
     return res.json({ success: true });
   } catch (err) {
     if (err.message === 'NOT_AUTHENTICATED') return res.status(401).json({ error: 'NOT_AUTHENTICATED' });
@@ -460,126 +914,35 @@ router.get('/directory-activity', async (req, res) => {
 });
 
 // ── GET /api/outlook/contacts ─────────────────────────────────────────────
-// Always returns DB-imported contacts. If Outlook is connected, also merges
-// live Graph contacts + mail stats. If not connected, DB contacts still show.
 router.get('/contacts', async (req, res) => {
   try {
-    // ── Step 1: Always load DB-imported contacts ──────────────────────────
-    const dbResult = await pool.query(`
-      SELECT id, fname, lname, company, designation, email,
-             phone, avatar_color, avatar_bg, initials, notes
-      FROM contacts
-      ORDER BY score DESC, created_at DESC
-    `);
-    const dbContacts = dbResult.rows.map(c => {
-      const displayName = `${c.fname || ''} ${c.lname || ''}`.trim() || c.company || 'Contact';
-      const primaryEmail = c.email || '';
-      return {
-        id: `db:${c.id}`,
-        _dbId: c.id,
-        displayName,
-        givenName:      c.fname || '',
-        surname:        c.lname || '',
-        emailAddresses: primaryEmail ? [{ address: primaryEmail }] : [],
-        mobilePhone:    c.phone || null,
-        businessPhones: [],
-        companyName:    c.company || null,
-        jobTitle:       c.designation || null,
-        source:         'db',
-        mailStats:      null,
-      };
-    });
+    res.set('Cache-Control', 'no-store, no-cache, must-revalidate, private');
+    res.set('Pragma', 'no-cache');
+    res.set('Expires', '0');
+    res.set('X-Outlook-Contacts-Source', 'microsoft-graph-contacts');
 
-    // ── Step 2: Try to get mail stats from DB cache (no Outlook needed) ───
-    let statsMap = new Map();
+    let outlookContacts = [];
     try {
-      statsMap = await mailStats.buildDirectoryStatsMap(MS_EMAIL, mailStats.MAIL_SCAN_PAGES);
-      directoryStatsCache = { map: statsMap, at: Date.now(), mailbox: MS_EMAIL };
-    } catch (_) { /* stats unavailable — continue without */ }
-
-    // ── Step 3: Try live Graph contacts (only if Outlook connected) ────────
-    let graphContacts = [];
-    let outlookConnected = false;
-    try {
-      graphContacts = await fetchAllOutlookContactsGraph(MS_EMAIL);
-      outlookConnected = true;
-    } catch (_) { /* not connected — skip */ }
-
-    // ── Step 4: Merge — Graph contacts take priority, DB fills the rest ───
-    const seenNorm  = new Set();
-    const seenDbIds = new Set();
-    const merged    = [];
-
-    function rawAddr(oc) {
-      return ((oc.emailAddresses || []).map(e => e && e.address).filter(Boolean)[0]) || '';
+      outlookContacts = (await fetchAllOutlookContactsGraph(MS_EMAIL)).map(mapOutlookContactToDirectoryItem);
+    } catch (err) {
+      if (err.message === 'NOT_AUTHENTICATED') return res.status(401).json({ error: 'NOT_AUTHENTICATED' });
+      if (err.status === 403 || /access is denied|ErrorAccessDenied|Authorization_RequestDenied|permission|privilege/i.test(`${err.code || ''} ${err.message || ''}`)) {
+        return res.status(403).json({
+          error: 'OUTLOOK_CONTACTS_PERMISSION_REQUIRED',
+          message: 'Grant Microsoft Graph Contacts.Read or Contacts.ReadWrite permission and reconnect Outlook.',
+        });
+      }
+      throw err;
     }
 
-    // Add Graph contacts first (with mail stats)
-    for (const oc of graphContacts) {
-      const raw = rawAddr(oc);
-      const n   = raw ? mailStats.norm(raw) : '';
-      if (n) seenNorm.add(n);
-      const st = n ? statsMap.get(n) : null;
-      merged.push({
-        ...oc,
-        source: 'people',
-        mailStats: st ? {
-          lastEmailAt:             st.lastEmailAt,
-          outlookSentToThem:       st.sentToThem,
-          outlookReceivedFromThem: st.receivedFromThem,
-        } : null,
-      });
-    }
-
-    // Add mail-stats-only entries (emails seen in mailbox but not in contacts folder)
-    for (const [n, st] of statsMap) {
-      if (seenNorm.has(n)) continue;
-      const addr  = (st.primaryEmail && mailStats.norm(st.primaryEmail) === n ? st.primaryEmail : n) || n;
-      const local = addr.includes('@') ? addr.split('@')[0] : addr;
-      merged.push({
-        id: `mail:${n}`,
-        displayName: local || addr,
-        givenName: '', surname: '',
-        emailAddresses: [{ address: addr }],
-        mobilePhone: null, businessPhones: [],
-        companyName: null, jobTitle: null,
-        source: 'mail',
-        mailStats: {
-          lastEmailAt:             st.lastEmailAt,
-          outlookSentToThem:       st.sentToThem,
-          outlookReceivedFromThem: st.receivedFromThem,
-        },
-      });
-      seenNorm.add(n);
-    }
-
-    // Add DB contacts that aren't already represented by Graph/mail entries
-    for (const dc of dbContacts) {
-      const email = rawAddr(dc);
-      const n     = email ? mailStats.norm(email) : '';
-      if (n && seenNorm.has(n)) continue; // already in merged via Graph or mail stats
-      const st = n ? statsMap.get(n) : null;
-      merged.push({
-        ...dc,
-        mailStats: st ? {
-          lastEmailAt:             st.lastEmailAt,
-          outlookSentToThem:       st.sentToThem,
-          outlookReceivedFromThem: st.receivedFromThem,
-        } : null,
-      });
-    }
-
-    // Sort by last email activity desc, then name
-    merged.sort((a, b) => {
-      const ta = a.mailStats?.lastEmailAt ? new Date(a.mailStats.lastEmailAt).getTime() : 0;
-      const tb = b.mailStats?.lastEmailAt ? new Date(b.mailStats.lastEmailAt).getTime() : 0;
-      if (tb !== ta) return tb - ta;
+    const rawAddr = (oc) => ((oc.emailAddresses || []).map(e => e && e.address).filter(Boolean)[0]) || '';
+    outlookContacts.sort((a, b) => {
       const na = (a.displayName || rawAddr(a) || '').trim();
       const nb = (b.displayName || rawAddr(b) || '').trim();
       return na.localeCompare(nb, undefined, { sensitivity: 'base' });
     });
 
-    return res.json(merged);
+    return res.json(outlookContacts);
   } catch (err) {
     if (err.message === 'NOT_AUTHENTICATED') return res.status(401).json({ error: 'NOT_AUTHENTICATED' });
     return res.status(500).json({ error: err.message });
@@ -781,54 +1144,121 @@ router.get('/sync-status', async (req, res) => {
 // ── GET /api/outlook/settings/auto-reply ─────────────────────────────────
 router.get('/settings/auto-reply', async (req, res) => {
   try {
-    const data = await graph.graphGet('/me/mailboxSettings/automaticRepliesSetting', MS_EMAIL);
+    const data = await graphSettingsFetch('/me/mailboxSettings/automaticRepliesSetting');
     return res.json(data);
   } catch (err) {
-    if (err.message === 'NOT_AUTHENTICATED') return res.status(401).json({ error: 'NOT_AUTHENTICATED' });
-    return res.status(500).json({ error: err.message });
+    return sendOutlookSettingsError(res, err);
   }
 });
 
 // ── PATCH /api/outlook/settings/auto-reply ────────────────────────────────
 router.patch('/settings/auto-reply', async (req, res) => {
   try {
-    const data = await graph.graphPatch('/me/mailboxSettings', { automaticRepliesSetting: req.body }, MS_EMAIL);
+    const data = await graphSettingsFetch('/me/mailboxSettings', {
+      method: 'PATCH',
+      body: { automaticRepliesSetting: req.body },
+    });
     return res.json(data);
   } catch (err) {
-    if (err.message === 'NOT_AUTHENTICATED') return res.status(401).json({ error: 'NOT_AUTHENTICATED' });
-    return res.status(500).json({ error: err.message });
+    return sendOutlookSettingsError(res, err);
   }
 });
 
 // ── GET /api/outlook/settings/categories ─────────────────────────────────
 router.get('/settings/categories', async (req, res) => {
   try {
-    const data = await graph.graphGet('/me/outlook/masterCategories', MS_EMAIL);
+    const data = await graphSettingsFetch('/me/outlook/masterCategories');
     return res.json(data.value || []);
   } catch (err) {
-    if (err.message === 'NOT_AUTHENTICATED') return res.status(401).json({ error: 'NOT_AUTHENTICATED' });
-    return res.status(500).json({ error: err.message });
+    return sendOutlookSettingsError(res, err);
   }
 });
 
 // ── GET /api/outlook/settings/storage ────────────────────────────────────
 router.get('/settings/storage', async (req, res) => {
+  res.set('Cache-Control', 'no-store, no-cache, must-revalidate, private');
+  res.set('Pragma', 'no-cache');
+  res.set('Expires', '0');
   try {
-    // Get folder list with available fields (sizeInBytes not available in basic tier)
-    const folders = await graph.graphGet(
-      '/me/mailFolders?$select=displayName,totalItemCount,unreadItemCount,childFolderCount&$top=20',
+    const folderData = await graph.graphGet(
+      '/me/mailFolders?$select=id,displayName,totalItemCount,unreadItemCount,childFolderCount&$top=50',
       MS_EMAIL
     );
-    // Try to get quota info from mailbox settings
+    const folders = folderData.value || [];
+
     let quota = null;
     try {
       const settings = await graph.graphGet('/me/mailboxSettings', MS_EMAIL);
       quota = settings;
     } catch(_) {}
 
+    let usage = null;
+    let usageError = null;
+    try {
+      usage = await getMailboxUsageReport(MS_EMAIL);
+    } catch (e) {
+      usageError = friendlyMailboxUsageError(e);
+    }
+
+    const outlookSnapshot = readOutlookStorageSnapshot();
+
+    let liveStorage = null;
+    let liveStorageError = null;
+    try {
+      liveStorage = await getLiveFolderStorageStats(folders, MS_EMAIL);
+      for (const folder of folders) {
+        folder.sizeInBytes = liveStorage.folderBytesById[folder.id] || 0;
+      }
+    } catch (e) {
+      liveStorageError = {
+        code: 'MESSAGE_SIZE_SCAN_FAILED',
+        message: e.message || 'Could not scan message sizes.',
+      };
+    }
+
+    const liveStorageHasSizes = !!(liveStorage && Number(liveStorage.sizedMessages || 0) > 0);
+    if (outlookSnapshot && Array.isArray(outlookSnapshot.folders)) {
+      const snapshotByName = new Map(outlookSnapshot.folders.map((f, index) => {
+        f.storageSortOrder = index;
+        return [storageFolderKey(f.displayName), f];
+      }));
+      const seenSnapshotKeys = new Set();
+      for (const folder of folders) {
+        const snap = snapshotByName.get(storageFolderKey(folder.displayName));
+        if (snap) {
+          seenSnapshotKeys.add(storageFolderKey(snap.displayName));
+          folder.sizeInBytes = Number(snap.sizeBytes || 0);
+          folder.storageSortOrder = snap.storageSortOrder;
+          folder.outlookStorageSnapshot = true;
+        }
+      }
+      for (const snap of outlookSnapshot.folders) {
+        const key = storageFolderKey(snap.displayName);
+        if (seenSnapshotKeys.has(key)) continue;
+        folders.push({
+          id: `snapshot-${key}`,
+          displayName: snap.displayName,
+          totalItemCount: Number(snap.messageCount || 0),
+          unreadItemCount: 0,
+          childFolderCount: 0,
+          sizeInBytes: Number(snap.sizeBytes || 0),
+          storageSortOrder: snap.storageSortOrder,
+          outlookStorageSnapshot: true,
+          snapshotOnly: true,
+        });
+      }
+    }
+
     return res.json({
+      mailbox: MS_EMAIL,
       quota,
-      folders: folders.value || [],
+      outlookSnapshot,
+      usage,
+      usageError,
+      liveStorage,
+      liveStorageError,
+      usageStatus: liveStorageHasSizes ? 'message-scan' : (usage ? 'report' : (outlookSnapshot ? 'snapshot-fallback' : 'folder-counts')),
+      folders,
     });
   } catch (err) {
     if (err.message === 'NOT_AUTHENTICATED') return res.status(401).json({ error: 'NOT_AUTHENTICATED' });
@@ -848,6 +1278,158 @@ router.get('/settings/shared', async (req, res) => {
   } catch (err) {
     if (err.message === 'NOT_AUTHENTICATED') return res.status(401).json({ error: 'NOT_AUTHENTICATED' });
     return res.status(500).json({ error: err.message });
+  }
+});
+
+router.get('/settings/signatures', async (_req, res) => {
+  try {
+    const rows = await getSignatureRows();
+    return res.json({
+      signatures: rows,
+      defaultNewId: rows.find(s => s.is_default_new)?.id || null,
+      defaultReplyId: rows.find(s => s.is_default_reply)?.id || null,
+    });
+  } catch (err) {
+    return res.status(500).json({ error: err.message });
+  }
+});
+
+router.post('/settings/signatures', async (req, res) => {
+  const name = String(req.body.name || '').trim();
+  const html = String(req.body.html_body || '').trim();
+  const defaultNew = !!req.body.is_default_new;
+  const defaultReply = !!req.body.is_default_reply;
+  if (!name) return res.status(400).json({ error: 'Signature name is required.' });
+  if (!html) return res.status(400).json({ error: 'Signature content is required.' });
+  try {
+    await ensureSignatureTable();
+    const r = await pool.query(
+      `INSERT INTO outlook_signatures (user_email, name, html_body, is_default_new, is_default_reply)
+       VALUES ($1,$2,$3,$4,$5)
+       RETURNING id, name, html_body, is_default_new, is_default_reply, created_at, updated_at`,
+      [MS_EMAIL, name, html, defaultNew, defaultReply]
+    );
+    const row = r.rows[0];
+    if (defaultNew) await setSignatureDefault('new', row.id);
+    if (defaultReply) await setSignatureDefault('reply', row.id);
+    const rows = await getSignatureRows();
+    return res.json({
+      signature: rows.find(s => s.id === row.id) || row,
+      signatures: rows,
+      defaultNewId: rows.find(s => s.is_default_new)?.id || null,
+      defaultReplyId: rows.find(s => s.is_default_reply)?.id || null,
+    });
+  } catch (err) {
+    return res.status(500).json({ error: err.message });
+  }
+});
+
+router.patch('/settings/signatures/defaults', async (req, res) => {
+  const kind = req.body.kind === 'reply' ? 'reply' : 'new';
+  const id = req.body.id ? Number(req.body.id) : null;
+  try {
+    await setSignatureDefault(kind, id);
+    const rows = await getSignatureRows();
+    return res.json({
+      signatures: rows,
+      defaultNewId: rows.find(s => s.is_default_new)?.id || null,
+      defaultReplyId: rows.find(s => s.is_default_reply)?.id || null,
+    });
+  } catch (err) {
+    return res.status(/not found/i.test(err.message) ? 404 : 500).json({ error: err.message });
+  }
+});
+
+router.patch('/settings/signatures/:id', async (req, res) => {
+  const name = String(req.body.name || '').trim();
+  const html = String(req.body.html_body || '').trim();
+  const defaultNew = !!req.body.is_default_new;
+  const defaultReply = !!req.body.is_default_reply;
+  if (!name) return res.status(400).json({ error: 'Signature name is required.' });
+  if (!html) return res.status(400).json({ error: 'Signature content is required.' });
+  try {
+    await ensureSignatureTable();
+    const r = await pool.query(
+      `UPDATE outlook_signatures
+       SET name=$1, html_body=$2, updated_at=NOW()
+       WHERE user_email=$3 AND id=$4
+       RETURNING id`,
+      [name, html, MS_EMAIL, req.params.id]
+    );
+    if (!r.rows.length) return res.status(404).json({ error: 'Signature not found' });
+    if (defaultNew) await setSignatureDefault('new', req.params.id);
+    if (defaultReply) await setSignatureDefault('reply', req.params.id);
+    const rows = await getSignatureRows();
+    return res.json({
+      signatures: rows,
+      defaultNewId: rows.find(s => s.is_default_new)?.id || null,
+      defaultReplyId: rows.find(s => s.is_default_reply)?.id || null,
+    });
+  } catch (err) {
+    return res.status(500).json({ error: err.message });
+  }
+});
+
+router.delete('/settings/signatures/:id', async (req, res) => {
+  try {
+    await ensureSignatureTable();
+    await pool.query(`DELETE FROM outlook_signatures WHERE user_email=$1 AND id=$2`, [MS_EMAIL, req.params.id]);
+    return res.json({ success: true });
+  } catch (err) {
+    return res.status(500).json({ error: err.message });
+  }
+});
+
+router.post('/settings/categories', async (req, res) => {
+  const displayName = String(req.body.displayName || '').trim();
+  const color = String(req.body.color || 'preset0').trim();
+  if (!displayName) return res.status(400).json({ error: 'Category name is required.' });
+  try {
+    const data = await graphSettingsFetch('/me/outlook/masterCategories', {
+      method: 'POST',
+      body: { displayName, color },
+    });
+    return res.json(data);
+  } catch (err) {
+    return sendOutlookSettingsError(res, err);
+  }
+});
+
+router.patch('/settings/categories/:id', async (req, res) => {
+  const patch = {};
+  if (req.body.displayName !== undefined) patch.displayName = String(req.body.displayName || '').trim();
+  if (req.body.color !== undefined) patch.color = String(req.body.color || '').trim();
+  if (patch.displayName === '') return res.status(400).json({ error: 'Category name is required.' });
+  try {
+    const data = await graphSettingsFetch(`/me/outlook/masterCategories/${encodeURIComponent(req.params.id)}`, {
+      method: 'PATCH',
+      body: patch,
+    });
+    return res.json(data);
+  } catch (err) {
+    return sendOutlookSettingsError(res, err);
+  }
+});
+
+router.delete('/settings/categories/:id', async (req, res) => {
+  try {
+    const token = await graph.getClientCredentialsToken(true) || await graph.getAccessToken(MS_EMAIL);
+    if (!token) throw new Error('NOT_AUTHENTICATED');
+    const url = `${GRAPH_ROOT}/users/${encodeURIComponent(MS_EMAIL)}/outlook/masterCategories/${encodeURIComponent(req.params.id)}`;
+    const delRes = await fetch(url, {
+      method: 'DELETE',
+      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+    });
+    if (!delRes.ok && delRes.status !== 404) {
+      const err = await delRes.json().catch(() => ({}));
+      const graphErr = new Error(err.error?.message || `Graph API error ${delRes.status}`);
+      graphErr.status = delRes.status;
+      graphErr.code = err.error?.code;
+      throw graphErr;
+    }
+    return res.json({ success: true });
+  } catch (err) {
+    return sendOutlookSettingsError(res, err);
   }
 });
 

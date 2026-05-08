@@ -6,7 +6,7 @@
 require('dotenv').config({ path: require('path').join(__dirname, '../.env') });
 const net = require('net');
 
-const PORT = parseInt(process.env.SMDR_PORT || '5001');
+const PORT = parseInt(process.env.SMDR_PORT || '5000');
 const HOST = '127.0.0.1';
 
 const callers = [

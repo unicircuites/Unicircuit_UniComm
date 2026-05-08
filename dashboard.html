@@ -230,6 +230,13 @@ nav{flex:1;overflow-y:auto;padding:10px 8px;}
   padding-right:4px;
 }
 #sec-contacts.contacts-hub .contacts-detail-cell{min-width:0;}
+.outlook-contact-tab{height:46px;padding:0 18px;border:0;border-bottom:2px solid transparent;background:transparent;color:var(--muted2);font:inherit;font-size:12.5px;cursor:pointer;}
+.outlook-contact-tab:hover{color:var(--text);background:rgba(255,255,255,0.03);}
+.outlook-contact-tab.active{color:var(--text);border-bottom-color:#0078d4;background:rgba(0,120,212,0.05);}
+.outlook-session-card{border:1px solid var(--border);border-radius:8px;background:rgba(255,255,255,0.025);padding:10px 12px;margin-bottom:8px;}
+.outlook-session-title{font-size:12.5px;font-weight:700;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.outlook-session-meta{font-size:10.5px;color:var(--muted);margin-top:3px;}
+.outlook-session-preview{font-size:12px;color:var(--muted2);line-height:1.45;margin-top:6px;}
 
 /* ── KPI CARDS ── */
 .kpi-row{display:grid;grid-template-columns:repeat(5,1fr);gap:12px;margin-bottom:18px;}
@@ -362,6 +369,8 @@ select.inp option{background:#1a2035;color:var(--text);}
   display:none;align-items:center;justify-content:center;backdrop-filter:blur(4px);
 }
 .modal-overlay.open{display:flex;}
+#et-sig-modal.open,
+#oa-signature-editor-modal.open{z-index:10010;}
 .modal{
   background:var(--bg3);border:1px solid var(--border2);
   border-radius:16px;padding:28px;width:100%;max-width:680px;
@@ -400,6 +409,86 @@ select.inp option{background:#1a2035;color:var(--text);}
 .oa-sub-item{padding:8px 14px;font-size:12.5px;color:var(--muted2);cursor:pointer;border-bottom:2px solid transparent;white-space:nowrap;}
 .oa-sub-item:hover{color:var(--text);}
 .oa-sub-item.oa-sub-active{color:#0078d4;border-bottom-color:#0078d4;font-weight:600;}
+.oa-auto-panel{display:flex;flex-direction:column;gap:16px;max-width:760px;}
+.oa-auto-row{display:flex;align-items:center;gap:12px;min-height:28px;}
+.oa-auto-switch{width:38px;height:20px;border:1px solid var(--border2);border-radius:999px;background:var(--card2);position:relative;cursor:pointer;transition:background 0.15s,border-color 0.15s;}
+.oa-auto-switch::after{content:"";position:absolute;top:2px;left:2px;width:14px;height:14px;border-radius:50%;background:#fff;transition:left 0.15s;}
+.oa-auto-switch.on{background:#0078d4;border-color:#0078d4;}
+.oa-auto-switch.on::after{left:20px;}
+.oa-auto-check{width:14px;height:14px;accent-color:#0078d4;}
+.oa-auto-label{font-size:13px;color:var(--text);}
+.oa-auto-label.disabled{color:var(--muted);}
+.oa-auto-schedule{display:grid;grid-template-columns:84px minmax(150px,185px) minmax(130px,160px);gap:10px 14px;align-items:center;margin-left:26px;}
+.oa-auto-schedule label{font-size:12px;color:var(--muted2);}
+.oa-auto-message{min-height:96px;resize:vertical;}
+.oa-auto-panel textarea:disabled,
+.oa-auto-panel input:disabled,
+.oa-auto-panel select:disabled{opacity:0.55;cursor:not-allowed;}
+.oa-html-toolbar{display:flex;gap:5px;flex-wrap:wrap;align-items:center;padding:6px;background:var(--card2);border:1px solid var(--border2);border-radius:8px 8px 0 0;border-bottom:none;}
+.oa-html-toolbar .btn{min-width:28px;height:28px;justify-content:center;padding:4px 7px;}
+.oa-html-toolbar select{height:28px;background:var(--card2);border:1px solid var(--border);border-radius:5px;color:var(--text);font-size:11px;padding:3px 6px;max-width:132px;}
+.oa-color-tool{display:inline-flex;align-items:center;gap:3px;}
+.oa-html-toolbar input[type="color"]{width:28px;height:28px;border:1px solid var(--border);border-radius:5px;background:transparent;padding:2px;cursor:pointer;}
+.oa-color-apply{min-width:24px!important;width:24px!important;height:28px!important;padding:0!important;font-size:10px!important;}
+.oa-html-toolbar select:disabled,
+.oa-html-toolbar input:disabled{opacity:0.45;cursor:not-allowed;}
+.oa-html-toolbar .btn.active{background:rgba(0,120,212,0.22)!important;border-color:rgba(0,120,212,0.55)!important;color:#4fb3ff!important;}
+.oa-html-more{position:relative;display:inline-flex;}
+.oa-html-more-menu{display:none;position:absolute;right:0;top:32px;z-index:10020;background:var(--bg3);border:1px solid var(--border2);border-radius:4px;box-shadow:0 8px 24px rgba(0,0,0,0.35);padding:7px;grid-template-columns:repeat(3,30px);gap:2px;}
+.oa-html-more.open .oa-html-more-menu{display:grid;}
+.oa-html-more-menu .btn{width:30px;min-width:30px;height:30px;padding:0;display:inline-flex;align-items:center;justify-content:center;font-size:12px;line-height:1;background:transparent!important;border:0!important;border-radius:3px!important;color:var(--muted2)!important;box-shadow:none!important;}
+.oa-html-more-menu .btn:hover{background:rgba(148,163,184,0.12)!important;color:var(--text)!important;}
+.oa-html-more-menu .btn i{font-size:12px;width:14px;text-align:center;color:inherit!important;}
+.oa-script-icon{position:relative;display:inline-block;width:18px;height:16px;font-size:13px;line-height:16px;text-align:left;}
+.oa-script-icon .oa-script-n{position:absolute;left:9px;font-size:8px;line-height:1;}
+.oa-script-icon .oa-script-super{top:-1px;}
+.oa-script-icon .oa-script-sub{bottom:-1px;}
+.oa-html-change-case{grid-column:2;}
+.oa-table-tool{position:relative;display:inline-flex;}
+.oa-table-picker{display:none;position:absolute;right:-42px;top:32px;z-index:10030;width:176px;background:var(--bg3);border:1px solid var(--border);border-radius:4px;box-shadow:0 8px 24px rgba(0,0,0,0.28);padding:12px;color:var(--text);}
+.oa-table-tool.open .oa-table-picker{display:block;}
+.oa-table-title{display:block;font-size:12px;font-weight:700;margin-bottom:10px;}
+.oa-table-grid{display:grid;grid-template-columns:repeat(10,14px);grid-template-rows:repeat(8,14px);gap:0;margin-bottom:10px;}
+.oa-table-cell{width:14px;height:14px;border:1px solid rgba(148,163,184,0.65);background:transparent;cursor:pointer;}
+.oa-table-cell.hot{background:rgba(0,120,212,0.18);border-color:#0078d4;}
+.oa-table-size{display:block;height:18px;font-size:11px;color:var(--muted2);border-bottom:1px solid var(--border);margin-bottom:8px;}
+.oa-table-custom{width:100%;height:28px;border:0;background:transparent;color:var(--text);display:flex;align-items:center;gap:10px;font-size:12px;cursor:pointer;border-radius:3px;padding:0 2px;}
+.oa-table-custom:hover{background:rgba(148,163,184,0.12);}
+.oa-html-editor{min-height:120px;max-height:260px;overflow-y:auto;background:#fff;color:#222;font-family:Calibri,Arial,sans-serif;font-size:14px;line-height:1.55;padding:10px 12px;border:1px solid var(--border2);border-radius:0 0 8px 8px;outline:none;}
+.oa-html-editor[contenteditable="false"]{opacity:0.55;cursor:not-allowed;background:#f3f4f6;}
+.oa-html-editor:empty:before{content:attr(data-placeholder);color:#888;}
+.oa-storage-panel{color:var(--text);font-family:inherit;}
+.oa-storage-summary{padding:16px 18px;background:linear-gradient(180deg,rgba(36,45,72,0.96),rgba(26,32,52,0.96));border:1px solid var(--border);border-radius:8px;margin-bottom:22px;}
+.oa-storage-copy{font-size:13px;line-height:1.5;color:var(--text);margin-bottom:18px;max-width:780px;}
+.oa-storage-usage{font-size:13px;font-weight:700;color:var(--text);margin-bottom:10px;}
+.oa-storage-bar{height:12px;border:1px solid rgba(148,163,184,0.2);border-radius:999px;overflow:hidden;background:rgba(5,10,22,0.55);display:flex;margin-bottom:12px;}
+.oa-storage-fill-empty{flex:1;background:rgba(255,255,255,0.05);}
+.oa-storage-legend{display:flex;gap:18px;flex-wrap:wrap;font-size:12px;color:var(--muted2);}
+.oa-storage-legend-item{display:inline-flex;align-items:center;gap:7px;white-space:nowrap;}
+.oa-storage-swatch{display:inline-block;width:7px;height:14px;border-radius:4px;}
+.oa-storage-manage{border-top:1px solid var(--border);padding-top:20px;}
+.oa-storage-heading{font-size:15px;font-weight:800;color:var(--text);margin-bottom:12px;}
+.oa-storage-help{font-size:12.5px;line-height:1.5;color:var(--muted2);margin-bottom:8px;}
+.oa-storage-meta{font-size:11px;line-height:1.45;color:var(--muted);margin-bottom:12px;}
+.oa-storage-table{border:1px solid var(--border);border-radius:8px;overflow:hidden;background:rgba(12,18,32,0.55);}
+.oa-storage-row{display:grid;grid-template-columns:minmax(190px,1fr) minmax(82px,0.42fr) minmax(118px,0.56fr) minmax(104px,0.46fr);align-items:center;column-gap:12px;min-height:44px;padding:0 14px;border-bottom:1px solid var(--border);}
+.oa-storage-row:last-child{border-bottom:0;}
+.oa-storage-head{min-height:36px;background:rgba(255,255,255,0.035);font-size:10.5px;color:var(--muted);text-transform:uppercase;font-weight:700;letter-spacing:0;}
+.oa-storage-cell{font-size:12.5px;color:var(--text);min-width:0;}
+.oa-storage-folder{display:flex;align-items:center;gap:12px;min-width:0;font-weight:700;}
+.oa-storage-folder i{width:18px;text-align:center;font-size:14px;color:var(--muted2);}
+.oa-storage-folder span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.oa-storage-size,.oa-storage-count{color:var(--muted2);}
+.oa-storage-empty{height:30px;border:1px solid rgba(0,120,212,0.3);background:rgba(0,120,212,0.08);border-radius:6px;color:var(--text);font:inherit;font-size:12px;cursor:pointer;display:inline-flex;align-items:center;gap:7px;padding:0 9px;transition:background 0.12s,border-color 0.12s;}
+.oa-storage-empty:hover{background:rgba(0,120,212,0.16);border-color:rgba(0,120,212,0.55);}
+.oa-storage-empty i:first-child{color:#28a8ea;}
+.oa-storage-dash{color:var(--muted);}
+@media (max-width:720px){
+  .oa-storage-row{grid-template-columns:minmax(150px,1fr) 72px 88px 92px;padding:0 10px;column-gap:8px;}
+  .oa-storage-head{font-size:9.5px;}
+  .oa-storage-cell{font-size:11.5px;}
+  .oa-storage-legend{gap:10px;}
+}
 .outlook-menu-item{position:relative;padding:6px 14px;font-size:12.5px;font-weight:500;color:var(--muted2);cursor:pointer;border-radius:4px;user-select:none;white-space:nowrap;transition:background 0.1s,color 0.1s;}
 .outlook-menu-item:hover{background:rgba(0,120,212,0.1);color:var(--text);}
 .outlook-menu-item.active{background:rgba(0,120,212,0.15);color:#0078d4;}
@@ -2157,6 +2246,12 @@ function escHtml(s) {
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;');
 }
+function escAttr(s) {
+  return escHtml(s).replace(/'/g, '&#39;');
+}
+function jsArg(s) {
+  return escHtml(JSON.stringify(String(s || '')));
+}
 /** Digits and leading + only, for tel: links */
 function sanitizeTelForHref(phone) {
   const t = String(phone || '').replace(/[^\d+]/g, '');
@@ -2246,7 +2341,7 @@ function formatMailBytes(n) {
 }
 
 // ── Contacts directory: Outlook · WhatsApp · PBX ──
-let contactsSource = 'whatsapp';
+let contactsSource = 'outlook';
 let outlookContactsCache = [];
 let pbxContactsCache = [];
 
@@ -2289,6 +2384,20 @@ function outlookPrimaryEmail(oc) {
   const a = arr.map(e => e && e.address).filter(Boolean)[0];
   return a ? String(a).trim() : '';
 }
+function outlookPrimaryPhone(oc) {
+  const business = Array.isArray(oc.businessPhones)
+    ? oc.businessPhones.map(p => String(p || '').trim()).find(Boolean)
+    : '';
+  return String(oc.mobilePhone || oc.phone || business || '').trim();
+}
+function outlookPeopleUrl(oc) {
+  const q = outlookPrimaryEmail(oc) || outlookDisplayTitle(oc);
+  return oc.outlookPeopleUrl || `https://outlook.cloud.microsoft/people/?q=${encodeURIComponent(q)}`;
+}
+function outlookEditableGraphId(oc) {
+  const id = String(oc && oc.id || '');
+  return (id && !id.startsWith('mail:') && !id.startsWith('person:') && !id.startsWith('db:')) ? id : '';
+}
 function outlookDisplayTitle(oc) {
   const dn = (oc.displayName || '').trim();
   if (dn) return dn;
@@ -2302,13 +2411,25 @@ async function loadOutlookContactsDirectory() {
   const el = document.getElementById('contact-list');
   el.innerHTML = '<div style="text-align:center;padding:28px;"><div class="spin-loader" style="margin:0 auto;"></div><div style="font-size:12px;color:var(--muted);margin-top:10px;">Loading contacts…</div></div>';
   try {
-    const res = await fetch(`${API_BASE}/outlook/contacts`, { headers: getAuthHeaders() });
-    if (!res.ok) throw new Error('request failed');
-    outlookContactsCache = await res.json();
+    const res = await fetch(`${API_BASE}/outlook/contacts?_=${Date.now()}`, { headers: getAuthHeaders(), cache: 'no-store' });
+    const data = await res.json();
+    if (!res.ok) {
+      if (data && (data.error === 'OUTLOOK_PEOPLE_PERMISSION_REQUIRED' || data.error === 'OUTLOOK_CONTACTS_PERMISSION_REQUIRED')) {
+        outlookContactsCache = [];
+        el.innerHTML = `<div style="text-align:center;padding:28px;color:var(--muted);font-size:12.5px;">
+          <i class="fab fa-microsoft" style="font-size:28px;color:#0078d4;display:block;margin-bottom:10px;opacity:0.7;"></i>
+          <div style="margin-bottom:10px;">Outlook Contacts permission needed.</div>
+          <button class="btn btn-blue btn-sm" onclick="connectOutlook()"><i class="fab fa-microsoft"></i> Reconnect Outlook</button>
+        </div>`;
+        return;
+      }
+      throw new Error(data && data.error ? data.error : 'request failed');
+    }
+    outlookContactsCache = data;
     ContactResolver.buildCache(outlookContactsCache);
     filterContacts();
-    // Show a soft hint if Outlook is not connected (no 'people' source entries)
-    const hasLive = outlookContactsCache.some(c => c.source === 'people');
+    // Show a soft hint if Outlook is not connected (no live contact entries)
+    const hasLive = outlookContactsCache.some(c => c.source === 'outlook-contacts' || c.source === 'outlook-people');
     if (!hasLive && outlookContactsCache.length > 0) {
       const hint = document.createElement('div');
       hint.style.cssText = 'padding:8px 14px;font-size:11px;color:var(--muted);background:rgba(245,166,35,0.06);border-bottom:1px solid var(--border);';
@@ -2334,7 +2455,7 @@ function renderOutlookContactsList(list) {
     const hasName = !!(oc.displayName || oc.givenName || oc.surname || '').trim();
     const srcBadge = oc.source === 'mail'
       ? '<span class="badge b-blue" style="font-size:9px;opacity:0.9;">Mail</span>'
-      : '<span class="badge b-blue" style="font-size:9px;">Outlook</span>';
+      : '<span class="badge b-blue" style="font-size:9px;">Outlook Contact</span>';
     // Show provider badge (Gmail/Yahoo/etc.) based on email domain, not source
     const primaryEmail = email || '';
     const providerInfo = primaryEmail ? ContactResolver.getProviderCategory(primaryEmail) : null;
@@ -2404,59 +2525,72 @@ function showOutlookDirectoryDetail(graphId, cardEl) {
   if (!oc) return;
   const title = outlookDisplayTitle(oc);
   const email = outlookPrimaryEmail(oc);
-  const phone = (oc.mobilePhone || (oc.businessPhones && oc.businessPhones[0]) || '').trim();
+  const phone = outlookPrimaryPhone(oc);
+  const outlookUrl = outlookPeopleUrl(oc);
+  const editableGraphId = outlookEditableGraphId(oc);
   const company = (oc.companyName || '').trim();
   const jobTitle = (oc.jobTitle || '').trim();
   const initials = (title.split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2) || 'O');
 
   document.getElementById('contact-detail-panel').innerHTML = `
-    <div class="card" style="animation:fadeUp 0.2s ease;">
-      <div style="padding:18px 20px;border-bottom:1px solid var(--border);display:flex;align-items:flex-start;gap:14px;">
-        <div class="contact-avatar" style="width:50px;height:50px;background:rgba(0,120,212,0.12);color:#60a5fa;font-size:18px;">${escHtml(initials)}</div>
-        <div style="flex:1;">
-          <div style="font-size:17px;font-weight:800;color:var(--text);">${escHtml(title)}</div>
-          ${jobTitle || company ? `<div style="font-size:12.5px;color:var(--muted);margin-top:2px;">${escHtml([jobTitle,company].filter(Boolean).join(' · '))}</div>` : ''}
-          <span class="badge b-blue" style="margin-top:6px;font-size:9px;">Outlook</span>
+    <div class="card" style="animation:fadeUp 0.2s ease;overflow:hidden;">
+      <div style="display:flex;gap:0;border-bottom:1px solid var(--border);background:var(--card);">
+        ${['Overview','Contact','Files','Messages','LinkedIn'].map((t,i) => `<button type="button" class="outlook-contact-tab ${i===1?'active':''}" onclick="showOutlookContactTab('${t.toLowerCase()}')">${t}</button>`).join('')}
+      </div>
+
+      <div id="outlook-contact-tab-overview" class="outlook-contact-pane" style="display:none;">
+        <div style="padding:18px 20px;border-bottom:1px solid var(--border);display:flex;align-items:flex-start;gap:14px;">
+          <div class="contact-avatar" style="width:50px;height:50px;background:rgba(0,120,212,0.12);color:#60a5fa;font-size:18px;">${escHtml(initials)}</div>
+          <div style="flex:1;">
+            <div style="font-size:17px;font-weight:800;color:var(--text);">${escHtml(title)}</div>
+            ${jobTitle || company ? `<div style="font-size:12.5px;color:var(--muted);margin-top:2px;">${escHtml([jobTitle,company].filter(Boolean).join(' · '))}</div>` : ''}
+            <span class="badge b-blue" style="margin-top:6px;font-size:9px;">Outlook</span>
+          </div>
+        </div>
+        <div style="padding:14px 20px;border-bottom:1px solid var(--border);background:rgba(0,120,212,0.04);">
+          <div class="section-label" style="margin-bottom:8px;"><i class="fas fa-chart-line" style="color:#0078d4;"></i> Activity</div>
+          <div class="stat-row"><div class="stat-label"><i class="fas fa-clock" style="width:14px;color:var(--muted);"></i> Last contact</div><div class="stat-val" id="outlook-dir-last-email" style="font-size:12px;"><span class="spin-loader"></span></div></div>
+          <div class="stat-row"><div class="stat-label"><i class="fas fa-paper-plane" style="width:14px;color:var(--muted);"></i> Emails sent to them</div><div class="stat-val" id="outlook-dir-sent" style="font-size:12px;font-weight:600;"><span class="spin-loader"></span></div></div>
+          <div class="stat-row"><div class="stat-label"><i class="fas fa-inbox" style="width:14px;color:var(--muted);"></i> Emails received from them</div><div class="stat-val" id="outlook-dir-received" style="font-size:12px;font-weight:600;"><span class="spin-loader"></span></div></div>
+          <div class="stat-row"><div class="stat-label"><i class="fas fa-bullhorn" style="width:14px;color:var(--muted);"></i> Broadcasts sent to them</div><div class="stat-val" id="outlook-dir-broadcast" style="font-size:12px;font-weight:600;"><span class="spin-loader"></span></div></div>
+          <div id="outlook-dir-stats-hint" style="display:none;font-size:10px;color:var(--muted);margin-top:6px;line-height:1.45;"></div>
+        </div>
+        <div style="padding:14px 20px;">
+          <div style="display:flex;gap:8px;flex-wrap:wrap;">
+            ${email ? `<button class="btn btn-gold btn-sm" onclick="draftEmailTo(${jsArg(email)})"><i class="fas fa-envelope"></i> Draft Email</button>` : ''}
+            ${email ? `<a class="btn btn-blue btn-sm" href="https://teams.microsoft.com/l/chat/0/0?users=${encodeURIComponent(email)}" target="_blank" rel="noopener" style="text-decoration:none;"><i class="fab fa-microsoft"></i> Teams Chat</a>` : ''}
+            <a class="btn btn-blue btn-sm" href="${escAttr(outlookUrl)}" target="_blank" rel="noopener" style="text-decoration:none;"><i class="fab fa-microsoft"></i> Open in Outlook</a>
+            ${email ? `<button class="btn btn-ghost btn-sm" onclick="openQuickSaveModal(${jsArg(email)}, ${jsArg(editableGraphId)}, ${jsArg(title === email ? '' : title)})"><i class="fa fa-pen"></i> ${title === email ? 'Add Name' : 'Edit Contact'}</button>` : ''}
+          </div>
         </div>
       </div>
 
-      <!-- Activity stats -->
-      <div style="padding:14px 20px;border-bottom:1px solid var(--border);background:rgba(0,120,212,0.04);">
-        <div class="section-label" style="margin-bottom:8px;"><i class="fas fa-chart-line" style="color:#0078d4;"></i> Activity</div>
-        <div class="stat-row">
-          <div class="stat-label"><i class="fas fa-clock" style="width:14px;color:var(--muted);"></i> Last contact</div>
-          <div class="stat-val" id="outlook-dir-last-email" style="font-size:12px;"><span class="spin-loader"></span></div>
+      <div id="outlook-contact-tab-contact" class="outlook-contact-pane" style="padding:14px 16px;min-height:360px;">
+        <div style="font-size:14px;font-family:Georgia,'Times New Roman',serif;color:var(--text);margin-bottom:2px;">Contact information</div>
+        <div style="max-width:405px;background:rgba(148,163,184,0.10);border:1px solid var(--border);display:grid;grid-template-columns:24px 1fr 24px;align-items:center;gap:8px;padding:10px 8px;margin-top:0;">
+          <i class="fas fa-mobile-alt" style="color:var(--muted);font-size:12px;text-align:center;"></i>
+          <div>
+            <div style="font-size:11px;color:var(--muted);">Mobile</div>
+            <a href="${phone ? `tel:${escAttr(phone)}` : '#'}" style="font-size:12.5px;color:#0078d4;text-decoration:none;">${phone ? escHtml(phone) : '—'}</a>
+          </div>
+          <i class="far fa-copy" title="Copy mobile" onclick="navigator.clipboard?.writeText(${jsArg(phone)})" style="color:var(--muted);font-size:12px;cursor:pointer;text-align:center;"></i>
         </div>
-        <div class="stat-row">
-          <div class="stat-label"><i class="fas fa-paper-plane" style="width:14px;color:var(--muted);"></i> Emails sent to them</div>
-          <div class="stat-val" id="outlook-dir-sent" style="font-size:12px;font-weight:600;"><span class="spin-loader"></span></div>
+        ${email ? `<div style="max-width:405px;background:rgba(148,163,184,0.06);border:1px solid var(--border);border-top:0;display:grid;grid-template-columns:24px 1fr 24px;align-items:center;gap:8px;padding:10px 8px;">
+          <i class="fas fa-envelope" style="color:#0078d4;font-size:12px;text-align:center;"></i>
+          <div><div style="font-size:11px;color:var(--muted);">Email</div><a href="mailto:${escAttr(email)}" style="font-size:12.5px;color:#0078d4;text-decoration:none;">${escHtml(email)}</a></div>
+          <i class="far fa-copy" title="Copy email" onclick="navigator.clipboard?.writeText(${jsArg(email)})" style="color:var(--muted);font-size:12px;cursor:pointer;text-align:center;"></i>
+        </div>` : ''}
+        <div style="display:flex;justify-content:center;margin-top:28px;">
+          <a class="btn btn-blue btn-sm" href="${escAttr(outlookUrl)}" target="_blank" rel="noopener" style="text-decoration:none;"><i class="fab fa-microsoft"></i> Open in Outlook</a>
+          ${email ? `<button class="btn btn-ghost btn-sm" onclick="openQuickSaveModal(${jsArg(email)}, ${jsArg(editableGraphId)}, ${jsArg(title === email ? '' : title)})" style="margin-left:8px;"><i class="fas fa-pen"></i> Edit contact</button>` : ''}
         </div>
-        <div class="stat-row">
-          <div class="stat-label"><i class="fas fa-inbox" style="width:14px;color:var(--muted);"></i> Emails received from them</div>
-          <div class="stat-val" id="outlook-dir-received" style="font-size:12px;font-weight:600;"><span class="spin-loader"></span></div>
-        </div>
-        <div class="stat-row">
-          <div class="stat-label"><i class="fas fa-bullhorn" style="width:14px;color:var(--muted);"></i> Broadcasts sent to them</div>
-          <div class="stat-val" id="outlook-dir-broadcast" style="font-size:12px;font-weight:600;"><span class="spin-loader"></span></div>
-        </div>
-        <div id="outlook-dir-stats-hint" style="display:none;font-size:10px;color:var(--muted);margin-top:6px;line-height:1.45;"></div>
       </div>
 
-      <!-- Contact info -->
-      <div style="padding:14px 20px;border-bottom:1px solid var(--border);">
-        <div class="section-label">Contact Info</div>
-        <div class="stat-row"><div class="stat-label"><i class="fas fa-envelope" style="width:14px;color:#0078d4;"></i> Email</div><div class="stat-val" style="font-size:12px;font-weight:500;">${email ? escHtml(email) : '—'}</div></div>
-        ${phone ? `<div class="stat-row"><div class="stat-label"><i class="fas fa-phone" style="width:14px;color:var(--muted);"></i> Phone</div><div class="stat-val" style="font-size:12.5px;font-weight:500;">${escHtml(phone)}</div></div>` : ''}
+      <div id="outlook-contact-tab-files" class="outlook-contact-pane" style="display:none;padding:28px;color:var(--muted);font-size:12.5px;">Files linked to this contact will appear here.</div>
+      <div id="outlook-contact-tab-messages" class="outlook-contact-pane" style="display:none;padding:14px 16px;min-height:360px;">
+        <div id="outlook-contact-sessions"><div class="spin-loader" style="margin:24px auto;"></div></div>
       </div>
-
-      <!-- Actions -->
-      <div style="padding:14px 20px;">
-        <div style="display:flex;gap:8px;flex-wrap:wrap;">
-          ${email ? `<button class="btn btn-gold btn-sm" onclick="draftEmailTo('${escHtml(email)}')"><i class="fas fa-envelope"></i> Draft Email</button>` : ''}
-          ${email ? `<a class="btn btn-blue btn-sm" href="https://teams.microsoft.com/l/chat/0/0?users=${encodeURIComponent(email)}" target="_blank" rel="noopener" style="text-decoration:none;"><i class="fab fa-microsoft"></i> Teams Chat</a>` : ''}
-          ${email ? `<button class="btn btn-ghost btn-sm" onclick="openQuickSaveModal('${escHtml(email)}', '${escHtml(String(graphId))}', '${escHtml(title === email ? '' : title)}')"><i class="fa fa-pen"></i> ${title === email ? 'Add Name' : 'Edit Contact'}</button>` : ''}
-        </div>
-      </div>
+      <div id="outlook-contact-tab-linkedin" class="outlook-contact-pane" style="display:none;padding:28px;color:var(--muted);font-size:12.5px;">No LinkedIn profile linked.</div>
     </div>`;
 
   // Load stats — use cached mailStats first for instant display, then fetch fresh from DB
@@ -2479,6 +2613,124 @@ function showOutlookDirectoryDetail(graphId, cardEl) {
   } else {
     fillOutlookDirectoryStats({ noEmail: true });
   }
+  loadOutlookContactSessions({ email, phone, title });
+}
+
+function showOutlookContactTab(tab) {
+  document.querySelectorAll('#contact-detail-panel .outlook-contact-tab').forEach(btn => {
+    btn.classList.toggle('active', btn.textContent.trim().toLowerCase() === tab);
+  });
+  document.querySelectorAll('#contact-detail-panel .outlook-contact-pane').forEach(pane => {
+    pane.style.display = pane.id === 'outlook-contact-tab-' + tab ? 'block' : 'none';
+  });
+}
+
+function normalizeContactPhoneDigits(phone) {
+  let n = String(phone || '').replace(/\D/g, '');
+  if (n.length === 10) n = '91' + n;
+  return n;
+}
+
+function outlookMessageDate(m) {
+  const raw = m.receivedDateTime || m.sentDateTime || m.createdDateTime || '';
+  if (!raw) return '';
+  try { return new Date(raw).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' }); } catch(_) { return raw; }
+}
+
+function openEmailThread(conversationId, messageId) {
+  nav('email', null);
+  setTimeout(() => {
+    if (messageId) openEmail(messageId);
+    if (conversationId) loadEmailThread(conversationId, messageId);
+  }, 120);
+}
+
+function renderOutlookContactSessionCards(messages) {
+  if (!messages || !messages.length) {
+    return '<div style="padding:18px;color:var(--muted);font-size:12.5px;border:1px dashed var(--border);border-radius:8px;">No Outlook messages found for this contact.</div>';
+  }
+  return messages.slice(0, 12).map(m => {
+    const from = m.from?.emailAddress?.address || '';
+    const to = (m.toRecipients || []).map(r => r.emailAddress?.address).filter(Boolean).join(', ');
+    return `<div class="outlook-session-card" onclick="openEmailThread(${jsArg(m.conversationId || '')}, ${jsArg(m.id || '')})">
+      <div style="display:flex;gap:10px;align-items:flex-start;">
+        <i class="fas fa-envelope" style="color:#0078d4;margin-top:2px;"></i>
+        <div style="min-width:0;flex:1;">
+          <div class="outlook-session-title">${escHtml(m.subject || '(no subject)')}</div>
+          <div class="outlook-session-meta">${escHtml(outlookMessageDate(m))} · ${escHtml(from ? 'From ' + from : (to ? 'To ' + to : 'Outlook'))}</div>
+          <div class="outlook-session-preview">${escHtml(m.bodyPreview || '')}</div>
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function renderWhatsappContactSession(chat, messages) {
+  if (!chat) {
+    return '<div style="padding:18px;color:var(--muted);font-size:12.5px;border:1px dashed var(--border);border-radius:8px;">No WhatsApp chat matched by mobile number.</div>';
+  }
+  const items = (messages || []).slice(-8).map(m => {
+    const mine = !!m.from_me;
+    const txt = m.body || m.text || m.message || m.caption || '';
+    const time = m.timestamp ? new Date(m.timestamp).toLocaleString('en-IN', { dateStyle: 'short', timeStyle: 'short' }) : '';
+    return `<div style="display:flex;justify-content:${mine ? 'flex-end' : 'flex-start'};margin:5px 0;">
+      <div class="wa-bubble ${mine ? 'wa-out' : 'wa-in'}" style="max-width:78%;">${escHtml(txt || '[media/message]')}<div class="wa-time">${escHtml(time)}${mine ? ' ✓✓' : ''}</div></div>
+    </div>`;
+  }).join('');
+  return `<div style="border:1px solid var(--border);border-radius:8px;overflow:hidden;background:var(--bg2);">
+    <div style="padding:10px 12px;background:var(--card);border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;gap:10px;">
+      <div><div style="font-size:12.5px;font-weight:700;color:var(--text);"><i class="fab fa-whatsapp" style="color:#25D366;"></i> ${escHtml(chat.name || chat.id)}</div><div style="font-size:10.5px;color:var(--muted);">${escHtml(chat.id || '')}</div></div>
+      <button type="button" class="btn btn-green btn-xs" onclick='openWhatsAppChatFromContacts(${JSON.stringify(chat.id)}, ${JSON.stringify(chat.name || chat.id)}, ${JSON.stringify(chat.phone || '')})'>Open</button>
+    </div>
+    <div style="padding:10px 12px;max-height:300px;overflow-y:auto;">${items || '<div style="color:var(--muted);font-size:12px;">No messages loaded.</div>'}</div>
+  </div>`;
+}
+
+async function loadOutlookContactSessions({ email, phone, title }) {
+  const wrap = document.getElementById('outlook-contact-sessions');
+  if (!wrap) return;
+  wrap.innerHTML = '<div class="spin-loader" style="margin:24px auto;"></div>';
+  const phoneDigits = normalizeContactPhoneDigits(phone);
+  let outlookHtml = '';
+  let waHtml = '';
+
+  try {
+    if (email) {
+      const res = await fetch(`${API_BASE}/outlook/inbox?filter=${encodeURIComponent(email)}&top=25`, { headers: getAuthHeaders() });
+      const data = res.ok ? await res.json() : { messages: [] };
+      outlookHtml = renderOutlookContactSessionCards(data.messages || []);
+    } else {
+      outlookHtml = '<div style="padding:18px;color:var(--muted);font-size:12.5px;border:1px dashed var(--border);border-radius:8px;">No email address on this contact.</div>';
+    }
+  } catch(e) {
+    outlookHtml = `<div style="padding:18px;color:var(--red2);font-size:12.5px;border:1px solid rgba(239,68,68,0.2);border-radius:8px;">Outlook messages could not load.</div>`;
+  }
+
+  try {
+    if (!waAllChats.length) {
+      const res = await fetch(`${API_BASE}/wa/chats`, { headers: getAuthHeaders() });
+      if (res.ok) waAllChats = await res.json();
+    }
+    const chat = phoneDigits ? waAllChats.find(ch => normalizeContactPhoneDigits(ch.phone || ch.id || '') === phoneDigits || String(ch.id || '').includes(phoneDigits)) : null;
+    let msgs = [];
+    if (chat) {
+      const mr = await fetch(`${API_BASE}/wa/messages/${encodeURIComponent(chat.id)}?limit=80`, { headers: getAuthHeaders() });
+      if (mr.ok) msgs = await mr.json();
+    }
+    waHtml = renderWhatsappContactSession(chat, msgs);
+  } catch(e) {
+    waHtml = `<div style="padding:18px;color:var(--red2);font-size:12.5px;border:1px solid rgba(239,68,68,0.2);border-radius:8px;">WhatsApp session could not load.</div>`;
+  }
+
+  wrap.innerHTML = `
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:12px;">
+      <div><div style="font-size:15px;font-weight:800;color:var(--text);">Messages</div><div style="font-size:11.5px;color:var(--muted);">${escHtml(title || email || phone || 'Contact sessions')}</div></div>
+      <div style="display:flex;gap:8px;">${email ? `<button class="btn btn-blue btn-xs" onclick="draftEmailTo(${jsArg(email)})"><i class="fas fa-envelope"></i> Email</button>` : ''}</div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr;gap:14px;">
+      <div><div class="section-label"><i class="fab fa-microsoft" style="color:#0078d4;"></i> Outlook mail</div>${outlookHtml}</div>
+      <div><div class="section-label"><i class="fab fa-whatsapp" style="color:#25D366;"></i> WhatsApp chat session</div>${waHtml}</div>
+    </div>`;
 }
 
 async function renderWhatsappContactsDirectory(forceReload) {
@@ -3945,7 +4197,16 @@ function bcInsertEmoji(emoji) {
 }
 
 // Signature — reuse et-sig-modal
-function bcInsertSignature() {
+async function bcInsertSignature() {
+  var savedSig = await ucGetDefaultSignature('new');
+  if (savedSig) {
+    var bced = document.getElementById('bc-html');
+    if (!bced) return;
+    bced.focus();
+    if (_bcSavedSel) { var bcsel = window.getSelection(); bcsel.removeAllRanges(); bcsel.addRange(_bcSavedSel); }
+    document.execCommand('insertHTML', false, '<br>' + savedSig.html_body);
+    return;
+  }
   openModal('et-sig-modal');
   var insertBtn = document.querySelector('#et-sig-modal .btn-gold');
   if (insertBtn) {
@@ -4537,21 +4798,32 @@ async function saveContact() {
   };
 
   try {
-    const res = await fetch(`${API_BASE}/contacts`, {
-      method: 'POST',
+    const isEdit = !!editingContactId;
+    const res = await fetch(`${API_BASE}/contacts${isEdit ? '/' + encodeURIComponent(editingContactId) : ''}`, {
+      method: isEdit ? 'PUT' : 'POST',
       headers: getAuthHeaders(),
       body: JSON.stringify(payload),
     });
     const data = await res.json();
     if (res.ok) {
-      contacts.push({ ...data, emails: data.emails_count, lastContact: data.last_contact });
+      const hydrated = { ...data, emails: data.emails_count, lastContact: data.last_contact };
+      if (isEdit) {
+        const idx = contacts.findIndex(c => String(c.id) === String(editingContactId));
+        if (idx >= 0) contacts[idx] = { ...contacts[idx], ...hydrated };
+      } else {
+        contacts.push(hydrated);
+      }
       closeModal('contact-modal');
-      notify('Contact saved to database', `${fname} ${lname} · ${company}`, 'var(--green)', 'fas fa-user-check');
+      editingContactId = null;
+      const outlookNote = data.outlookSync && !data.outlookSync.skipped ? ' · Outlook synced' : '';
+      notify(isEdit ? 'Contact updated' : 'Contact saved', `${fname} ${lname} · ${company}${outlookNote}`, 'var(--green)', 'fas fa-user-check');
       // Clear form
       ['c-fname','c-lname','c-company','c-designation','c-dept','c-phone','c-wa','c-email','c-products','c-city','c-notes'].forEach(id => {
         const el = document.getElementById(id);
         if (el) el.value = '';
       });
+      if (contactsSource === 'outlook') await loadOutlookContactsDirectory();
+      else filterContacts();
     } else {
       notify('Save failed', data.error || 'Unknown error', 'var(--red)', 'fas fa-exclamation-circle');
     }
@@ -5016,6 +5288,7 @@ function oaShowSub(id) {
   // Load live data when tab is opened
   if (id === 'shared')     oaLoadShared();
   if (id === 'auto-reply') oaLoadAutoReply();
+  if (id === 'signatures') oaLoadSignatures();
   if (id === 'categories') oaLoadCategories();
   if (id === 'storage')    oaLoadStorage();
 }
@@ -5048,33 +5321,789 @@ async function oaLoadAutoReply() {
   el.innerHTML = '<div class="spin-loader" style="margin:20px auto;"></div>';
   try {
     const res = await fetch(`${API_BASE}/outlook/settings/auto-reply`, { headers: getAuthHeaders() });
-    if (!res.ok) throw new Error('Not connected');
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.error || err.message || 'Not connected');
+    }
     const d = await res.json();
     const isOn = d.status === 'alwaysEnabled' || d.status === 'scheduled';
+    const isScheduled = d.status === 'scheduled';
+    const externalAudience = d.externalAudience || 'none';
+    const sendsExternal = externalAudience === 'all' || externalAudience === 'contactsOnly';
+    const start = oaAutoDateParts(d.scheduledStartDateTime, 0);
+    const end = oaAutoDateParts(d.scheduledEndDateTime, 1);
+    window.oaAutoReplyTimeZone = d.scheduledStartDateTime?.timeZone || d.scheduledEndDateTime?.timeZone || oaAutoDefaultTimeZone();
     el.innerHTML = `
-      <div style="display:flex;align-items:center;gap:12px;padding:14px 16px;background:var(--card2);border-radius:8px;border:1px solid var(--border);margin-bottom:14px;">
-        <div style="width:40px;height:22px;border-radius:11px;background:${isOn?'var(--green)':'var(--border2)'};position:relative;cursor:pointer;" onclick="oaToggleAutoReply(${!isOn})">
-          <div style="width:18px;height:18px;border-radius:50%;background:#fff;position:absolute;top:2px;${isOn?'right:2px':'left:2px'};transition:all 0.2s;"></div>
+      <div class="oa-auto-panel">
+        <div class="oa-auto-row">
+          <button type="button" id="oa-auto-enabled" class="oa-auto-switch ${isOn ? 'on' : ''}" aria-label="Turn on automatic replies" onclick="oaAutoToggleEnabled()"></button>
+          <span class="oa-auto-label">Turn on automatic replies</span>
+          <span class="badge ${isOn ? 'b-green' : 'b-gray'}" style="margin-left:auto;">${isOn ? 'ON' : 'OFF'}</span>
         </div>
-        <span style="font-size:13.5px;color:var(--text);font-weight:500;">Turn on automatic replies</span>
-        <span class="badge ${isOn?'b-green':'b-gray'}" style="margin-left:auto;">${isOn?'ON':'OFF'}</span>
-      </div>
-      ${d.internalReplyMessage ? `<div style="padding:12px 16px;background:var(--card2);border-radius:8px;border:1px solid var(--border);margin-bottom:10px;"><div style="font-size:11px;color:var(--muted);margin-bottom:6px;text-transform:uppercase;letter-spacing:0.05em;">Internal reply message</div><div style="font-size:12.5px;color:var(--text);">${escHtml(d.internalReplyMessage)}</div></div>` : ''}
-      ${d.externalReplyMessage ? `<div style="padding:12px 16px;background:var(--card2);border-radius:8px;border:1px solid var(--border);"><div style="font-size:11px;color:var(--muted);margin-bottom:6px;text-transform:uppercase;letter-spacing:0.05em;">External reply message</div><div style="font-size:12.5px;color:var(--text);">${escHtml(d.externalReplyMessage)}</div></div>` : ''}`;
+
+        <label class="oa-auto-row">
+          <input id="oa-auto-scheduled" class="oa-auto-check" type="checkbox" ${isScheduled ? 'checked' : ''} ${!isOn ? 'disabled' : ''} onchange="oaAutoRefreshDisabledState()">
+          <span class="oa-auto-label ${!isOn ? 'disabled' : ''}">Send replies only during a time period</span>
+        </label>
+        <div class="oa-auto-schedule">
+          <label>Start time</label>
+          <input id="oa-auto-start-date" class="inp" type="date" value="${start.date}" ${(!isOn || !isScheduled) ? 'disabled' : ''}>
+          <input id="oa-auto-start-time" class="inp" type="time" value="${start.time}" ${(!isOn || !isScheduled) ? 'disabled' : ''}>
+          <label>End time</label>
+          <input id="oa-auto-end-date" class="inp" type="date" value="${end.date}" ${(!isOn || !isScheduled) ? 'disabled' : ''}>
+          <input id="oa-auto-end-time" class="inp" type="time" value="${end.time}" ${(!isOn || !isScheduled) ? 'disabled' : ''}>
+        </div>
+
+        <div>
+          <label class="form-label">Reply inside your organization</label>
+          ${oaAutoHtmlEditor('oa-auto-internal-message', d.internalReplyMessage || '', !isOn, "I'll reply when I'm available.")}
+        </div>
+
+        <label class="oa-auto-row">
+          <input id="oa-auto-external-enabled" class="oa-auto-check" type="checkbox" ${sendsExternal ? 'checked' : ''} ${!isOn ? 'disabled' : ''} onchange="oaAutoRefreshDisabledState()">
+          <span class="oa-auto-label ${!isOn ? 'disabled' : ''}">Send replies outside your organization</span>
+        </label>
+        <label class="oa-auto-row" style="margin-left:26px;">
+          <input id="oa-auto-contacts-only" class="oa-auto-check" type="checkbox" ${externalAudience === 'contactsOnly' ? 'checked' : ''} ${(!isOn || !sendsExternal) ? 'disabled' : ''}>
+          <span class="oa-auto-label ${(!isOn || !sendsExternal) ? 'disabled' : ''}">Send replies only to contacts</span>
+        </label>
+        <div>
+          <label class="form-label">Reply outside your organization</label>
+          ${oaAutoHtmlEditor('oa-auto-external-message', d.externalReplyMessage || '', !isOn || !sendsExternal, "Thanks for your email. I'll respond when I'm back.")}
+        </div>
+
+        <div style="display:flex;justify-content:flex-end;gap:10px;">
+          <button type="button" class="btn btn-ghost" onclick="oaLoadAutoReply()">Cancel</button>
+          <button type="button" class="btn btn-blue" id="oa-auto-save-btn" onclick="oaSaveAutoReply()"><i class="fas fa-save"></i> Save</button>
+        </div>
+      </div>`;
   } catch(e) {
     el.innerHTML = `<div style="color:var(--muted);font-size:12.5px;">${e.message === 'Not connected' ? 'Connect Outlook to manage automatic replies.' : e.message}</div>`;
   }
 }
 
 async function oaToggleAutoReply(enable) {
+  const enabled = document.getElementById('oa-auto-enabled');
+  if (enabled) enabled.classList.toggle('on', !!enable);
+  await oaSaveAutoReply(enable);
+}
+
+function oaAutoHtmlEditor(id, html, disabled, placeholder) {
+  const dis = disabled ? 'disabled' : '';
+  const editable = disabled ? 'false' : 'true';
+  return `
+    <div class="oa-html-toolbar" data-editor-for="${id}">
+      <button type="button" class="btn btn-ghost btn-xs" ${dis} onmousedown="event.preventDefault()" onclick="oaAutoFormatPainter('${id}')" title="Format painter"><i class="fas fa-paint-roller"></i></button>
+      <select class="oa-font-family-select" ${dis} onmousedown="oaAutoRestoreSelection('${id}')" onchange="oaAutoSetFont('${id}',this.value)" title="Font style">
+        <option value="" disabled hidden></option>
+        <option value="Calibri">Calibri</option>
+        <option value="Aptos">Aptos</option>
+        <option value="Arial">Arial</option>
+        <option value="Segoe UI">Segoe UI</option>
+        <option value="Times New Roman">Times New Roman</option>
+        <option value="Georgia">Georgia</option>
+        <option value="Verdana">Verdana</option>
+        <option value="Tahoma">Tahoma</option>
+        <option value="Courier New">Courier New</option>
+      </select>
+      <select class="oa-font-size-select" ${dis} onmousedown="oaAutoRestoreSelection('${id}')" onchange="oaAutoSetFontSize('${id}',this.value)" title="Font size">
+        <option value="">Size</option>
+        <option value="10px">10</option>
+        <option value="12px">12</option>
+        <option value="14px">14</option>
+        <option value="16px">16</option>
+        <option value="18px">18</option>
+        <option value="20px">20</option>
+        <option value="24px">24</option>
+        <option value="28px">28</option>
+        <option value="32px">32</option>
+      </select>
+      <button type="button" class="btn btn-ghost btn-xs" data-cmd="bold" ${dis} onmousedown="event.preventDefault();oaAutoRestoreSelection('${id}')" onclick="oaAutoFmt('${id}','bold')" title="Bold"><b>B</b></button>
+      <button type="button" class="btn btn-ghost btn-xs" data-cmd="italic" ${dis} onmousedown="event.preventDefault();oaAutoRestoreSelection('${id}')" onclick="oaAutoFmt('${id}','italic')" title="Italic"><i>I</i></button>
+      <button type="button" class="btn btn-ghost btn-xs" data-cmd="underline" ${dis} onmousedown="event.preventDefault();oaAutoRestoreSelection('${id}')" onclick="oaAutoFmt('${id}','underline')" title="Underline"><u>U</u></button>
+      <span class="oa-color-tool" title="Highlight">
+        <input id="${id}-highlight-color" type="color" ${dis} value="#fff176" onmousedown="oaAutoRestoreSelection('${id}')">
+        <button type="button" class="btn btn-ghost btn-xs oa-color-apply" ${dis} onmousedown="event.preventDefault();oaAutoRestoreSelection('${id}')" onclick="oaAutoApplyColor('${id}','hiliteColor',document.getElementById('${id}-highlight-color').value)" title="Apply highlight"><i class="fas fa-check"></i></button>
+      </span>
+      <span class="oa-color-tool" title="Font color">
+        <input id="${id}-font-color" type="color" ${dis} value="#222222" onmousedown="oaAutoRestoreSelection('${id}')">
+        <button type="button" class="btn btn-ghost btn-xs oa-color-apply" ${dis} onmousedown="event.preventDefault();oaAutoRestoreSelection('${id}')" onclick="oaAutoApplyColor('${id}','foreColor',document.getElementById('${id}-font-color').value)" title="Apply font color"><i class="fas fa-check"></i></button>
+      </span>
+      <button type="button" class="btn btn-ghost btn-xs" data-cmd="insertUnorderedList" ${dis} onmousedown="event.preventDefault();oaAutoRestoreSelection('${id}')" onclick="oaAutoFmt('${id}','insertUnorderedList')" title="Bulleted list"><i class="fas fa-list-ul"></i></button>
+      <button type="button" class="btn btn-ghost btn-xs" data-cmd="insertOrderedList" ${dis} onmousedown="event.preventDefault();oaAutoRestoreSelection('${id}')" onclick="oaAutoFmt('${id}','insertOrderedList')" title="Numbered list"><i class="fas fa-list-ol"></i></button>
+      <button type="button" class="btn btn-ghost btn-xs" ${dis} onmousedown="event.preventDefault();oaAutoRestoreSelection('${id}')" onclick="oaAutoFmt('${id}','outdent')" title="Decrease indent"><i class="fas fa-outdent"></i></button>
+      <button type="button" class="btn btn-ghost btn-xs" ${dis} onmousedown="event.preventDefault();oaAutoRestoreSelection('${id}')" onclick="oaAutoFmt('${id}','indent')" title="Increase indent"><i class="fas fa-indent"></i></button>
+      <button type="button" class="btn btn-ghost btn-xs" ${dis} onmousedown="event.preventDefault();oaAutoRestoreSelection('${id}')" onclick="oaAutoFmt('${id}','formatBlock','blockquote')" title="Quote"><i class="fas fa-quote-right"></i></button>
+      <button type="button" class="btn btn-ghost btn-xs" data-cmd="justifyLeft" ${dis} onmousedown="event.preventDefault();oaAutoRestoreSelection('${id}')" onclick="oaAutoFmt('${id}','justifyLeft')" title="Align left"><i class="fas fa-align-left"></i></button>
+      <button type="button" class="btn btn-ghost btn-xs" data-cmd="justifyCenter" ${dis} onmousedown="event.preventDefault();oaAutoRestoreSelection('${id}')" onclick="oaAutoFmt('${id}','justifyCenter')" title="Center"><i class="fas fa-align-center"></i></button>
+      <button type="button" class="btn btn-ghost btn-xs" data-cmd="justifyRight" ${dis} onmousedown="event.preventDefault();oaAutoRestoreSelection('${id}')" onclick="oaAutoFmt('${id}','justifyRight')" title="Align right"><i class="fas fa-align-right"></i></button>
+      <button type="button" class="btn btn-ghost btn-xs" ${dis} onmousedown="event.preventDefault();oaAutoRestoreSelection('${id}')" onclick="oaAutoLink('${id}')" title="Insert link"><i class="fas fa-link"></i></button>
+      <button type="button" class="btn btn-ghost btn-xs" ${dis} onmousedown="event.preventDefault();oaAutoRestoreSelection('${id}')" onclick="oaAutoFmt('${id}','unlink')" title="Remove link"><i class="fas fa-unlink"></i></button>
+      <span class="oa-html-more">
+        <button type="button" class="btn btn-ghost btn-xs" ${dis} onmousedown="event.preventDefault();oaAutoRestoreSelection('${id}')" onclick="oaAutoToggleMore(this, '${id}')" title="More"><i class="fas fa-ellipsis-h"></i></button>
+        <span class="oa-html-more-menu">
+          <button type="button" class="btn btn-ghost btn-xs" data-cmd="superscript" ${dis} onmousedown="event.preventDefault();oaAutoRestoreSelection('${id}')" onclick="oaAutoFmt('${id}','superscript')" title="Superscript"><span class="oa-script-icon">X<span class="oa-script-n oa-script-super">2</span></span></button>
+          <button type="button" class="btn btn-ghost btn-xs" data-cmd="subscript" ${dis} onmousedown="event.preventDefault();oaAutoRestoreSelection('${id}')" onclick="oaAutoFmt('${id}','subscript')" title="Subscript"><span class="oa-script-icon">X<span class="oa-script-n oa-script-sub">2</span></span></button>
+          <button type="button" class="btn btn-ghost btn-xs" data-cmd="strikeThrough" ${dis} onmousedown="event.preventDefault();oaAutoRestoreSelection('${id}')" onclick="oaAutoFmt('${id}','strikeThrough')" title="Strikethrough"><s>S</s></button>
+          <button type="button" class="btn btn-ghost btn-xs" ${dis} onmousedown="event.preventDefault();oaAutoRestoreSelection('${id}')" onclick="oaAutoSetDirection('${id}','ltr')" title="Left to right">A<i class="fas fa-long-arrow-alt-right" style="font-size:9px;width:9px;"></i></button>
+          <button type="button" class="btn btn-ghost btn-xs" ${dis} onmousedown="event.preventDefault();oaAutoRestoreSelection('${id}')" onclick="oaAutoSetDirection('${id}','rtl')" title="Right to left"><i class="fas fa-long-arrow-alt-left" style="font-size:9px;width:9px;"></i>A</button>
+          <button type="button" class="btn btn-ghost btn-xs" ${dis} onmousedown="event.preventDefault();oaAutoRestoreSelection('${id}')" onclick="oaAutoFmt('${id}','undo')" title="Undo"><i class="fas fa-undo"></i></button>
+          <button type="button" class="btn btn-ghost btn-xs" ${dis} onmousedown="event.preventDefault();oaAutoRestoreSelection('${id}')" onclick="oaAutoFmt('${id}','redo')" title="Redo"><i class="fas fa-redo"></i></button>
+          <button type="button" class="btn btn-ghost btn-xs" ${dis} onmousedown="event.preventDefault();oaAutoRestoreSelection('${id}')" onclick="oaAutoFmt('${id}','removeFormat')" title="Clear formatting"><i class="fas fa-eraser"></i></button>
+          <span class="oa-table-tool">
+            <button type="button" class="btn btn-ghost btn-xs" ${dis} onmousedown="event.preventDefault();oaAutoRestoreSelection('${id}')" onclick="oaAutoToggleTablePicker(this, '${id}')" title="Insert table"><i class="fas fa-table"></i></button>
+            <span class="oa-table-picker" data-table-editor="${id}">
+              <span class="oa-table-title">Insert table</span>
+              <span class="oa-table-grid">${oaAutoTableCells(id)}</span>
+              <span class="oa-table-size" id="oa-table-size-${id}"></span>
+              <button type="button" class="oa-table-custom" onmousedown="event.preventDefault()" onclick="oaAutoPromptTable('${id}')"><i class="fas fa-table"></i> Insert table...</button>
+            </span>
+          </span>
+          <button type="button" class="btn btn-ghost btn-xs oa-html-change-case" ${dis} onmousedown="event.preventDefault();oaAutoRestoreSelection('${id}')" onclick="oaAutoChangeCase('${id}')" title="Change case">aA</button>
+        </span>
+      </span>
+    </div>
+    <div id="${id}" class="oa-html-editor" contenteditable="${editable}" data-placeholder="${escHtml(placeholder || '')}" onmouseup="oaAutoActiveEditorId='${id}';oaAutoSaveSelection('${id}');oaAutoUpdateToolbarState('${id}')" onkeyup="oaAutoActiveEditorId='${id}';oaAutoSaveSelection('${id}');oaAutoUpdateToolbarState('${id}')" onfocus="oaAutoActiveEditorId='${id}';oaAutoSaveSelection('${id}');oaAutoUpdateToolbarState('${id}')" oninput="oaAutoActiveEditorId='${id}';oaAutoSaveSelection('${id}');oaAutoUpdateToolbarState('${id}')">${html || ''}</div>`;
+}
+
+const oaAutoSelections = {};
+let oaAutoLastCmd = { id: '', cmd: '', at: 0 };
+let oaAutoActiveEditorId = '';
+function oaAutoSaveSelection(id) {
+  const ed = document.getElementById(id);
+  const sel = window.getSelection();
+  if (!ed || !sel || !sel.rangeCount) return;
+  const range = sel.getRangeAt(0);
+  if (!ed.contains(range.commonAncestorContainer)) return;
+  oaAutoSelections[id] = range.cloneRange();
+}
+
+function oaAutoRestoreSelection(id) {
+  const range = oaAutoSelections[id];
+  if (!range) return false;
+  const sel = window.getSelection();
+  if (!sel) return false;
+  sel.removeAllRanges();
+  sel.addRange(range);
+  return true;
+}
+
+function oaAutoUpdateToolbarState(id) {
+  const toolbar = document.querySelector(`[data-editor-for="${id}"]`);
+  if (!toolbar) return;
+  toolbar.querySelectorAll('[data-cmd]').forEach(btn => {
+    let active = false;
+    try { active = document.queryCommandState(btn.dataset.cmd); } catch(_) {}
+    btn.classList.toggle('active', !!active);
+  });
+  const ed = document.getElementById(id);
+  const sel = window.getSelection();
+  let node = sel && sel.anchorNode;
+  if (!node || (ed && !ed.contains(node))) {
+    const range = oaAutoSelections[id];
+    node = range && range.startContainer;
+  }
+  if (sel && sel.rangeCount && ed && ed.contains(sel.getRangeAt(0).commonAncestorContainer)) {
+    node = oaAutoNodeFromRange(sel.getRangeAt(0), ed) || node;
+  }
+  if (node && node.nodeType !== 1) node = node.parentElement;
+  if (!node || (ed && !ed.contains(node))) node = ed;
+  const cs = node ? window.getComputedStyle(node) : null;
+  const fontSelect = toolbar.querySelector('.oa-font-family-select');
+  const sizeSelect = toolbar.querySelector('.oa-font-size-select');
+  if (cs && fontSelect) {
+    const family = oaAutoPickFontFamily(node, cs);
+    let match = Array.from(fontSelect.options).find(opt => opt.value && oaAutoNormalizeFont(opt.value) === family);
+    if (!match && family) {
+      const detected = oaAutoDisplayFontFamily(node, cs);
+      if (detected) {
+        match = document.createElement('option');
+        match.value = detected;
+        match.textContent = detected;
+        match.dataset.detected = 'true';
+        fontSelect.appendChild(match);
+      }
+    }
+    fontSelect.value = match ? match.value : '';
+  }
+  if (cs && sizeSelect) {
+    const px = Math.round(parseFloat(cs.fontSize || '0'));
+    const match = Array.from(sizeSelect.options).find(opt => parseInt(opt.value, 10) === px);
+    sizeSelect.value = match ? match.value : '';
+  }
+}
+
+function oaAutoFmt(id, cmd, val) {
+  const ed = document.getElementById(id);
+  if (!ed || ed.getAttribute('contenteditable') === 'false') return;
+  const now = Date.now();
+  if (!val && oaAutoLastCmd.id === id && oaAutoLastCmd.cmd === cmd && now - oaAutoLastCmd.at < 280) return;
+  oaAutoLastCmd = { id, cmd, at: now };
+  ed.focus();
+  oaAutoRestoreSelection(id);
+  try { document.execCommand('styleWithCSS', false, true); } catch(_) {}
+  document.execCommand(cmd, false, val || null);
+  oaAutoSaveSelection(id);
+  oaAutoUpdateToolbarState(id);
+}
+
+function oaAutoNormalizeFont(value) {
+  return String(value || '').split(',')[0].replace(/['"]/g, '').trim().toLowerCase();
+}
+
+function oaAutoNodeFromRange(range, ed) {
+  if (!range) return null;
+  let node = range.startContainer;
+  if (node && node.nodeType === 3 && node.textContent.slice(range.startOffset).trim()) return node.parentElement;
+  const walker = document.createTreeWalker(range.commonAncestorContainer, NodeFilter.SHOW_TEXT, {
+    acceptNode: function(textNode) {
+      if (!textNode.textContent.trim()) return NodeFilter.FILTER_REJECT;
+      return range.intersectsNode(textNode) && ed.contains(textNode) ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_REJECT;
+    }
+  });
+  const firstText = walker.nextNode();
+  return firstText ? firstText.parentElement : null;
+}
+
+function oaAutoPickFontFamily(node, cs) {
+  return oaAutoNormalizeFont(oaAutoDisplayFontFamily(node, cs));
+}
+
+function oaAutoDisplayFontFamily(node, cs) {
+  const fontEl = node && node.closest ? node.closest('font[face]') : null;
+  const raw = fontEl?.getAttribute('face') || cs?.fontFamily || '';
+  return String(raw).split(',')[0].replace(/['"]/g, '').trim();
+}
+
+let oaAutoPaintStyle = null;
+function oaAutoFormatPainter(id) {
+  const ed = document.getElementById(id);
+  if (!ed || ed.getAttribute('contenteditable') === 'false') return;
+  ed.focus();
+  oaAutoRestoreSelection(id);
+  const sel = window.getSelection();
+  if (!sel || !sel.rangeCount) return;
+  if (!oaAutoPaintStyle) {
+    const node = sel.anchorNode && (sel.anchorNode.nodeType === 1 ? sel.anchorNode : sel.anchorNode.parentElement);
+    const cs = node ? window.getComputedStyle(node) : null;
+    oaAutoPaintStyle = cs ? [
+      `font-family:${cs.fontFamily}`,
+      `font-size:${cs.fontSize}`,
+      `font-weight:${cs.fontWeight}`,
+      `font-style:${cs.fontStyle}`,
+      `text-decoration:${cs.textDecorationLine}`,
+      `color:${cs.color}`,
+      `background-color:${cs.backgroundColor}`,
+    ].join(';') : '';
+    notify('Format painter', 'Select text and click format painter again to apply.', '#0078d4', 'fas fa-paint-roller');
+    return;
+  }
+  const html = sel.toString();
+  if (html) document.execCommand('insertHTML', false, `<span style="${oaAutoPaintStyle}">${escHtml(html)}</span>`);
+  oaAutoPaintStyle = null;
+  oaAutoSaveSelection(id);
+  oaAutoUpdateToolbarState(id);
+}
+
+function oaAutoSetFont(id, family) {
+  if (!family) return;
+  oaAutoApplyInlineStyle(id, { fontFamily: family });
+}
+
+function oaAutoSetFontSize(id, size) {
+  if (!size) return;
+  oaAutoApplyInlineStyle(id, { fontSize: size });
+}
+
+function oaAutoApplyInlineStyle(id, styles) {
+  const ed = document.getElementById(id);
+  if (!ed || ed.getAttribute('contenteditable') === 'false') return;
+  ed.focus();
+  oaAutoRestoreSelection(id);
+  const sel = window.getSelection();
+  if (!sel || !sel.rangeCount) return;
+  const range = sel.getRangeAt(0);
+  const wrapper = document.createElement('span');
+  Object.assign(wrapper.style, oaAutoMergedTypingStyle(id, styles));
+  if (sel.isCollapsed) {
+    wrapper.appendChild(document.createTextNode('\u200b'));
+    range.insertNode(wrapper);
+    const nextRange = document.createRange();
+    nextRange.setStart(wrapper.firstChild, 1);
+    nextRange.collapse(true);
+    sel.removeAllRanges();
+    sel.addRange(nextRange);
+  } else {
+    wrapper.appendChild(range.extractContents());
+    range.insertNode(wrapper);
+    sel.removeAllRanges();
+    const nextRange = document.createRange();
+    nextRange.selectNodeContents(wrapper);
+    sel.addRange(nextRange);
+  }
+  oaAutoSaveSelection(id);
+  oaAutoUpdateToolbarState(id);
+}
+
+function oaAutoMergedTypingStyle(id, styles) {
+  const toolbar = document.querySelector(`[data-editor-for="${id}"]`);
+  const font = toolbar?.querySelector('.oa-font-family-select')?.value || '';
+  const size = toolbar?.querySelector('.oa-font-size-select')?.value || '';
+  const merged = {};
+  if (font) merged.fontFamily = font;
+  if (size) merged.fontSize = size;
+  return Object.assign(merged, styles || {});
+}
+
+function oaAutoApplyColor(id, cmd, color) {
+  const ed = document.getElementById(id);
+  if (!ed || ed.getAttribute('contenteditable') === 'false' || !color) return;
+  const styles = cmd === 'foreColor'
+    ? { color: color }
+    : { backgroundColor: color };
+  oaAutoApplyInlineStyle(id, styles);
+}
+
+function oaAutoLink(id) {
+  oaAutoRestoreSelection(id);
+  const url = prompt('Enter link URL');
+  if (!url) return;
+  oaAutoFmt(id, 'createLink', url);
+}
+
+function oaAutoInsertTable(id) {
+  const ed = document.getElementById(id);
+  if (!ed || ed.getAttribute('contenteditable') === 'false') return;
+  ed.focus();
+  oaAutoRestoreSelection(id);
+  oaAutoCloseTablePickers();
+  document.execCommand('insertHTML', false,
+    '<table style="border-collapse:collapse;width:100%;margin:8px 0;"><tr><td style="border:1px solid #ccc;padding:6px;">Cell</td><td style="border:1px solid #ccc;padding:6px;">Cell</td></tr><tr><td style="border:1px solid #ccc;padding:6px;">Cell</td><td style="border:1px solid #ccc;padding:6px;">Cell</td></tr></table><br>');
+}
+
+function oaAutoTableCells(id) {
+  let html = '';
+  for (let r = 1; r <= 8; r++) {
+    for (let c = 1; c <= 10; c++) {
+      html += `<span class="oa-table-cell" data-row="${r}" data-col="${c}" onmouseenter="oaAutoTableHover('${id}',${r},${c})" onmousedown="event.preventDefault()" onclick="oaAutoInsertSizedTable('${id}',${r},${c})"></span>`;
+    }
+  }
+  return html;
+}
+
+function oaAutoToggleTablePicker(btn, id) {
+  const tool = btn.closest('.oa-table-tool');
+  if (!tool) return;
+  document.querySelectorAll('.oa-table-tool.open').forEach(el => { if (el !== tool) el.classList.remove('open'); });
+  tool.classList.toggle('open');
+  oaAutoTableHover(id, 0, 0);
+}
+
+function oaAutoCloseTablePickers() {
+  document.querySelectorAll('.oa-table-tool.open').forEach(el => el.classList.remove('open'));
+}
+
+function oaAutoTableHover(id, rows, cols) {
+  const picker = document.querySelector(`[data-table-editor="${id}"]`);
+  if (!picker) return;
+  picker.querySelectorAll('.oa-table-cell').forEach(cell => {
+    const r = Number(cell.dataset.row);
+    const c = Number(cell.dataset.col);
+    cell.classList.toggle('hot', r <= rows && c <= cols);
+  });
+  const label = document.getElementById(`oa-table-size-${id}`);
+  if (label) label.textContent = rows && cols ? `${cols} x ${rows} Table` : '';
+}
+
+function oaAutoInsertSizedTable(id, rows, cols) {
+  const ed = document.getElementById(id);
+  if (!ed || ed.getAttribute('contenteditable') === 'false') return;
+  ed.focus();
+  oaAutoRestoreSelection(id);
+  let html = '<table style="border-collapse:collapse;width:100%;margin:8px 0;">';
+  for (let r = 0; r < rows; r++) {
+    html += '<tr>';
+    for (let c = 0; c < cols; c++) {
+      html += '<td style="border:1px solid #ccc;padding:6px;min-width:40px;">&nbsp;</td>';
+    }
+    html += '</tr>';
+  }
+  html += '</table><br>';
+  oaAutoCloseTablePickers();
+  document.execCommand('insertHTML', false, html);
+  oaAutoSaveSelection(id);
+  oaAutoUpdateToolbarState(id);
+}
+
+function oaAutoPromptTable(id) {
+  const rows = Math.max(1, Math.min(20, Number(prompt('Rows', '3')) || 0));
+  const cols = Math.max(1, Math.min(20, Number(prompt('Columns', '3')) || 0));
+  if (!rows || !cols) return;
+  oaAutoInsertSizedTable(id, rows, cols);
+}
+
+function oaAutoToggleMore(btn, id) {
+  const wrap = btn.closest('.oa-html-more');
+  if (!wrap) return;
+  document.querySelectorAll('.oa-html-more.open').forEach(el => { if (el !== wrap) el.classList.remove('open'); });
+  wrap.classList.toggle('open');
+  if (id) {
+    oaAutoRestoreSelection(id);
+    oaAutoUpdateToolbarState(id);
+  }
+}
+
+function oaAutoSetDirection(id, dir) {
+  const ed = document.getElementById(id);
+  if (!ed || ed.getAttribute('contenteditable') === 'false') return;
+  ed.setAttribute('dir', dir);
+  ed.style.textAlign = dir === 'rtl' ? 'right' : 'left';
+  oaAutoUpdateToolbarState(id);
+}
+
+function oaAutoChangeCase(id) {
+  const ed = document.getElementById(id);
+  if (!ed || ed.getAttribute('contenteditable') === 'false') return;
+  ed.focus();
+  oaAutoRestoreSelection(id);
+  const sel = window.getSelection();
+  if (!sel || !sel.rangeCount || sel.isCollapsed) return;
+  const text = sel.toString();
+  const changed = text === text.toUpperCase() ? text.toLowerCase() : text.toUpperCase();
+  document.execCommand('insertText', false, changed);
+  oaAutoSaveSelection(id);
+  oaAutoUpdateToolbarState(id);
+}
+
+document.addEventListener('selectionchange', function() {
+  const id = oaAutoActiveEditorId;
+  const ed = id && document.getElementById(id);
+  const sel = window.getSelection();
+  if (!ed || !sel || !sel.rangeCount) return;
+  const range = sel.getRangeAt(0);
+  if (!ed.contains(range.commonAncestorContainer)) return;
+  oaAutoSaveSelection(id);
+  oaAutoUpdateToolbarState(id);
+});
+
+function oaAutoDateParts(graphDateTime, addDays) {
+  const pad = n => String(n).padStart(2, '0');
+  let date = new Date();
+  date.setDate(date.getDate() + (addDays || 0));
+  if (graphDateTime && graphDateTime.dateTime) {
+    const raw = String(graphDateTime.dateTime).slice(0, 16);
+    const match = raw.match(/^(\d{4}-\d{2}-\d{2})T(\d{2}:\d{2})/);
+    if (match) return { date: match[1], time: match[2] };
+  }
+  return {
+    date: `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`,
+    time: `${pad(date.getHours())}:${pad(date.getMinutes())}`,
+  };
+}
+
+function oaAutoRefreshDisabledState() {
+  const enabled = document.getElementById('oa-auto-enabled')?.classList.contains('on');
+  const scheduled = !!document.getElementById('oa-auto-scheduled')?.checked;
+  const external = !!document.getElementById('oa-auto-external-enabled')?.checked;
+  ['oa-auto-scheduled','oa-auto-external-enabled'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.disabled = !enabled;
+  });
+  ['oa-auto-start-date','oa-auto-start-time','oa-auto-end-date','oa-auto-end-time'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.disabled = !enabled || !scheduled;
+  });
+  ['oa-auto-contacts-only','oa-auto-external-message'].forEach(id => {
+    if (id === 'oa-auto-external-message') oaAutoSetHtmlEditorEnabled(id, enabled && external);
+    else {
+      const el = document.getElementById(id);
+      if (el) el.disabled = !enabled || !external;
+    }
+  });
+  oaAutoSetHtmlEditorEnabled('oa-auto-internal-message', enabled);
+}
+
+function oaAutoSetHtmlEditorEnabled(id, enabled) {
+  const ed = document.getElementById(id);
+  if (ed) ed.setAttribute('contenteditable', enabled ? 'true' : 'false');
+  document.querySelectorAll(`[data-editor-for="${id}"] button, [data-editor-for="${id}"] input, [data-editor-for="${id}"] select`).forEach(el => {
+    el.disabled = !enabled;
+  });
+}
+
+function oaAutoToggleEnabled() {
+  const btn = document.getElementById('oa-auto-enabled');
+  if (!btn) return;
+  btn.classList.toggle('on');
+  oaAutoRefreshDisabledState();
+}
+
+function oaAutoDateTimePayload(dateId, timeId) {
+  const date = document.getElementById(dateId)?.value;
+  const time = document.getElementById(timeId)?.value || '00:00';
+  if (!date) return null;
+  return {
+    dateTime: `${date}T${time}:00`,
+    timeZone: window.oaAutoReplyTimeZone || oaAutoDefaultTimeZone(),
+  };
+}
+
+function oaAutoDefaultTimeZone() {
+  const zone = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
+  if (zone === 'Asia/Calcutta' || zone === 'Asia/Kolkata') return 'India Standard Time';
+  return zone;
+}
+
+async function oaSaveAutoReply(forceEnabled) {
+  const saveBtn = document.getElementById('oa-auto-save-btn');
+  const enabled = forceEnabled === undefined
+    ? !!document.getElementById('oa-auto-enabled')?.classList.contains('on')
+    : !!forceEnabled;
+  const scheduled = enabled && !!document.getElementById('oa-auto-scheduled')?.checked;
+  const external = enabled && !!document.getElementById('oa-auto-external-enabled')?.checked;
+  const contactsOnly = external && !!document.getElementById('oa-auto-contacts-only')?.checked;
+  const body = {
+    status: enabled ? (scheduled ? 'scheduled' : 'alwaysEnabled') : 'disabled',
+    internalReplyMessage: document.getElementById('oa-auto-internal-message')?.innerHTML || '',
+    externalReplyMessage: document.getElementById('oa-auto-external-message')?.innerHTML || '',
+    externalAudience: external ? (contactsOnly ? 'contactsOnly' : 'all') : 'none',
+  };
+  if (scheduled) {
+    body.scheduledStartDateTime = oaAutoDateTimePayload('oa-auto-start-date', 'oa-auto-start-time');
+    body.scheduledEndDateTime = oaAutoDateTimePayload('oa-auto-end-date', 'oa-auto-end-time');
+    if (!body.scheduledStartDateTime || !body.scheduledEndDateTime) {
+      notify('Automatic replies', 'Start and end time are required.', 'var(--red2)', 'fas fa-exclamation-circle');
+      return;
+    }
+  }
   try {
-    await fetch(`${API_BASE}/outlook/settings/auto-reply`, {
+    if (saveBtn) {
+      saveBtn.disabled = true;
+      saveBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Saving';
+    }
+    const res = await fetch(`${API_BASE}/outlook/settings/auto-reply`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
-      body: JSON.stringify({ status: enable ? 'alwaysEnabled' : 'disabled' }),
+      body: JSON.stringify(body),
     });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.error || err.message || `HTTP ${res.status}`);
+    }
+    notify('Automatic replies', enabled ? 'Automatic replies saved.' : 'Automatic replies turned off.', 'var(--green2)', 'fas fa-check-circle');
     oaLoadAutoReply();
-  } catch(e) { notify('Error', e.message, 'var(--red2)', 'fas fa-exclamation-triangle'); }
+  } catch(e) {
+    notify('Automatic replies', e.message, 'var(--red2)', 'fas fa-exclamation-circle');
+    if (saveBtn) {
+      saveBtn.disabled = false;
+      saveBtn.innerHTML = '<i class="fas fa-save"></i> Save';
+    }
+  }
+}
+
+let oaSignaturesCache = [];
+let oaEditingSignatureId = null;
+let oaSignatureBuilderMode = false;
+
+async function oaLoadSignatures() {
+  const el = document.getElementById('oa-signatures-content');
+  if (!el) return;
+  el.innerHTML = '<div class="spin-loader" style="margin:20px auto;"></div>';
+  try {
+    const res = await fetch(`${API_BASE}/outlook/settings/signatures`, { headers: getAuthHeaders() });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.error || err.message || `HTTP ${res.status}`);
+    }
+    const data = await res.json();
+    oaSignaturesCache = data.signatures || [];
+    const optionHtml = '<option value="">No signature</option>' + oaSignaturesCache.map(s =>
+      `<option value="${s.id}">${escHtml(s.name)}</option>`
+    ).join('');
+
+    el.innerHTML = `
+      <div style="display:grid;grid-template-columns:220px 1fr;gap:16px;align-items:center;margin-bottom:12px;">
+        <label style="font-size:12.5px;color:var(--text);">Default for new messages</label>
+        <select id="oa-signature-default-new" class="inp" style="height:auto;padding:6px 10px;font-size:12px;" onchange="oaSetSignatureDefault('new', this.value)">${optionHtml}</select>
+        <label style="font-size:12.5px;color:var(--text);">Default for replies and forwards</label>
+        <select id="oa-signature-default-reply" class="inp" style="height:auto;padding:6px 10px;font-size:12px;" onchange="oaSetSignatureDefault('reply', this.value)">${optionHtml}</select>
+      </div>
+      <div style="border:1px solid var(--border);border-radius:6px;overflow:hidden;background:rgba(12,18,32,0.35);">
+        ${oaSignaturesCache.length ? oaSignaturesCache.map(s => `
+          <div style="display:grid;grid-template-columns:1fr 112px;align-items:center;gap:12px;padding:10px 14px;border-bottom:1px solid var(--border);min-height:44px;">
+            <div style="min-width:0;">
+              <div style="font-size:12.5px;color:var(--text);font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escHtml(s.name)}</div>
+              <div style="font-size:10.5px;color:var(--muted);margin-top:3px;">${s.is_default_new ? 'New messages default' : ''}${s.is_default_new && s.is_default_reply ? ' · ' : ''}${s.is_default_reply ? 'Replies default' : ''}</div>
+            </div>
+            <div style="display:flex;justify-content:flex-end;gap:8px;">
+              <button type="button" class="btn btn-ghost btn-xs" title="Edit" onclick="oaOpenSignatureEditor(${s.id})"><i class="far fa-edit"></i></button>
+              <button type="button" class="btn btn-ghost btn-xs" title="Delete" onclick="oaDeleteSignature(${s.id})"><i class="far fa-trash-alt"></i></button>
+            </div>
+          </div>
+        `).join('') : `<div style="color:var(--muted);font-size:12.5px;padding:18px 14px;">No signatures yet.</div>`}
+      </div>`;
+
+    const newSel = document.getElementById('oa-signature-default-new');
+    const replySel = document.getElementById('oa-signature-default-reply');
+    if (newSel) newSel.value = data.defaultNewId || '';
+    if (replySel) replySel.value = data.defaultReplyId || '';
+  } catch(e) {
+    el.innerHTML = `<div style="color:var(--muted);font-size:12.5px;">${e.message}</div>`;
+  }
+}
+
+function oaOpenSignatureEditor(id) {
+  oaEditingSignatureId = id || null;
+  const sig = oaEditingSignatureId ? oaSignaturesCache.find(s => Number(s.id) === Number(oaEditingSignatureId)) : null;
+  const title = document.getElementById('oa-signature-editor-title');
+  const name = document.getElementById('oa-signature-name');
+  const body = document.getElementById('oa-signature-body');
+  const defNew = document.getElementById('oa-signature-default-new-check');
+  const defReply = document.getElementById('oa-signature-default-reply-check');
+  if (title) title.textContent = sig ? 'Edit signature' : 'Add signature';
+  if (name) name.value = sig ? sig.name : '';
+  if (body) body.innerHTML = sig ? sig.html_body : '';
+  if (defNew) defNew.checked = !!(sig && sig.is_default_new);
+  if (defReply) defReply.checked = !!(sig && sig.is_default_reply);
+  openModal('oa-signature-editor-modal');
+  setTimeout(() => name && name.focus(), 80);
+}
+
+function oaOpenSignatureBuilder(id) {
+  oaSignatureBuilderMode = true;
+  oaEditingSignatureId = id || null;
+  const sig = oaEditingSignatureId ? oaSignaturesCache.find(s => Number(s.id) === Number(oaEditingSignatureId)) : null;
+  const name = document.getElementById('sig-name');
+  const title = document.getElementById('sig-title');
+  const email = document.getElementById('sig-email');
+  if (name) name.value = sig ? sig.name : 'NIDHI';
+  if (title && !sig) title.value = '';
+  if (email && !sig) email.value = outlookConnectedEmail || 'sales@unicircuites.com';
+  openModal('et-sig-modal');
+  const insertBtn = document.querySelector('#et-sig-modal .btn-gold');
+  if (insertBtn) {
+    insertBtn.innerHTML = '<i class="fas fa-save"></i> Save signature';
+    insertBtn.onclick = function() { oaSaveBuiltSignature(); };
+  }
+  setTimeout(etRefreshSigPreview, 80);
+}
+
+async function oaSaveBuiltSignature() {
+  const rawName = (document.getElementById('sig-name')?.value || '').trim();
+  const name = rawName || 'NIDHI';
+  const html = etBuildSigHTML();
+  try {
+    const res = await fetch(`${API_BASE}/outlook/settings/signatures${oaEditingSignatureId ? '/' + encodeURIComponent(oaEditingSignatureId) : ''}`, {
+      method: oaEditingSignatureId ? 'PATCH' : 'POST',
+      headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
+      body: JSON.stringify({
+        name,
+        html_body: html,
+        is_default_new: true,
+        is_default_reply: true,
+      }),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.error || err.message || `HTTP ${res.status}`);
+    }
+    oaRestoreSignatureBuilderButton();
+    closeModal('et-sig-modal');
+    notify('Signatures', `Signature "${name}" saved.`, 'var(--green2)', 'fas fa-check-circle');
+    oaLoadSignatures();
+  } catch(e) {
+    notify('Signatures', e.message, 'var(--red2)', 'fas fa-exclamation-circle');
+  }
+}
+
+function oaRestoreSignatureBuilderButton() {
+  if (!oaSignatureBuilderMode) return;
+  oaSignatureBuilderMode = false;
+  const insertBtn = document.querySelector('#et-sig-modal .btn-gold');
+  if (insertBtn) {
+    insertBtn.innerHTML = '<i class="fas fa-check"></i> Insert Signature';
+    insertBtn.onclick = function() { etApplySignature(); };
+  }
+}
+
+async function oaSaveSignature() {
+  const name = (document.getElementById('oa-signature-name')?.value || '').trim();
+  const html = (document.getElementById('oa-signature-body')?.innerHTML || '').trim();
+  const defNew = !!document.getElementById('oa-signature-default-new-check')?.checked;
+  const defReply = !!document.getElementById('oa-signature-default-reply-check')?.checked;
+  if (!name) { notify('Signatures', 'Signature name is required.', 'var(--red2)', 'fas fa-exclamation-circle'); return; }
+  if (!html || html === '<br>') { notify('Signatures', 'Signature content is required.', 'var(--red2)', 'fas fa-exclamation-circle'); return; }
+  try {
+    const res = await fetch(`${API_BASE}/outlook/settings/signatures${oaEditingSignatureId ? '/' + encodeURIComponent(oaEditingSignatureId) : ''}`, {
+      method: oaEditingSignatureId ? 'PATCH' : 'POST',
+      headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
+      body: JSON.stringify({ name, html_body: html, is_default_new: defNew, is_default_reply: defReply }),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.error || err.message || `HTTP ${res.status}`);
+    }
+    closeModal('oa-signature-editor-modal');
+    notify('Signatures', oaEditingSignatureId ? 'Signature updated.' : 'Signature added.', 'var(--green2)', 'fas fa-check-circle');
+    oaLoadSignatures();
+  } catch(e) {
+    notify('Signatures', e.message, 'var(--red2)', 'fas fa-exclamation-circle');
+  }
+}
+
+async function oaSetSignatureDefault(kind, id) {
+  try {
+    const res = await fetch(`${API_BASE}/outlook/settings/signatures/defaults`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
+      body: JSON.stringify({ kind, id: id || null }),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.error || err.message || `HTTP ${res.status}`);
+    }
+    oaLoadSignatures();
+  } catch(e) {
+    notify('Signatures', e.message, 'var(--red2)', 'fas fa-exclamation-circle');
+  }
+}
+
+async function oaDeleteSignature(id) {
+  const sig = oaSignaturesCache.find(s => Number(s.id) === Number(id));
+  if (!confirm(`Delete signature "${sig ? sig.name : id}"?`)) return;
+  try {
+    const res = await fetch(`${API_BASE}/outlook/settings/signatures/${encodeURIComponent(id)}`, {
+      method: 'DELETE',
+      headers: getAuthHeaders(),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.error || err.message || `HTTP ${res.status}`);
+    }
+    notify('Signatures', 'Signature deleted.', 'var(--green2)', 'fas fa-check-circle');
+    oaLoadSignatures();
+  } catch(e) {
+    notify('Signatures', e.message, 'var(--red2)', 'fas fa-exclamation-circle');
+  }
+}
+
+async function ucGetDefaultSignature(kind) {
+  try {
+    const res = await fetch(`${API_BASE}/outlook/settings/signatures`, { headers: getAuthHeaders() });
+    if (!res.ok) return null;
+    const data = await res.json();
+    const id = kind === 'reply' ? data.defaultReplyId : data.defaultNewId;
+    return (data.signatures || []).find(s => Number(s.id) === Number(id)) || null;
+  } catch(_) {
+    return null;
+  }
+}
+
+async function composeApplyDefaultSignature(kind) {
+  const body = document.getElementById('compose-body');
+  if (!body || body.innerHTML.trim()) return;
+  const sig = await ucGetDefaultSignature(kind || 'new');
+  if (sig) body.innerHTML = '<br>' + sig.html_body;
 }
 
 async function oaLoadCategories() {
@@ -5083,24 +6112,100 @@ async function oaLoadCategories() {
   el.innerHTML = '<div class="spin-loader" style="margin:20px auto;"></div>';
   try {
     const res = await fetch(`${API_BASE}/outlook/settings/categories`, { headers: getAuthHeaders() });
-    if (!res.ok) throw new Error('Not connected');
-    const cats = await res.json();
-    if (!cats.length) {
-      el.innerHTML = '<div style="color:var(--muted);font-size:12.5px;">No categories found.</div>';
-      return;
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.error || err.message || `HTTP ${res.status}`);
     }
-    const colorMap = { preset0:'#e74856', preset1:'#ff8c00', preset2:'#ffb900', preset3:'#fff100', preset4:'#16c60c', preset5:'#00b7c3', preset6:'#0078d4', preset7:'#8764b8', preset8:'#b146c2', preset9:'#e3008c', preset10:'#ef6950', preset11:'#bad80a', preset12:'#0099bc', none:'var(--muted)' };
-    el.innerHTML = `<div style="border:1px solid var(--border);border-radius:8px;overflow:hidden;">
-      <div style="display:grid;grid-template-columns:1fr auto;padding:8px 14px;font-size:10.5px;color:var(--muted);text-transform:uppercase;letter-spacing:0.05em;border-bottom:1px solid var(--border);background:var(--bg2);">
-        <span>Category name</span>
+    const cats = await res.json();
+    const colorMap = oaCategoryColorMap();
+    el.innerHTML = `
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:16px;margin-bottom:16px;">
+        <div style="font-size:12px;line-height:1.45;color:var(--muted2);max-width:520px;">Categorizing your email and calendar can help you organize and track messages and events related to a project, task, or person.</div>
+        <button type="button" class="btn btn-ghost btn-sm" onclick="oaLoadCategories()" title="Refresh categories"><i class="fas fa-sync-alt"></i></button>
       </div>
-      ${cats.map(c => `<div style="display:flex;align-items:center;gap:12px;padding:10px 14px;border-bottom:1px solid var(--border);">
-        <div style="width:14px;height:14px;border-radius:50%;background:${colorMap[c.color]||'var(--muted)'};flex-shrink:0;"></div>
-        <span style="font-size:13px;color:var(--text);flex:1;">${escHtml(c.displayName)}</span>
-      </div>`).join('')}
-    </div>`;
+      <div style="border:1px solid var(--border);border-radius:6px;overflow:hidden;background:rgba(12,18,32,0.35);">
+        <div style="display:grid;grid-template-columns:1fr 104px;padding:9px 14px;font-size:10.5px;color:var(--muted);text-transform:uppercase;font-weight:700;letter-spacing:0;border-bottom:1px solid var(--border);background:var(--bg2);">
+          <span>Category name</span><span></span>
+        </div>
+        ${cats.length ? cats.map(c => {
+          const rawId = c.id || c.displayName || '';
+          const rawName = c.displayName || '';
+          const rawColor = c.color || 'preset0';
+          const id = escHtml(rawId);
+          const name = escHtml(c.displayName || '');
+          const color = colorMap[c.color] || colorMap.none;
+          const idArg = encodeURIComponent(rawId);
+          const nameArg = encodeURIComponent(rawName);
+          const colorArg = encodeURIComponent(rawColor);
+          return `<div style="display:grid;grid-template-columns:1fr 104px;align-items:center;gap:10px;padding:9px 14px;border-bottom:1px solid var(--border);min-height:42px;">
+            <div style="display:flex;align-items:center;gap:10px;min-width:0;">
+              <i class="fas fa-tag" style="font-size:12px;color:${color};width:16px;text-align:center;"></i>
+              <span style="font-size:12.5px;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" title="${name}">${name}</span>
+            </div>
+            <div style="display:flex;justify-content:flex-end;align-items:center;gap:10px;color:var(--muted2);">
+              <button type="button" class="btn btn-ghost btn-xs" title="Favorite" onclick="notify('Categories', 'Favorite marker is visual only here.', '#0078d4', 'fas fa-star')"><i class="far fa-star"></i></button>
+              <button type="button" class="btn btn-ghost btn-xs" title="Edit" onclick="oaOpenCategoryEditor(decodeURIComponent('${idArg}'), decodeURIComponent('${nameArg}'), decodeURIComponent('${colorArg}'))"><i class="far fa-edit"></i></button>
+              <button type="button" class="btn btn-ghost btn-xs" title="Delete" onclick="oaDeleteCategory(decodeURIComponent('${idArg}'), decodeURIComponent('${nameArg}'))"><i class="far fa-trash-alt"></i></button>
+            </div>
+          </div>`;
+        }).join('') : `<div style="color:var(--muted);font-size:12.5px;padding:18px 14px;">No categories found.</div>`}
+      </div>`;
   } catch(e) {
     el.innerHTML = `<div style="color:var(--muted);font-size:12.5px;">${e.message === 'Not connected' ? 'Connect Outlook to view categories.' : e.message}</div>`;
+  }
+}
+
+function oaCategoryColorMap() {
+  return {
+    preset0:'#e74856', preset1:'#ff8c00', preset2:'#ffb900', preset3:'#fff100',
+    preset4:'#16c60c', preset5:'#00b7c3', preset6:'#0078d4', preset7:'#8764b8',
+    preset8:'#b146c2', preset9:'#e3008c', preset10:'#ef6950', preset11:'#bad80a',
+    preset12:'#0099bc', preset13:'#00cc6a', preset14:'#00bcf2', preset15:'#8764b8',
+    preset16:'#744da9', preset17:'#b4009e', preset18:'#e3008c', preset19:'#e74856',
+    preset20:'#ff8c00', preset21:'#ffb900', preset22:'#fff100', preset23:'#bad80a',
+    preset24:'#16c60c', none:'var(--muted)'
+  };
+}
+
+function oaOpenCategoryEditor(id, currentName, currentColor) {
+  const name = prompt(id ? 'Edit category name' : 'New category name', currentName || '');
+  if (name === null) return;
+  const cleanName = name.trim();
+  if (!cleanName) { notify('Categories', 'Category name is required.', 'var(--red2)', 'fas fa-exclamation-circle'); return; }
+  const color = prompt('Color preset (preset0 to preset24)', currentColor || 'preset6');
+  if (color === null) return;
+  oaSaveCategory(id, cleanName, color.trim() || 'preset6');
+}
+
+async function oaSaveCategory(id, displayName, color) {
+  try {
+    const res = await fetch(`${API_BASE}/outlook/settings/categories${id ? '/' + encodeURIComponent(id) : ''}`, {
+      method: id ? 'PATCH' : 'POST',
+      headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
+      body: JSON.stringify({ displayName, color }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Could not save category');
+    notify('Categories', id ? 'Category updated.' : 'Category created.', 'var(--green2)', 'fas fa-check-circle');
+    oaLoadCategories();
+  } catch(e) {
+    notify('Categories', e.message, 'var(--red2)', 'fas fa-exclamation-circle');
+  }
+}
+
+async function oaDeleteCategory(id, name) {
+  if (!id || !confirm(`Delete category "${name}"?`)) return;
+  try {
+    const res = await fetch(`${API_BASE}/outlook/settings/categories/${encodeURIComponent(id)}`, {
+      method: 'DELETE',
+      headers: getAuthHeaders(),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Could not delete category');
+    notify('Categories', 'Category deleted.', 'var(--green2)', 'fas fa-check-circle');
+    oaLoadCategories();
+  } catch(e) {
+    notify('Categories', e.message, 'var(--red2)', 'fas fa-exclamation-circle');
   }
 }
 
@@ -5108,33 +6213,175 @@ async function oaLoadStorage() {
   const el = document.getElementById('oa-storage-content');
   if (!el) return;
   el.innerHTML = '<div class="spin-loader" style="margin:20px auto;"></div>';
+  const fmtBytes = (bytes) => {
+    const n = Number(bytes || 0);
+    if (!Number.isFinite(n) || n <= 0) return '0 B';
+    const units = ['B', 'KB', 'MB', 'GB', 'TB'];
+    const i = Math.min(Math.floor(Math.log(n) / Math.log(1024)), units.length - 1);
+    return `${(n / Math.pow(1024, i)).toFixed(i === 0 ? 0 : 2)} ${units[i]}`;
+  };
+  const pct = (used, total) => {
+    const u = Number(used || 0), t = Number(total || 0);
+    return t > 0 ? Math.max(0, Math.min(100, (u / t) * 100)) : 0;
+  };
+  const fmtGb = (bytes) => `${(Number(bytes || 0) / Math.pow(1024, 3)).toFixed(2)} GB`;
+  const folderKind = (name) => {
+    const n = String(name || '').toLowerCase();
+    if (n === 'inbox') return 'inbox';
+    if (n === 'sent items' || n === 'sentitems') return 'sent';
+    if (n === 'deleted items' || n === 'deleteditems') return 'deleted';
+    if (n === 'junk email' || n === 'junkemail') return 'junk';
+    if (n === 'drafts') return 'drafts';
+    if (n === 'archive') return 'archive';
+    return 'other';
+  };
+  const folderIcon = (kind) => ({
+    inbox: 'fa-inbox',
+    sent: 'fa-paper-plane',
+    deleted: 'fa-trash-alt',
+    junk: 'fa-folder-minus',
+    drafts: 'fa-feather-alt',
+    archive: 'fa-archive',
+    other: 'fa-folder',
+  })[kind] || 'fa-folder';
+  const canEmptyFolder = () => true;
   try {
-    const res = await fetch(`${API_BASE}/outlook/settings/storage`, { headers: getAuthHeaders() });
+    const res = await fetch(`${API_BASE}/outlook/settings/storage?_=${Date.now()}`, {
+      headers: { 'Cache-Control': 'no-cache', ...getAuthHeaders() },
+      cache: 'no-store',
+    });
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
       throw new Error(err.error || `HTTP ${res.status}`);
     }
     const d = await res.json();
     const folders = d.folders || [];
+    const usage = d.usage || null;
+    const outlookSnapshot = d.outlookSnapshot || null;
+    const liveStorage = d.liveStorage || null;
+    const liveStorageHasSizes = !!(liveStorage && Number(liveStorage.sizedMessages || 0) > 0);
+    const hasFolderSizes = folders.some(f => Number(f.sizeInBytes || 0) > 0);
+    const liveFolderBytes = folders.reduce((sum, f) => sum + Number(f.sizeInBytes || 0), 0);
+    const snapshotFallback = !!(outlookSnapshot && folders.some(f => f.outlookStorageSnapshot));
+    const limitBytes = outlookSnapshot?.quotaBytes || usage?.issueWarningQuotaBytes || usage?.prohibitSendQuotaBytes || usage?.prohibitSendReceiveQuotaBytes || 0;
+    const usedBytes = liveStorageHasSizes
+      ? Number(liveStorage.totalBytes || 0)
+      : (usage?.storageUsedBytes || liveFolderBytes || outlookSnapshot?.usedBytes || 0);
+    const usedPct = pct(usedBytes, limitBytes);
+    const folderSizeByName = (name) => folders
+      .filter(f => String(f.displayName || '').toLowerCase() === name)
+      .reduce((sum, f) => sum + Number(f.sizeInBytes || 0), 0);
+    const buckets = liveStorageHasSizes ? liveStorage.buckets : (snapshotFallback ? outlookSnapshot.buckets : null);
+    const deletedBytes = buckets?.deleted ?? (folderSizeByName('deleted items') || usage?.deletedItemSizeBytes || 0);
+    const inboxBytes = buckets?.inbox ?? folderSizeByName('inbox');
+    const sentBytes = buckets?.sent ?? folderSizeByName('sent items');
+    const otherBytes = buckets?.other ?? Math.max(0, usedBytes - deletedBytes - inboxBytes - sentBytes);
+    const deletedPct = pct(deletedBytes, limitBytes);
+    const inboxPct = pct(inboxBytes, limitBytes);
+    const sentPct = pct(sentBytes, limitBytes);
+    const otherPct = pct(otherBytes, limitBytes);
+    const mailboxLabel = d.mailbox || 'Outlook mailbox';
+    const usageError = d.usageError || null;
+    let usageErrorText = typeof usageError === 'string'
+      ? usageError
+      : (usageError?.message || 'Showing folder counts for now.');
+    try {
+      const parsedUsageError = JSON.parse(usageErrorText);
+      usageErrorText = parsedUsageError.error?.message || parsedUsageError.message || usageErrorText;
+    } catch (_) {}
+    if (/S2SUnauthorized|Invalid permission|Reports\.Read\.All|permission|privilege|authorization|access/i.test(usageErrorText)) {
+      usageErrorText = 'Exact storage quota needs Microsoft Graph Reports.Read.All admin consent. Showing folder counts for now.';
+    }
+    const usageNote = liveStorageHasSizes
+        ? `Message sizes scanned ${liveStorage.scannedMessages || 0} messages (${liveStorage.sizedMessages || 0} with size values). Refreshed ${escHtml((liveStorage.scannedAt || '').slice(0, 10) || 'recently')}.`
+      : (usage
+        ? `Live folder counts from Outlook. Quota report refreshed ${escHtml(usage.reportRefreshDate || 'recently')}.`
+      : (snapshotFallback
+        ? `Live folder counts from Outlook. Sizes use Outlook web snapshot captured ${escHtml(outlookSnapshot.capturedAt || 'recently')}.`
+      : (liveStorage
+        ? `Microsoft Graph returned ${liveStorage.scannedMessages || 0} messages but no message-size values. Outlook web uses an internal storage service for these exact folder stats.`
+        : escHtml(usageErrorText))));
+    const totalItems = folders.reduce((sum, f) => sum + Number(f.totalItemCount || 0), 0);
+    const storageLabel = limitBytes
+      ? `You have ${fmtGb(limitBytes)} of email storage with this account which includes attachments and messages across all folders.`
+      : 'Storage usage includes attachments and messages across all folders.';
+    const usageLabel = limitBytes
+      ? `${fmtGb(usedBytes)} used of ${fmtGb(limitBytes)} (${usedPct.toFixed(1)}%)`
+      : `${totalItems} mailbox items`;
+    const segmentWidth = (value, min) => {
+      const n = Number(value || 0);
+      if (n <= 0) return min;
+      return Math.max(min, Math.min(100, n));
+    };
+    const displayFolders = folders
+      .map((f, index) => ({ ...f, kind: folderKind(f.displayName), _index: index }))
+      .filter(f => String(f.displayName || '').toLowerCase() !== 'conversation history')
+      .filter(f => Number(f.totalItemCount || 0) > 0 || Number(f.sizeInBytes || 0) > 0 || ['deleted', 'junk', 'inbox', 'sent', 'drafts', 'archive'].includes(f.kind))
+      .sort((a, b) => {
+        if (a.storageSortOrder !== undefined || b.storageSortOrder !== undefined) {
+          return (a.storageSortOrder ?? 999) - (b.storageSortOrder ?? 999);
+        }
+        const order = { deleted: 0, junk: 1, sent: 2, inbox: 3, archive: 4 };
+        const ao = order[a.kind], bo = order[b.kind];
+        if (ao !== undefined || bo !== undefined) return (ao ?? 50) - (bo ?? 50);
+        return a._index - b._index;
+      });
     el.innerHTML = `
-      <div style="padding:14px 16px;background:var(--card2);border-radius:8px;border:1px solid var(--border);margin-bottom:16px;">
-        <div style="font-size:12px;color:var(--muted);margin-bottom:4px;">Mailbox</div>
-        <div style="font-size:15px;font-weight:700;color:var(--text);">${escHtml(process?.env?.MS_USER_EMAIL || 'sales@unicircuites.com')}</div>
-        <div style="font-size:11.5px;color:var(--muted);margin-top:2px;">Microsoft 365</div>
-      </div>
-      <div style="border:1px solid var(--border);border-radius:8px;overflow:hidden;">
-        <div style="display:grid;grid-template-columns:1fr auto auto;padding:8px 14px;font-size:10.5px;color:var(--muted);text-transform:uppercase;letter-spacing:0.05em;border-bottom:1px solid var(--border);background:var(--bg2);">
-          <span>Folder</span><span style="text-align:right;">Messages</span><span style="text-align:right;padding-left:16px;">Unread</span>
+      <div class="oa-storage-panel">
+        <div class="oa-storage-summary">
+          <div class="oa-storage-copy">${escHtml(storageLabel)}</div>
+          <div class="oa-storage-usage">${escHtml(usageLabel)}</div>
+          <div class="oa-storage-bar">
+          <div title="Inbox ${inboxPct.toFixed(1)}%" style="width:${segmentWidth(inboxPct, 2)}%;background:#0f9ee8;"></div>
+          <div title="Sent Items ${sentPct.toFixed(1)}%" style="width:${segmentWidth(sentPct, 2)}%;background:#ff9f1a;"></div>
+          <div title="Deleted Items ${deletedPct.toFixed(1)}%" style="width:${segmentWidth(deletedPct, 2)}%;background:#5c8f12;"></div>
+          <div title="Other ${otherPct.toFixed(1)}%" style="width:${segmentWidth(otherPct, 2)}%;background:#7a7a7a;"></div>
+          <div class="oa-storage-fill-empty"></div>
+          </div>
+          <div class="oa-storage-legend">
+            <span class="oa-storage-legend-item"><i class="oa-storage-swatch" style="background:#0f9ee8;"></i>Inbox</span>
+            <span class="oa-storage-legend-item"><i class="oa-storage-swatch" style="background:#ff9f1a;"></i>Sent Items</span>
+            <span class="oa-storage-legend-item"><i class="oa-storage-swatch" style="background:#5c8f12;"></i>Deleted Items</span>
+            <span class="oa-storage-legend-item"><i class="oa-storage-swatch" style="background:#7a7a7a;"></i>Other</span>
+          </div>
         </div>
-        ${folders.map(f => `<div style="display:grid;grid-template-columns:1fr auto auto;align-items:center;padding:10px 14px;border-bottom:1px solid var(--border);gap:12px;">
-          <span style="font-size:13px;color:var(--text);">${escHtml(f.displayName)}</span>
-          <span style="font-size:12px;color:var(--muted2);text-align:right;">${f.totalItemCount||0}</span>
-          <span style="font-size:12px;color:${(f.unreadItemCount||0)>0?'var(--blue2)':'var(--muted)'};text-align:right;padding-left:16px;font-weight:${(f.unreadItemCount||0)>0?'700':'400'};">${f.unreadItemCount||0}</span>
-        </div>`).join('')}
+
+        <div class="oa-storage-manage">
+          <div class="oa-storage-heading">Manage storage</div>
+          <div class="oa-storage-help">Emptying contents from a folder will help free up space. Items will be permanently deleted.</div>
+          <div class="oa-storage-meta">${escHtml(mailboxLabel)}${usageNote ? ` · ${usageNote}` : ''}</div>
+          <div class="oa-storage-table">
+            <div class="oa-storage-row oa-storage-head">
+              <span>Folder</span><span>Size</span><span>Message Count</span><span>Manage</span>
+            </div>
+            ${displayFolders.length ? displayFolders.map(f => `
+              <div class="oa-storage-row">
+                <div class="oa-storage-cell oa-storage-folder">
+                  <i class="fas ${folderIcon(f.kind)}"></i>
+                  <span title="${escHtml(f.displayName)}">${escHtml(f.displayName)}</span>
+                </div>
+                <div class="oa-storage-cell oa-storage-size">${hasFolderSizes ? fmtBytes(f.sizeInBytes || 0) : '&mdash;'}</div>
+                <div class="oa-storage-cell oa-storage-count">${f.totalItemCount || 0}</div>
+                <div class="oa-storage-cell">
+                  ${canEmptyFolder(f.kind)
+                    ? `<button type="button" class="oa-storage-empty" onclick="notify('Storage', 'Empty folder action is not connected yet.', '#0078d4', 'fas fa-info-circle')"><i class="far fa-trash-alt"></i>Empty <i class="fas fa-chevron-down" style="font-size:10px;"></i></button>`
+                    : '<span class="oa-storage-dash">&mdash;</span>'}
+                </div>
+              </div>`).join('') : `<div class="oa-storage-row"><div class="oa-storage-cell" style="grid-column:1 / -1;color:var(--muted);">No folders found.</div></div>`}
+          </div>
+        </div>
       </div>`;
   } catch(e) {
     el.innerHTML = `<div style="color:var(--red2);font-size:12.5px;padding:12px 0;"><i class="fas fa-exclamation-circle" style="margin-right:6px;"></i>${escHtml(e.message)}</div>`;
   }
+}
+
+function oaRefreshStorageIfOpen() {
+  const storageEl = document.getElementById('oa-sub-storage');
+  const modalEl = document.getElementById('outlook-account-modal');
+  if (!storageEl || storageEl.style.display === 'none') return;
+  if (modalEl && modalEl.style.display === 'none') return;
+  oaLoadStorage();
 }
 
 function downloadOutlookEmails() {
@@ -5330,6 +6577,7 @@ async function loadInbox(forceRefresh) {
 
     if (!msgs.length) {
       listEl.innerHTML = `<div style="text-align:center;padding:40px;color:var(--muted);font-size:12.5px;">No messages found.</div>`;
+      oaRefreshStorageIfOpen();
       return;
     }
 
@@ -5385,6 +6633,7 @@ async function loadInbox(forceRefresh) {
           </div>
         </div>`;
     }).join('');
+    oaRefreshStorageIfOpen();
 
   } catch (err) {
     listEl.innerHTML = `<div style="text-align:center;padding:30px;color:var(--red2);font-size:12.5px;"><i class="fas fa-exclamation-circle"></i> ${err.message}</div>`;
@@ -5773,6 +7022,7 @@ function openComposeEmailModal() {
   openModal('compose-email-modal');
   loadComposeTemplates();
   composeLoadGroupsDropdown();
+  composeApplyDefaultSignature('new');
 }
 
 function draftEmailTo(email) {
@@ -5783,6 +7033,7 @@ function draftEmailTo(email) {
   if (toEl) toEl.value = email;
   openModal('compose-email-modal');
   loadComposeTemplates();
+  composeApplyDefaultSignature('new');
 }
 
 function closeComposeEmailModal() {
@@ -5896,6 +7147,7 @@ function openReply(replyAll) {
   if (!activeMessageId) return;
   document.getElementById('compose-title').textContent = replyAll ? 'Reply All' : 'Reply';
   openModal('compose-email-modal');
+  composeApplyDefaultSignature('reply');
 
   // Fetch message details to pre-fill To/Cc/Subject
   fetch(`${API_BASE}/outlook/message/${activeMessageId}`, { headers: getAuthHeaders() })
@@ -6037,6 +7289,7 @@ async function sendEmail() {
       if (statusEl) { statusEl.style.display='block'; statusEl.style.color='var(--green2)'; statusEl.textContent='✓ Email sent successfully via Outlook.'; }
       // Refresh inbox to show the reply
       setTimeout(() => loadInbox(), 1500);
+      setTimeout(() => oaRefreshStorageIfOpen(), 1800);
     } else {
       if (data.error === 'NOT_AUTHENTICATED') {
         notify('Not connected', 'Please connect Outlook first', 'var(--red)', 'fab fa-microsoft');
@@ -7608,7 +8861,7 @@ function composeInsertButton() {
   document.execCommand('insertHTML', false, html);
   document.getElementById('compose-body')?.focus();
 }
-function composeInsertSignature() {
+async function composeInsertSignature() {
   // Save cursor position BEFORE opening modal (modal open loses focus/selection)
   var ed = document.getElementById('compose-body');
   var savedRange = null;
@@ -7623,6 +8876,17 @@ function composeInsertSignature() {
       savedRange.selectNodeContents(ed);
       savedRange.collapse(false);
     }
+  }
+
+  var composeTitle = (document.getElementById('compose-title')?.textContent || '').toLowerCase();
+  var savedSig = await ucGetDefaultSignature((activeMessageId || composeTitle.includes('reply')) ? 'reply' : 'new');
+  if (savedSig && ed) {
+    ed.focus();
+    var savedSel = window.getSelection();
+    savedSel.removeAllRanges();
+    if (savedRange) savedSel.addRange(savedRange);
+    document.execCommand('insertHTML', false, '<br>' + savedSig.html_body);
+    return;
   }
 
   openModal('et-sig-modal');
@@ -8176,8 +9440,7 @@ function etUseInBroadcast() {
                placeholder="Write your message…"
                onmouseup="composeSaveSelection();composeUpdateToolbarState()"
                onkeyup="composeSaveSelection();composeUpdateToolbarState()"
-               onfocus="composeUpdateToolbarState()">
-          </div>
+               onfocus="composeUpdateToolbarState()"></div>
         </div>
         <button type="button" class="btn btn-gold" style="justify-content:center;" id="send-btn" onclick="sendEmail()"><i class="fas fa-paper-plane"></i> Send via Outlook</button>
         <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;">
@@ -8427,7 +9690,7 @@ function etUseInBroadcast() {
     <div class="modal" style="max-width:500px;">
       <div class="modal-title">
         <span><i class="fas fa-signature" style="color:var(--gold);margin-right:8px;"></i>Build Signature</span>
-        <span class="modal-close" onclick="closeModal('et-sig-modal')"><i class="fas fa-times"></i></span>
+        <span class="modal-close" onclick="oaRestoreSignatureBuilderButton();closeModal('et-sig-modal')"><i class="fas fa-times"></i></span>
       </div>
 
       <!-- Style picker -->
@@ -8572,7 +9835,7 @@ Nagpur, Maharashtra, 440017, India<br>
 
       <div style="display:flex;gap:8px;margin-top:16px;justify-content:flex-end;">
         <button class="btn btn-gold" onclick="etApplySignature()"><i class="fas fa-check"></i> Insert Signature</button>
-        <button class="btn btn-ghost" onclick="closeModal('et-sig-modal')">Cancel</button>
+        <button class="btn btn-ghost" onclick="oaRestoreSignatureBuilderButton();closeModal('et-sig-modal')">Cancel</button>
       </div>
     </div>
   </div>
@@ -8761,6 +10024,39 @@ Nagpur, Maharashtra, 440017, India<br>
   </div>
 </div>
 
+<!-- Outlook Signature Editor Modal -->
+<div class="modal-overlay" id="oa-signature-editor-modal" onclick="if(event.target===this)closeModal('oa-signature-editor-modal')">
+  <div class="modal" style="max-width:720px;width:92vw;">
+    <div class="modal-title">
+      <span id="oa-signature-editor-title"><i class="fas fa-signature" style="color:var(--blue2);margin-right:8px;"></i>Add signature</span>
+      <span class="modal-close" onclick="closeModal('oa-signature-editor-modal')"><i class="fas fa-times"></i></span>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Signature name</label>
+      <input id="oa-signature-name" class="inp" placeholder="NIDHI">
+    </div>
+    <div class="form-group">
+      <label class="form-label">Signature content</label>
+      <div id="oa-signature-body"
+           contenteditable="true"
+           style="min-height:180px;max-height:320px;overflow-y:auto;background:#fff;color:#222;font-family:Calibri,Arial,sans-serif;font-size:14px;line-height:1.55;padding:12px;border:1px solid var(--border2);border-radius:8px;outline:none;">
+      </div>
+    </div>
+    <div style="display:flex;gap:16px;align-items:center;flex-wrap:wrap;margin-bottom:16px;">
+      <label style="font-size:12.5px;color:var(--text);display:flex;gap:8px;align-items:center;cursor:pointer;">
+        <input id="oa-signature-default-new-check" type="checkbox"> Default for new messages
+      </label>
+      <label style="font-size:12.5px;color:var(--text);display:flex;gap:8px;align-items:center;cursor:pointer;">
+        <input id="oa-signature-default-reply-check" type="checkbox"> Default for replies and forwards
+      </label>
+    </div>
+    <div style="display:flex;justify-content:flex-end;gap:10px;">
+      <button class="btn btn-ghost" onclick="closeModal('oa-signature-editor-modal')">Cancel</button>
+      <button class="btn btn-gold" onclick="oaSaveSignature()"><i class="fas fa-save"></i> Save signature</button>
+    </div>
+  </div>
+</div>
+
 <!-- ██████ OUTLOOK ACCOUNT INFO MODAL ██████ -->
 <div class="modal-overlay" id="outlook-account-modal" onclick="if(event.target===this)closeModal('outlook-account-modal')">
   <div class="modal" style="max-width:900px;width:95vw;padding:0;overflow:hidden;display:flex;flex-direction:column;max-height:90vh;">
@@ -8828,18 +10124,15 @@ Nagpur, Maharashtra, 440017, India<br>
           <div id="oa-sub-signatures" style="display:none;">
             <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
               <div style="font-size:16px;font-weight:700;color:var(--text);">Signatures</div>
-              <a href="https://outlook.office.com/mail/options/mail/messageContent" target="_blank" class="btn btn-blue btn-sm"><i class="fas fa-external-link-alt"></i> Manage in Outlook</a>
+              <button class="btn btn-blue btn-sm" onclick="oaOpenSignatureBuilder()"><i class="fas fa-plus"></i> Add signature</button>
             </div>
             <div style="font-size:12.5px;color:var(--muted);margin-bottom:14px;">You can add and modify signatures that can be added to your emails.</div>
-            <div style="padding:16px;background:var(--card2);border-radius:8px;border:1px solid var(--border);text-align:center;color:var(--muted);font-size:12.5px;">
-              <i class="fas fa-signature" style="font-size:24px;margin-bottom:8px;display:block;opacity:0.4;"></i>
-              Signatures are managed directly in Outlook Web. Click "Manage in Outlook" to add or edit signatures.
-            </div>
+            <div id="oa-signatures-content"><div class="spin-loader" style="margin:20px auto;"></div></div>
           </div>
           <div id="oa-sub-categories" style="display:none;">
             <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
               <div style="font-size:16px;font-weight:700;color:var(--text);">Categories</div>
-              <button class="btn btn-blue btn-sm" onclick="oaLoadCategories()"><i class="fas fa-sync-alt"></i> Refresh</button>
+              <button class="btn btn-blue btn-sm" onclick="oaOpenCategoryEditor()"><i class="fas fa-plus"></i> Create new</button>
             </div>
             <div id="oa-categories-list"><div class="spin-loader" style="margin:20px auto;"></div></div>
           </div>

@@ -1,0 +1,74 @@
+{
+  "source": "outlook-web-storage",
+  "capturedAt": "2026-05-07",
+  "quotaBytes": 53150220288,
+  "usedBytes": 11091758285,
+  "buckets": {
+    "inbox": 1395864371,
+    "sent": 4337916969,
+    "deleted": 196901601,
+    "other": 5169075344
+  },
+  "folders": [
+    {
+      "displayName": "Deleted Items",
+      "sizeBytes": 196901601,
+      "messageCount": 776
+    },
+    {
+      "displayName": "Junk Email",
+      "sizeBytes": 215613,
+      "messageCount": 4
+    },
+    {
+      "displayName": "Sent Items",
+      "sizeBytes": 4337916969,
+      "messageCount": 2050
+    },
+    {
+      "displayName": "Inbox",
+      "sizeBytes": 1395864371,
+      "messageCount": 3095
+    },
+    {
+      "displayName": "Archive",
+      "sizeBytes": 180134871,
+      "messageCount": 246
+    },
+    {
+      "displayName": "Director",
+      "sizeBytes": 111107113,
+      "messageCount": 340
+    },
+    {
+      "displayName": "IndiaMart",
+      "sizeBytes": 49408901,
+      "messageCount": 449
+    },
+    {
+      "displayName": "PETTY CASH",
+      "sizeBytes": 11681137,
+      "messageCount": 110
+    },
+    {
+      "displayName": "Drafts",
+      "sizeBytes": 9437184,
+      "messageCount": 1
+    },
+    {
+      "displayName": "CRM_FFHERP",
+      "sizeBytes": 4005560,
+      "messageCount": 85
+    },
+    {
+      "displayName": "Conflicts",
+      "sizeBytes": 2013266,
+      "messageCount": 1
+    },
+    {
+      "displayName": "Marketing",
+      "sizeBytes": 347597,
+      "messageCount": 2
+    }
+  ]
+}

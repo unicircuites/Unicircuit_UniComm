@@ -3,6 +3,14 @@
  * Connects to Matrix PBX TCP SMDR port, parses call records, saves to DB
  * Matrix SMDR format (fixed-width):
  * Field positions based on Matrix Eternity NX/GE SMDR output
+ *
+ * Matrix Eternity CTI integration:
+ *   SMDR port (default 5000) — PBX pushes raw call records TO this TCP server
+ *   CTI  port (default 5001) — real-time call control (click-to-dial, pickup, transfer)
+ *
+ * PBX-side setup required:
+ *   System → SMDR Settings  → Enable SMDR: YES, Output: TCP Server, Port: SMDR_PORT
+ *   System → CTI  Settings  → Enable CTI:  YES, Port: CTI_PORT, create CTI user
  */
 const net  = require('net');
 const pool = require('../db/pool');
@@ -10,6 +18,19 @@ const pool = require('../db/pool');
 // ── CONFIG (from .env) ────────────────────────────────────────────────────
 const PBX_HOST  = process.env.PBX_HOST  || '192.168.0.81';
 const SMDR_PORT = parseInt(process.env.SMDR_PORT || '5000');
+const CTI_PORT  = parseInt(process.env.CTI_PORT  || '5001');
+
+// ── STARTUP CONFIG DUMP ───────────────────────────────────────────────────
+console.log('[SMDR] ══════════════════════════════════════════════════════');
+console.log('[SMDR] Matrix Eternity CTI — configuration check');
+console.log(`[SMDR]   PBX_HOST  : ${PBX_HOST}  (Matrix Eternity IP)`);
+console.log(`[SMDR]   SMDR_PORT : ${SMDR_PORT}  (PBX → this server, raw call records)`);
+console.log(`[SMDR]   CTI_PORT  : ${CTI_PORT}  (click-to-dial / call control)`);
+console.log('[SMDR]   Source    : process.env (SMDR_PORT=' +
+  (process.env.SMDR_PORT ? process.env.SMDR_PORT + ' ✅ set in .env' : 'NOT SET — using default 5000 ⚠️') + ')');
+console.log('[SMDR]   Source    : process.env (CTI_PORT=' +
+  (process.env.CTI_PORT  ? process.env.CTI_PORT  + ' ✅ set in .env' : 'NOT SET — using default 5001 ⚠️') + ')');
+console.log('[SMDR] ══════════════════════════════════════════════════════');
 
 let io          = null;
 let isConnected = false;
@@ -149,47 +170,104 @@ function processBuffer() {
   for (const line of lines) {
     const trimmed = line.trim();
     if (!trimmed) continue;
-    console.log('[SMDR] Raw:', trimmed);
+    console.log('[SMDR] 📋 Raw line:', JSON.stringify(trimmed));
     const record = parseSMDR(trimmed);
-    if (record) saveCallLog(record);
-    else console.log('[SMDR] Could not parse line:', trimmed);
+    if (record) {
+      console.log('[SMDR] ✅ Parsed:', JSON.stringify(record));
+      saveCallLog(record);
+    } else {
+      console.log('[SMDR] ⚠️ Could not parse line — check SMDR format');
+    }
   }
 }
 
 // ── TCP SERVER — PBX connects TO us ──────────────────────────────────────
-let tcpServer  = null;
+let tcpServer     = null;
+let connectedPeers = 0;  // track simultaneous connections
 
 function startServer() {
   if (tcpServer) { try { tcpServer.close(); } catch (_) {} }
 
+  console.log('[SMDR] ── startServer() ──────────────────────────────────');
+  console.log(`[SMDR]   Binding TCP server on 0.0.0.0:${SMDR_PORT}`);
+  console.log(`[SMDR]   Expecting Matrix PBX at ${PBX_HOST} to connect`);
+  console.log('[SMDR]   PBX setup: System → SMDR Settings → Output: TCP Server');
+  console.log(`[SMDR]              SMDR Port must be set to ${SMDR_PORT} on the PBX`);
+
   tcpServer = net.createServer((socket) => {
+    connectedPeers++;
     isConnected = true;
     const remote = `${socket.remoteAddress}:${socket.remotePort}`;
-    console.log(`[SMDR] PBX connected from ${remote}`);
+    const isPBX  = socket.remoteAddress === PBX_HOST ||
+                   socket.remoteAddress === `::ffff:${PBX_HOST}`;
+
+    console.log('[SMDR] ── INBOUND CONNECTION ─────────────────────────────');
+    console.log(`[SMDR]   Remote  : ${remote}`);
+    console.log(`[SMDR]   Is PBX? : ${isPBX ? '✅ YES — matches PBX_HOST (' + PBX_HOST + ')' : '⚠️  NO  — unexpected source (PBX_HOST=' + PBX_HOST + ')'}`);
+    console.log(`[SMDR]   Socket  : readable=${socket.readable} writable=${socket.writable}`);
+    console.log(`[SMDR]   Active connections: ${connectedPeers}`);
+    if (!isPBX) {
+      console.warn(`[SMDR]   ⚠️  Connection from unknown host ${socket.remoteAddress} — check PBX_HOST in .env`);
+    }
     emit('pbx:connected', { host: PBX_HOST, port: SMDR_PORT });
 
     socket.on('data', (data) => {
-      buffer += data.toString();
+      const raw = data.toString();
+      console.log(`[SMDR] 📥 Data from ${remote} (${data.length} bytes): ${JSON.stringify(raw)}`);
+      buffer += raw;
       processBuffer();
     });
 
-    socket.on('close', () => {
-      isConnected = false;
-      console.log('[SMDR] PBX disconnected');
+    socket.on('close', (hadError) => {
+      connectedPeers = Math.max(0, connectedPeers - 1);
+      isConnected    = connectedPeers > 0;
+      console.log('[SMDR] ── DISCONNECTED ───────────────────────────────────');
+      console.log(`[SMDR]   Remote  : ${remote}`);
+      console.log(`[SMDR]   hadError: ${hadError}`);
+      console.log(`[SMDR]   Active connections remaining: ${connectedPeers}`);
+      if (!isConnected) {
+        console.log('[SMDR]   No PBX connections — waiting for Matrix PBX to reconnect...');
+        console.log(`[SMDR]   Verify PBX SMDR output is set to TCP Server → ${SMDR_PORT}`);
+      }
       emit('pbx:disconnected', {});
     });
 
     socket.on('error', (err) => {
-      console.error('[SMDR] Socket error:', err.message);
+      console.error(`[SMDR] ⚠️  Socket error from ${remote}: ${err.message} (code=${err.code})`);
+      if (err.code === 'ECONNRESET') {
+        console.error('[SMDR]   PBX reset the connection — may be a PBX restart or config change');
+      }
+    });
+
+    socket.on('timeout', () => {
+      console.warn(`[SMDR] ⏱️  Socket timeout from ${remote} — no data received`);
+      console.warn('[SMDR]   Check PBX SMDR is enabled and sending data');
     });
   });
 
   tcpServer.listen(SMDR_PORT, '0.0.0.0', () => {
-    console.log(`[SMDR] Listening for Matrix PBX on port ${SMDR_PORT}...`);
+    console.log('[SMDR] ── SERVER READY ───────────────────────────────────');
+    console.log(`[SMDR]   ✅ Listening on 0.0.0.0:${SMDR_PORT}`);
+    console.log(`[SMDR]   Waiting for Matrix PBX (${PBX_HOST}) to connect...`);
+    console.log('[SMDR]   If PBX does not connect within 60s, check:');
+    console.log(`[SMDR]     1. PBX SMDR output IP = this machine's LAN IP`);
+    console.log(`[SMDR]     2. PBX SMDR port      = ${SMDR_PORT}`);
+    console.log(`[SMDR]     3. Windows Firewall inbound rule for TCP ${SMDR_PORT}`);
+    console.log('[SMDR]        Run as admin: New-NetFirewallRule -DisplayName "UniComm SMDR"');
+    console.log(`[SMDR]          -Direction Inbound -Protocol TCP -LocalPort ${SMDR_PORT} -Action Allow`);
   });
 
   tcpServer.on('error', (err) => {
-    console.error('[SMDR] Server error:', err.message);
+    console.error('[SMDR] ❌ Server error:', err.message, `(code=${err.code})`);
+    if (err.code === 'EADDRINUSE') {
+      console.error(`[SMDR]   Port ${SMDR_PORT} already in use.`);
+      console.error('[SMDR]   Find the process: netstat -ano | findstr :' + SMDR_PORT);
+      console.error('[SMDR]   Kill it:          taskkill /PID <pid> /F');
+    }
+    if (err.code === 'EACCES') {
+      console.error(`[SMDR]   Permission denied on port ${SMDR_PORT} — ports below 1024 need admin`);
+    }
+    console.log('[SMDR]   Retrying in 10 seconds...');
     setTimeout(startServer, 10000);
   });
 }

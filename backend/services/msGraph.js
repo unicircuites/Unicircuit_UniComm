@@ -45,7 +45,12 @@ const SCOPES = [
   'https://graph.microsoft.com/Mail.Send',
   'https://graph.microsoft.com/Mail.ReadWrite',
   'https://graph.microsoft.com/Contacts.ReadWrite',
+  'https://graph.microsoft.com/MailboxSettings.ReadWrite',
   'offline_access',
+];
+const AUTH_SCOPES = [
+  ...SCOPES,
+  'https://graph.microsoft.com/People.Read',
 ];
 
 // ── TOKEN STORAGE (PostgreSQL) ─────────────────────────────────────────────
@@ -70,7 +75,7 @@ async function saveTokens(email, tokenResponse) {
     VALUES ($1, $2, $3, $4, NOW())
     ON CONFLICT (user_email) DO UPDATE
       SET access_token  = EXCLUDED.access_token,
-          refresh_token = EXCLUDED.refresh_token,
+          refresh_token = COALESCE(EXCLUDED.refresh_token, ms_tokens.refresh_token),
           expires_at    = EXCLUDED.expires_at,
           updated_at    = NOW()
   `, [email, tokenResponse.accessToken, tokenResponse.refreshToken || null, expiresAt]);
@@ -88,9 +93,9 @@ async function getStoredTokens(email) {
 let _ccToken = null;
 let _ccExpiry = null;
 
-async function getClientCredentialsToken() {
+async function getClientCredentialsToken(forceRefresh = false) {
   // Return cached token if still valid (5 min buffer)
-  if (_ccToken && _ccExpiry && _ccExpiry > new Date(Date.now() + 5 * 60 * 1000)) {
+  if (!forceRefresh && _ccToken && _ccExpiry && _ccExpiry > new Date(Date.now() + 5 * 60 * 1000)) {
     return _ccToken;
   }
   try {
@@ -144,6 +149,22 @@ async function getAccessToken(email) {
   return null; // Need re-auth
 }
 
+async function getAccessTokenForScopes(email, scopes) {
+  const stored = await getStoredTokens(email);
+  if (!stored || !stored.refresh_token) return null;
+  try {
+    const result = await cca.acquireTokenByRefreshToken({
+      refreshToken: stored.refresh_token,
+      scopes: scopes && scopes.length ? scopes : SCOPES,
+    });
+    await saveTokens(email, result);
+    return result.accessToken;
+  } catch (err) {
+    console.warn('[Graph] Scoped refresh token failed:', err.message);
+    return null;
+  }
+}
+
 // ── BUILD AUTH URL ─────────────────────────────────────────────────────────
 async function getAuthUrl(state) {
   const authority = msAuthority();
@@ -154,11 +175,11 @@ async function getAuthUrl(state) {
   console.log('  MS_REDIRECT_URI             =', process.env.MS_REDIRECT_URI || '(empty)');
   console.log('  MS_USER_EMAIL (login_hint)  =', process.env.MS_USER_EMAIL || '(empty)');
   console.log('  client_secret in .env?      =', process.env.MS_CLIENT_SECRET ? `yes (${process.env.MS_CLIENT_SECRET.length} chars)` : 'NO — OAuth will fail');
-  console.log('  scopes                      =', SCOPES.join(', '));
+  console.log('  scopes                      =', AUTH_SCOPES.join(', '));
 
   try {
     const url = await cca.getAuthCodeUrl({
-      scopes:      SCOPES,
+      scopes:      AUTH_SCOPES,
       redirectUri: process.env.MS_REDIRECT_URI,
       loginHint:   process.env.MS_USER_EMAIL,
       state:       state || 'unicomm',
@@ -209,7 +230,7 @@ async function exchangeCode(code) {
   try {
     const result = await cca.acquireTokenByCode({
       code,
-      scopes:      SCOPES,
+      scopes:      AUTH_SCOPES,
       redirectUri: process.env.MS_REDIRECT_URI,
     });
     console.log('[MSAL] ✅ Token acquired for:', result.account?.username);
@@ -240,7 +261,10 @@ async function graphGet(endpoint, email) {
   });
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
-    throw new Error(err.error?.message || `Graph API error ${res.status}`);
+    const graphErr = new Error(err.error?.message || `Graph API error ${res.status}`);
+    graphErr.status = res.status;
+    graphErr.code = err.error?.code;
+    throw graphErr;
   }
   return res.json();
 }
@@ -257,7 +281,10 @@ async function graphPost(endpoint, body, email) {
   });
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
-    throw new Error(err.error?.message || `Graph API error ${res.status}`);
+    const graphErr = new Error(err.error?.message || `Graph API error ${res.status}`);
+    graphErr.status = res.status;
+    graphErr.code = err.error?.code;
+    throw graphErr;
   }
   // 202 / 204 = no body
   if (res.status === 202 || res.status === 204) return { success: true };
@@ -276,7 +303,10 @@ async function graphPatch(endpoint, body, email) {
   });
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
-    throw new Error(err.error?.message || `Graph API error ${res.status}`);
+    const graphErr = new Error(err.error?.message || `Graph API error ${res.status}`);
+    graphErr.status = res.status;
+    graphErr.code = err.error?.code;
+    throw graphErr;
   }
   return res.json().catch(() => ({ success: true }));
 }
@@ -332,6 +362,8 @@ module.exports = {
   getAuthUrl,
   exchangeCode,
   getAccessToken,
+  getClientCredentialsToken,
+  getAccessTokenForScopes,
   graphGet,
   graphPost,
   graphPatch,
