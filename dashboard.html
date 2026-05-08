@@ -6039,6 +6039,18 @@ async function switchAssignSource(src) {
       select.innerHTML = opts || '<option value="">No contacts with email found</option>';
 
     } else if (src === 'whatsapp') {
+      // Check WA connection status first
+      try {
+        const statusRes = await fetch(API_BASE + '/wa/status', { headers: getAuthHeaders() });
+        const statusData = statusRes.ok ? await statusRes.json() : {};
+        if (!statusData.connected) {
+          select.innerHTML = '<option value="">WhatsApp not connected — scan QR first</option>';
+          const prev = document.getElementById('assignee-pick-preview');
+          if (prev) prev.innerHTML = '<span style="color:var(--gold);"><i class="fas fa-exclamation-triangle"></i> WhatsApp is not connected. Go to WhatsApp section and scan the QR code first.</span>';
+          return;
+        }
+      } catch (_) {}
+
       // Load WA contacts from DB (synced) — individual chats only, no groups
       if (!waAllChats.length) {
         const res = await fetch(API_BASE + '/wa/chats', { headers: getAuthHeaders() });
