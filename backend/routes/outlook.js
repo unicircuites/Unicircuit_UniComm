@@ -955,6 +955,41 @@ router.get('/contacts', async (req, res) => {
       throw err;
     }
 
+    // Fetch People API to get phone numbers (contacts folder often lacks phone data)
+    // People.Read permission required — merge phone numbers by email
+    try {
+      const peopleList = await fetchAllOutlookPeopleGraphSafe(MS_EMAIL);
+      if (peopleList && peopleList.length > 0) {
+        // Build email → phone map from People API
+        const phoneByEmail = new Map();
+        for (const p of peopleList) {
+          const phone = p.mobilePhone || (p.businessPhones && p.businessPhones[0]) || null;
+          if (phone) {
+            const emails = (p.emailAddresses || []).map(e => String(e.address || '').trim().toLowerCase()).filter(Boolean);
+            for (const em of emails) {
+              if (!phoneByEmail.has(em)) phoneByEmail.set(em, phone);
+            }
+          }
+        }
+        console.log(`[Outlook Contacts] People API phone map size: ${phoneByEmail.size}`);
+
+        // Merge phone numbers into contacts
+        let merged = 0;
+        for (const contact of outlookContacts) {
+          if (!contact.mobilePhone) {
+            const contactEmail = ((contact.emailAddresses || []).map(e => e && e.address).filter(Boolean)[0] || '').trim().toLowerCase();
+            if (contactEmail && phoneByEmail.has(contactEmail)) {
+              contact.mobilePhone = phoneByEmail.get(contactEmail);
+              merged++;
+            }
+          }
+        }
+        console.log(`[Outlook Contacts] Merged phone numbers from People API: ${merged} contacts updated`);
+      }
+    } catch (peopleErr) {
+      console.warn('[Outlook Contacts] People API phone merge failed (non-fatal):', peopleErr.message);
+    }
+
     const rawAddr = (oc) => ((oc.emailAddresses || []).map(e => e && e.address).filter(Boolean)[0]) || '';
     outlookContacts.sort((a, b) => {
       const na = (a.displayName || rawAddr(a) || '').trim();
