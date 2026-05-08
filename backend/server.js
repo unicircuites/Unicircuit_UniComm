@@ -22,7 +22,8 @@ const { Server } = require('socket.io');
 const rateLimit  = require('express-rate-limit');
 const wa         = require('./services/whatsapp');
 const smdr       = require('./services/matrixSmdr');
-const mktCron    = require('./services/marketingCron');
+const mktCron      = require('./services/marketingCron');
+const taskNotifier = require('./services/taskNotifier');
 const pool       = require('./db/pool');
 const activityLog  = require('./services/activityLog');
 const systemRoutes = require('./routes/system');
@@ -267,10 +268,14 @@ app.use(express.static(path.join(__dirname, '..'), {
     const ext = path.extname(filePath).toLowerCase();
     if (ext === '.html' || ext === '.htm') {
       res.setHeader('Content-Type', 'text/html; charset=UTF-8');
+      res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, private');
+      res.setHeader('Pragma', 'no-cache');
     } else if (ext === '.js') {
       res.setHeader('Content-Type', 'text/javascript; charset=UTF-8');
+      res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, private');
     } else if (ext === '.css') {
       res.setHeader('Content-Type', 'text/css; charset=UTF-8');
+      res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, private');
     } else if (ext === '.json') {
       res.setHeader('Content-Type', 'application/json; charset=UTF-8');
     }
@@ -363,6 +368,7 @@ app.use('/api/broadcast', apiLimiter,  require('./routes/broadcast'));
 app.use('/api/templates', apiLimiter,  require('./routes/emailTemplates'));
 app.use('/api/marquee',  require('./routes/marquee'));
 app.use('/api/groups',   apiLimiter,  require('./routes/recipientGroups'));
+app.use('/api/mail-tasks', apiLimiter, require('./routes/mailTasks'));
 app.use('/api/system',  apiLimiter,  require('./routes/system'));
 
 // OAuth2 callback — must be at root level to match redirect URI
@@ -399,6 +405,9 @@ server.listen(PORT, HOST, () => {
 
   // Start Marketing cron (6 PM daily reminder)
   mktCron.start(io);
+
+  // Start Task Notification scheduler (WA + email reminders before due time)
+  taskNotifier.start(pool);
 });
 
 // Clear WhatsApp session on server stop so mobile shows disconnected
