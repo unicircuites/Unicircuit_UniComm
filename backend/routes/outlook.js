@@ -458,8 +458,20 @@ async function setSignatureDefault(kind, id) {
 }
 
 async function fetchAllOutlookContactsGraph(email) {
-  const token = await graph.getAccessToken(email);
+  // MUST use delegated token — client credentials cannot access /me/contacts
+  // or personal contact folders like "Your contacts"
+  let token = await graph.getAccessTokenForScopes(email, [
+    'https://graph.microsoft.com/Contacts.ReadWrite',
+    'https://graph.microsoft.com/Mail.Read',
+    'offline_access',
+  ]);
+  if (!token) {
+    // Fallback to any available token (may be client credentials — will still
+    // work for /users/{email}/contacts but not /me/contacts)
+    token = await graph.getAccessToken(email);
+  }
   if (!token) throw new Error('NOT_AUTHENTICATED');
+  console.log('[Outlook Contacts] Token type:', token.length > 500 ? 'JWT (delegated or CC)' : 'short');
   // homePhones added — many contacts store phone there instead of mobilePhone
   const sel = 'id,displayName,givenName,surname,emailAddresses,businessPhones,mobilePhone,homePhones,companyName,jobTitle';
   const rows = [];
