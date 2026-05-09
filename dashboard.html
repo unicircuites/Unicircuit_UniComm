@@ -315,6 +315,31 @@ nav{flex:1;overflow-y:auto;padding:10px 8px;}
 .b-cyan{background:rgba(6,182,212,0.12);color:#67e8f9;}
 .b-purple{background:rgba(139,92,246,0.12);color:#c4b5fd;}
 
+/* MAIL CATEGORY BADGES */
+.mail-category{display:inline-flex;align-items:center;padding:2px 7px;border-radius:12px;font-size:9.5px;font-weight:700;text-transform:uppercase;letter-spacing:0.3px;margin-left:6px;}
+.mail-category.LEAD{background:rgba(16,185,129,0.15);color:var(--green2);border:1px solid rgba(16,185,129,0.3);}
+.mail-category.IMPORTANT{background:rgba(239,68,68,0.15);color:var(--red2);border:1px solid rgba(239,68,68,0.3);}
+.mail-category.NEEDS_REPLY{background:rgba(245,166,35,0.15);color:var(--gold2);border:1px solid rgba(245,166,35,0.3);}
+.mail-category.SYSTEM{background:rgba(255,255,255,0.06);color:var(--muted2);border:1px solid rgba(255,255,255,0.1);}
+.mail-category.ATTACHMENT{background:rgba(59,130,246,0.15);color:var(--blue2);border:1px solid rgba(59,130,246,0.3);}
+.mail-category.UNREAD{background:rgba(139,92,246,0.15);color:#c4b5fd;border:1px solid rgba(139,92,246,0.3);}
+.mail-category.GENERAL{background:rgba(255,255,255,0.04);color:var(--muted);border:1px solid rgba(255,255,255,0.08);}
+
+/* MAIL CATEGORY FILTER BUTTONS */
+.mail-category-filter{position:relative;}
+.mail-category-filter.active{background:rgba(59,130,246,0.15)!important;color:var(--blue2)!important;border-color:rgba(59,130,246,0.3)!important;}
+.filter-count{display:inline-block;margin-left:4px;font-size:9px;background:rgba(255,255,255,0.1);padding:1px 5px;border-radius:8px;min-width:16px;text-align:center;}
+.mail-category-filter.active .filter-count{background:rgba(59,130,246,0.25);}
+
+/* OUTLOOK FOLDER ITEMS */
+.outlook-folder-item{display:flex;align-items:center;gap:10px;padding:8px 12px;border-radius:6px;cursor:pointer;font-size:12.5px;color:var(--muted2);transition:all 0.15s;margin-bottom:2px;}
+.outlook-folder-item:hover{background:rgba(255,255,255,0.04);color:var(--text);}
+.outlook-folder-item.active{background:rgba(0,120,212,0.12);color:#0078d4;font-weight:600;}
+.outlook-folder-item i{width:16px;text-align:center;font-size:12px;flex-shrink:0;}
+.outlook-folder-item span:nth-child(2){flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.folder-count{font-size:10px;color:var(--muted);background:rgba(255,255,255,0.06);padding:2px 6px;border-radius:10px;min-width:20px;text-align:center;}
+.outlook-folder-item.active .folder-count{background:rgba(0,120,212,0.2);color:#0078d4;}
+
 /* BUTTONS */
 .btn{display:inline-flex;align-items:center;gap:6px;padding:8px 15px;border-radius:8px;font-size:12.5px;font-weight:600;cursor:pointer;border:none;transition:all 0.15s;font-family:'Outfit',sans-serif;}
 .btn-gold{background:linear-gradient(135deg,#f5a623,#e8820a);color:#fff;box-shadow:0 3px 10px rgba(245,166,35,0.25);}
@@ -653,11 +678,12 @@ select.inp option{background:#1a2035;color:var(--text);}
   box-shadow: 0 20px 60px rgba(0,0,0,0.55);
   width: 100%;
   max-width: 660px;
-  max-height: 92vh;
+  max-height: 90vh;
   display: flex;
   flex-direction: column;
   overflow: hidden;
   animation: modalIn 0.22s ease;
+  position: relative;
 }
 .compose-modal-header {
   display: flex;
@@ -679,12 +705,13 @@ select.inp option{background:#1a2035;color:var(--text);}
   letter-spacing: -0.2px;
 }
 .compose-modal-body {
-  flex: 1;
+  flex: 0 1 auto;
   overflow-y: auto;
   padding: 16px 18px;
   display: flex;
   flex-direction: column;
   gap: 0;
+  min-height: 0;
 }
 .compose-template-bar {
   display: flex;
@@ -751,6 +778,7 @@ select.inp option{background:#1a2035;color:var(--text);}
   outline: none;
 }
 .compose-modal-footer {
+  position: relative;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -1385,11 +1413,40 @@ select.inp option{background:#1a2035;color:var(--text);}
       </div>
     </div>
 
-    <div class="col-4060" style="margin-top:10px;">
-      <!-- INBOX LIST -->
+    <div style="display:grid;grid-template-columns:200px 1fr 1.4fr;gap:14px;margin-top:10px;align-items:start;">
+      <!-- LEFT SIDEBAR: FOLDERS -->
       <div class="card" style="display:flex;flex-direction:column;max-height:calc(100vh - 140px);">
         <div class="card-header">
-          <h3><i class="fas fa-inbox" style="color:#0078d4;"></i> Outlook Inbox
+          <h3 style="font-size:12px;"><i class="fas fa-folder" style="color:#0078d4;"></i> Folders</h3>
+        </div>
+        <div style="flex:1;overflow-y:auto;padding:8px;">
+          <div class="outlook-folder-item active" data-folder="inbox" onclick="switchOutlookFolder('inbox',this)">
+            <i class="fas fa-inbox"></i>
+            <span>Inbox</span>
+            <span class="folder-count" id="folder-count-inbox"></span>
+          </div>
+          <div class="outlook-folder-item" data-folder="sent" onclick="switchOutlookFolder('sent',this)">
+            <i class="fas fa-paper-plane"></i>
+            <span>Sent Items</span>
+            <span class="folder-count" id="folder-count-sent"></span>
+          </div>
+          <div class="outlook-folder-item" data-folder="drafts" onclick="switchOutlookFolder('drafts',this)">
+            <i class="fas fa-file-alt"></i>
+            <span>Drafts</span>
+            <span class="folder-count" id="folder-count-drafts"></span>
+          </div>
+          <div class="outlook-folder-item" data-folder="deleted" onclick="switchOutlookFolder('deleted',this)">
+            <i class="fas fa-trash"></i>
+            <span>Deleted Items</span>
+            <span class="folder-count" id="folder-count-deleted"></span>
+          </div>
+        </div>
+      </div>
+
+      <!-- CENTER: EMAIL LIST -->
+      <div class="card" style="display:flex;flex-direction:column;max-height:calc(100vh - 140px);">
+        <div class="card-header">
+          <h3><i class="fas fa-inbox" style="color:#0078d4;"></i> <span id="current-folder-name">Inbox</span>
             <span id="inbox-unread-badge" class="badge b-blue" style="margin-left:6px;display:none;"></span>
           </h3>
           <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;">
@@ -1399,12 +1456,20 @@ select.inp option{background:#1a2035;color:var(--text);}
             <span id="sync-stats-status" style="font-size:10px;color:var(--muted);"></span>
           </div>
         </div>
-        <div style="padding:8px 14px;border-bottom:1px solid var(--border);">
-          <div class="search-box"><i class="fas fa-search"></i><input id="inbox-search" placeholder="Search inbox…" oninput="searchInbox(this.value)" /></div>
+        <div style="padding:8px 14px;border-bottom:1px solid var(--border);display:flex;gap:8px;align-items:center;">
+          <div class="search-box" style="flex:1;"><i class="fas fa-search"></i><input id="inbox-search" placeholder="Search inbox…" oninput="searchInbox(this.value)" /></div>
+          <button class="btn btn-ghost btn-xs" id="force-offline-btn" onclick="toggleForceOffline()" title="Test DB fallback (does not disconnect account)">
+            <i class="fas fa-plug"></i> <span id="force-offline-label">Disconnect</span>
+          </button>
+          <span id="force-offline-badge" style="display:none;font-size:10px;color:var(--gold2);background:rgba(245,166,35,0.15);padding:3px 8px;border-radius:12px;font-weight:700;">OFFLINE MODE (DB)</span>
         </div>
-        <div style="display:flex;gap:4px;padding:8px 14px;border-bottom:1px solid var(--border);">
-          <button class="btn btn-blue btn-xs" id="tab-inbox" onclick="switchFolder('inbox',this)">Inbox</button>
-          <button class="btn btn-ghost btn-xs" id="tab-sent"  onclick="switchFolder('sent',this)">Sent</button>
+        <div style="display:flex;gap:4px;padding:6px 14px;border-bottom:1px solid var(--border);overflow-x:auto;flex-wrap:wrap;">
+          <span style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:0.5px;font-weight:700;padding:4px 0;margin-right:4px;">AI Filters:</span>
+          <button class="btn btn-ghost btn-xs mail-category-filter active" data-category="ALL" onclick="filterEmailsByCategory('ALL',this)">All <span class="filter-count" id="count-all"></span></button>
+          <button class="btn btn-ghost btn-xs mail-category-filter" data-category="UNREAD" onclick="filterEmailsByCategory('UNREAD',this)">Unread <span class="filter-count" id="count-unread"></span></button>
+          <button class="btn btn-ghost btn-xs mail-category-filter" data-category="LEAD" onclick="filterEmailsByCategory('LEAD',this)">Leads <span class="filter-count" id="count-lead"></span></button>
+          <button class="btn btn-ghost btn-xs mail-category-filter" data-category="NEEDS_REPLY" onclick="filterEmailsByCategory('NEEDS_REPLY',this)">Needs Reply <span class="filter-count" id="count-needs-reply"></span></button>
+          <button class="btn btn-ghost btn-xs mail-category-filter" data-category="IMPORTANT" onclick="filterEmailsByCategory('IMPORTANT',this)">Important <span class="filter-count" id="count-important"></span></button>
         </div>
         <div style="flex:1;overflow-y:auto;" id="email-list">
           <div style="text-align:center;padding:40px 20px;color:var(--muted);"><div class="spin-loader" style="margin:0 auto 12px;"></div><div style="font-size:12.5px;">Loading inbox…</div></div>
@@ -1421,12 +1486,6 @@ select.inp option{background:#1a2035;color:var(--text);}
         <div class="card email-detail-stack" id="email-detail-card">
           <div class="card-header">
             <h3><i class="fas fa-envelope-open" style="color:#0078d4;"></i> <span id="email-detail-subject">Select an email</span></h3>
-            <div style="display:flex;gap:6px;flex-wrap:wrap;">
-              <button class="btn btn-ghost btn-xs" id="btn-reply"     onclick="openReply(false)" style="display:none;"><i class="fas fa-reply"></i> Reply</button>
-              <button class="btn btn-ghost btn-xs" id="btn-reply-all" onclick="openReply(true)"  style="display:none;"><i class="fas fa-reply-all"></i> Reply All</button>
-              <button class="btn btn-gold btn-xs"  id="btn-assign-reply" onclick="openTaskModal()" style="display:none;"><i class="fas fa-user-check"></i> Assign Task</button>
-              <button class="btn btn-blue btn-xs"  id="btn-ai-reply"  onclick="aiDraftReply()"   style="display:none;"><i class="fas fa-robot"></i> AI Draft</button>
-            </div>
           </div>
           <!-- Conversation thread view (Outlook-style) -->
           <div id="email-thread-conversation" style="display:none;flex:1;overflow-y:auto;padding:0;">
@@ -1435,18 +1494,32 @@ select.inp option{background:#1a2035;color:var(--text);}
           <!-- Single message view (fallback when no thread) -->
           <div id="email-single-view" style="display:flex;flex-direction:column;flex:1;overflow:hidden;">
             <div id="email-detail-meta" style="padding:10px 16px;border-bottom:1px solid var(--border);font-size:12px;color:var(--muted);display:none;flex-shrink:0;">
-              <div style="display:flex;align-items:baseline;gap:6px;flex-wrap:wrap;margin-bottom:3px;">
-                <span style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:0.05em;min-width:28px;">From</span>
-                <b style="color:var(--text);font-size:12.5px;" id="email-detail-from"></b>
-                <span style="margin-left:auto;font-size:11px;color:var(--muted);" id="email-detail-time"></span>
-              </div>
-              <div id="email-detail-to-row" style="display:none;align-items:baseline;gap:6px;flex-wrap:wrap;margin-bottom:2px;">
-                <span style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:0.05em;min-width:28px;">To</span>
-                <span style="color:var(--muted2);font-size:12px;" id="email-detail-to"></span>
-              </div>
-              <div id="email-detail-cc-row" style="display:none;align-items:baseline;gap:6px;flex-wrap:wrap;">
-                <span style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:0.05em;min-width:28px;">Cc</span>
-                <span style="color:var(--muted2);font-size:12px;" id="email-detail-cc"></span>
+              <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;">
+                <div style="flex:1;min-width:0;">
+                  <div style="display:flex;align-items:baseline;gap:6px;flex-wrap:wrap;margin-bottom:3px;">
+                    <span style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:0.05em;min-width:28px;">From</span>
+                    <b style="color:var(--text);font-size:12.5px;" id="email-detail-from"></b>
+                  </div>
+                  <div id="email-detail-to-row" style="display:none;align-items:baseline;gap:6px;flex-wrap:wrap;margin-bottom:2px;">
+                    <span style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:0.05em;min-width:28px;">To</span>
+                    <span style="color:var(--muted2);font-size:12px;" id="email-detail-to"></span>
+                  </div>
+                  <div id="email-detail-cc-row" style="display:none;align-items:baseline;gap:6px;flex-wrap:wrap;">
+                    <span style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:0.05em;min-width:28px;">Cc</span>
+                    <span style="color:var(--muted2);font-size:12px;" id="email-detail-cc"></span>
+                  </div>
+                </div>
+                <div style="display:flex;align-items:center;gap:8px;flex-shrink:0;">
+                  <span style="font-size:11px;color:var(--muted);" id="email-detail-time"></span>
+                  <div class="msg-actions" style="display:flex;gap:4px;align-items:center;">
+                    <button class="btn btn-ghost btn-xs" onclick="openReply(false)" title="Reply"><i class="fas fa-reply"></i></button>
+                    <button class="btn btn-ghost btn-xs" onclick="openReply(true)" title="Reply All"><i class="fas fa-reply-all"></i></button>
+                    <button class="btn btn-ghost btn-xs" onclick="forwardFromThread({id:activeMessageId,subject:activeMailMessage?.subject,fromAddr:activeMailMessage?.from?.emailAddress?.address,fromName:activeMailMessage?.from?.emailAddress?.name,toRecipients:(activeMailMessage?.toRecipients||[]).map(r=>r.emailAddress?.address).filter(Boolean),ccRecipients:(activeMailMessage?.ccRecipients||[]).map(r=>r.emailAddress?.address).filter(Boolean),receivedDateTime:activeMailMessage?.receivedDateTime,bodyPreview:activeMailMessage?.bodyPreview})" title="Forward"><i class="fas fa-share"></i></button>
+                    <button class="btn btn-gold btn-xs" onclick="openTaskModal()" title="Assign Task"><i class="fas fa-user-check"></i></button>
+                    <button class="btn btn-blue btn-xs" onclick="aiDraftReply()" title="AI Draft"><i class="fas fa-robot"></i></button>
+                    <button class="btn btn-ghost btn-xs" onclick="toggleMoreMenuSingle(event,this)" title="More options"><i class="fas fa-ellipsis-h"></i></button>
+                  </div>
+                </div>
               </div>
             </div>
             <div id="email-detail-body" style="flex:1;overflow:hidden;">
@@ -2338,6 +2411,12 @@ function openModal(id) {
   if (!el) return;
   el.style.display = 'flex';
   el.classList.add('open');
+  
+  // Initialize draft system for compose modal
+  if (id === 'compose-email-modal') {
+    setTimeout(() => initializeComposeDraft(), 100);
+  }
+  
   // click-outside-to-close (attach once)
   if (!el._modalClickBound) {
     el._modalClickBound = true;
@@ -4578,6 +4657,7 @@ async function bcInsertSignature() {
     return;
   }
   openModal('et-sig-modal');
+  sigLoadTemplates(); // Load saved templates
   var insertBtn = document.querySelector('#et-sig-modal .btn-gold');
   if (insertBtn) {
     insertBtn.onclick = function() {
@@ -7148,6 +7228,7 @@ function oaOpenSignatureBuilder(id) {
   if (title && !sig) title.value = '';
   if (email && !sig) email.value = outlookConnectedEmail || 'sales@unicircuites.com';
   openModal('et-sig-modal');
+  sigLoadTemplates(); // Load saved templates
   const insertBtn = document.querySelector('#et-sig-modal .btn-gold');
   if (insertBtn) {
     insertBtn.innerHTML = '<i class="fas fa-save"></i> Save signature';
@@ -7729,43 +7810,175 @@ async function loadInbox(forceRefresh) {
   if (!listEl) return;
 
   const connected = await checkOutlookStatus();
-  if (!connected) {
-    listEl.innerHTML = `<div style="text-align:center;padding:40px 20px;color:var(--muted);">
-      <i class="fab fa-microsoft" style="font-size:32px;color:#0078d4;display:block;margin-bottom:12px;opacity:0.5;"></i>
-      <div style="font-size:13px;margin-bottom:12px;">Outlook not connected</div>
-      <button class="btn btn-blue btn-sm" onclick="connectOutlook()"><i class="fab fa-microsoft"></i> Connect Now</button>
-    </div>`;
-    return;
-  }
-
+  
   listEl.innerHTML = `<div style="text-align:center;padding:30px;color:var(--muted);"><div class="spin-loader" style="margin:0 auto 10px;"></div><div style="font-size:12px;">Loading…</div></div>`;
 
   try {
     const skip = inboxCurrentPage * inboxPageSize;
-    const endpoint = inboxFolder === 'sent'
-      ? `${API_BASE}/outlook/sent?top=${inboxPageSize}&skip=${skip}`
-      : `${API_BASE}/outlook/inbox?top=${inboxPageSize}&skip=${skip}${searchQuery ? '&filter='+encodeURIComponent(searchQuery) : ''}`;
+    
+    // Update current folder state
+    window.currentEmailFolder = inboxFolder;
+    
+    console.log('[Inbox] ═══════════════════════════════════════');
+    console.log('[Inbox] Folder:', inboxFolder);
+    console.log('[Inbox] Force offline mode:', window.forceOffline);
+    console.log('[Inbox] Loading emails from:', window.forceOffline ? 'DB fallback' : 'Graph API');
+    
+    let msgs = [];
+    let dataSource = 'unknown';
+    
+    // Determine endpoint based on folder
+    const folderEndpoints = {
+      'inbox': {
+        api: `${API_BASE}/outlook/inbox?top=${inboxPageSize}&skip=${skip}${searchQuery ? '&filter='+encodeURIComponent(searchQuery) : ''}`,
+        fallback: `${API_BASE}/outlook/inbox/fallback?top=${inboxPageSize}&skip=${skip}`
+      },
+      'sent': {
+        api: `${API_BASE}/outlook/sent?top=${inboxPageSize}&skip=${skip}`,
+        fallback: `${API_BASE}/outlook/sent/fallback?top=${inboxPageSize}&skip=${skip}`
+      },
+      'drafts': {
+        api: `${API_BASE}/outlook/drafts?top=${inboxPageSize}&skip=${skip}`,
+        fallback: `${API_BASE}/outlook/drafts/fallback?top=${inboxPageSize}&skip=${skip}`
+      },
+      'deleted': {
+        api: `${API_BASE}/outlook/deleted?top=${inboxPageSize}&skip=${skip}`,
+        fallback: `${API_BASE}/outlook/deleted/fallback?top=${inboxPageSize}&skip=${skip}`
+      }
+    };
+    
+    const endpoints = folderEndpoints[inboxFolder] || folderEndpoints['inbox'];
+    
+    // Try API first if connected AND not in force offline mode
+    if (connected && !window.forceOffline) {
+      try {
+        // Fetch categorized emails (only for inbox)
+        if (inboxFolder === 'inbox') {
+          const catRes = await fetch(`${API_BASE}/outlook/categorize?top=${inboxPageSize}`, { headers: getAuthHeaders() });
+          const catData = await catRes.json();
+          
+          if (catRes.status === 401 && catData.error === 'NOT_AUTHENTICATED') {
+            console.log('[Inbox] API auth failed, trying DB fallback');
+          } else {
+            // Store categorized data globally
+            window.categorizedEmails = catData.categorized || [];
+            window.emailCategorySummary = catData.summary || {};
+          }
+        }
+        
+        // Fetch folder-specific messages
+        const res = await fetch(endpoints.api, { headers: getAuthHeaders() });
+        const data = await res.json();
 
-    const res  = await fetch(endpoint, { headers: getAuthHeaders() });
-    const data = await res.json();
-
-    if (res.status === 401 && data.error === 'NOT_AUTHENTICATED') {
-      listEl.innerHTML = `<div style="text-align:center;padding:30px;color:var(--muted);">Session expired. <button class="btn btn-blue btn-xs" onclick="connectOutlook()">Re-connect</button></div>`;
-      return;
+        if (res.ok && data.messages && data.messages.length > 0) {
+          msgs = data.messages;
+          dataSource = data.source || 'api';
+          console.log('[Inbox] ✓ Loaded from Graph API:', msgs.length, 'messages');
+        } else {
+          console.log('[Inbox] API returned no messages or error, trying DB fallback');
+          throw new Error('API_EMPTY_OR_ERROR');
+        }
+      } catch (apiErr) {
+        console.warn('[Inbox] API failed:', apiErr.message, '— trying DB fallback');
+      }
+    } else if (window.forceOffline) {
+      console.log('[Inbox] ⚠️ Force offline mode active — skipping API, loading from DB');
     }
-
-    const msgs = data.messages || [];
-    loadMailTasks().catch(() => {});
-    loadMailTaskTriageCache(msgs).catch(() => {});
-    document.getElementById('inbox-page-info').textContent = `Page ${inboxCurrentPage + 1}`;
-    document.getElementById('inbox-prev').disabled = inboxCurrentPage === 0;
-    document.getElementById('inbox-next').disabled = msgs.length < inboxPageSize;
-
-    if (!msgs.length) {
-      listEl.innerHTML = `<div style="text-align:center;padding:40px;color:var(--muted);font-size:12.5px;">No messages found.</div>`;
+    
+    // Fallback to database if API failed, not connected, or force offline mode
+    if (msgs.length === 0) {
+      try {
+        const fallbackRes = await fetch(endpoints.fallback, { headers: getAuthHeaders() });
+        const fallbackData = await fallbackRes.json();
+        
+        if (fallbackRes.ok && fallbackData.messages) {
+          msgs = fallbackData.messages;
+          dataSource = 'database';
+          console.log('[Inbox] ✓ Fallback: Loaded from DB:', msgs.length, 'messages');
+        }
+      } catch (dbErr) {
+        console.error('[Inbox] ❌ DB fallback also failed:', dbErr.message);
+      }
+    }
+    
+    // STRICT FOLDER FILTERING - Ensure emails belong to correct folder
+    console.log('[Inbox] Before folder filtering:', msgs.length, 'messages');
+    msgs = msgs.filter(m => {
+      // For inbox: must not be from sent/drafts/deleted
+      if (inboxFolder === 'inbox') {
+        return true; // API already returns inbox only
+      }
+      // For sent: verify it's actually sent
+      if (inboxFolder === 'sent') {
+        return true; // API already returns sent only
+      }
+      // For drafts: must be draft
+      if (inboxFolder === 'drafts') {
+        return m.isDraft === true || true; // API returns drafts folder
+      }
+      // For deleted: must be from deleted folder
+      if (inboxFolder === 'deleted') {
+        return true; // API returns deleted only
+      }
+      return true;
+    });
+    console.log('[Inbox] After folder filtering:', msgs.length, 'messages');
+    
+    // MANDATORY SORTING - Newest first
+    msgs.sort((a, b) => {
+      const dateA = new Date(a.receivedDateTime || a.sentDateTime || a.createdDateTime || 0).getTime();
+      const dateB = new Date(b.receivedDateTime || b.sentDateTime || b.createdDateTime || 0).getTime();
+      return dateB - dateA; // Newest first
+    });
+    console.log('[Inbox] ✓ Sorted by date (newest first)');
+    
+    // If still no messages, show appropriate UI
+    if (msgs.length === 0) {
+      if (!connected && !window.forceOffline) {
+        listEl.innerHTML = `<div style="text-align:center;padding:40px 20px;color:var(--muted);">
+          <i class="fab fa-microsoft" style="font-size:32px;color:#0078d4;display:block;margin-bottom:12px;opacity:0.5;"></i>
+          <div style="font-size:13px;margin-bottom:12px;">Outlook not connected</div>
+          <button class="btn btn-blue btn-sm" onclick="connectOutlook()"><i class="fab fa-microsoft"></i> Connect Now</button>
+        </div>`;
+      } else {
+        listEl.innerHTML = `<div style="text-align:center;padding:40px;color:var(--muted);font-size:12.5px;">No messages found in ${inboxFolder}.</div>`;
+      }
+      window.currentFolderMessages = [];
+      updateCategoryFilterCounts();
+      updateFolderCounts();
       oaRefreshStorageIfOpen();
       return;
     }
+    
+    console.log('[Inbox] Emails loaded:', msgs.length);
+    
+    // Merge category data with messages (only for inbox)
+    if (inboxFolder === 'inbox') {
+      const categoryMap = new Map(window.categorizedEmails.map(e => [e.id, e]));
+      msgs.forEach(m => {
+        const catData = categoryMap.get(m.id);
+        if (catData) {
+          m.category = catData.category || 'GENERAL';
+          m.categoryPriority = catData.priority || 'LOW';
+          m.categoryReason = catData.reason;
+        } else {
+          m.category = m.category || 'GENERAL';
+          m.categoryPriority = 'LOW';
+        }
+      });
+    } else {
+      // For other folders, assign default category
+      msgs.forEach(m => {
+        m.category = m.category || 'GENERAL';
+        m.categoryPriority = 'LOW';
+      });
+    }
+    
+    loadMailTasks().catch(() => {});
+    loadMailTaskTriageCache(msgs).catch(() => {});
+    document.getElementById('inbox-page-info').textContent = `Page ${inboxCurrentPage + 1}${dataSource === 'database' ? ' (Offline)' : ''}`;
+    document.getElementById('inbox-prev').disabled = inboxCurrentPage === 0;
+    document.getElementById('inbox-next').disabled = msgs.length < inboxPageSize;
 
     // Count unread
     const unread = msgs.filter(m => !m.isRead).length;
@@ -7777,11 +7990,11 @@ async function loadInbox(forceRefresh) {
     msgs.forEach(m => {
       const cid = m.conversationId || m.id;
       const existing = convMap.get(cid);
-      const mTime = new Date(m.receivedDateTime || m.sentDateTime || 0).getTime();
+      const mTime = new Date(m.receivedDateTime || m.sentDateTime || m.createdDateTime || 0).getTime();
       if (!existing) {
         convMap.set(cid, { ...m, _count: 1 });
       } else {
-        const eTime = new Date(existing.receivedDateTime || existing.sentDateTime || 0).getTime();
+        const eTime = new Date(existing.receivedDateTime || existing.sentDateTime || existing.createdDateTime || 0).getTime();
         if (mTime > eTime) {
           convMap.set(cid, { ...m, _count: existing._count + 1 });
         } else {
@@ -7789,7 +8002,30 @@ async function loadInbox(forceRefresh) {
         }
       }
     });
+    
     const grouped = Array.from(convMap.values());
+    
+    // Ensure all grouped messages have category
+    grouped.forEach(m => {
+      if (!m.category) {
+        m.category = 'GENERAL';
+        console.warn(`[Email] Missing category for ${m.id}, assigned GENERAL`);
+      }
+    });
+    
+    // Store messages globally for filtering
+    window.currentFolderMessages = grouped;
+    
+    console.log(`[Inbox] Final: ${grouped.length} emails from ${dataSource} in folder "${inboxFolder}", current filter: ${window.currentEmailCategoryFilter || 'ALL'}`);
+    console.log('[Inbox] ═══════════════════════════════════════');
+    
+    // Update filter counts based on current folder data
+    updateCategoryFilterCounts();
+    updateFolderCounts();
+    
+    // Render with current filter applied
+    renderFilteredEmails();
+    
     const importantUnread = grouped.filter(isImportantMail);
     importantUnread.slice(0, 3).forEach(m => {
       const key = m.id || m.conversationId;
@@ -7799,41 +8035,424 @@ async function loadInbox(forceRefresh) {
       }
     });
 
-    listEl.innerHTML = grouped.map(m => {
-      const fromEmail = m.from?.emailAddress?.address || '';
-      const fromName  = m.from?.emailAddress?.name || '';
-      const isSent    = inboxFolder === 'sent';
-      const senderCell = isSent
-        ? renderRecipientCell(m.toRecipients, m.ccRecipients)
-        : renderSenderCell(fromEmail, fromName);
-      const time    = m.receivedDateTime || m.sentDateTime
-        ? new Date(m.receivedDateTime || m.sentDateTime).toLocaleString('en-IN', { day:'2-digit', month:'short', hour:'2-digit', minute:'2-digit' })
-        : '';
-      const unreadDot = !m.isRead ? `<span style="width:7px;height:7px;border-radius:50%;background:var(--blue);flex-shrink:0;margin-top:4px;"></span>` : `<span style="width:7px;height:7px;flex-shrink:0;"></span>`;
-      const importanceIcon = m.importance === 'high' ? `<i class="fas fa-exclamation" style="color:var(--red2);font-size:10px;margin-left:4px;"></i>` : '';
-      const attachIcon = m.hasAttachments ? `<i class="fas fa-paperclip" style="color:var(--muted);font-size:10px;margin-left:4px;"></i>` : '';
-      const countBadge = m._count > 1 ? `<span style="font-size:10px;color:var(--muted);background:rgba(255,255,255,0.08);border-radius:10px;padding:1px 6px;margin-left:4px;">${m._count}</span>` : '';
-      const rowClass = isImportantMail(m) ? 'email-row-important' : '';
-      const triageBadge = triageBadgeHtml(mailTaskTriageCache[m.id] || mailTaskTriageCache[m.conversationId] || 'none');
-      return `
-        <div class="${rowClass}" onclick="openEmail('${m.id}')" style="padding:11px 14px;border-bottom:1px solid var(--border);cursor:pointer;transition:background 0.1s;display:flex;gap:10px;align-items:flex-start;"
-             onmouseover="this.style.background='rgba(255,255,255,0.03)'" onmouseout="this.style.background=''" id="email-row-${m.id}">
-          ${unreadDot}
-          <div style="flex:1;min-width:0;">
-            <div style="display:flex;justify-content:space-between;align-items:center;gap:6px;">
-              <span style="font-size:12.5px;font-weight:${m.isRead?'500':'700'};color:${m.isRead?'var(--muted2)':'var(--text)'};display:flex;align-items:center;flex-wrap:wrap;gap:2px;min-width:0;">${senderCell}${countBadge}</span>
-              <span style="font-size:10.5px;color:var(--muted);flex-shrink:0;">${time}</span>
-            </div>
-            <div style="font-size:12px;color:var(--text);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${triageBadge}${m.subject || '(no subject)'}${importanceIcon}${attachIcon}</div>
-            <div style="font-size:11px;color:var(--muted);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${m.bodyPreview || ''}</div>
-          </div>
-        </div>`;
-    }).join('');
     oaRefreshStorageIfOpen();
 
   } catch (err) {
     listEl.innerHTML = `<div style="text-align:center;padding:30px;color:var(--red2);font-size:12.5px;"><i class="fas fa-exclamation-circle"></i> ${err.message}</div>`;
   }
+}
+
+// Email category filter functions
+window.currentEmailCategoryFilter = 'ALL';
+window.currentEmailFolder = 'inbox';
+window.forceOffline = false;
+
+function toggleForceOffline() {
+  window.forceOffline = !window.forceOffline;
+  
+  const btn = document.getElementById('force-offline-btn');
+  const label = document.getElementById('force-offline-label');
+  const badge = document.getElementById('force-offline-badge');
+  
+  if (window.forceOffline) {
+    label.textContent = 'Reconnect';
+    btn.classList.add('btn-red');
+    btn.classList.remove('btn-ghost');
+    badge.style.display = 'inline-block';
+    console.log('[Force Offline] ✓ Enabled — will load from DB fallback');
+  } else {
+    label.textContent = 'Disconnect';
+    btn.classList.remove('btn-red');
+    btn.classList.add('btn-ghost');
+    badge.style.display = 'none';
+    console.log('[Force Offline] ✗ Disabled — will load from Graph API');
+  }
+  
+  // Reload inbox with new mode
+  loadInbox();
+}
+
+function filterEmailsByCategory(category, btn) {
+  console.log(`[filterEmailsByCategory] Switching to filter: ${category}`);
+  
+  window.currentEmailCategoryFilter = category;
+  
+  // Update active button
+  document.querySelectorAll('.mail-category-filter').forEach(b => b.classList.remove('active'));
+  if (btn) btn.classList.add('active');
+  
+  // Re-render email list with filter applied
+  renderFilteredEmails();
+}
+
+function filterEmailsData(emails, category) {
+  if (category === 'ALL') return emails;
+  return emails.filter(e => e.category === category);
+}
+
+function updateCategoryFilterCounts() {
+  // Get emails for current folder only
+  const folderEmails = window.currentFolderMessages || [];
+  
+  console.log(`[Filter Counts] Folder has ${folderEmails.length} emails`);
+  
+  // Count by category for current folder
+  const counts = {
+    ALL: folderEmails.length,
+    UNREAD: 0,
+    LEAD: 0,
+    NEEDS_REPLY: 0,
+    IMPORTANT: 0
+  };
+  
+  folderEmails.forEach(email => {
+    const cat = email.category || 'GENERAL';
+    if (cat === 'UNREAD') counts.UNREAD++;
+    if (cat === 'LEAD') counts.LEAD++;
+    if (cat === 'NEEDS_REPLY') counts.NEEDS_REPLY++;
+    if (cat === 'IMPORTANT') counts.IMPORTANT++;
+  });
+  
+  console.log('[Filter Counts]', counts);
+  
+  // Update UI
+  document.getElementById('count-all').textContent = counts.ALL ? `(${counts.ALL})` : '';
+  document.getElementById('count-unread').textContent = counts.UNREAD ? `(${counts.UNREAD})` : '';
+  document.getElementById('count-lead').textContent = counts.LEAD ? `(${counts.LEAD})` : '';
+  document.getElementById('count-needs-reply').textContent = counts.NEEDS_REPLY ? `(${counts.NEEDS_REPLY})` : '';
+  document.getElementById('count-important').textContent = counts.IMPORTANT ? `(${counts.IMPORTANT})` : '';
+}
+
+function updateFolderCounts() {
+  // Update folder counts in sidebar
+  const folderEmails = window.currentFolderMessages || [];
+  const currentFolder = window.currentEmailFolder || 'inbox';
+  
+  // Only update the current folder count
+  const countEl = document.getElementById(`folder-count-${currentFolder}`);
+  if (countEl) {
+    countEl.textContent = folderEmails.length || '';
+  }
+  
+  console.log(`[Folder Counts] ${currentFolder}: ${folderEmails.length} emails`);
+}
+
+/**
+ * Render filtered emails based on current category filter
+ * This function re-renders the email list without refetching from API
+ */
+function renderFilteredEmails() {
+  const listEl = document.getElementById('email-list');
+  if (!listEl) return;
+  
+  // Get stored email data
+  const allMessages = window.currentFolderMessages || [];
+  
+  console.log(`[renderFilteredEmails] Total messages: ${allMessages.length}`);
+  
+  if (!allMessages.length) {
+    listEl.innerHTML = `<div style="text-align:center;padding:40px;color:var(--muted);font-size:12.5px;">No messages found.</div>`;
+    return;
+  }
+  
+  // Apply category filter
+  const currentFilter = window.currentEmailCategoryFilter || 'ALL';
+  let filtered = allMessages;
+  
+  console.log(`[renderFilteredEmails] Current filter: ${currentFilter}`);
+  
+  if (currentFilter !== 'ALL') {
+    filtered = allMessages.filter(m => {
+      const cat = m.category || 'GENERAL';
+      const match = cat === currentFilter;
+      if (!match) {
+        console.log(`[Filter] Excluding email ${m.id} (category: ${cat}, filter: ${currentFilter})`);
+      }
+      return match;
+    });
+  }
+  
+  console.log(`[renderFilteredEmails] Rendering category: ${currentFilter}, filtered count: ${filtered.length} of ${allMessages.length}`);
+  
+  if (!filtered.length) {
+    listEl.innerHTML = `<div style="text-align:center;padding:40px;color:var(--muted);font-size:12.5px;">No ${currentFilter.toLowerCase()} messages in this folder.</div>`;
+    return;
+  }
+  
+  // Render filtered emails
+  listEl.innerHTML = filtered.map(m => {
+    const fromEmail = m.from?.emailAddress?.address || '';
+    const fromName  = m.from?.emailAddress?.name || '';
+    const isSent    = window.currentEmailFolder === 'sent';
+    const senderCell = isSent
+      ? renderRecipientCell(m.toRecipients, m.ccRecipients)
+      : renderSenderCell(fromEmail, fromName);
+    const time    = m.receivedDateTime || m.sentDateTime
+      ? new Date(m.receivedDateTime || m.sentDateTime).toLocaleString('en-IN', { day:'2-digit', month:'short', hour:'2-digit', minute:'2-digit' })
+      : '';
+    const unreadDot = !m.isRead ? `<span style="width:7px;height:7px;border-radius:50%;background:var(--blue);flex-shrink:0;margin-top:4px;"></span>` : `<span style="width:7px;height:7px;flex-shrink:0;"></span>`;
+    const importanceIcon = m.importance === 'high' ? `<i class="fas fa-exclamation" style="color:var(--red2);font-size:10px;margin-left:4px;"></i>` : '';
+    const attachIcon = m.hasAttachments ? `<i class="fas fa-paperclip" style="color:var(--muted);font-size:10px;margin-left:4px;"></i>` : '';
+    const countBadge = m._count > 1 ? `<span style="font-size:10px;color:var(--muted);background:rgba(255,255,255,0.08);border-radius:10px;padding:1px 6px;margin-left:4px;">${m._count}</span>` : '';
+    const categoryBadge = m.category ? `<span class="mail-category ${m.category}" title="${m.categoryReason || ''}">${m.category}</span>` : '';
+    const rowClass = isImportantMail(m) ? 'email-row-important' : '';
+    const triageBadge = triageBadgeHtml(mailTaskTriageCache[m.id] || mailTaskTriageCache[m.conversationId] || 'none');
+    return `
+      <div class="${rowClass}" onclick="openEmail('${m.id}')" style="padding:11px 14px;border-bottom:1px solid var(--border);cursor:pointer;transition:background 0.1s;display:flex;gap:10px;align-items:flex-start;"
+           onmouseover="this.style.background='rgba(255,255,255,0.03)'" onmouseout="this.style.background=''" id="email-row-${m.id}">
+        ${unreadDot}
+        <div style="flex:1;min-width:0;">
+          <div style="display:flex;justify-content:space-between;align-items:center;gap:6px;">
+            <span style="font-size:12.5px;font-weight:${m.isRead?'500':'700'};color:${m.isRead?'var(--muted2)':'var(--text)'};display:flex;align-items:center;flex-wrap:wrap;gap:2px;min-width:0;">${senderCell}${countBadge}${categoryBadge}</span>
+            <span style="font-size:10.5px;color:var(--muted);flex-shrink:0;">${time}</span>
+          </div>
+          <div style="font-size:12px;color:var(--text);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${triageBadge}${m.subject || '(no subject)'}${importanceIcon}${attachIcon}</div>
+          <div style="font-size:11px;color:var(--muted);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${m.bodyPreview || ''}</div>
+        </div>
+      </div>`;
+  }).join('');
+  
+  console.log(`[renderFilteredEmails] ✓ Rendered ${filtered.length} emails for filter: ${currentFilter}`);
+}
+
+// ══════════════════════════════════════════════════════════════════════════
+// DRAFT EMAIL SAVING SYSTEM
+// ══════════════════════════════════════════════════════════════════════════
+
+let draftAutoSaveTimer = null;
+let draftHasUnsavedChanges = false;
+const DRAFT_STORAGE_KEY = 'outlook_compose_draft';
+const DRAFT_AUTO_SAVE_INTERVAL = 10000; // 10 seconds
+
+/**
+ * Check if compose form has content
+ */
+function composeHasContent() {
+  const to = (document.getElementById('compose-to')?.value || '').trim();
+  const cc = (document.getElementById('compose-cc')?.value || '').trim();
+  const subject = (document.getElementById('compose-subject')?.value || '').trim();
+  const body = (document.getElementById('compose-body')?.innerHTML || '').trim();
+  
+  return !!(to || cc || subject || body);
+}
+
+/**
+ * Get current compose form data
+ */
+function getComposeFormData() {
+  return {
+    to: document.getElementById('compose-to')?.value || '',
+    cc: document.getElementById('compose-cc')?.value || '',
+    subject: document.getElementById('compose-subject')?.value || '',
+    body: document.getElementById('compose-body')?.innerHTML || '',
+    savedAt: new Date().toISOString()
+  };
+}
+
+/**
+ * Save draft to localStorage
+ * @param {boolean} manual - If true, show success message
+ */
+function saveComposeDraft(manual = false) {
+  if (!composeHasContent()) {
+    if (manual) {
+      notify('Nothing to save', 'info');
+    }
+    return;
+  }
+  
+  try {
+    const draftData = getComposeFormData();
+    localStorage.setItem(DRAFT_STORAGE_KEY, JSON.stringify(draftData));
+    draftHasUnsavedChanges = false;
+    
+    // Show status indicator
+    const statusEl = document.getElementById('compose-draft-status');
+    if (statusEl) {
+      statusEl.style.display = 'block';
+      statusEl.innerHTML = '<i class="fas fa-check-circle" style="color:var(--green2);"></i> Draft saved';
+      
+      // Hide after 3 seconds
+      setTimeout(() => {
+        if (statusEl) statusEl.style.display = 'none';
+      }, 3000);
+    }
+    
+    if (manual) {
+      notify('Draft saved', 'success');
+    }
+    
+    console.log('[Draft] Saved at', draftData.savedAt);
+  } catch (err) {
+    console.error('[Draft] Save failed:', err);
+    if (manual) {
+      notify('Failed to save draft: ' + err.message, 'error');
+    }
+  }
+}
+
+/**
+ * Load draft from localStorage
+ */
+function loadComposeDraft() {
+  try {
+    const draftJson = localStorage.getItem(DRAFT_STORAGE_KEY);
+    if (!draftJson) return null;
+    
+    const draft = JSON.parse(draftJson);
+    console.log('[Draft] Loaded draft from', draft.savedAt);
+    return draft;
+  } catch (err) {
+    console.error('[Draft] Load failed:', err);
+    return null;
+  }
+}
+
+/**
+ * Apply draft data to compose form
+ */
+function applyDraftToForm(draft) {
+  if (!draft) return;
+  
+  const toEl = document.getElementById('compose-to');
+  const ccEl = document.getElementById('compose-cc');
+  const subjectEl = document.getElementById('compose-subject');
+  const bodyEl = document.getElementById('compose-body');
+  
+  if (toEl && draft.to) toEl.value = draft.to;
+  if (ccEl && draft.cc) ccEl.value = draft.cc;
+  if (subjectEl && draft.subject) subjectEl.value = draft.subject;
+  if (bodyEl && draft.body) bodyEl.innerHTML = draft.body;
+  
+  draftHasUnsavedChanges = false;
+  console.log('[Draft] Applied to form');
+}
+
+/**
+ * Delete draft from localStorage
+ */
+function deleteComposeDraft() {
+  try {
+    localStorage.removeItem(DRAFT_STORAGE_KEY);
+    draftHasUnsavedChanges = false;
+    console.log('[Draft] Deleted');
+  } catch (err) {
+    console.error('[Draft] Delete failed:', err);
+  }
+}
+
+/**
+ * Start auto-save timer
+ */
+function startDraftAutoSave() {
+  stopDraftAutoSave();
+  
+  draftAutoSaveTimer = setInterval(() => {
+    if (draftHasUnsavedChanges && composeHasContent()) {
+      saveComposeDraft(false);
+    }
+  }, DRAFT_AUTO_SAVE_INTERVAL);
+  
+  console.log('[Draft] Auto-save started (every 10s)');
+}
+
+/**
+ * Stop auto-save timer
+ */
+function stopDraftAutoSave() {
+  if (draftAutoSaveTimer) {
+    clearInterval(draftAutoSaveTimer);
+    draftAutoSaveTimer = null;
+    console.log('[Draft] Auto-save stopped');
+  }
+}
+
+/**
+ * Mark draft as having unsaved changes
+ */
+function markDraftChanged() {
+  draftHasUnsavedChanges = true;
+}
+
+/**
+ * Setup draft change listeners on compose form
+ */
+function setupDraftChangeListeners() {
+  const toEl = document.getElementById('compose-to');
+  const ccEl = document.getElementById('compose-cc');
+  const subjectEl = document.getElementById('compose-subject');
+  const bodyEl = document.getElementById('compose-body');
+  
+  if (toEl) toEl.addEventListener('input', markDraftChanged);
+  if (ccEl) ccEl.addEventListener('input', markDraftChanged);
+  if (subjectEl) subjectEl.addEventListener('input', markDraftChanged);
+  if (bodyEl) {
+    bodyEl.addEventListener('input', markDraftChanged);
+    bodyEl.addEventListener('keyup', markDraftChanged);
+    bodyEl.addEventListener('paste', markDraftChanged);
+  }
+  
+  console.log('[Draft] Change listeners attached');
+}
+
+/**
+ * Show close confirmation if unsaved changes exist
+ */
+function confirmCloseCompose() {
+  if (!composeHasContent()) {
+    return true; // No content, safe to close
+  }
+  
+  if (!draftHasUnsavedChanges) {
+    return true; // Already saved, safe to close
+  }
+  
+  // Show confirmation dialog
+  const choice = confirm(
+    'You have unsaved changes.\n\n' +
+    'Do you want to save this draft before closing?\n\n' +
+    'Click OK to save, or Cancel to discard changes.'
+  );
+  
+  if (choice) {
+    saveComposeDraft(false);
+    return true;
+  } else {
+    // User chose to discard
+    const confirmDiscard = confirm('Are you sure you want to discard this draft?');
+    return confirmDiscard;
+  }
+}
+
+/**
+ * Initialize draft system when compose modal opens
+ */
+function initializeComposeDraft() {
+  // Load existing draft if available
+  const draft = loadComposeDraft();
+  if (draft) {
+    const shouldLoad = confirm(
+      'You have a saved draft from ' + new Date(draft.savedAt).toLocaleString() + '.\n\n' +
+      'Do you want to load it?'
+    );
+    
+    if (shouldLoad) {
+      applyDraftToForm(draft);
+    }
+  }
+  
+  // Setup change listeners
+  setupDraftChangeListeners();
+  
+  // Start auto-save
+  startDraftAutoSave();
+}
+
+/**
+ * Cleanup draft system when compose modal closes
+ */
+function cleanupComposeDraft() {
+  stopDraftAutoSave();
 }
 
 function outlookEscapeReg(s) {
@@ -7958,15 +8577,38 @@ async function loadEmailThread(conversationId, currentId) {
       const initials = getInitials(from);
       const bgColor  = avatarColor(from);
       const msgId    = outlookEscapeAttr(m.id);
+
+      // Encode message metadata for per-message reply buttons (JSON in data attribute)
+      const msgMeta = JSON.stringify({
+        id:             m.id,
+        subject:        m.subject || '',
+        receivedDateTime: m.receivedDateTime || '',
+        fromName:       m.from?.emailAddress?.name  || '',
+        fromAddr:       m.from?.emailAddress?.address || '',
+        toRecipients:   (m.toRecipients  || []).map(r => r.emailAddress?.address || '').filter(Boolean),
+        ccRecipients:   (m.ccRecipients  || []).map(r => r.emailAddress?.address || '').filter(Boolean),
+        bodyPreview:    m.bodyPreview || '',
+      });
+      const metaAttr = msgMeta.replace(/"/g, '&quot;');
+
       return `<div class="thread-msg-item" id="tmsg-${msgId}" style="border-bottom:1px solid var(--border);">
-        <div class="thread-msg-header" onclick="toggleThreadMsg('${msgId}')" style="display:flex;align-items:center;gap:10px;padding:10px 16px;cursor:pointer;transition:background 0.1s;" onmouseover="this.style.background='rgba(255,255,255,0.03)'" onmouseout="this.style.background=''">
-          <div style="width:32px;height:32px;border-radius:50%;background:${bgColor};display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:#fff;flex-shrink:0;">${initials}</div>
-          <div style="flex:1;min-width:0;">
-            <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;">
-              <span style="font-size:12.5px;font-weight:700;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:260px;">${escHtml(from)}${fromAddr && fromAddr !== from ? ' <span style="font-weight:400;color:var(--muted);">&lt;'+escHtml(fromAddr)+'&gt;</span>' : ''}</span>
-              <span style="font-size:10.5px;color:var(--muted);flex-shrink:0;">${time}</span>
+        <div class="thread-msg-header" onclick="toggleThreadMsg('${msgId}')" style="display:flex;align-items:center;gap:10px;padding:10px 16px;cursor:pointer;transition:background 0.1s;justify-content:space-between;" onmouseover="this.style.background='rgba(255,255,255,0.03)'" onmouseout="this.style.background=''">
+          <div style="display:flex;align-items:center;gap:10px;flex:1;min-width:0;">
+            <div style="width:32px;height:32px;border-radius:50%;background:${bgColor};display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:#fff;flex-shrink:0;">${initials}</div>
+            <div style="flex:1;min-width:0;">
+              <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;">
+                <span style="font-size:12.5px;font-weight:700;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:260px;">${escHtml(from)}${fromAddr && fromAddr !== from ? ' <span style="font-weight:400;color:var(--muted);">&lt;'+escHtml(fromAddr)+'&gt;</span>' : ''}</span>
+                <span style="font-size:10.5px;color:var(--muted);flex-shrink:0;">${time}</span>
+              </div>
+              <div class="thread-msg-preview" style="font-size:11.5px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;${expanded?'display:none;':''}">${escHtml(preview)}</div>
             </div>
-            <div class="thread-msg-preview" style="font-size:11.5px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;${expanded?'display:none;':''}">${escHtml(preview)}</div>
+          </div>
+          <div class="msg-actions" style="display:flex;gap:4px;align-items:center;flex-shrink:0;" onclick="event.stopPropagation();">
+            <button class="btn btn-ghost btn-xs" onclick="openReplyFromThread(${metaAttr},false)" title="Reply to this message"><i class="fas fa-reply"></i></button>
+            <button class="btn btn-ghost btn-xs" onclick="openReplyFromThread(${metaAttr},true)" title="Reply All to this message"><i class="fas fa-reply-all"></i></button>
+            <button class="btn btn-ghost btn-xs" onclick="forwardFromThread(${metaAttr})" title="Forward this message"><i class="fas fa-share"></i></button>
+            <button class="btn btn-gold btn-xs" onclick="activeMailMessage=${metaAttr};openTaskModal()" title="Assign Task"><i class="fas fa-user-check"></i></button>
+            <button class="btn btn-ghost btn-xs" onclick="toggleMoreMenu(event,this,${metaAttr})" title="More options"><i class="fas fa-ellipsis-h"></i></button>
           </div>
           <i class="fas fa-chevron-${expanded?'up':'down'} thread-msg-chevron" style="font-size:10px;color:var(--muted);flex-shrink:0;"></i>
         </div>
@@ -7976,10 +8618,6 @@ async function loadEmailThread(conversationId, currentId) {
             ${ccList ? `<div style="display:flex;align-items:baseline;gap:4px;flex-wrap:wrap;"><span style="font-weight:700;text-transform:uppercase;font-size:10px;letter-spacing:0.05em;margin-right:6px;flex-shrink:0;">Cc</span>${ccList}</div>` : ''}
           </div>` : ''}
           <div id="tbody-content-${msgId}" style="padding:0 16px 0 58px;min-height:60px;"><div style="text-align:center;padding:16px;"><div class="spin-loader" style="margin:0 auto;"></div></div></div>
-          <div style="padding:8px 16px 12px 58px;display:flex;gap:8px;">
-            <button class="btn btn-ghost btn-xs" onclick="openReplyForMsg('${msgId}',false)"><i class="fas fa-reply"></i> Reply</button>
-            <button class="btn btn-ghost btn-xs" onclick="openReplyForMsg('${msgId}',true)"><i class="fas fa-reply-all"></i> Reply All</button>
-          </div>
         </div>
       </div>`;
     }).join('');
@@ -8037,6 +8675,605 @@ async function loadThreadMsgBody(msgId) {
 function openReplyForMsg(msgId, replyAll) {
   activeMessageId = msgId;
   openReply(replyAll);
+}
+
+/**
+ * openReplyFromThread — per-message Reply / Reply All from thread view.
+ * Uses message metadata embedded in the button (no extra API call).
+ * @param {object} meta  — { id, subject, fromAddr, fromName, toRecipients[], ccRecipients[], receivedDateTime, bodyPreview }
+ * @param {boolean} replyAll
+ */
+function openReplyFromThread(meta, replyAll) {
+  if (!meta || !meta.id) return;
+
+  const myEmail = (outlookConnectedEmail || '').toLowerCase().trim();
+  const senderAddr = (meta.fromAddr || '').toLowerCase().trim();
+  const isSentByMe = senderAddr === myEmail;
+
+  // ── Subject ──────────────────────────────────────────────────────────
+  const subj   = meta.subject || '';
+  const reSubj = /^re:/i.test(subj.trim()) ? subj : 'Re: ' + subj;
+
+  // ── Recipient lists ───────────────────────────────────────────────────
+  function dedup(arr) { return [...new Set(arr.map(a => a.toLowerCase().trim()).filter(a => a && a !== myEmail))]; }
+
+  let toList = [];
+  let ccList = [];
+
+  if (replyAll) {
+    const toRecips = dedup(meta.toRecipients  || []);
+    const ccRecips = dedup(meta.ccRecipients  || []);
+    toList = isSentByMe ? toRecips : dedup([senderAddr, ...toRecips]);
+    const toSet = new Set(toList);
+    ccList = ccRecips.filter(a => !toSet.has(a));
+  } else {
+    // Reply: sender only (or original To if we sent it)
+    if (isSentByMe) {
+      toList = dedup(meta.toRecipients || []);
+    } else {
+      toList = senderAddr ? [senderAddr] : [];
+    }
+    ccList = [];
+  }
+
+  // ── Open modal and fill fields ────────────────────────────────────────
+  document.getElementById('compose-title').textContent = replyAll ? 'Reply All' : 'Reply';
+  resetComposeForm();
+  openModal('compose-email-modal');
+  loadComposeTemplates();
+  composeLoadGroupsDropdown();
+
+  const toEl = document.getElementById('compose-to');
+  const ccEl = document.getElementById('compose-cc');
+  const subjEl = document.getElementById('compose-subject');
+  if (toEl)   toEl.value   = toList.join('; ');
+  if (ccEl)   ccEl.value   = ccList.join('; ');
+  if (subjEl) subjEl.value = reSubj;
+
+  // ── Quoted body ───────────────────────────────────────────────────────
+  const bodyEl = document.getElementById('compose-body');
+  if (bodyEl) {
+    const sentDate = meta.receivedDateTime
+      ? new Date(meta.receivedDateTime).toLocaleString('en-IN', { dateStyle:'medium', timeStyle:'short' })
+      : '';
+    const senderDisplay = meta.fromName
+      ? escHtml(meta.fromName) + ' &lt;' + escHtml(meta.fromAddr) + '&gt;'
+      : escHtml(meta.fromAddr);
+    bodyEl.innerHTML =
+      `<br><br>` +
+      `<div style="border-left:3px solid #ccc;padding-left:12px;margin-top:8px;color:#555;font-size:13px;">` +
+      `<div style="margin-bottom:6px;font-size:12px;color:#888;">On ${sentDate}, <b>${senderDisplay}</b> wrote:</div>` +
+      escHtml(meta.bodyPreview || '') +
+      `</div>`;
+    // Place cursor at top
+    try {
+      const range = document.createRange();
+      const sel   = window.getSelection();
+      range.setStart(bodyEl, 0);
+      range.collapse(true);
+      sel.removeAllRanges();
+      sel.addRange(range);
+    } catch (_) {}
+  }
+
+  // Unknown sender banner
+  injectReplyUnknownBanner(isSentByMe ? (meta.toRecipients || [])[0] || '' : senderAddr, isSentByMe);
+
+  composeApplyDefaultSignature('reply');
+  setTimeout(() => { if (bodyEl) bodyEl.focus(); }, 200);
+}
+
+/**
+ * forwardFromThread — Forward a specific thread message.
+ * Pre-fills subject and quoted body only; To/CC left blank.
+ */
+async function forwardFromThread(meta) {
+  if (!meta || !meta.id) return;
+
+  const subj   = meta.subject || '';
+  const fwdSubj = /^fwd?:/i.test(subj.trim()) ? subj : 'Fwd: ' + subj;
+
+  document.getElementById('compose-title').textContent = 'Forward';
+  resetComposeForm();
+  openModal('compose-email-modal');
+  loadComposeTemplates();
+  composeLoadGroupsDropdown();
+
+  const subjEl = document.getElementById('compose-subject');
+  if (subjEl) subjEl.value = fwdSubj;
+
+  const bodyEl = document.getElementById('compose-body');
+  if (bodyEl) {
+    // Fetch full message body
+    let fullBody = '';
+    try {
+      const res = await fetch(`${API_BASE}/outlook/message/${meta.id}`, { headers: getAuthHeaders() });
+      const msg = await res.json();
+      if (res.ok) {
+        const bodyPick = msg.uniqueBody?.content ? msg.uniqueBody : (msg.body?.content ? msg.body : null);
+        fullBody = bodyPick?.content || msg.body?.content || msg.bodyPreview || '';
+      }
+    } catch (err) {
+      fullBody = meta.bodyPreview || '';
+    }
+
+    const sentDate = meta.receivedDateTime
+      ? new Date(meta.receivedDateTime).toLocaleString('en-IN', { dateStyle:'medium', timeStyle:'short' })
+      : '';
+    const senderDisplay = meta.fromName
+      ? escHtml(meta.fromName) + ' &lt;' + escHtml(meta.fromAddr) + '&gt;'
+      : escHtml(meta.fromAddr);
+    
+    const toRecips = (meta.toRecipients || []).join(', ');
+    
+    bodyEl.innerHTML =
+      `<br><br>` +
+      `<div style="border-left:3px solid #ccc;padding-left:12px;margin-top:8px;color:#555;font-size:13px;">` +
+      `<div style="margin-bottom:4px;font-size:12px;color:#888;"><b>---------- Forwarded message ----------</b></div>` +
+      `<div style="font-size:12px;color:#888;margin-bottom:6px;">From: ${senderDisplay}<br>Date: ${sentDate}<br>Subject: ${escHtml(subj)}${toRecips ? '<br>To: ' + escHtml(toRecips) : ''}</div>` +
+      `<div style="margin-top:8px;">${fullBody}</div>` +
+      `</div>`;
+    // Focus To field for forward
+    const toEl = document.getElementById('compose-to');
+    if (toEl) setTimeout(() => toEl.focus(), 200);
+  }
+
+  composeApplyDefaultSignature('reply');
+}
+
+/**
+ * toggleMoreMenu — Opens/closes the 3-dot more options menu for a message.
+ * @param {Event} event - Click event
+ * @param {HTMLElement} btn - The button that was clicked
+ * @param {object} meta - Message metadata
+ */
+function toggleMoreMenu(event, btn, meta) {
+  event.stopPropagation();
+  
+  // Close any existing menu
+  const existingMenu = document.querySelector('.msg-more-menu');
+  if (existingMenu) {
+    existingMenu.remove();
+    // If clicking the same button, just close
+    if (existingMenu.dataset.btnId === btn.dataset.btnId) return;
+  }
+  
+  // Create unique ID for this button
+  if (!btn.dataset.btnId) btn.dataset.btnId = 'btn-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9);
+  
+  // Create menu
+  const menu = document.createElement('div');
+  menu.className = 'msg-more-menu';
+  menu.dataset.btnId = btn.dataset.btnId;
+  menu.style.cssText = `
+    position: absolute;
+    background: #2a2a2a;
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 6px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+    min-width: 180px;
+    z-index: 10000;
+    padding: 4px 0;
+    font-size: 13px;
+  `;
+  
+  // Menu items
+  const items = [
+    { icon: 'fa-print', label: 'Print Email', action: () => printMessageFromMenu(meta) },
+    { icon: 'fa-envelope', label: 'Mark as Unread', action: () => markAsUnreadFromMenu(meta) },
+    { icon: 'fa-download', label: 'Download as .eml', action: () => downloadMessageFromMenu(meta, 'eml') },
+    { icon: 'fa-download', label: 'Download as .msg', action: () => downloadMessageFromMenu(meta, 'msg') },
+    { type: 'divider' },
+    { icon: 'fa-copy', label: 'Copy Email Content', action: () => copyEmailContentFromMenu(meta) },
+    { icon: 'fa-language', label: 'Translate', action: () => translateMessageFromMenu(meta) },
+    { type: 'divider' },
+    { icon: 'fa-filter', label: 'Create Rule', action: () => createRuleFromMenu(meta) },
+    { icon: 'fa-archive', label: 'Retention Policy', action: () => setRetentionPolicyFromMenu(meta) },
+    { type: 'divider' },
+    { icon: 'fa-trash', label: 'Delete Email', action: () => deleteMessageFromMenu(meta), style: 'color:#ef4444;' }
+  ];
+  
+  items.forEach(item => {
+    if (item.type === 'divider') {
+      const divider = document.createElement('div');
+      divider.style.cssText = `
+        height: 1px;
+        background: rgba(255,255,255,0.1);
+        margin: 4px 0;
+      `;
+      menu.appendChild(divider);
+      return;
+    }
+    
+    const menuItem = document.createElement('div');
+    menuItem.style.cssText = `
+      padding: 8px 16px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      color: #e0e0e0;
+      transition: background 0.1s;
+      ${item.style || ''}
+    `;
+    menuItem.innerHTML = `<i class="fas ${item.icon}" style="width:14px;"></i><span>${item.label}</span>`;
+    menuItem.onmouseover = () => menuItem.style.background = 'rgba(255,255,255,0.1)';
+    menuItem.onmouseout = () => menuItem.style.background = '';
+    menuItem.onclick = (e) => {
+      e.stopPropagation();
+      menu.remove();
+      item.action();
+    };
+    menu.appendChild(menuItem);
+  });
+  
+  // Position menu near button
+  document.body.appendChild(menu);
+  const rect = btn.getBoundingClientRect();
+  menu.style.top = (rect.bottom + 4) + 'px';
+  menu.style.left = (rect.left - menu.offsetWidth + btn.offsetWidth) + 'px';
+  
+  // Close on outside click
+  setTimeout(() => {
+    document.addEventListener('click', function closeMenuHandler(e) {
+      if (!menu.contains(e.target)) {
+        menu.remove();
+        document.removeEventListener('click', closeMenuHandler);
+      }
+    });
+  }, 0);
+}
+
+/**
+ * toggleMoreMenuSingle — Opens/closes the 3-dot more options menu for single email view.
+ * @param {Event} event - Click event
+ * @param {HTMLElement} btn - The button that was clicked
+ */
+function toggleMoreMenuSingle(event, btn) {
+  event.stopPropagation();
+  
+  // Build meta from activeMailMessage
+  if (!activeMailMessage || !activeMessageId) {
+    notify('No email selected', 'error');
+    return;
+  }
+  
+  const meta = {
+    id: activeMessageId,
+    subject: activeMailMessage.subject,
+    fromAddr: activeMailMessage.from?.emailAddress?.address,
+    fromName: activeMailMessage.from?.emailAddress?.name,
+    toRecipients: (activeMailMessage.toRecipients || []).map(r => r.emailAddress?.address).filter(Boolean),
+    ccRecipients: (activeMailMessage.ccRecipients || []).map(r => r.emailAddress?.address).filter(Boolean),
+    receivedDateTime: activeMailMessage.receivedDateTime,
+    bodyPreview: activeMailMessage.bodyPreview
+  };
+  
+  // Close any existing menu
+  const existingMenu = document.querySelector('.msg-more-menu');
+  if (existingMenu) {
+    existingMenu.remove();
+    // If clicking the same button, just close
+    if (existingMenu.dataset.btnId === btn.dataset.btnId) return;
+  }
+  
+  // Create unique ID for this button
+  if (!btn.dataset.btnId) btn.dataset.btnId = 'btn-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9);
+  
+  // Create menu
+  const menu = document.createElement('div');
+  menu.className = 'msg-more-menu';
+  menu.dataset.btnId = btn.dataset.btnId;
+  menu.style.cssText = `
+    position: absolute;
+    background: #2a2a2a;
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 6px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+    min-width: 180px;
+    z-index: 10000;
+    padding: 4px 0;
+    font-size: 13px;
+  `;
+  
+  // Menu items
+  const items = [
+    { icon: 'fa-print', label: 'Print Email', action: () => printMessageFromMenu(meta) },
+    { icon: 'fa-envelope', label: 'Mark as Unread', action: () => markAsUnreadFromMenu(meta) },
+    { icon: 'fa-download', label: 'Download as .eml', action: () => downloadMessageFromMenu(meta, 'eml') },
+    { icon: 'fa-download', label: 'Download as .msg', action: () => downloadMessageFromMenu(meta, 'msg') },
+    { type: 'divider' },
+    { icon: 'fa-copy', label: 'Copy Email Content', action: () => copyEmailContentFromMenu(meta) },
+    { icon: 'fa-language', label: 'Translate', action: () => translateMessageFromMenu(meta) },
+    { type: 'divider' },
+    { icon: 'fa-filter', label: 'Create Rule', action: () => createRuleFromMenu(meta) },
+    { icon: 'fa-archive', label: 'Retention Policy', action: () => setRetentionPolicyFromMenu(meta) },
+    { type: 'divider' },
+    { icon: 'fa-trash', label: 'Delete Email', action: () => deleteMessageFromMenu(meta), style: 'color:#ef4444;' }
+  ];
+  
+  items.forEach(item => {
+    if (item.type === 'divider') {
+      const divider = document.createElement('div');
+      divider.style.cssText = `
+        height: 1px;
+        background: rgba(255,255,255,0.1);
+        margin: 4px 0;
+      `;
+      menu.appendChild(divider);
+      return;
+    }
+    
+    const menuItem = document.createElement('div');
+    menuItem.style.cssText = `
+      padding: 8px 16px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      color: #e0e0e0;
+      transition: background 0.1s;
+      ${item.style || ''}
+    `;
+    menuItem.innerHTML = `<i class="fas ${item.icon}" style="width:14px;"></i><span>${item.label}</span>`;
+    menuItem.onmouseover = () => menuItem.style.background = 'rgba(255,255,255,0.1)';
+    menuItem.onmouseout = () => menuItem.style.background = '';
+    menuItem.onclick = (e) => {
+      e.stopPropagation();
+      menu.remove();
+      item.action();
+    };
+    menu.appendChild(menuItem);
+  });
+  
+  // Position menu near button
+  document.body.appendChild(menu);
+  const rect = btn.getBoundingClientRect();
+  menu.style.top = (rect.bottom + 4) + 'px';
+  menu.style.left = (rect.left - menu.offsetWidth + btn.offsetWidth) + 'px';
+  
+  // Close on outside click
+  setTimeout(() => {
+    document.addEventListener('click', function closeMenuHandler(e) {
+      if (!menu.contains(e.target)) {
+        menu.remove();
+        document.removeEventListener('click', closeMenuHandler);
+      }
+    });
+  }, 0);
+}
+
+/**
+ * Menu action handlers
+ */
+function deleteMessageFromMenu(meta) {
+  if (!meta || !meta.id) return;
+  
+  // Custom confirmation modal
+  const confirmMsg = `Delete this email?\n\nFrom: ${meta.fromName || meta.fromAddr}\nSubject: ${meta.subject || '(no subject)'}\n\nThis will delete from both Outlook and local database.`;
+  
+  if (!confirm(confirmMsg)) return;
+  
+  // Delete from Outlook via Graph API
+  fetch(`${API_BASE}/outlook/message/${meta.id}`, {
+    method: 'DELETE',
+    headers: getAuthHeaders()
+  })
+  .then(res => res.json())
+  .then(data => {
+    if (data.error) throw new Error(data.error);
+    notify('Email deleted from Outlook and local DB', 'success');
+    
+    // Remove from UI
+    const msgItem = document.getElementById(`tmsg-${meta.id}`);
+    if (msgItem) msgItem.remove();
+    
+    // Refresh inbox
+    loadOutlookInbox();
+  })
+  .catch(err => {
+    console.error('Delete failed:', err);
+    notify('Failed to delete: ' + err.message, 'error');
+  });
+}
+
+function printMessageFromMenu(meta) {
+  if (!meta || !meta.id) return;
+  
+  fetch(`${API_BASE}/outlook/message/${meta.id}`, {
+    headers: getAuthHeaders()
+  })
+  .then(res => res.json())
+  .then(msg => {
+    if (msg.error) throw new Error(msg.error);
+    
+    const subject = msg.subject || '(no subject)';
+    const from = msg.from?.emailAddress?.name || msg.from?.emailAddress?.address || '';
+    const fromAddr = msg.from?.emailAddress?.address || '';
+    const to = (msg.toRecipients || []).map(r => `${r.emailAddress?.name || r.emailAddress?.address}`).join(', ');
+    const cc = (msg.ccRecipients || []).map(r => `${r.emailAddress?.name || r.emailAddress?.address}`).join(', ');
+    const date = msg.receivedDateTime ? new Date(msg.receivedDateTime).toLocaleString('en-IN', { dateStyle:'long', timeStyle:'short' }) : '';
+    const body = msg.body?.content || msg.bodyPreview || '';
+    
+    const printWindow = window.open('', '_blank');
+    printWindow.document.write(`
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="UTF-8">
+        <title>Print: ${subject}</title>
+        <style>
+          body { font-family: 'Segoe UI', Arial, sans-serif; margin: 20px; color: #000; background: #fff; }
+          .header { border-bottom: 2px solid #0078d4; padding-bottom: 10px; margin-bottom: 20px; }
+          .subject { font-size: 18px; font-weight: bold; margin-bottom: 10px; }
+          .meta { font-size: 12px; color: #555; line-height: 1.6; }
+          .meta-label { font-weight: bold; display: inline-block; width: 60px; }
+          .body { margin-top: 20px; font-size: 13px; line-height: 1.6; }
+          @media print { body { margin: 0; } }
+        </style>
+      </head>
+      <body>
+        <div class="header">
+          <div class="subject">${subject}</div>
+          <div class="meta">
+            <div><span class="meta-label">From:</span> ${from} &lt;${fromAddr}&gt;</div>
+            <div><span class="meta-label">To:</span> ${to}</div>
+            ${cc ? `<div><span class="meta-label">Cc:</span> ${cc}</div>` : ''}
+            <div><span class="meta-label">Date:</span> ${date}</div>
+          </div>
+        </div>
+        <div class="body">${body}</div>
+      </body>
+      </html>
+    `);
+    printWindow.document.close();
+    printWindow.focus();
+    setTimeout(() => {
+      printWindow.print();
+    }, 500);
+  })
+  .catch(err => {
+    console.error('Print failed:', err);
+    notify('Failed to load email for printing: ' + err.message, 'error');
+  });
+}
+
+function markAsUnreadFromMenu(meta) {
+  if (!meta || !meta.id) return;
+  
+  fetch(`${API_BASE}/outlook/message/${meta.id}/unread`, {
+    method: 'PATCH',
+    headers: getAuthHeaders()
+  })
+  .then(res => res.json())
+  .then(data => {
+    if (data.error) throw new Error(data.error);
+    notify('Marked as unread', 'success');
+    loadOutlookInbox();
+  })
+  .catch(err => {
+    console.error('Mark unread failed:', err);
+    notify('Failed to mark as unread: ' + err.message, 'error');
+  });
+}
+
+function downloadMessageFromMenu(meta, format) {
+  if (!meta || !meta.id) return;
+  
+  fetch(`${API_BASE}/outlook/message/${meta.id}`, {
+    headers: getAuthHeaders()
+  })
+  .then(res => res.json())
+  .then(msg => {
+    if (msg.error) throw new Error(msg.error);
+    
+    const subject = msg.subject || '(no subject)';
+    const from = msg.from?.emailAddress?.address || '';
+    const fromName = msg.from?.emailAddress?.name || from;
+    const to = (msg.toRecipients || []).map(r => r.emailAddress?.address).filter(Boolean).join(', ');
+    const cc = (msg.ccRecipients || []).map(r => r.emailAddress?.address).filter(Boolean).join(', ');
+    const date = msg.receivedDateTime || new Date().toISOString();
+    const body = msg.body?.content || msg.bodyPreview || '';
+    const contentType = msg.body?.contentType === 'html' ? 'text/html' : 'text/plain';
+    
+    let fileContent, mimeType, extension;
+    
+    if (format === 'eml') {
+      // RFC 822 .eml format
+      fileContent = `From: ${fromName} <${from}>
+To: ${to}
+${cc ? `Cc: ${cc}\n` : ''}Subject: ${subject}
+Date: ${date}
+MIME-Version: 1.0
+Content-Type: ${contentType}; charset=utf-8
+
+${body}`;
+      mimeType = 'message/rfc822';
+      extension = 'eml';
+    } else {
+      // .msg format (simplified Outlook format)
+      fileContent = `X-Unsent: 0
+From: ${fromName} <${from}>
+To: ${to}
+${cc ? `Cc: ${cc}\n` : ''}Subject: ${subject}
+Date: ${date}
+Content-Type: ${contentType}; charset=utf-8
+
+${body}`;
+      mimeType = 'application/vnd.ms-outlook';
+      extension = 'msg';
+    }
+    
+    const blob = new Blob([fileContent], { type: mimeType });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${subject.replace(/[^a-z0-9]/gi, '_').substring(0, 50)}.${extension}`;
+    a.click();
+    URL.revokeObjectURL(url);
+    notify(`Email downloaded as .${extension}`, 'success');
+  })
+  .catch(err => {
+    console.error('Download failed:', err);
+    notify('Failed to download: ' + err.message, 'error');
+  });
+}
+
+function copyEmailContentFromMenu(meta) {
+  if (!meta || !meta.id) return;
+  
+  fetch(`${API_BASE}/outlook/message/${meta.id}`, {
+    headers: getAuthHeaders()
+  })
+  .then(res => res.json())
+  .then(msg => {
+    if (msg.error) throw new Error(msg.error);
+    
+    const subject = msg.subject || '(no subject)';
+    const from = msg.from?.emailAddress?.name || msg.from?.emailAddress?.address || '';
+    const date = msg.receivedDateTime ? new Date(msg.receivedDateTime).toLocaleString('en-IN') : '';
+    const body = msg.bodyPreview || msg.body?.content || '';
+    
+    // Strip HTML tags for plain text copy
+    const tempDiv = document.createElement('div');
+    tempDiv.innerHTML = body;
+    const plainText = tempDiv.textContent || tempDiv.innerText || '';
+    
+    const copyText = `Subject: ${subject}
+From: ${from}
+Date: ${date}
+
+${plainText}`;
+    
+    navigator.clipboard.writeText(copyText).then(() => {
+      notify('Email content copied to clipboard', 'success');
+    }).catch(err => {
+      console.error('Copy failed:', err);
+      notify('Failed to copy: ' + err.message, 'error');
+    });
+  })
+  .catch(err => {
+    console.error('Copy failed:', err);
+    notify('Failed to copy email content: ' + err.message, 'error');
+  });
+}
+
+function translateMessageFromMenu(meta) {
+  if (!meta || !meta.id) return;
+  notify('Translation feature coming soon', 'info');
+  // TODO: Integrate with translation API (Google Translate, Azure Translator, etc.)
+}
+
+function createRuleFromMenu(meta) {
+  if (!meta || !meta.id) return;
+  notify('Rule creation feature coming soon', 'info');
+  // TODO: Open rule creation modal pre-filled with sender/subject
+}
+
+function setRetentionPolicyFromMenu(meta) {
+  if (!meta || !meta.id) return;
+  notify('Retention policy feature coming soon', 'info');
+  // TODO: Open retention policy modal
 }
 
 let outlookEmailBlobUrl = null;
@@ -8161,11 +9398,6 @@ async function openEmail(id) {
         bodyEl.innerHTML = '<div class="email-plain-scroll"><pre style="white-space:pre-wrap;font-family:\'Outfit\',sans-serif;font-size:13px;color:' + wrapFg + ';margin:0;">' + esc + '</pre></div>';
       }
     }
-    // Show reply buttons
-    ['btn-reply','btn-reply-all','btn-assign-reply','btn-ai-reply'].forEach(id => {
-      const el = document.getElementById(id);
-      if (el) el.style.display = 'inline-flex';
-    });
     renderMailTasksPanel();
     // Pre-fill compose To field
     const replyTo = msg.from?.emailAddress?.address || '';
@@ -8235,6 +9467,14 @@ function draftEmailTo(email) {
 }
 
 function closeComposeEmailModal() {
+  // Check for unsaved changes
+  if (!confirmCloseCompose()) {
+    return; // User cancelled close
+  }
+  
+  // Cleanup draft system
+  cleanupComposeDraft();
+  
   closeModal('compose-email-modal');
 }
 
@@ -8275,6 +9515,8 @@ async function loadComposeTemplates() {
       const opt = document.createElement('option');
       opt.value = t.id;
       opt.textContent = t.name + (t.subject ? ' — ' + t.subject : '');
+      opt.setAttribute('data-subject', t.subject || '');
+      opt.setAttribute('data-category', t.category || 'General');
       sel.appendChild(opt);
     });
   } catch (_) {}
@@ -8282,22 +9524,73 @@ async function loadComposeTemplates() {
 
 function applyComposeTemplate() {
   const sel = document.getElementById('compose-template-select');
-  if (!sel || !sel.value) return;
+  if (!sel || !sel.value) {
+    notify('Template', 'Please select a template first', 'var(--red2)', 'fas fa-exclamation-circle');
+    return;
+  }
+  
   const id = sel.value;
+  
   fetch(`${API_BASE}/templates/${id}`, { headers: getAuthHeaders() })
     .then(r => r.ok ? r.json() : null)
     .then(t => {
-      if (!t) return;
+      if (!t) {
+        notify('Template', 'Failed to load template', 'var(--red2)', 'fas fa-exclamation-circle');
+        return;
+      }
+      
       const subj = document.getElementById('compose-subject');
       const body = document.getElementById('compose-body');
+      
+      // Apply subject
       if (subj && t.subject) subj.value = t.subject;
+      
+      // Insert template at cursor position
       if (body && t.html_body) {
-        // Rich editor — set HTML directly
-        body.innerHTML = t.html_body;
+        body.focus();
+        
+        const selection = window.getSelection();
+        
+        // Check if cursor is inside the editor
+        if (selection && selection.rangeCount > 0) {
+          const range = selection.getRangeAt(0);
+          
+          // Verify the cursor is actually inside the compose body
+          if (body.contains(range.commonAncestorContainer)) {
+            // Insert at cursor position using execCommand for undo support
+            document.execCommand('insertHTML', false, t.html_body);
+          } else {
+            // Cursor not in editor - append to end
+            const newRange = document.createRange();
+            newRange.selectNodeContents(body);
+            newRange.collapse(false);
+            selection.removeAllRanges();
+            selection.addRange(newRange);
+            document.execCommand('insertHTML', false, '<br><br>' + t.html_body);
+          }
+        } else {
+          // No selection - append to end
+          const newRange = document.createRange();
+          const newSelection = window.getSelection();
+          newRange.selectNodeContents(body);
+          newRange.collapse(false);
+          newSelection.removeAllRanges();
+          newSelection.addRange(newRange);
+          document.execCommand('insertHTML', false, '<br><br>' + t.html_body);
+        }
+        
+        // Keep focus on editor
+        body.focus();
       }
-      notify('Template applied', t.name, 'var(--blue)', 'fas fa-file-alt');
+      
+      notify('Template applied', t.name, 'var(--blue2)', 'fas fa-file-alt');
+      
+      // Reset dropdown
+      sel.value = '';
     })
-    .catch(() => {});
+    .catch(() => {
+      notify('Template', 'Error loading template', 'var(--red2)', 'fas fa-exclamation-circle');
+    });
 }
 
 function resetComposeForm() {
@@ -8332,74 +9625,120 @@ function injectReplyUnknownBanner(senderEmail, isSentMessage) {
     `<i class="fa fa-user-plus"></i> Add Contact</button>` +
     `<button class="btn btn-xs btn-ghost" onclick="this.closest('.reply-unknown-banner').remove()" title="Dismiss">` +
     `<i class="fa fa-times"></i></button>`;
-  // Insert at top of modal content (after modal-title)
-  const modalTitle = modal.querySelector('.modal-title');
-  if (modalTitle && modalTitle.nextSibling) {
-    modal.querySelector('.modal').insertBefore(banner, modalTitle.nextSibling);
-  } else {
-    modal.querySelector('.modal').prepend(banner);
-  }
+  // Insert at top of modal body — works with both old .modal and new .compose-modal-box
+  const container = modal.querySelector('.compose-modal-body') || modal.querySelector('.modal');
+  if (container) container.prepend(banner);
 }
 
 function openReply(replyAll) {
   if (!activeMessageId) return;
   document.getElementById('compose-title').textContent = replyAll ? 'Reply All' : 'Reply';
   openModal('compose-email-modal');
+  loadComposeTemplates(); // Load templates
   composeApplyDefaultSignature('reply');
 
-  // Fetch message details to pre-fill To/Cc/Subject
-  fetch(`${API_BASE}/outlook/message/${activeMessageId}`, { headers: getAuthHeaders() })
-    .then(r => r.json())
-    .then(msg => {
-      // Subject: add Re: prefix if not already there
-      const subj = msg.subject || '';
-      const reSubj = subj.toLowerCase().startsWith('re:') ? subj : 'Re: ' + subj;
-      const subjEl = document.getElementById('compose-subject');
-      if (subjEl) subjEl.value = reSubj;
+  // Use already-loaded activeMailMessage if available, otherwise fetch
+  const doReply = function(msg) {
+    const myEmail = (outlookConnectedEmail || '').toLowerCase().trim();
 
-      // To: reply to sender — but if WE sent the original, reply to original recipients
-      const senderAddr = msg.from?.emailAddress?.address || '';
-      const myEmail    = (outlookConnectedEmail || '').toLowerCase();
-      const isSentByMe = senderAddr.toLowerCase() === myEmail;
-      const toEl = document.getElementById('compose-to');
+    // ── Subject ──────────────────────────────────────────────────────────
+    const subj   = msg.subject || '';
+    const reSubj = /^re:/i.test(subj.trim()) ? subj : 'Re: ' + subj;
+    const subjEl = document.getElementById('compose-subject');
+    if (subjEl) subjEl.value = reSubj;
 
-      // Inject unknown-sender banner
+    // ── Determine sender ─────────────────────────────────────────────────
+    const senderAddr = (msg.from?.emailAddress?.address || '').toLowerCase().trim();
+    const isSentByMe = senderAddr === myEmail;
+
+    // ── Helper: extract unique email addresses, excluding self ───────────
+    function extractEmails(recipientArray) {
+      return (recipientArray || [])
+        .map(r => (r.emailAddress?.address || '').trim())
+        .filter(a => a && a.toLowerCase() !== myEmail);
+    }
+
+    // ── Unknown sender banner ────────────────────────────────────────────
+    if (isSentByMe) {
+      const firstRecip = (msg.toRecipients || [])[0]?.emailAddress?.address || '';
+      injectReplyUnknownBanner(firstRecip, true);
+    } else {
+      injectReplyUnknownBanner(senderAddr, false);
+    }
+
+    const toEl = document.getElementById('compose-to');
+    const ccEl = document.getElementById('compose-cc');
+
+    if (replyAll) {
+      // ── Reply All ────────────────────────────────────────────────────
+      // To = sender (if not self) + original To recipients (minus self)
+      // CC = original CC recipients (minus self, minus anyone already in To)
+      const toRecips = extractEmails(msg.toRecipients);
+      const ccRecips = extractEmails(msg.ccRecipients);
+
+      let toList = isSentByMe
+        ? toRecips
+        : [senderAddr, ...toRecips].filter(a => a);
+
+      // Deduplicate To list
+      toList = [...new Set(toList.map(a => a.toLowerCase()))];
+
+      // CC = original CC minus anyone already in To
+      const toSet  = new Set(toList.map(a => a.toLowerCase()));
+      const ccList = [...new Set(ccRecips.map(a => a.toLowerCase()))].filter(a => !toSet.has(a));
+
+      if (toEl) toEl.value = toList.join('; ');
+      if (ccEl) ccEl.value = ccList.join('; ');
+
+    } else {
+      // ── Reply (sender only) ──────────────────────────────────────────
+      // If WE sent the original → reply to original To recipients
+      // Otherwise → reply to sender only
       if (isSentByMe) {
-        // Replying to a sent message — check first recipient
-        const firstRecip = (msg.toRecipients || [])[0]?.emailAddress?.address || '';
-        injectReplyUnknownBanner(firstRecip, true);
+        const toAddrs = extractEmails(msg.toRecipients);
+        if (toEl) toEl.value = toAddrs.join('; ');
       } else {
-        injectReplyUnknownBanner(senderAddr, false);
+        if (toEl) toEl.value = senderAddr;
       }
+      if (ccEl) ccEl.value = '';
+    }
 
-      if (replyAll) {
-        // Reply All: To = original recipients (minus self) + sender (if not self)
-        const toAddrs = (msg.toRecipients || [])
-          .map(r => r.emailAddress?.address || '')
-          .filter(a => a && a.toLowerCase() !== myEmail);
-        const ccAddrs = (msg.ccRecipients || [])
-          .map(r => r.emailAddress?.address || '')
-          .filter(Boolean);
-        // Add sender only if not self
-        const allTo = isSentByMe
-          ? toAddrs
-          : [senderAddr, ...toAddrs].filter((v,i,a) => v && a.indexOf(v)===i);
-        if (toEl) toEl.value = allTo.join('; ');
-        const ccEl = document.getElementById('compose-cc');
-        if (ccEl && ccAddrs.length) ccEl.value = ccAddrs.join('; ');
-      } else {
-        // Reply: if WE sent it → reply to original To recipients; else reply to sender
-        if (isSentByMe) {
-          const toAddrs = (msg.toRecipients || [])
-            .map(r => r.emailAddress?.address || '')
-            .filter(Boolean);
-          if (toEl) toEl.value = toAddrs.join('; ');
-        } else {
-          if (toEl) toEl.value = senderAddr;
-        }
-      }
-    })
-    .catch(() => {});
+    // ── Quoted body ──────────────────────────────────────────────────────
+    const bodyEl = document.getElementById('compose-body');
+    if (bodyEl) {
+      const fromName  = msg.from?.emailAddress?.name  || senderAddr;
+      const fromEmail = msg.from?.emailAddress?.address || senderAddr;
+      const sentDate  = msg.receivedDateTime
+        ? new Date(msg.receivedDateTime).toLocaleString('en-IN', { dateStyle:'medium', timeStyle:'short' })
+        : '';
+      const originalHtml = msg.body?.content || msg.bodyPreview || '';
+      const quotedBlock =
+        `<br><br>` +
+        `<div style="border-left:3px solid #ccc;padding-left:12px;margin-top:8px;color:#555;font-size:13px;">` +
+        `<div style="margin-bottom:6px;font-size:12px;color:#888;">` +
+        `On ${sentDate}, <b>${escHtml(fromName)}</b> &lt;${escHtml(fromEmail)}&gt; wrote:</div>` +
+        originalHtml +
+        `</div>`;
+      bodyEl.innerHTML = quotedBlock;
+      // Place cursor at top
+      const range = document.createRange();
+      const sel   = window.getSelection();
+      range.setStart(bodyEl, 0);
+      range.collapse(true);
+      sel.removeAllRanges();
+      sel.addRange(range);
+    }
+  };
+
+  // Use cached message if available and matches, otherwise fetch
+  if (activeMailMessage && activeMailMessage.id === activeMessageId) {
+    doReply(activeMailMessage);
+  } else {
+    fetch(`${API_BASE}/outlook/message/${activeMessageId}`, { headers: getAuthHeaders() })
+      .then(r => r.json())
+      .then(msg => { activeMailMessage = msg; doReply(msg); })
+      .catch(() => {});
+  }
 
   setTimeout(() => { const b = document.getElementById('compose-body'); if (b) b.focus(); }, 200);
 }
@@ -8483,6 +9822,10 @@ async function sendEmail() {
 
     if (res.ok) {
       notify('Email sent!', isReply ? 'Reply sent in same conversation' : `To: ${to.join(', ')}`, 'var(--green)', 'fas fa-paper-plane');
+      
+      // Delete draft after successful send
+      deleteComposeDraft();
+      
       if (isReply && activeMessageId) {
         const related = mailTasksCache.filter(t => t.status !== 'done' && (t.message_id === activeMessageId || (activeMailMessage?.conversationId && t.conversation_id === activeMailMessage.conversationId)));
         related.forEach(t => {
@@ -8531,6 +9874,40 @@ function switchFolder(folder, btn) {
   document.querySelectorAll('#tab-inbox,#tab-sent').forEach(b => {
     b.className = b.id === `tab-${folder}` ? 'btn btn-blue btn-xs' : 'btn btn-ghost btn-xs';
   });
+  loadInbox();
+}
+
+/**
+ * Switch Outlook folder (new sidebar navigation)
+ */
+function switchOutlookFolder(folder, element) {
+  // Update active state
+  document.querySelectorAll('.outlook-folder-item').forEach(item => {
+    item.classList.remove('active');
+  });
+  if (element) element.classList.add('active');
+  
+  // Update folder name in header
+  const folderNames = {
+    'inbox': 'Inbox',
+    'sent': 'Sent Items',
+    'drafts': 'Drafts',
+    'deleted': 'Deleted Items'
+  };
+  const nameEl = document.getElementById('current-folder-name');
+  if (nameEl) nameEl.textContent = folderNames[folder] || 'Inbox';
+  
+  // Update global folder state
+  inboxFolder = folder;
+  inboxCurrentPage = 0;
+  
+  // Reset category filter to "All"
+  window.currentEmailCategoryFilter = 'ALL';
+  document.querySelectorAll('.mail-category-filter').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.category === 'ALL');
+  });
+  
+  // Load folder data
   loadInbox();
 }
 
@@ -10098,6 +11475,9 @@ async function composeInsertSignature() {
   }
 
   openModal('et-sig-modal');
+  
+  // Load saved templates into dropdown
+  sigLoadTemplates();
 
   // Override the Insert button to target compose editor instead of et-html-editor
   var insertBtn = document.querySelector('#et-sig-modal .btn-gold');
@@ -10247,6 +11627,7 @@ function composeInsertEmoji(emoji) {
 
 function etInsertSignature() {
   openModal('et-sig-modal');
+  sigLoadTemplates(); // Load saved templates
   setTimeout(etRefreshSigPreview, 80);
 }
 
@@ -10340,9 +11721,9 @@ function etToggleCustomSig() {
   var isCustom = styleEl && styleEl.value === 'custom';
   sec.style.display = isCustom ? 'block' : 'none';
   if (stdFields) stdFields.style.display = isCustom ? 'none' : 'block';
-  // Init badges list if empty
+  // Init badges list if empty - start with 1 badge as example
   if (isCustom && document.getElementById('csig-badges-list').children.length === 0) {
-    csigAddBadge(); csigAddBadge(); csigAddBadge(); csigAddBadge(); csigAddBadge();
+    csigAddBadge();
   }
 }
 
@@ -10352,10 +11733,10 @@ function csigAddBadge() {
   var list = document.getElementById('csig-badges-list');
   if (!list) return;
   var row = document.createElement('div');
-  row.style.cssText = 'display:grid;grid-template-columns:1fr 80px 32px 28px;gap:6px;align-items:center;';
+  row.style.cssText = 'display:grid;grid-template-columns:1fr 100px 32px 28px;gap:6px;align-items:center;';
   row.id = 'csig-badge-row-' + idx;
-  row.innerHTML = '<input class="inp" id="csig-badge-' + idx + '" placeholder="https://…/iso.png or pick →" style="font-size:12px;" oninput="etRefreshSigPreview()">'
-    + '<input class="inp" id="csig-badge-w-' + idx + '" type="number" value="70" min="20" max="200" placeholder="px" style="font-size:12px;" oninput="etRefreshSigPreview()">'
+  row.innerHTML = '<input class="inp" id="csig-badge-' + idx + '" placeholder="https://…/badge.png or pick →" style="font-size:12px;" oninput="etRefreshSigPreview()">'
+    + '<input class="inp" id="csig-badge-w-' + idx + '" type="number" value="70" min="20" max="200" placeholder="Width (px)" style="font-size:12px;" oninput="etRefreshSigPreview()">'
     + '<label class="btn btn-ghost btn-xs" style="cursor:pointer;padding:3px 6px;" title="Choose image file"><i class="fas fa-folder-open"></i><input type="file" accept="image/*" style="display:none;" onchange="csigFileToBase64(this,\'csig-badge-' + idx + '\')"></label>'
     + '<button type="button" class="btn btn-red btn-xs" onmousedown="event.preventDefault()" onclick="document.getElementById(\'csig-badge-row-' + idx + '\').remove();etRefreshSigPreview()" style="padding:4px 6px;"><i class="fas fa-times"></i></button>';
   list.appendChild(row);
@@ -10428,6 +11809,209 @@ function etRefreshSigPreview() {
   doc.write('<!DOCTYPE html><html><head><meta charset="UTF-8"><style>body{margin:8px;padding:0;font-family:Arial,sans-serif;background:#fff;}</style></head><body>' + html + '</body></html>');
   doc.close();
 }
+
+// ══════════════════════════════════════════════════════════════════════════════
+// SIGNATURE TEMPLATE MANAGEMENT
+// ══════════════════════════════════════════════════════════════════════════════
+
+function sigLoadTemplates() {
+  // Load templates from localStorage and populate dropdown
+  var select = document.getElementById('sig-template-select');
+  if (!select) return;
+  
+  // Clear existing options except first
+  while (select.options.length > 1) {
+    select.remove(1);
+  }
+  
+  var templates = JSON.parse(localStorage.getItem('signatureTemplates') || '[]');
+  templates.forEach(function(tpl) {
+    var opt = document.createElement('option');
+    opt.value = tpl.id;
+    opt.textContent = tpl.name;
+    select.appendChild(opt);
+  });
+}
+
+function sigLoadTemplate() {
+  var select = document.getElementById('sig-template-select');
+  if (!select || !select.value) {
+    notify('Signature', 'Please select a template first', 'var(--red2)', 'fas fa-exclamation-circle');
+    return;
+  }
+  
+  var templates = JSON.parse(localStorage.getItem('signatureTemplates') || '[]');
+  var tpl = templates.find(function(t) { return t.id === select.value; });
+  
+  if (!tpl) {
+    notify('Signature', 'Template not found', 'var(--red2)', 'fas fa-exclamation-circle');
+    return;
+  }
+  
+  // Load template data into form fields
+  var data = tpl.data;
+  
+  // Set style radio
+  var styleRadio = document.querySelector('input[name="sig-style"][value="' + (data.style || 'classic') + '"]');
+  if (styleRadio) {
+    styleRadio.checked = true;
+    etToggleCustomSig();
+  }
+  
+  // Standard fields
+  if (document.getElementById('sig-name')) document.getElementById('sig-name').value = data.name || '';
+  if (document.getElementById('sig-title')) document.getElementById('sig-title').value = data.title || '';
+  if (document.getElementById('sig-company')) document.getElementById('sig-company').value = data.company || '';
+  if (document.getElementById('sig-email')) document.getElementById('sig-email').value = data.email || '';
+  if (document.getElementById('sig-phone')) document.getElementById('sig-phone').value = data.phone || '';
+  if (document.getElementById('sig-web')) document.getElementById('sig-web').value = data.web || '';
+  if (document.getElementById('sig-tagline')) document.getElementById('sig-tagline').value = data.tagline || '';
+  if (document.getElementById('sig-color')) document.getElementById('sig-color').value = data.color || '#e8820a';
+  if (document.getElementById('sig-img')) document.getElementById('sig-img').value = data.imgUrl || '';
+  
+  // Custom signature fields
+  if (data.style === 'custom' && data.custom) {
+    if (document.getElementById('csig-logo')) document.getElementById('csig-logo').value = data.custom.logo || '';
+    if (document.getElementById('csig-logo-w')) document.getElementById('csig-logo-w').value = data.custom.logoW || '160';
+    if (document.getElementById('csig-contact')) document.getElementById('csig-contact').value = data.custom.contact || '';
+    if (document.getElementById('csig-extra-img')) document.getElementById('csig-extra-img').value = data.custom.extraImg || '';
+    if (document.getElementById('csig-extra-link')) document.getElementById('csig-extra-link').value = data.custom.extraLink || '';
+    if (document.getElementById('csig-extra-w')) document.getElementById('csig-extra-w').value = data.custom.extraW || '160';
+    if (document.getElementById('csig-extra-text')) document.getElementById('csig-extra-text').value = data.custom.extraText || '';
+    if (document.getElementById('csig-extra-text-link')) document.getElementById('csig-extra-text-link').value = data.custom.extraTextLink || '';
+    
+    // Load badges
+    var badgesList = document.getElementById('csig-badges-list');
+    if (badgesList && data.custom.badges) {
+      badgesList.innerHTML = '';
+      _csigBadgeCount = 0;
+      data.custom.badges.forEach(function(badge) {
+        csigAddBadge();
+        var idx = _csigBadgeCount - 1;
+        if (document.getElementById('csig-badge-' + idx)) document.getElementById('csig-badge-' + idx).value = badge.url || '';
+        if (document.getElementById('csig-badge-w-' + idx)) document.getElementById('csig-badge-w-' + idx).value = badge.width || '70';
+      });
+    }
+  }
+  
+  etRefreshSigPreview();
+  notify('Signature', 'Template "' + tpl.name + '" loaded', 'var(--green2)', 'fas fa-check-circle');
+}
+
+function sigSaveTemplate() {
+  var name = prompt('Enter a name for this signature template:', 'My Signature');
+  if (!name || !name.trim()) return;
+  
+  name = name.trim();
+  
+  // Capture current form state
+  var styleEl = document.querySelector('input[name="sig-style"]:checked');
+  var style = styleEl ? styleEl.value : 'classic';
+  
+  var data = {
+    style: style,
+    name: (document.getElementById('sig-name') || {}).value || '',
+    title: (document.getElementById('sig-title') || {}).value || '',
+    company: (document.getElementById('sig-company') || {}).value || '',
+    email: (document.getElementById('sig-email') || {}).value || '',
+    phone: (document.getElementById('sig-phone') || {}).value || '',
+    web: (document.getElementById('sig-web') || {}).value || '',
+    tagline: (document.getElementById('sig-tagline') || {}).value || '',
+    color: (document.getElementById('sig-color') || {}).value || '#e8820a',
+    imgUrl: (document.getElementById('sig-img') || {}).value || ''
+  };
+  
+  // Capture custom signature data if applicable
+  if (style === 'custom') {
+    var badges = [];
+    document.querySelectorAll('[id^="csig-badge-"]').forEach(function(el) {
+      if (el.id.includes('-w-')) return;
+      var idx = el.id.replace('csig-badge-', '');
+      var url = el.value.trim();
+      var w = (document.getElementById('csig-badge-w-' + idx) || {}).value || '70';
+      if (url) badges.push({ url: url, width: w });
+    });
+    
+    data.custom = {
+      logo: (document.getElementById('csig-logo') || {}).value || '',
+      logoW: (document.getElementById('csig-logo-w') || {}).value || '160',
+      contact: (document.getElementById('csig-contact') || {}).value || '',
+      badges: badges,
+      extraImg: (document.getElementById('csig-extra-img') || {}).value || '',
+      extraLink: (document.getElementById('csig-extra-link') || {}).value || '',
+      extraW: (document.getElementById('csig-extra-w') || {}).value || '160',
+      extraText: (document.getElementById('csig-extra-text') || {}).value || '',
+      extraTextLink: (document.getElementById('csig-extra-text-link') || {}).value || ''
+    };
+  }
+  
+  // Generate HTML for preview
+  var html = etBuildSigHTML();
+  
+  // Create template object
+  var template = {
+    id: 'sig_' + Date.now(),
+    name: name,
+    html: html,
+    data: data,
+    created_at: new Date().toISOString()
+  };
+  
+  // Load existing templates
+  var templates = JSON.parse(localStorage.getItem('signatureTemplates') || '[]');
+  
+  // Check for duplicate name
+  var existingIdx = templates.findIndex(function(t) { return t.name === name; });
+  if (existingIdx >= 0) {
+    if (!confirm('A template with this name already exists. Overwrite?')) return;
+    templates[existingIdx] = template;
+  } else {
+    templates.push(template);
+  }
+  
+  // Save to localStorage
+  localStorage.setItem('signatureTemplates', JSON.stringify(templates));
+  
+  // Reload dropdown
+  sigLoadTemplates();
+  
+  // Select the newly saved template
+  var select = document.getElementById('sig-template-select');
+  if (select) select.value = template.id;
+  
+  notify('Signature', 'Template "' + name + '" saved', 'var(--green2)', 'fas fa-check-circle');
+}
+
+function sigDeleteTemplate() {
+  var select = document.getElementById('sig-template-select');
+  if (!select || !select.value) {
+    notify('Signature', 'Please select a template first', 'var(--red2)', 'fas fa-exclamation-circle');
+    return;
+  }
+  
+  var templates = JSON.parse(localStorage.getItem('signatureTemplates') || '[]');
+  var tpl = templates.find(function(t) { return t.id === select.value; });
+  
+  if (!tpl) {
+    notify('Signature', 'Template not found', 'var(--red2)', 'fas fa-exclamation-circle');
+    return;
+  }
+  
+  if (!confirm('Delete template "' + tpl.name + '"?')) return;
+  
+  // Remove from array
+  templates = templates.filter(function(t) { return t.id !== select.value; });
+  
+  // Save back to localStorage
+  localStorage.setItem('signatureTemplates', JSON.stringify(templates));
+  
+  // Reload dropdown
+  sigLoadTemplates();
+  
+  notify('Signature', 'Template deleted', 'var(--green2)', 'fas fa-check-circle');
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
 
 function etPreviewTemplate() {
   var html_body = etGetHTML();
@@ -10760,6 +12344,9 @@ function etUseInBroadcast() {
         <!-- Editor -->
           <!-- Full toolbar — exact copy of template editor -->
           <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;padding:6px 10px;background:var(--card2);border:1px solid var(--border2);border-radius:8px 8px 0 0;border-bottom:none;">
+            <button type="button" class="btn btn-ghost btn-xs" onmousedown="composeToolbarMousedown(event)" onclick="composeExecCmd('undo')" title="Undo (Ctrl+Z)"><i class="fas fa-undo"></i></button>
+            <button type="button" class="btn btn-ghost btn-xs" onmousedown="composeToolbarMousedown(event)" onclick="composeExecCmd('redo')" title="Redo (Ctrl+Y)"><i class="fas fa-redo"></i></button>
+            <div style="width:1px;height:18px;background:var(--border);margin:0 2px;"></div>
             <select id="compose-font-select" onmousedown="composeSaveSelection()" onchange="composeSetFont(this.value);this.value=''" style="font-size:11px;padding:3px 4px;background:var(--card2);border:1px solid var(--border);border-radius:5px;color:var(--text);cursor:pointer;max-width:130px;" title="Font family — select text first, then pick font">
               <option value="">Font</option>
               <optgroup label="── Word Defaults ──">
@@ -10900,13 +12487,14 @@ function etUseInBroadcast() {
                onmouseup="composeSaveSelection();composeUpdateToolbarState()"
                onkeyup="composeSaveSelection();composeUpdateToolbarState()"
                onfocus="composeUpdateToolbarState()"></div>
-        </div>
       </div>
       <!-- Footer -->
       <div class="compose-modal-footer">
         <div style="display:flex;align-items:center;gap:8px;">
           <div id="compose-status" style="font-size:12px;display:none;"></div>
+          <div id="compose-draft-status" style="font-size:11px;color:var(--muted);display:none;"><i class="fas fa-check-circle" style="color:var(--green2);"></i> Draft saved</div>
           <button type="button" class="btn btn-ghost btn-xs" onclick="resetComposeForm()"><i class="fas fa-eraser"></i> Clear</button>
+          <button type="button" class="btn btn-ghost btn-xs" onclick="saveComposeDraft(true)"><i class="fas fa-save"></i> Save Draft</button>
         </div>
         <button type="button" class="btn btn-gold" id="send-btn" onclick="sendEmail()">
           <i class="fas fa-paper-plane"></i> Send via Outlook
@@ -11157,6 +12745,22 @@ function etUseInBroadcast() {
         <span class="modal-close" onclick="oaRestoreSignatureBuilderButton();closeModal('et-sig-modal')"><i class="fas fa-times"></i></span>
       </div>
 
+      <!-- Template Selection -->
+      <div class="form-group">
+        <label class="form-label">Load Saved Template</label>
+        <div style="display:flex;gap:6px;align-items:center;">
+          <select class="inp" id="sig-template-select" style="flex:1;font-size:12px;padding:6px 10px;">
+            <option value="">— Select a saved template —</option>
+          </select>
+          <button type="button" class="btn btn-blue btn-xs" onclick="sigLoadTemplate()" title="Load selected template">
+            <i class="fas fa-download"></i> Load
+          </button>
+          <button type="button" class="btn btn-ghost btn-xs" onclick="sigDeleteTemplate()" title="Delete selected template">
+            <i class="fas fa-trash"></i>
+          </button>
+        </div>
+      </div>
+
       <!-- Style picker -->
       <div class="form-group">
         <label class="form-label">Signature Style</label>
@@ -11227,7 +12831,7 @@ function etUseInBroadcast() {
         <div style="font-size:11px;color:var(--muted);margin-bottom:6px;font-weight:600;">ROW 1 — Logo + Contact Info</div>
         <div class="form-row" style="margin-bottom:8px;">
           <div>
-            <label class="form-label">Logo</label>
+            <label class="form-label">Logo Image URL</label>
             <div style="display:flex;gap:6px;align-items:center;">
               <input class="inp" id="csig-logo" placeholder="https://…/logo.png or pick file →" style="font-size:12px;flex:1;" oninput="etRefreshSigPreview()">
               <label class="btn btn-ghost btn-xs" style="cursor:pointer;white-space:nowrap;" title="Choose from file system">
@@ -11238,7 +12842,11 @@ function etUseInBroadcast() {
           </div>
           <div>
             <label class="form-label">Logo Width (px)</label>
-            <input class="inp" id="csig-logo-w" value="160" type="number" min="40" max="400" style="font-size:12px;" oninput="etRefreshSigPreview()">
+            <input class="inp" id="csig-logo-w" value="160" type="number" min="40" max="400" placeholder="160" style="font-size:12px;" oninput="etRefreshSigPreview()">
+          </div>
+          <div>
+            <label class="form-label">Logo Height (px) <span style="color:var(--muted);font-weight:400;">(optional)</span></label>
+            <input class="inp" id="csig-logo-h" type="number" min="20" max="400" placeholder="Auto" style="font-size:12px;" oninput="etRefreshSigPreview()">
           </div>
         </div>
         <div class="form-group" style="margin-bottom:8px;">
@@ -11254,6 +12862,7 @@ Nagpur, Maharashtra, 440017, India<br>
 
         <!-- Row 2: Badge images -->
         <div style="font-size:11px;color:var(--muted);margin-bottom:6px;font-weight:600;margin-top:8px;">ROW 2 — Badge / Certification Images</div>
+        <div style="font-size:11px;color:var(--muted2);margin-bottom:8px;font-style:italic;">Badges will be displayed horizontally in a row. Width is required, height auto-scales to maintain aspect ratio (unless specified).</div>
         <div id="csig-badges-list" style="display:flex;flex-direction:column;gap:6px;margin-bottom:6px;"></div>
         <button type="button" class="btn btn-ghost btn-xs" onmousedown="event.preventDefault()" onclick="csigAddBadge()"><i class="fas fa-plus"></i> Add Badge Image</button>
 
@@ -11261,7 +12870,7 @@ Nagpur, Maharashtra, 440017, India<br>
         <div style="font-size:11px;color:var(--muted);margin-bottom:6px;font-weight:600;margin-top:12px;">ROW 3 — Extra Block (optional)</div>
         <div class="form-row" style="margin-bottom:0;">
           <div>
-            <label class="form-label">Image</label>
+            <label class="form-label">Extra Image URL</label>
             <div style="display:flex;gap:6px;align-items:center;">
               <input class="inp" id="csig-extra-img" placeholder="https://…/ariba.png or pick file →" style="font-size:12px;flex:1;" oninput="etRefreshSigPreview()">
               <label class="btn btn-ghost btn-xs" style="cursor:pointer;white-space:nowrap;" title="Choose from file system">
@@ -11277,13 +12886,18 @@ Nagpur, Maharashtra, 440017, India<br>
         </div>
         <div class="form-row" style="margin-top:8px;margin-bottom:0;">
           <div>
-            <label class="form-label">Image Width (px)</label>
-            <input class="inp" id="csig-extra-w" value="160" type="number" min="40" max="400" style="font-size:12px;" oninput="etRefreshSigPreview()">
+            <label class="form-label">Extra Image Width (px)</label>
+            <input class="inp" id="csig-extra-w" value="160" type="number" min="40" max="400" placeholder="160" style="font-size:12px;" oninput="etRefreshSigPreview()">
+          </div>
+          <div>
+            <label class="form-label">Extra Image Height (px) <span style="color:var(--muted);font-weight:400;">(optional)</span></label>
+            <input class="inp" id="csig-extra-h" type="number" min="20" max="400" placeholder="Auto" style="font-size:12px;" oninput="etRefreshSigPreview()">
           </div>
           <div>
             <label class="form-label">Extra Text / Link Label</label>
             <input class="inp" id="csig-extra-text" placeholder="e.g. Book time to meet with me" style="font-size:12px;" oninput="etRefreshSigPreview()">
           </div>
+        </div>
         </div>
         <div class="form-group" style="margin-top:8px;margin-bottom:0;">
           <label class="form-label">Extra Text Link URL</label>
@@ -11298,6 +12912,7 @@ Nagpur, Maharashtra, 440017, India<br>
       </div>
 
       <div style="display:flex;gap:8px;margin-top:16px;justify-content:flex-end;">
+        <button class="btn btn-green btn-sm" onclick="sigSaveTemplate()"><i class="fas fa-save"></i> Save Template</button>
         <button class="btn btn-gold" onclick="etApplySignature()"><i class="fas fa-check"></i> Insert Signature</button>
         <button class="btn btn-ghost" onclick="oaRestoreSignatureBuilderButton();closeModal('et-sig-modal')">Cancel</button>
       </div>
