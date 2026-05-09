@@ -1488,6 +1488,34 @@ router.get('/status', async (req, res) => {
   }
 });
 
+// ── GET /api/outlook/debug-token (TEMP — for Postman Graph testing) ───────
+router.get('/debug-token', authenticate, async (req, res) => {
+  try {
+    const token = await graph.getDelegatedToken(MS_EMAIL, [
+      'https://graph.microsoft.com/Contacts.Read',
+      'https://graph.microsoft.com/Contacts.ReadWrite',
+      'https://graph.microsoft.com/People.Read',
+      'https://graph.microsoft.com/Mail.Read',
+      'offline_access',
+    ]).catch(() => null) || await graph.getClientCredentialsToken().catch(() => null);
+    if (!token) return res.status(401).json({ error: 'No token available' });
+    return res.json({
+      access_token: token,
+      mailbox: MS_EMAIL,
+      note: 'Use this token as Bearer in direct Graph API calls. Expires ~1hr.',
+      sample_urls: [
+        `https://graph.microsoft.com/v1.0/users/${MS_EMAIL}/contacts?$select=displayName,mobilePhone,businessPhones,homePhones,emailAddresses&$top=10`,
+        `https://graph.microsoft.com/v1.0/users/${MS_EMAIL}/contacts?$filter=mobilePhone ne null&$select=displayName,mobilePhone,emailAddresses&$top=25`,
+        `https://graph.microsoft.com/v1.0/users/${MS_EMAIL}/contactFolders?$select=id,displayName`,
+        `https://graph.microsoft.com/v1.0/users/${MS_EMAIL}/people?$select=displayName,phones,emailAddresses&$top=25`,
+        `https://graph.microsoft.com/v1.0/contacts?$select=displayName,mobilePhone,businessPhones,emailAddresses&$top=25`,
+      ]
+    });
+  } catch (err) {
+    return res.status(500).json({ error: err.message });
+  }
+});
+
 // ── GET /api/outlook/auth ─────────────────────────────────────────────────
 router.get('/auth', async (req, res) => {
   try {
