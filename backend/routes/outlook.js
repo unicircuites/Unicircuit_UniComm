@@ -32,6 +32,77 @@ const activityLog = require('../services/activityLog');
 const router = express.Router();
 const MS_EMAIL = process.env.MS_USER_EMAIL;
 
+// Helper function to store messages in database
+async function storeMessagesInDB(messages, folder) {
+  await mailStore.ensureTable();
+  
+  // Ensure outlook_emails_cache table exists
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS outlook_emails_cache (
+      id                TEXT PRIMARY KEY,
+      conversation_id   TEXT,
+      subject           TEXT,
+      from_address      TEXT,
+      from_name         TEXT,
+      to_recipients     JSONB,
+      cc_recipients     JSONB,
+      received_datetime TIMESTAMPTZ,
+      sent_datetime     TIMESTAMPTZ,
+      is_read           BOOLEAN DEFAULT FALSE,
+      body_preview      TEXT,
+      has_attachments   BOOLEAN DEFAULT FALSE,
+      importance        TEXT,
+      folder            TEXT DEFAULT 'inbox',
+      category          TEXT DEFAULT 'GENERAL',
+      synced_at         TIMESTAMPTZ DEFAULT NOW()
+    )
+  `);
+  
+  for (const msg of messages) {
+    try {
+      await pool.query(`
+        INSERT INTO outlook_emails_cache (
+          id, conversation_id, subject, from_address, from_name,
+          to_recipients, cc_recipients, received_datetime, sent_datetime,
+          is_read, body_preview, has_attachments, importance, folder, synced_at
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, NOW())
+        ON CONFLICT (id) DO UPDATE SET
+          conversation_id = EXCLUDED.conversation_id,
+          subject = EXCLUDED.subject,
+          from_address = EXCLUDED.from_address,
+          from_name = EXCLUDED.from_name,
+          to_recipients = EXCLUDED.to_recipients,
+          cc_recipients = EXCLUDED.cc_recipients,
+          received_datetime = EXCLUDED.received_datetime,
+          sent_datetime = EXCLUDED.sent_datetime,
+          is_read = EXCLUDED.is_read,
+          body_preview = EXCLUDED.body_preview,
+          has_attachments = EXCLUDED.has_attachments,
+          importance = EXCLUDED.importance,
+          folder = EXCLUDED.folder,
+          synced_at = NOW()
+      `, [
+        msg.id,
+        msg.conversationId || null,
+        msg.subject || '',
+        msg.from?.emailAddress?.address || '',
+        msg.from?.emailAddress?.name || '',
+        JSON.stringify(msg.toRecipients || []),
+        JSON.stringify(msg.ccRecipients || []),
+        msg.receivedDateTime || null,
+        msg.sentDateTime || null,
+        msg.isRead || false,
+        msg.bodyPreview || '',
+        msg.hasAttachments || false,
+        msg.importance || 'normal',
+        folder
+      ]);
+    } catch (err) {
+      console.warn(`[Outlook] Failed to store message ${msg.id}:`, err.message);
+    }
+  }
+}
+
 const APP_PUBLIC_URL = (process.env.APP_PUBLIC_URL || `http://localhost:${process.env.PORT || 8088}`).replace(/\/$/, '');
 const GRAPH_ROOT = 'https://graph.microsoft.com/v1.0';
 const MESSAGE_SIZE_PROPS = ['Integer 0x0E08', 'Long 0x0E08'];
@@ -1463,10 +1534,21 @@ router.get('/inbox', async (req, res) => {
     const messages = data.value || [];
     console.log('[Outlook] Returning', messages.length, 'messages');
     
+    // Store messages in database for fallback
+    if (messages.length > 0) {
+      try {
+        await storeMessagesInDB(messages, 'inbox');
+        console.log('[Outlook] ✓ Stored', messages.length, 'messages in DB');
+      } catch (dbErr) {
+        console.warn('[Outlook] Failed to store messages in DB:', dbErr.message);
+      }
+    }
+    
     return res.json({
       messages,
       nextLink: data['@odata.nextLink'] || null,
       total:    messages.length,
+      source: 'api'
     });
   } catch (err) {
     console.error('[Outlook] ❌ Inbox fetch error:', err.message);
@@ -1475,6 +1557,237 @@ router.get('/inbox', async (req, res) => {
       return res.status(401).json({ error: 'NOT_AUTHENTICATED', message: 'Outlook not connected. Please authenticate.' });
     }
     return res.status(500).json({ error: err.message, stack: err.stack });
+  }
+});
+
+// ── GET /api/outlook/inbox/fallback ──────────────────────────────────────
+// Fallback endpoint to load emails from database when API fails
+router.get('/inbox/fallback', async (req, res) => {
+  const top = parseInt(req.query.top || '50');
+  const skip = parseInt(req.query.skip || '0');
+  
+  console.log('[Outlook] GET /inbox/fallback — loading from DB, top:', top, 'skip:', skip);
+  
+  try {
+    await mailStore.ensureTable();
+    
+    // Ensure table exists
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS outlook_emails_cache (
+        id                TEXT PRIMARY KEY,
+        conversation_id   TEXT,
+        subject           TEXT,
+        from_address      TEXT,
+        from_name         TEXT,
+        to_recipients     JSONB,
+        cc_recipients     JSONB,
+        received_datetime TIMESTAMPTZ,
+        sent_datetime     TIMESTAMPTZ,
+        is_read           BOOLEAN DEFAULT FALSE,
+        body_preview      TEXT,
+        has_attachments   BOOLEAN DEFAULT FALSE,
+        importance        TEXT,
+        folder            TEXT DEFAULT 'inbox',
+        category          TEXT DEFAULT 'GENERAL',
+        synced_at         TIMESTAMPTZ DEFAULT NOW()
+      )
+    `);
+    
+    const result = await pool.query(`
+      SELECT 
+        id,
+        conversation_id AS "conversationId",
+        subject,
+        from_address,
+        from_name,
+        to_recipients,
+        cc_recipients,
+        received_datetime,
+        sent_datetime,
+        is_read,
+        body_preview,
+        has_attachments,
+        importance,
+        category
+      FROM outlook_emails_cache
+      WHERE folder = 'inbox'
+      ORDER BY received_datetime DESC NULLS LAST
+      LIMIT $1 OFFSET $2
+    `, [top, skip]);
+    
+    // Transform to match API format
+    const messages = result.rows.map(row => ({
+      id: row.id,
+      conversationId: row.conversationId,
+      subject: row.subject,
+      from: {
+        emailAddress: {
+          address: row.from_address,
+          name: row.from_name
+        }
+      },
+      toRecipients: row.to_recipients || [],
+      ccRecipients: row.cc_recipients || [],
+      receivedDateTime: row.received_datetime,
+      sentDateTime: row.sent_datetime,
+      isRead: row.is_read,
+      bodyPreview: row.body_preview,
+      hasAttachments: row.has_attachments,
+      importance: row.importance,
+      category: row.category || 'GENERAL'
+    }));
+    
+    console.log('[Outlook] Fallback: Loaded', messages.length, 'messages from DB');
+    
+    return res.json({
+      messages,
+      nextLink: null,
+      total: messages.length,
+      source: 'database'
+    });
+  } catch (err) {
+    console.error('[Outlook] ❌ Fallback error:', err.message);
+    return res.status(500).json({ error: err.message, messages: [] });
+  }
+});
+
+// ── GET /api/outlook/categorize ──────────────────────────────────────────
+router.get('/categorize', async (req, res) => {
+  const top = parseInt(req.query.top || '50');
+  
+  console.log('[Outlook] GET /categorize — fetching', top, 'emails for categorization');
+
+  try {
+    // Fetch emails from Graph API
+    const endpoint = `/me/mailFolders/inbox/messages?$top=${top}`
+      + `&$select=id,subject,from,bodyPreview,receivedDateTime,isRead,hasAttachments,importance,categories`
+      + `&$orderby=receivedDateTime desc`;
+    
+    const data = await graph.graphGet(endpoint, MS_EMAIL);
+    const messages = data.value || [];
+    
+    console.log('[Outlook] Fetched', messages.length, 'emails for categorization');
+    
+    // Transform to categorization format
+    const emails = messages.map(msg => ({
+      id: msg.id,
+      subject: msg.subject || '(no subject)',
+      from: msg.from?.emailAddress?.address || '',
+      fromName: msg.from?.emailAddress?.name || '',
+      body_summary: (msg.bodyPreview || '').substring(0, 200),
+      received_time: msg.receivedDateTime,
+      is_read: msg.isRead || false,
+      has_attachments: msg.hasAttachments || false,
+      importance: msg.importance || 'normal',
+      existing_categories: msg.categories || []
+    }));
+    
+    // Categorization logic
+    const categorized = emails.map(email => {
+      const subject = (email.subject || '').toLowerCase();
+      const body = (email.body_summary || '').toLowerCase();
+      const from = (email.from || '').toLowerCase();
+      const combined = `${subject} ${body} ${from}`;
+      
+      const now = new Date();
+      const receivedDate = new Date(email.received_time);
+      const hoursSinceReceived = (now - receivedDate) / (1000 * 60 * 60);
+      const isRecent = hoursSinceReceived <= 48;
+      
+      let category = 'GENERAL';
+      let priority = 'LOW';
+      let reason = 'Default category';
+      
+      // Priority order: LEAD > IMPORTANT > NEEDS_REPLY > ATTACHMENT > UNREAD > GENERAL
+      
+      // Check for LEAD / SALES
+      const leadKeywords = ['indiamart', 'buyer', 'enquiry', 'inquiry', 'quotation', 'quote request', 'product inquiry', 'business opportunity', 'interested in', 'purchase', 'order'];
+      if (leadKeywords.some(kw => combined.includes(kw))) {
+        category = 'LEAD';
+        priority = 'HIGH';
+        reason = 'Detected buyer inquiry or sales opportunity keywords';
+      }
+      
+      // Check for IMPORTANT
+      else if (email.importance === 'high' || ['urgent', 'asap', 'important', 'critical', 'immediate'].some(kw => combined.includes(kw))) {
+        category = 'IMPORTANT';
+        priority = 'HIGH';
+        reason = 'Marked as high importance or contains urgency keywords';
+      }
+      
+      // Check for NEEDS_REPLY
+      else if (['quote', 'price', 'pricing', 'need', 'requirement', 'please respond', 'please reply', 'waiting for', 'can you', 'could you', 'would you'].some(kw => combined.includes(kw))) {
+        category = 'NEEDS_REPLY';
+        priority = 'MEDIUM';
+        reason = 'Contains keywords indicating response required';
+      }
+      
+      // Check for SYSTEM / OTP
+      else if (['otp', 'verification code', 'login alert', 'security code', 'authentication', 'verify your', 'no-reply', 'noreply', 'automated'].some(kw => combined.includes(kw))) {
+        category = 'SYSTEM';
+        priority = 'LOW';
+        reason = 'Automated system message or OTP';
+      }
+      
+      // Check for ATTACHMENT
+      else if (email.has_attachments) {
+        category = 'ATTACHMENT';
+        priority = 'MEDIUM';
+        reason = 'Email contains attachments';
+      }
+      
+      // Check for UNREAD
+      else if (!email.is_read) {
+        category = 'UNREAD';
+        priority = 'MEDIUM';
+        reason = 'Email is unread';
+      }
+      
+      // Boost priority if recent
+      if (isRecent && priority === 'LOW') {
+        priority = 'MEDIUM';
+      }
+      if (isRecent && category === 'LEAD') {
+        priority = 'URGENT';
+      }
+      
+      return {
+        id: email.id,
+        subject: email.subject,
+        from: email.from,
+        fromName: email.fromName,
+        category,
+        priority,
+        reason,
+        received_time: email.received_time,
+        is_read: email.is_read,
+        has_attachments: email.has_attachments
+      };
+    });
+    
+    console.log('[Outlook] Categorized', categorized.length, 'emails');
+    
+    // Return categorized results
+    return res.json({
+      total: categorized.length,
+      categorized,
+      summary: {
+        LEAD: categorized.filter(e => e.category === 'LEAD').length,
+        IMPORTANT: categorized.filter(e => e.category === 'IMPORTANT').length,
+        NEEDS_REPLY: categorized.filter(e => e.category === 'NEEDS_REPLY').length,
+        SYSTEM: categorized.filter(e => e.category === 'SYSTEM').length,
+        ATTACHMENT: categorized.filter(e => e.category === 'ATTACHMENT').length,
+        UNREAD: categorized.filter(e => e.category === 'UNREAD').length,
+        GENERAL: categorized.filter(e => e.category === 'GENERAL').length,
+      }
+    });
+    
+  } catch (err) {
+    console.error('[Outlook] ❌ Categorization error:', err.message);
+    if (err.message === 'NOT_AUTHENTICATED') {
+      return res.status(401).json({ error: 'NOT_AUTHENTICATED', message: 'Outlook not connected. Please authenticate.' });
+    }
+    return res.status(500).json({ error: err.message });
   }
 });
 
@@ -1568,10 +1881,252 @@ router.get('/sent', async (req, res) => {
       + `&$orderby=sentDateTime desc`,
       MS_EMAIL
     );
-    return res.json({ messages: data.value || [] });
+    
+    const messages = data.value || [];
+    
+    // Store messages in database for fallback
+    if (messages.length > 0) {
+      try {
+        await storeMessagesInDB(messages, 'sent');
+        console.log('[Outlook] ✓ Stored', messages.length, 'sent messages in DB');
+      } catch (dbErr) {
+        console.warn('[Outlook] Failed to store sent messages in DB:', dbErr.message);
+      }
+    }
+    
+    return res.json({ messages, source: 'api' });
   } catch (err) {
     if (err.message === 'NOT_AUTHENTICATED') return res.status(401).json({ error: 'NOT_AUTHENTICATED' });
     return res.status(500).json({ error: err.message });
+  }
+});
+
+// ── GET /api/outlook/sent/fallback ───────────────────────────────────────
+router.get('/sent/fallback', async (req, res) => {
+  const top = parseInt(req.query.top || '25');
+  const skip = parseInt(req.query.skip || '0');
+  
+  console.log('[Outlook] GET /sent/fallback — loading from DB');
+  
+  try {
+    const result = await pool.query(`
+      SELECT 
+        id,
+        conversation_id AS "conversationId",
+        subject,
+        to_recipients,
+        sent_datetime,
+        body_preview,
+        has_attachments
+      FROM outlook_emails_cache
+      WHERE folder = 'sent'
+      ORDER BY sent_datetime DESC NULLS LAST
+      LIMIT $1 OFFSET $2
+    `, [top, skip]);
+    
+    const messages = result.rows.map(row => ({
+      id: row.id,
+      conversationId: row.conversationId,
+      subject: row.subject,
+      toRecipients: row.to_recipients || [],
+      sentDateTime: row.sent_datetime,
+      bodyPreview: row.body_preview,
+      hasAttachments: row.has_attachments
+    }));
+    
+    console.log('[Outlook] Fallback: Loaded', messages.length, 'sent messages from DB');
+    
+    return res.json({ messages, source: 'database' });
+  } catch (err) {
+    console.error('[Outlook] ❌ Sent fallback error:', err.message);
+    return res.status(500).json({ error: err.message, messages: [] });
+  }
+});
+
+// ── GET /api/outlook/drafts ──────────────────────────────────────────────
+router.get('/drafts', async (req, res) => {
+  const top = parseInt(req.query.top || '25');
+  const skip = parseInt(req.query.skip || '0');
+  
+  console.log('[Outlook] GET /drafts — top:', top, 'skip:', skip);
+  
+  try {
+    const data = await graph.graphGet(
+      `/me/mailFolders/drafts/messages?$top=${top}&$skip=${skip}`
+      + `&$select=id,conversationId,subject,from,toRecipients,ccRecipients,receivedDateTime,sentDateTime,createdDateTime,isRead,bodyPreview,hasAttachments,importance,isDraft`
+      + `&$orderby=createdDateTime desc`,
+      MS_EMAIL
+    );
+    
+    const messages = data.value || [];
+    
+    // Store messages in database for fallback
+    if (messages.length > 0) {
+      try {
+        await storeMessagesInDB(messages, 'drafts');
+        console.log('[Outlook] ✓ Stored', messages.length, 'draft messages in DB');
+      } catch (dbErr) {
+        console.warn('[Outlook] Failed to store draft messages in DB:', dbErr.message);
+      }
+    }
+    
+    console.log('[Outlook] Returning', messages.length, 'draft messages');
+    return res.json({ messages, source: 'api' });
+  } catch (err) {
+    console.error('[Outlook] ❌ Drafts fetch error:', err.message);
+    if (err.message === 'NOT_AUTHENTICATED') return res.status(401).json({ error: 'NOT_AUTHENTICATED' });
+    return res.status(500).json({ error: err.message });
+  }
+});
+
+// ── GET /api/outlook/drafts/fallback ─────────────────────────────────────
+router.get('/drafts/fallback', async (req, res) => {
+  const top = parseInt(req.query.top || '25');
+  const skip = parseInt(req.query.skip || '0');
+  
+  console.log('[Outlook] GET /drafts/fallback — loading from DB');
+  
+  try {
+    const result = await pool.query(`
+      SELECT 
+        id,
+        conversation_id AS "conversationId",
+        subject,
+        from_address,
+        from_name,
+        to_recipients,
+        cc_recipients,
+        received_datetime,
+        sent_datetime,
+        is_read,
+        body_preview,
+        has_attachments,
+        importance
+      FROM outlook_emails_cache
+      WHERE folder = 'drafts'
+      ORDER BY received_datetime DESC NULLS LAST, sent_datetime DESC NULLS LAST
+      LIMIT $1 OFFSET $2
+    `, [top, skip]);
+    
+    const messages = result.rows.map(row => ({
+      id: row.id,
+      conversationId: row.conversationId,
+      subject: row.subject,
+      from: {
+        emailAddress: {
+          address: row.from_address,
+          name: row.from_name
+        }
+      },
+      toRecipients: row.to_recipients || [],
+      ccRecipients: row.cc_recipients || [],
+      receivedDateTime: row.received_datetime,
+      sentDateTime: row.sent_datetime,
+      isRead: row.is_read,
+      bodyPreview: row.body_preview,
+      hasAttachments: row.has_attachments,
+      importance: row.importance,
+      isDraft: true
+    }));
+    
+    console.log('[Outlook] Fallback: Loaded', messages.length, 'draft messages from DB');
+    return res.json({ messages, source: 'database' });
+  } catch (err) {
+    console.error('[Outlook] ❌ Drafts fallback error:', err.message);
+    return res.status(500).json({ error: err.message, messages: [] });
+  }
+});
+
+// ── GET /api/outlook/deleted ─────────────────────────────────────────────
+router.get('/deleted', async (req, res) => {
+  const top = parseInt(req.query.top || '25');
+  const skip = parseInt(req.query.skip || '0');
+  
+  console.log('[Outlook] GET /deleted — top:', top, 'skip:', skip);
+  
+  try {
+    const data = await graph.graphGet(
+      `/me/mailFolders/deleteditems/messages?$top=${top}&$skip=${skip}`
+      + `&$select=id,conversationId,subject,from,toRecipients,ccRecipients,receivedDateTime,sentDateTime,isRead,bodyPreview,hasAttachments,importance`
+      + `&$orderby=receivedDateTime desc`,
+      MS_EMAIL
+    );
+    
+    const messages = data.value || [];
+    
+    // Store messages in database for fallback
+    if (messages.length > 0) {
+      try {
+        await storeMessagesInDB(messages, 'deleteditems');
+        console.log('[Outlook] ✓ Stored', messages.length, 'deleted messages in DB');
+      } catch (dbErr) {
+        console.warn('[Outlook] Failed to store deleted messages in DB:', dbErr.message);
+      }
+    }
+    
+    console.log('[Outlook] Returning', messages.length, 'deleted messages');
+    return res.json({ messages, source: 'api' });
+  } catch (err) {
+    console.error('[Outlook] ❌ Deleted items fetch error:', err.message);
+    if (err.message === 'NOT_AUTHENTICATED') return res.status(401).json({ error: 'NOT_AUTHENTICATED' });
+    return res.status(500).json({ error: err.message });
+  }
+});
+
+// ── GET /api/outlook/deleted/fallback ────────────────────────────────────
+router.get('/deleted/fallback', async (req, res) => {
+  const top = parseInt(req.query.top || '25');
+  const skip = parseInt(req.query.skip || '0');
+  
+  console.log('[Outlook] GET /deleted/fallback — loading from DB');
+  
+  try {
+    const result = await pool.query(`
+      SELECT 
+        id,
+        conversation_id AS "conversationId",
+        subject,
+        from_address,
+        from_name,
+        to_recipients,
+        cc_recipients,
+        received_datetime,
+        sent_datetime,
+        is_read,
+        body_preview,
+        has_attachments,
+        importance
+      FROM outlook_emails_cache
+      WHERE folder = 'deleteditems'
+      ORDER BY received_datetime DESC NULLS LAST
+      LIMIT $1 OFFSET $2
+    `, [top, skip]);
+    
+    const messages = result.rows.map(row => ({
+      id: row.id,
+      conversationId: row.conversationId,
+      subject: row.subject,
+      from: {
+        emailAddress: {
+          address: row.from_address,
+          name: row.from_name
+        }
+      },
+      toRecipients: row.to_recipients || [],
+      ccRecipients: row.cc_recipients || [],
+      receivedDateTime: row.received_datetime,
+      sentDateTime: row.sent_datetime,
+      isRead: row.is_read,
+      bodyPreview: row.body_preview,
+      hasAttachments: row.has_attachments,
+      importance: row.importance
+    }));
+    
+    console.log('[Outlook] Fallback: Loaded', messages.length, 'deleted messages from DB');
+    return res.json({ messages, source: 'database' });
+  } catch (err) {
+    console.error('[Outlook] ❌ Deleted fallback error:', err.message);
+    return res.status(500).json({ error: err.message, messages: [] });
   }
 });
 
