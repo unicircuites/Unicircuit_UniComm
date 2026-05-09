@@ -8,6 +8,7 @@ const fetch = require('node-fetch');
 const pool  = require('../db/pool');
 
 const GRAPH = 'https://graph.microsoft.com/v1.0';
+const GRAPH_VERBOSE_LOGS = process.env.MS_GRAPH_VERBOSE === '1';
 
 function msAuthority() {
   const tid = (process.env.MS_TENANT_ID || '').trim().toLowerCase();
@@ -30,10 +31,12 @@ const msalConfig = {
   system: {
     loggerOptions: {
       loggerCallback(level, message) {
-        console.log(`[MSAL][${level}] ${message}`);
+        if (GRAPH_VERBOSE_LOGS) {
+          console.log(`[MSAL][${level}] ${message}`);
+        }
       },
       piiLoggingEnabled: false,
-      logLevel: 3, // Info
+      logLevel: GRAPH_VERBOSE_LOGS ? 3 : 0,
     }
   }
 };
@@ -92,6 +95,7 @@ async function getStoredTokens(email) {
 // ── CLIENT CREDENTIALS TOKEN CACHE ────────────────────────────────────────
 let _ccToken = null;
 let _ccExpiry = null;
+let _ccTokenLogged = false;
 
 async function getClientCredentialsToken(forceRefresh = false) {
   // Return cached token if still valid (5 min buffer)
@@ -105,7 +109,10 @@ async function getClientCredentialsToken(forceRefresh = false) {
     if (result && result.accessToken) {
       _ccToken  = result.accessToken;
       _ccExpiry = new Date(Date.now() + (result.expiresIn || 3600) * 1000);
-      console.log('[Graph] ✅ Client credentials token acquired (no user login needed)');
+      if (!_ccTokenLogged) {
+        console.log('[Graph] Client credentials token acquired (no user login needed)');
+        _ccTokenLogged = true;
+      }
       return _ccToken;
     }
   } catch (err) {
@@ -142,7 +149,9 @@ async function getAccessToken(email) {
 
   // Fallback: Client Credentials (app-level, no user login needed)
   // Requires Application permissions + admin consent in Azure
-  console.log('[Graph] No delegated token — trying client credentials flow...');
+  if (GRAPH_VERBOSE_LOGS) {
+    console.log('[Graph] No delegated token - trying client credentials flow...');
+  }
   const ccToken = await getClientCredentialsToken();
   if (ccToken) return ccToken;
 

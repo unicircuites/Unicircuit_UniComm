@@ -48,6 +48,7 @@ function outlookBodyFromCrmContact(row) {
     companyName: String(row.company || '').trim() || undefined,
     jobTitle: String(row.designation || '').trim() || undefined,
     mobilePhone: phone || undefined,
+    businessPhones: phone ? [phone] : undefined,
   };
   if (email) body.emailAddresses = [{ address: email, name: body.displayName }];
   Object.keys(body).forEach(k => body[k] === undefined && delete body[k]);
@@ -57,26 +58,46 @@ function outlookBodyFromCrmContact(row) {
 async function findOutlookContactByEmail(email) {
   const wanted = String(email || '').trim().toLowerCase();
   if (!wanted) return null;
+  const token = await graph.getAccessToken(process.env.MS_USER_EMAIL);
 
-  const data = await graph.graphGet('/me/contacts?$top=500&$select=id,emailAddresses', process.env.MS_USER_EMAIL);
-  let rows = data.value || [];
-  let next = data['@odata.nextLink'] || '';
-  while (next && rows.length < 5000) {
-    const token = await graph.getAccessToken(process.env.MS_USER_EMAIL);
-    if (!token) break;
-    const res = await fetch(next, { headers: { Authorization: `Bearer ${token}` } });
-    if (!res.ok) break;
-    const page = await res.json();
-    rows = rows.concat(page.value || []);
-    next = page['@odata.nextLink'] || '';
+  async function readContacts(path) {
+    const data = await graph.graphGet(path, process.env.MS_USER_EMAIL);
+    let rows = data.value || [];
+    let next = data['@odata.nextLink'] || '';
+    while (next && rows.length < 5000 && token) {
+      const res = await fetch(next, { headers: { Authorization: `Bearer ${token}` } });
+      if (!res.ok) break;
+      const page = await res.json();
+      rows = rows.concat(page.value || []);
+      next = page['@odata.nextLink'] || '';
+    }
+    return rows;
   }
 
-  return rows.find(c => (c.emailAddresses || []).some(e => String(e && e.address || '').trim().toLowerCase() === wanted)) || null;
+  const select = '$top=500&$select=id,emailAddresses';
+  let rows = await readContacts(`/me/contacts?${select}`);
+  let found = rows.find(c => (c.emailAddresses || []).some(e => String(e && e.address || '').trim().toLowerCase() === wanted));
+  if (found) return found;
+
+  try {
+    const folders = await graph.graphGet('/me/contactFolders?$top=100&$select=id,displayName', process.env.MS_USER_EMAIL);
+    for (const folder of (folders.value || [])) {
+      rows = await readContacts(`/me/contactFolders/${encodeURIComponent(folder.id)}/contacts?${select}`);
+      found = rows.find(c => (c.emailAddresses || []).some(e => String(e && e.address || '').trim().toLowerCase() === wanted));
+      if (found) return found;
+    }
+  } catch (err) {
+    console.warn('[Contacts] Outlook folder lookup skipped:', err.message);
+  }
+
+  return null;
 }
 
 async function upsertOutlookContactFromCrm(row) {
   const email = String(row.email || '').trim();
   if (!email) return { skipped: true, reason: 'NO_EMAIL' };
+  const phone = String(row.phone || row.wa || '').trim();
+  if (!phone) return { skipped: true, reason: 'NO_MOBILE_PHONE' };
 
   const body = outlookBodyFromCrmContact(row);
   try {
@@ -193,6 +214,9 @@ router.post('/', async (req, res) => {
   if (!fname || !lname || !company) {
     return res.status(400).json({ error: 'First name, last name, and company are required.' });
   }
+  if (!String(phone || wa || '').trim()) {
+    return res.status(400).json({ error: 'Mobile number is required for contact tracking.' });
+  }
 
   const initials = `${fname[0]}${lname[0]}`.toUpperCase();
   const palettes = [
@@ -243,6 +267,9 @@ router.post('/', async (req, res) => {
 router.put('/:id', async (req, res) => {
   const { fname, lname, company, designation, dept, phone, wa, email,
           segment, score, products, city, notes } = req.body;
+  if (!String(phone || wa || '').trim()) {
+    return res.status(400).json({ error: 'Mobile number is required for contact tracking.' });
+  }
   try {
     const result = await pool.query(`
       UPDATE contacts SET

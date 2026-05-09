@@ -39,6 +39,15 @@ const STORAGE_SCAN_CACHE_MS = 5 * 60 * 1000;
 let storageScanCache = null;
 const STORAGE_SNAPSHOT_PATH = path.join(__dirname, '..', 'config', 'outlookStorageSnapshot.json');
 let lastContactsTrace = {};
+const OUTLOOK_CONTACTS_CONSOLE_TRACE = process.env.OUTLOOK_CONTACTS_CONSOLE_TRACE === '1';
+
+function contactsTraceLog(...args) {
+  if (OUTLOOK_CONTACTS_CONSOLE_TRACE) console.log(...args);
+}
+
+function contactsTraceWarn(...args) {
+  if (OUTLOOK_CONTACTS_CONSOLE_TRACE) console.warn(...args);
+}
 
 function decodeJwtPayload(token) {
   try {
@@ -86,6 +95,8 @@ function contactsTraceHeaderSummary(trace) {
     contactsSelect: contacts.select,
     contactsTotalFetched: contacts.totalFetched,
     contactsWithPhone: contacts.withPhone,
+    contactsMeSupplementalAdded: contacts.meSupplementalAdded,
+    contactsMeSupplementalSkipped: contacts.meSupplementalSkipped,
     contactFolders: Array.isArray(contacts.folders) ? contacts.folders.map(f => f.name) : [],
     contactsEndpointCount: Array.isArray(contacts.endpoints) ? contacts.endpoints.length : 0,
     peopleToken: people.token || null,
@@ -107,6 +118,50 @@ function contactsTraceHeaderSummary(trace) {
     directoryUsersTotalFetched: (trace && trace.directoryUsers || {}).totalFetched,
     directoryUsersError: (trace && trace.directoryUsers || {}).error || null,
   };
+}
+
+function contactPrimaryEmail(contact) {
+  return ((contact && contact.emailAddresses || []).map(e => e && e.address).filter(Boolean)[0] || '').trim();
+}
+
+function contactPhoneSummary(contact) {
+  const businessPhones = Array.isArray(contact && contact.businessPhones) ? contact.businessPhones.filter(Boolean) : [];
+  const homePhones = Array.isArray(contact && contact.homePhones) ? contact.homePhones.filter(Boolean) : [];
+  return {
+    mobilePhone: (contact && contact.mobilePhone) || null,
+    businessPhones,
+    homePhones,
+    resolvedPhone: (contact && contact.resolvedPhone) || null,
+    resolvedPhoneSource: (contact && contact.resolvedPhoneSource) || null,
+    hasAnyPhone: !!((contact && contact.mobilePhone) || businessPhones.length || homePhones.length || (contact && contact.resolvedPhone)),
+  };
+}
+
+function traceContactSample(label, contacts, limit = 8) {
+  if (!OUTLOOK_CONTACTS_CONSOLE_TRACE) return;
+  const list = Array.isArray(contacts) ? contacts : [];
+  const withEmail = list.filter(c => contactPrimaryEmail(c));
+  const withPhone = list.filter(c => contactPhoneSummary(c).hasAnyPhone);
+  const bySource = list.reduce((acc, c) => {
+    const key = c && c.source || 'raw-graph';
+    acc[key] = (acc[key] || 0) + 1;
+    return acc;
+  }, {});
+  console.log(`[Outlook Contacts][TRACE][${label}] count=${list.length}, withEmail=${withEmail.length}, withPhone=${withPhone.length}, sources=${JSON.stringify(bySource)}`);
+  list.slice(0, limit).forEach((c, i) => {
+    const phones = contactPhoneSummary(c);
+    console.log(`[Outlook Contacts][TRACE][${label}][sample:${i}] source="${c.source || 'raw-graph'}" id="${String(c.id || '').slice(0, 24)}" name="${c.displayName || ''}" email="${contactPrimaryEmail(c)}" phone=${JSON.stringify(phones)}`);
+  });
+  if (withPhone.length > limit) {
+    console.log(`[Outlook Contacts][TRACE][${label}] phone sample truncated: showing ${limit} of ${withPhone.length}`);
+  }
+}
+
+function tracePermissionDecision(label, tokenSummary, required) {
+  if (!OUTLOOK_CONTACTS_CONSOLE_TRACE) return;
+  const summary = tokenSummary || {};
+  console.log(`[Outlook Contacts][TRACE][${label}] auth tokenType=${summary.tokenType || 'unknown'}, signal=${summary.permissionSignal || 'none'}, user="${summary.user || ''}", tenant="${summary.tenantId || ''}", appId="${summary.appId || ''}", expiresAt="${summary.expiresAt || ''}"`);
+  console.log(`[Outlook Contacts][TRACE][${label}] required=${JSON.stringify(required)}, scopes=${JSON.stringify(summary.scopes || [])}, roles=${JSON.stringify(summary.roles || [])}`);
 }
 
 function clearStorageScanCache() {
@@ -458,20 +513,21 @@ async function setSignatureDefault(kind, id) {
 }
 
 async function fetchAllOutlookContactsGraph(email) {
-  // MUST use delegated token — client credentials cannot access /me/contacts
-  // or personal contact folders like "Your contacts"
+  contactsTraceLog(`[Outlook Contacts][STEP 1] Starting mailbox contacts fetch for MS_USER_EMAIL="${email || ''}"`);
+  // Try delegated token first (has access to personal "Your contacts" folder)
+  // Fall back to client credentials (works if Contacts.ReadWrite Application permission granted)
   let token = await graph.getAccessTokenForScopes(email, [
     'https://graph.microsoft.com/Contacts.ReadWrite',
     'https://graph.microsoft.com/Mail.Read',
     'offline_access',
   ]);
+  let tokenType = 'delegated';
   if (!token) {
-    // Fallback to any available token (may be client credentials — will still
-    // work for /users/{email}/contacts but not /me/contacts)
-    token = await graph.getAccessToken(email);
+    token = await graph.getClientCredentialsToken();
+    tokenType = 'client-credentials';
   }
   if (!token) throw new Error('NOT_AUTHENTICATED');
-  console.log('[Outlook Contacts] Token type:', token.length > 500 ? 'JWT (delegated or CC)' : 'short');
+  contactsTraceLog(`[Outlook Contacts] Using ${tokenType} token for contacts fetch`);
   // homePhones added — many contacts store phone there instead of mobilePhone
   const sel = 'id,displayName,givenName,surname,emailAddresses,businessPhones,mobilePhone,homePhones,companyName,jobTitle';
   const rows = [];
@@ -482,10 +538,12 @@ async function fetchAllOutlookContactsGraph(email) {
     endpoints: [],
     folders: [],
   };
-  console.log('[Outlook Contacts][TRACE] Token permission summary:', lastContactsTrace.contacts.token);
-  console.log('[Outlook Contacts][TRACE] Contact fields selected:', sel);
+  contactsTraceLog('[Outlook Contacts][TRACE] Token permission summary:', lastContactsTrace.contacts.token);
+  tracePermissionDecision('mailbox-contacts', lastContactsTrace.contacts.token, ['Contacts.Read', 'Contacts.ReadWrite']);
+  contactsTraceLog('[Outlook Contacts][TRACE] Contact fields selected:', sel);
 
   async function readPages(firstUrl, label = 'contacts') {
+    contactsTraceLog(`[Outlook Contacts][STEP 2] Reading Graph pages label="${label}" url="${firstUrl}"`);
     let url = firstUrl;
     for (let page = 0; page < 100 && url; page++) {
       const traceItem = { label, page, url, status: null, count: 0, next: false };
@@ -497,7 +555,7 @@ async function fetchAllOutlookContactsGraph(email) {
         const err = await res.json().catch(() => ({}));
         traceItem.error = err.error?.message || `Graph API error ${res.status}`;
         lastContactsTrace.contacts.endpoints.push(traceItem);
-        console.warn('[Outlook Contacts][TRACE] Graph page failed:', traceItem);
+        contactsTraceWarn('[Outlook Contacts][TRACE] Graph page failed:', traceItem);
         const graphErr = new Error(err.error?.message || `Graph API error ${res.status}`);
         graphErr.status = res.status;
         graphErr.code = err.error?.code;
@@ -508,9 +566,11 @@ async function fetchAllOutlookContactsGraph(email) {
       rows.push(...pageRows);
       url = data['@odata.nextLink'] || null;
       traceItem.count = pageRows.length;
+      traceItem.withPhone = pageRows.filter(c => contactPhoneSummary(c).hasAnyPhone).length;
       traceItem.next = !!url;
       lastContactsTrace.contacts.endpoints.push(traceItem);
-      console.log('[Outlook Contacts][TRACE] Graph page:', traceItem);
+      contactsTraceLog('[Outlook Contacts][TRACE] Graph page:', traceItem);
+      traceContactSample(`${label}:page-${page}`, pageRows, 3);
     }
   }
 
@@ -525,44 +585,54 @@ async function fetchAllOutlookContactsGraph(email) {
   let folderIds = [];
   try {
     const foldersUrl = `${baseUrl}/contactFolders?$top=100&$select=id,displayName`;
+    contactsTraceLog(`[Outlook Contacts][STEP 3] Listing contact folders url="${foldersUrl}"`);
     const fRes = await fetch(foldersUrl, {
       headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
     });
+    lastContactsTrace.contacts.folderList = { url: foldersUrl, status: fRes.status, count: 0 };
     if (fRes.ok) {
       const fData = await fRes.json();
       folderIds = (fData.value || []).map(f => ({ id: f.id, name: f.displayName }));
+      lastContactsTrace.contacts.folderList.count = folderIds.length;
       lastContactsTrace.contacts.folders = folderIds.map(f => ({
         name: f.name,
         idPreview: String(f.id || '').slice(0, 18) + '...',
       }));
-      console.log(`[Outlook Contacts] Found ${folderIds.length} contact folders:`, folderIds.map(f => f.name).join(', '));
-      console.log('[Outlook Contacts][TRACE] Contact folders:', lastContactsTrace.contacts.folders);
+      contactsTraceLog(`[Outlook Contacts] Found ${folderIds.length} contact folders:`, folderIds.map(f => f.name).join(', '));
+      contactsTraceLog('[Outlook Contacts][TRACE] Contact folders:', lastContactsTrace.contacts.folders);
+    } else {
+      const err = await fRes.json().catch(() => ({}));
+      lastContactsTrace.contacts.folderList.error = err.error?.message || `Graph API error ${fRes.status}`;
+      contactsTraceWarn('[Outlook Contacts][TRACE] Contact folder list failed:', lastContactsTrace.contacts.folderList);
     }
   } catch (fErr) {
-    console.warn('[Outlook Contacts] Could not fetch contact folders:', fErr.message);
+    contactsTraceWarn('[Outlook Contacts] Could not fetch contact folders:', fErr.message);
   }
 
   // Step 2: Fetch contacts from default folder
   const defaultUrl = `${baseUrl}/contacts?$top=500&$select=${encodeURIComponent(sel)}`;
   try {
+    contactsTraceLog('[Outlook Contacts][STEP 4] Fetching default Contacts folder');
     await readPages(defaultUrl, 'default-contacts');
-    console.log(`[Outlook Contacts] Default folder: ${rows.length} contacts`);
+    contactsTraceLog(`[Outlook Contacts] Default folder: ${rows.length} contacts`);
+    traceContactSample('after-default-contacts', rows);
   } catch (err) {
-    console.warn('[Outlook Contacts] Default folder fetch failed:', err.message);
+    contactsTraceWarn('[Outlook Contacts] Default folder fetch failed:', err.message);
     // Try /me fallback
     if (useUserEndpoint) {
       try {
         rows.length = 0;
         await readPages(`${GRAPH_ROOT}/me/contacts?$top=500&$select=${encodeURIComponent(sel)}`, 'me-fallback-contacts');
-        console.log(`[Outlook Contacts] /me fallback: ${rows.length} contacts`);
+        contactsTraceLog(`[Outlook Contacts] /me fallback: ${rows.length} contacts`);
       } catch (e2) {
-        console.warn('[Outlook Contacts] /me fallback also failed:', e2.message);
+        contactsTraceWarn('[Outlook Contacts] /me fallback also failed:', e2.message);
       }
     }
   }
 
   // Step 3: Fetch contacts from each named folder (to get "Your contacts" etc.)
   const seenIds = new Set(rows.map(r => r.id));
+  contactsTraceLog(`[Outlook Contacts][STEP 5] Fetching ${folderIds.length} named contact folders`);
   for (const folder of folderIds) {
     try {
       const folderUrl = `${baseUrl}/contactFolders/${encodeURIComponent(folder.id)}/contacts?$top=500&$select=${encodeURIComponent(sel)}`;
@@ -578,7 +648,7 @@ async function fetchAllOutlookContactsGraph(email) {
         if (!res.ok) {
           traceItem.error = `Graph API error ${res.status}`;
           lastContactsTrace.contacts.endpoints.push(traceItem);
-          console.warn('[Outlook Contacts][TRACE] Folder page failed:', traceItem);
+          contactsTraceWarn('[Outlook Contacts][TRACE] Folder page failed:', traceItem);
           break;
         }
         const data = await res.json();
@@ -592,26 +662,34 @@ async function fetchAllOutlookContactsGraph(email) {
         url = data['@odata.nextLink'] || null;
         traceItem.count = (data.value || []).length;
         traceItem.newUniqueCount = folderRows.length - uniqueBefore;
+        traceItem.withPhone = (data.value || []).filter(c => contactPhoneSummary(c).hasAnyPhone).length;
         traceItem.next = !!url;
         lastContactsTrace.contacts.endpoints.push(traceItem);
-        console.log('[Outlook Contacts][TRACE] Folder Graph page:', traceItem);
+        contactsTraceLog('[Outlook Contacts][TRACE] Folder Graph page:', traceItem);
+        traceContactSample(`folder:${folder.name}:page-${page}`, data.value || [], 3);
       }
       rows.push(...folderRows);
       if (folderRows.length > 0) {
-        console.log(`[Outlook Contacts] Folder "${folder.name}": +${folderRows.length} new contacts (total now: ${rows.length})`);
+        contactsTraceLog(`[Outlook Contacts] Folder "${folder.name}": +${folderRows.length} new contacts (total now: ${rows.length})`);
+        traceContactSample(`folder:${folder.name}:new-unique`, folderRows);
+      } else {
+        contactsTraceLog(`[Outlook Contacts] Folder "${folder.name}": 0 new unique contacts (total still: ${rows.length}, before: ${beforeCount})`);
       }
     } catch (fErr) {
-      console.warn(`[Outlook Contacts] Folder "${folder.name}" fetch failed:`, fErr.message);
+      contactsTraceWarn(`[Outlook Contacts] Folder "${folder.name}" fetch failed:`, fErr.message);
     }
   }
 
   // Step 4: Always include delegated /me contacts too. Outlook personal People
   // contacts are user-scoped; /users/{mailbox}/contacts can miss entries even
   // when the signed-in mailbox is the same account.
-  if (useUserEndpoint) {
+  const contactTokenSummary = lastContactsTrace.contacts && lastContactsTrace.contacts.token;
+  const canUseMeEndpoint = contactTokenSummary && contactTokenSummary.tokenType === 'delegated';
+  if (useUserEndpoint && canUseMeEndpoint) {
     const beforeMe = rows.length;
     const meRows = [];
     async function readMePages(firstUrl, label) {
+      contactsTraceLog(`[Outlook Contacts][STEP 6] Reading delegated /me supplement label="${label}" url="${firstUrl}"`);
       let url = firstUrl;
       for (let page = 0; page < 100 && url; page++) {
         const traceItem = { label, page, url, status: null, count: 0, newUniqueCount: 0, next: false };
@@ -622,7 +700,7 @@ async function fetchAllOutlookContactsGraph(email) {
         if (!res.ok) {
           traceItem.error = `Graph API error ${res.status}`;
           lastContactsTrace.contacts.endpoints.push(traceItem);
-          console.warn('[Outlook Contacts][TRACE] /me page failed:', traceItem);
+          contactsTraceWarn('[Outlook Contacts][TRACE] /me page failed:', traceItem);
           break;
         }
         const data = await res.json();
@@ -636,38 +714,57 @@ async function fetchAllOutlookContactsGraph(email) {
         url = data['@odata.nextLink'] || null;
         traceItem.count = (data.value || []).length;
         traceItem.newUniqueCount = meRows.length - uniqueBefore;
+        traceItem.withPhone = (data.value || []).filter(c => contactPhoneSummary(c).hasAnyPhone).length;
         traceItem.next = !!url;
         lastContactsTrace.contacts.endpoints.push(traceItem);
-        console.log('[Outlook Contacts][TRACE] /me Graph page:', traceItem);
+        contactsTraceLog('[Outlook Contacts][TRACE] /me Graph page:', traceItem);
+        traceContactSample(`${label}:page-${page}`, data.value || [], 3);
       }
     }
 
     await readMePages(`${GRAPH_ROOT}/me/contacts?$top=500&$select=${encodeURIComponent(sel)}`, 'me-contacts');
     try {
+      contactsTraceLog('[Outlook Contacts][STEP 7] Listing delegated /me contact folders');
       const fRes = await fetch(`${GRAPH_ROOT}/me/contactFolders?$top=100&$select=id,displayName`, {
         headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
       });
       if (fRes.ok) {
         const fData = await fRes.json();
-        for (const folder of (fData.value || [])) {
+        const meFolders = fData.value || [];
+        lastContactsTrace.contacts.meFolders = meFolders.map(f => ({ name: f.displayName, idPreview: String(f.id || '').slice(0, 18) + '...' }));
+        contactsTraceLog(`[Outlook Contacts][TRACE] /me contact folders found: ${meFolders.map(f => f.displayName).join(', ')}`);
+        for (const folder of meFolders) {
           await readMePages(`${GRAPH_ROOT}/me/contactFolders/${encodeURIComponent(folder.id)}/contacts?$top=500&$select=${encodeURIComponent(sel)}`, `me-folder:${folder.displayName}`);
         }
+      } else {
+        const err = await fRes.json().catch(() => ({}));
+        contactsTraceWarn('[Outlook Contacts][TRACE] /me contact folders failed:', {
+          status: fRes.status,
+          error: err.error?.message || `Graph API error ${fRes.status}`,
+        });
       }
     } catch (meFolderErr) {
-      console.warn('[Outlook Contacts] /me contact folders fetch failed:', meFolderErr.message);
+      contactsTraceWarn('[Outlook Contacts] /me contact folders fetch failed:', meFolderErr.message);
     }
     rows.push(...meRows);
     lastContactsTrace.contacts.meSupplementalAdded = rows.length - beforeMe;
-    console.log(`[Outlook Contacts] /me supplemental: +${rows.length - beforeMe} contacts (total now: ${rows.length})`);
+    contactsTraceLog(`[Outlook Contacts] /me supplemental: +${rows.length - beforeMe} contacts (total now: ${rows.length})`);
+    traceContactSample('after-me-supplement', rows);
+  } else if (useUserEndpoint) {
+    lastContactsTrace.contacts.meSupplementalSkipped = contactTokenSummary && contactTokenSummary.tokenType
+      ? `Skipped /me supplemental fetch for ${contactTokenSummary.tokenType} token`
+      : 'Skipped /me supplemental fetch because token type is unknown';
+    contactsTraceLog(`[Outlook Contacts][STEP 6] ${lastContactsTrace.contacts.meSupplementalSkipped}`);
   }
 
   // Log contacts with phone numbers
   const withPhone = rows.filter(c => c.mobilePhone || (c.businessPhones && c.businessPhones.length) || (c.homePhones && c.homePhones.length));
   lastContactsTrace.contacts.totalFetched = rows.length;
   lastContactsTrace.contacts.withPhone = withPhone.length;
-  console.log(`[Outlook Contacts] Total fetched: ${rows.length} | With phone: ${withPhone.length}`);
+  contactsTraceLog(`[Outlook Contacts] Total fetched: ${rows.length} | With phone: ${withPhone.length}`);
+  traceContactSample('raw-mailbox-final-before-map', rows, 12);
   withPhone.forEach((c, i) => {
-    console.log(`[Outlook Contacts][phone][${i}] "${c.displayName}" | mobile="${c.mobilePhone}" | business=${JSON.stringify(c.businessPhones)} | home=${JSON.stringify(c.homePhones)} | email=${JSON.stringify((c.emailAddresses||[]).map(e=>e.address))}`);
+    contactsTraceLog(`[Outlook Contacts][phone][${i}] "${c.displayName}" | mobile="${c.mobilePhone}" | business=${JSON.stringify(c.businessPhones)} | home=${JSON.stringify(c.homePhones)} | email=${JSON.stringify((c.emailAddresses||[]).map(e=>e.address))}`);
   });
 
   return rows;
@@ -712,7 +809,7 @@ async function fetchAllOutlookPeopleGraphSafe(email) {
       status: err.status || null,
       code: err.code || null,
     };
-    console.warn('[Outlook People][TRACE] People API merge failed:', lastContactsTrace.people);
+    contactsTraceWarn('[Outlook People][TRACE] People API merge failed:', lastContactsTrace.people);
     return [];
   }
 }
@@ -854,11 +951,44 @@ function directoryPrimaryEmail(contact) {
 }
 
 function directoryPrimaryPhone(contact) {
-  return (contact.mobilePhone && String(contact.mobilePhone).trim())
+  return (contact.resolvedPhone && String(contact.resolvedPhone).trim())
+    || (contact.mobilePhone && String(contact.mobilePhone).trim())
     || (Array.isArray(contact.businessPhones) && contact.businessPhones.map(p => String(p || '').trim()).find(Boolean))
     || (Array.isArray(contact.homePhones) && contact.homePhones.map(p => String(p || '').trim()).find(Boolean))
-    || (contact.resolvedPhone && String(contact.resolvedPhone).trim())
     || null;
+}
+
+function normalizeDirectoryPhoneFields(contact) {
+  if (!contact) return contact;
+  const phone = directoryPrimaryPhone(contact);
+  if (!phone) return contact;
+
+  // Keep mobilePhone populated because CRM, WhatsApp matching, and call-log
+  // matching all consume this field first.
+  if (!contact.mobilePhone) contact.mobilePhone = phone;
+  if (!contact.resolvedPhone) contact.resolvedPhone = phone;
+  if (!contact.resolvedPhoneSource) contact.resolvedPhoneSource = 'normalized';
+  return contact;
+}
+
+function mergeOutlookGraphMarker(notes, graphId) {
+  const marker = `Outlook contact · Graph ID: ${graphId}`;
+  const current = String(notes || '').trim();
+  if (!graphId) return current || null;
+  if (!current) return marker;
+  if (/Graph ID:/i.test(current)) return current.replace(/Outlook contact\s*·\s*Graph ID:\s*[^\s,\n]+/i, marker);
+  return `${current}\n${marker}`;
+}
+
+function directoryContactRank(contact) {
+  const email = directoryPrimaryEmail(contact).toLowerCase();
+  const name = String(contact.displayName || '').trim().toLowerCase();
+  const hasUsefulName = !!name && name !== email;
+  const hasPhone = !!directoryPrimaryPhone(contact);
+  const sourceRank = contact.source === 'outlook-contacts'
+    ? 100
+    : (contact.source === 'outlook-org-contacts' ? 70 : (contact.source === 'outlook-people' ? 40 : 10));
+  return sourceRank + (hasUsefulName ? 20 : 0) + (hasPhone ? 10 : 0);
 }
 
 function mergeDirectoryContact(existing, incoming) {
@@ -886,6 +1016,37 @@ function mergeDirectoryContact(existing, incoming) {
   if (!existing.displayName && incoming.displayName) existing.displayName = incoming.displayName;
   if (incoming.orgContactId && !existing.orgContactId) existing.orgContactId = incoming.orgContactId;
   if (incoming.outlookPersonId && !existing.outlookPersonId) existing.outlookPersonId = incoming.outlookPersonId;
+  normalizeDirectoryPhoneFields(existing);
+}
+
+function collapseDirectoryContactsByEmail(contacts) {
+  const result = [];
+  const byEmail = new Map();
+  for (const contact of contacts || []) {
+    normalizeDirectoryPhoneFields(contact);
+    const email = directoryPrimaryEmail(contact).toLowerCase();
+    if (!email) {
+      result.push(contact);
+      continue;
+    }
+
+    const existing = byEmail.get(email);
+    if (!existing) {
+      byEmail.set(email, contact);
+      result.push(contact);
+      continue;
+    }
+
+    if (directoryContactRank(contact) > directoryContactRank(existing)) {
+      mergeDirectoryContact(contact, existing);
+      const index = result.indexOf(existing);
+      if (index >= 0) result[index] = contact;
+      byEmail.set(email, contact);
+    } else {
+      mergeDirectoryContact(existing, contact);
+    }
+  }
+  return result;
 }
 
 function appendUniqueDirectoryContacts(base, incoming) {
@@ -904,11 +1065,20 @@ function appendUniqueDirectoryContacts(base, incoming) {
     const id = contact.id ? String(contact.id) : '';
     const existing = (email && byEmail.get(email)) || (id && byId.get(id));
     if (existing) {
-      mergeDirectoryContact(existing, contact);
+      if (email && directoryContactRank(contact) > directoryContactRank(existing)) {
+        mergeDirectoryContact(contact, existing);
+        const index = base.indexOf(existing);
+        if (index >= 0) base[index] = contact;
+        byEmail.set(email, contact);
+        if (id) byId.set(id, contact);
+      } else {
+        mergeDirectoryContact(existing, contact);
+      }
       merged++;
       continue;
     }
     base.push(contact);
+    normalizeDirectoryPhoneFields(contact);
     if (email) byEmail.set(email, contact);
     if (id) byId.set(id, contact);
     appended++;
@@ -943,32 +1113,44 @@ async function getOutlookPeopleTokenContext(email) {
 }
 
 async function fetchOutlookDirectoryItems(email) {
-  let outlookContacts = (await fetchAllOutlookContactsGraph(email)).map(mapOutlookContactToDirectoryItem);
+  contactsTraceLog(`[Outlook Contacts][STEP 8] Building unified Outlook directory for "${email || ''}"`);
+  let outlookContacts = collapseDirectoryContactsByEmail((await fetchAllOutlookContactsGraph(email)).map(mapOutlookContactToDirectoryItem));
+  traceContactSample('mapped-mailbox-contacts', outlookContacts, 12);
   let peopleList = [];
 
   try {
+    contactsTraceLog('[Outlook Contacts][STEP 9] Fetching People API list for suggested/relevant people merge');
     peopleList = await fetchAllOutlookPeopleGraphSafe(email);
+    traceContactSample('people-api-before-merge', peopleList, 12);
     if (peopleList && peopleList.length > 0) {
       const peopleMerge = appendUniqueDirectoryContacts(outlookContacts, peopleList);
       lastContactsTrace.people.phoneMapSize = peopleList.filter(directoryPrimaryPhone).length;
       lastContactsTrace.people.mergedIntoContacts = peopleMerge.merged;
       lastContactsTrace.people.appendedToContacts = peopleMerge.appended;
-      console.log(`[Outlook People][TRACE] Merged ${peopleMerge.merged}, appended ${peopleMerge.appended}`);
+      contactsTraceLog(`[Outlook People][TRACE] Merged ${peopleMerge.merged}, appended ${peopleMerge.appended}`);
+      traceContactSample('after-people-merge', outlookContacts, 12);
+    } else {
+      contactsTraceLog('[Outlook People][TRACE] People API returned 0 contacts; no merge happened');
     }
   } catch (peopleErr) {
-    console.warn('[Outlook Contacts] People API merge failed (non-fatal):', peopleErr.message);
+    contactsTraceWarn('[Outlook Contacts] People API merge failed (non-fatal):', peopleErr.message);
   }
 
   try {
+    contactsTraceLog('[Outlook Contacts][STEP 10] Fetching OrgContact list for tenant/global contacts merge');
     const orgContacts = await fetchAllOrgContactsGraphSafe();
+    traceContactSample('orgcontacts-before-merge', orgContacts, 12);
     if (orgContacts && orgContacts.length > 0) {
       const orgMerge = appendUniqueDirectoryContacts(outlookContacts, orgContacts);
       lastContactsTrace.orgContacts.mergedIntoContacts = orgMerge.merged;
       lastContactsTrace.orgContacts.appendedToContacts = orgMerge.appended;
-      console.log(`[Outlook OrgContacts][TRACE] Merged ${orgMerge.merged}, appended ${orgMerge.appended}`);
+      contactsTraceLog(`[Outlook OrgContacts][TRACE] Merged ${orgMerge.merged}, appended ${orgMerge.appended}`);
+      traceContactSample('after-orgcontacts-merge', outlookContacts, 12);
+    } else {
+      contactsTraceLog('[Outlook OrgContacts][TRACE] OrgContact API returned 0 contacts; no merge happened');
     }
   } catch (orgErr) {
-    console.warn('[Outlook Contacts] Org contacts merge failed (non-fatal):', orgErr.message);
+    contactsTraceWarn('[Outlook Contacts] Org contacts merge failed (non-fatal):', orgErr.message);
   }
 
   outlookContacts.sort((a, b) => {
@@ -976,7 +1158,9 @@ async function fetchOutlookDirectoryItems(email) {
     const nb = (b.displayName || directoryPrimaryEmail(b) || '').trim();
     return na.localeCompare(nb, undefined, { sensitivity: 'base' });
   });
+  outlookContacts.forEach(normalizeDirectoryPhoneFields);
 
+  traceContactSample('final-directory-items', outlookContacts, 15);
   return outlookContacts;
 }
 
@@ -991,7 +1175,7 @@ async function fetchAllOrgContactsGraphSafe() {
       code: err.code || null,
       requiredPermission: 'OrgContact.Read.All',
     };
-    console.warn('[Outlook OrgContacts][TRACE] Org contacts fetch failed:', lastContactsTrace.orgContacts);
+    contactsTraceWarn('[Outlook OrgContacts][TRACE] Org contacts fetch failed:', lastContactsTrace.orgContacts);
     return [];
   }
 }
@@ -1009,8 +1193,9 @@ async function fetchAllOrgContactsGraph() {
     requiredPermission: 'OrgContact.Read.All',
     pages: [],
   };
-  console.log('[Outlook OrgContacts][TRACE] Token permission summary:', lastContactsTrace.orgContacts.token);
-  console.log('[Outlook OrgContacts][TRACE] OrgContact fields selected:', sel);
+  contactsTraceLog('[Outlook OrgContacts][TRACE] Token permission summary:', lastContactsTrace.orgContacts.token);
+  tracePermissionDecision('orgcontacts', lastContactsTrace.orgContacts.token, ['OrgContact.Read.All']);
+  contactsTraceLog('[Outlook OrgContacts][TRACE] OrgContact fields selected:', sel);
   for (let page = 0; page < 20 && url; page++) {
     const traceItem = { page, url, status: null, count: 0, next: false };
     const res = await fetch(url, {
@@ -1021,7 +1206,7 @@ async function fetchAllOrgContactsGraph() {
       const err = await res.json().catch(() => ({}));
       traceItem.error = err.error?.message || `Graph API error ${res.status}`;
       lastContactsTrace.orgContacts.pages.push(traceItem);
-      console.warn('[Outlook OrgContacts][TRACE] Graph page failed:', traceItem);
+      contactsTraceWarn('[Outlook OrgContacts][TRACE] Graph page failed:', traceItem);
       const graphErr = new Error(traceItem.error);
       graphErr.status = res.status;
       graphErr.code = err.error?.code;
@@ -1032,13 +1217,16 @@ async function fetchAllOrgContactsGraph() {
     rows.push(...pageRows.map(mapOrgContactToDirectoryItem));
     url = data['@odata.nextLink'] || null;
     traceItem.count = pageRows.length;
+    traceItem.withPhone = pageRows.filter(c => orgContactPrimaryPhone(c)).length;
     traceItem.next = !!url;
     lastContactsTrace.orgContacts.pages.push(traceItem);
-    console.log('[Outlook OrgContacts][TRACE] Graph page:', traceItem);
+    contactsTraceLog('[Outlook OrgContacts][TRACE] Graph page:', traceItem);
+    traceContactSample(`orgcontacts:page-${page}`, pageRows.map(mapOrgContactToDirectoryItem), 3);
   }
   lastContactsTrace.orgContacts.totalFetched = rows.length;
   lastContactsTrace.orgContacts.withPhone = rows.filter(c => c.mobilePhone || (c.businessPhones && c.businessPhones.length)).length;
-  console.log(`[Outlook OrgContacts][TRACE] Total fetched: ${rows.length} | With phone: ${lastContactsTrace.orgContacts.withPhone}`);
+  contactsTraceLog(`[Outlook OrgContacts][TRACE] Total fetched: ${rows.length} | With phone: ${lastContactsTrace.orgContacts.withPhone}`);
+  traceContactSample('orgcontacts-final', rows, 12);
   return rows;
 }
 
@@ -1078,9 +1266,10 @@ async function fetchAllOutlookPeopleGraph(email) {
     select: sel,
     endpoints: [],
   };
-  console.log('[Outlook People][TRACE] Requested scopes:', requestedScopes);
-  console.log('[Outlook People][TRACE] Token permission summary:', lastContactsTrace.people.token);
-  console.log('[Outlook People][TRACE] People fields selected:', sel);
+  contactsTraceLog('[Outlook People][TRACE] Requested scopes:', requestedScopes);
+  contactsTraceLog('[Outlook People][TRACE] Token permission summary:', lastContactsTrace.people.token);
+  tracePermissionDecision('people-api', lastContactsTrace.people.token, usingDelegatedToken ? ['People.Read'] : ['People.Read.All']);
+  contactsTraceLog('[Outlook People][TRACE] People fields selected:', sel);
   for (let page = 0; page < 20 && url; page++) {
     const traceItem = { label: 'me-people', page, url, status: null, count: 0, next: false };
     const res = await fetch(url, {
@@ -1091,7 +1280,7 @@ async function fetchAllOutlookPeopleGraph(email) {
       const err = await res.json().catch(() => ({}));
       traceItem.error = err.error?.message || `Graph API error ${res.status}`;
       lastContactsTrace.people.endpoints.push(traceItem);
-      console.warn('[Outlook People][TRACE] Graph page failed:', traceItem);
+      contactsTraceWarn('[Outlook People][TRACE] Graph page failed:', traceItem);
       const graphErr = new Error(err.error?.message || `Graph API error ${res.status}`);
       graphErr.status = res.status;
       graphErr.code = err.error?.code;
@@ -1099,16 +1288,20 @@ async function fetchAllOutlookPeopleGraph(email) {
     }
     const data = await res.json();
     const pageRows = data.value || [];
-    rows.push(...pageRows.map(mapOutlookPersonToContact));
+    const mappedRows = pageRows.map(mapOutlookPersonToContact);
+    rows.push(...mappedRows);
     url = data['@odata.nextLink'] || null;
     traceItem.count = pageRows.length;
+    traceItem.withPhone = mappedRows.filter(c => contactPhoneSummary(c).hasAnyPhone).length;
     traceItem.next = !!url;
     lastContactsTrace.people.endpoints.push(traceItem);
-    console.log('[Outlook People][TRACE] Graph page:', traceItem);
+    contactsTraceLog('[Outlook People][TRACE] Graph page:', traceItem);
+    traceContactSample(`people-api:page-${page}`, mappedRows, 3);
   }
   lastContactsTrace.people.totalFetched = rows.length;
   lastContactsTrace.people.withPhone = rows.filter(p => p.mobilePhone || (p.businessPhones && p.businessPhones.length)).length;
-  console.log(`[Outlook People][TRACE] Total fetched: ${rows.length} | With phone: ${lastContactsTrace.people.withPhone}`);
+  contactsTraceLog(`[Outlook People][TRACE] Total fetched: ${rows.length} | With phone: ${lastContactsTrace.people.withPhone}`);
+  traceContactSample('people-api-final', rows, 12);
   return rows;
 }
 
@@ -1526,6 +1719,8 @@ router.get('/contacts', async (req, res) => {
       requestedAt: new Date().toISOString(),
       mailbox: MS_EMAIL,
     };
+    contactsTraceLog(`[Outlook Contacts][REQUEST] GET /api/outlook/contacts started at ${lastContactsTrace.requestedAt}`);
+    contactsTraceLog(`[Outlook Contacts][REQUEST] Runtime mailbox MS_USER_EMAIL="${MS_EMAIL || ''}"`);
     res.set('Cache-Control', 'no-store, no-cache, must-revalidate, private');
     res.set('Pragma', 'no-cache');
     res.set('Expires', '0');
@@ -1533,8 +1728,15 @@ router.get('/contacts', async (req, res) => {
 
     let outlookContacts = [];
     try {
+      contactsTraceLog('[Outlook Contacts][REQUEST] Calling fetchOutlookDirectoryItems()');
       outlookContacts = await fetchOutlookDirectoryItems(MS_EMAIL);
+      traceContactSample('route-after-fetchOutlookDirectoryItems', outlookContacts, 15);
     } catch (err) {
+      contactsTraceWarn('[Outlook Contacts][REQUEST] fetchOutlookDirectoryItems failed:', {
+        message: err.message,
+        status: err.status || null,
+        code: err.code || null,
+      });
       if (err.message === 'NOT_AUTHENTICATED') return res.status(401).json({ error: 'NOT_AUTHENTICATED' });
       if (err.status === 403 || /access is denied|ErrorAccessDenied|Authorization_RequestDenied|permission|privilege/i.test(`${err.code || ''} ${err.message || ''}`)) {
         return res.status(403).json({
@@ -1548,7 +1750,9 @@ router.get('/contacts', async (req, res) => {
     // Fetch People API to get phone numbers (contacts folder often lacks phone data)
     // People.Read permission required — merge phone numbers by email
     try {
+      contactsTraceLog('[Outlook Contacts][STEP 11] Route-level People API phone merge pass starting');
       const peopleList = await fetchAllOutlookPeopleGraphSafe(MS_EMAIL);
+      traceContactSample('route-people-phone-pass-list', peopleList, 12);
       if (peopleList && peopleList.length > 0) {
         // Build email → phone map from People API
         const phoneByEmail = new Map();
@@ -1561,7 +1765,7 @@ router.get('/contacts', async (req, res) => {
             }
           }
         }
-        console.log(`[Outlook Contacts] People API phone map size: ${phoneByEmail.size}`);
+        contactsTraceLog(`[Outlook Contacts] People API phone map size: ${phoneByEmail.size}`);
         lastContactsTrace.people.phoneMapSize = phoneByEmail.size;
 
         // Merge phone numbers into contacts
@@ -1575,11 +1779,14 @@ router.get('/contacts', async (req, res) => {
             }
           }
         }
-        console.log(`[Outlook Contacts] Merged phone numbers from People API: ${merged} contacts updated`);
+        contactsTraceLog(`[Outlook Contacts] Merged phone numbers from People API: ${merged} contacts updated`);
         lastContactsTrace.people.mergedIntoContacts = merged;
+        traceContactSample('route-after-people-phone-pass', outlookContacts, 15);
+      } else {
+        contactsTraceLog('[Outlook Contacts][STEP 11] People API phone merge skipped because People API returned 0 rows');
       }
     } catch (peopleErr) {
-      console.warn('[Outlook Contacts] People API phone merge failed (non-fatal):', peopleErr.message);
+      contactsTraceWarn('[Outlook Contacts] People API phone merge failed (non-fatal):', peopleErr.message);
     }
 
     const rawAddr = (oc) => ((oc.emailAddresses || []).map(e => e && e.address).filter(Boolean)[0]) || '';
@@ -1587,7 +1794,9 @@ router.get('/contacts', async (req, res) => {
     // Organizational contacts appear as "External" in Outlook People/profile cards.
     // They are not mailbox contacts, so Contacts.Read returns blank/missing phone data.
     try {
+      contactsTraceLog('[Outlook Contacts][STEP 12] Route-level OrgContact merge pass starting');
       const orgContacts = await fetchAllOrgContactsGraphSafe();
+      traceContactSample('route-orgcontacts-pass-list', orgContacts, 12);
       if (orgContacts && orgContacts.length > 0) {
         const byEmail = new Map();
         for (const contact of outlookContacts) {
@@ -1618,10 +1827,13 @@ router.get('/contacts', async (req, res) => {
         }
         lastContactsTrace.orgContacts.mergedIntoContacts = merged;
         lastContactsTrace.orgContacts.appendedToContacts = appended;
-        console.log(`[Outlook OrgContacts][TRACE] Merged ${merged}, appended ${appended}`);
+        contactsTraceLog(`[Outlook OrgContacts][TRACE] Merged ${merged}, appended ${appended}`);
+        traceContactSample('route-after-orgcontacts-pass', outlookContacts, 15);
+      } else {
+        contactsTraceLog('[Outlook Contacts][STEP 12] OrgContact merge skipped because OrgContact API returned 0 rows');
       }
     } catch (orgErr) {
-      console.warn('[Outlook Contacts] Org contacts merge failed (non-fatal):', orgErr.message);
+      contactsTraceWarn('[Outlook Contacts] Org contacts merge failed (non-fatal):', orgErr.message);
     }
 
     outlookContacts.sort((a, b) => {
@@ -1629,11 +1841,27 @@ router.get('/contacts', async (req, res) => {
       const nb = (b.displayName || rawAddr(b) || '').trim();
       return na.localeCompare(nb, undefined, { sensitivity: 'base' });
     });
+    outlookContacts.forEach(normalizeDirectoryPhoneFields);
 
+    traceContactSample('route-final-response', outlookContacts, 20);
     res.set('X-Outlook-Contacts-Trace', safeHeaderValue(contactsTraceHeaderSummary(lastContactsTrace)));
-    console.log('[Outlook Contacts][TRACE] Final trace summary:', JSON.stringify(lastContactsTrace, null, 2));
+    contactsTraceLog('[Outlook Contacts][TRACE] Final trace summary:', JSON.stringify(lastContactsTrace, null, 2));
+    console.log(`[Outlook Contacts][REQUEST] completed: returned=${outlookContacts.length}, withPhone=${outlookContacts.filter(c => contactPhoneSummary(c).hasAnyPhone).length}. Full trace is in browser DevTools Network response via ?debug=1.`);
+    if (req.query.debug === '1') {
+      return res.json({
+        contacts: outlookContacts,
+        trace: lastContactsTrace,
+        summary: contactsTraceHeaderSummary(lastContactsTrace),
+      });
+    }
     return res.json(outlookContacts);
   } catch (err) {
+    console.error('[Outlook Contacts][REQUEST] GET /api/outlook/contacts failed:', {
+      message: err.message,
+      status: err.status || null,
+      code: err.code || null,
+      stack: err.stack,
+    });
     if (err.message === 'NOT_AUTHENTICATED') return res.status(401).json({ error: 'NOT_AUTHENTICATED' });
     return res.status(500).json({ error: err.message });
   }
@@ -1645,6 +1873,9 @@ router.post('/contacts', async (req, res) => {
 
   if (!displayName || !email) {
     return res.status(400).json({ error: 'displayName and email are required' });
+  }
+  if (!String(mobilePhone || '').trim()) {
+    return res.status(400).json({ error: 'mobilePhone is required for Outlook contact sync' });
   }
 
   const body = {
@@ -1682,6 +1913,9 @@ router.patch('/contacts/:id', async (req, res) => {
   if (!displayName) {
     return res.status(400).json({ error: 'displayName is required' });
   }
+  if (!String(mobilePhone || '').trim()) {
+    return res.status(400).json({ error: 'mobilePhone is required for Outlook contact sync' });
+  }
   if (!id || id.startsWith('mail:')) {
     return res.status(400).json({ error: 'Cannot update a mail-derived contact. Use POST to create a new one.' });
   }
@@ -1709,8 +1943,8 @@ router.patch('/contacts/:id', async (req, res) => {
 });
 
 // ── POST /api/outlook/contacts/sync ───────────────────────────────────────
-// Full two-way sync: add new Outlook contacts, update phone numbers, delete contacts
-// that exist in UniComm CRM but are NOT in Outlook (i.e. were removed from Outlook).
+// Non-destructive two-way sync: add new Outlook contacts and update CRM fields.
+// CRM contacts are never deleted just because Outlook did not return them.
 router.post('/contacts/sync', async (req, res) => {
   const palettes = [
     ['#1d4ed8', 'rgba(29,78,216,0.15)'], ['#d97706', 'rgba(217,119,6,0.15)'],
@@ -1752,31 +1986,12 @@ router.post('/contacts/sync', async (req, res) => {
       console.log(`[Outlook Sync][CRM] id=${c.id} name="${c.fname} ${c.lname}" email="${c.email}" outlookImported=${isOutlookImported} notes="${c.notes}"`);
     });
 
-    // 3. Delete CRM contacts that are NOT in Outlook
-    //    Only delete contacts that were originally imported from Outlook (notes contains "Graph ID:")
+    // 3. Non-destructive sync: never delete CRM contacts here. Graph can miss
+    // folders/accounts temporarily, and CRM contacts are needed for WhatsApp/calls.
     let deleted = 0;
     for (const crm of crmContacts) {
       const isOutlookImported = crm.notes && crm.notes.includes('Graph ID:');
-      if (!isOutlookImported) {
-        console.log(`[Outlook Sync][SKIP DELETE] id=${crm.id} "${crm.fname} ${crm.lname}" — not an Outlook import (no Graph ID in notes)`);
-        continue; // skip manually added CRM contacts
-      }
-
-      const crmEmail = crm.email ? crm.email.trim().toLowerCase() : null;
-      // Extract Graph ID from notes
-      const graphIdMatch = crm.notes && crm.notes.match(/Graph ID:\s*([^\s,\n]+)/);
-      const crmGraphId = graphIdMatch ? graphIdMatch[1].trim() : null;
-
-      const inOutlookByEmail = crmEmail && outlookEmailSet.has(crmEmail);
-      const inOutlookById = crmGraphId && outlookGraphIdSet.has(crmGraphId);
-
-      console.log(`[Outlook Sync][DELETE CHECK] id=${crm.id} "${crm.fname} ${crm.lname}" email="${crmEmail}" graphId="${crmGraphId}" inOutlookByEmail=${inOutlookByEmail} inOutlookById=${inOutlookById}`);
-
-      if (!inOutlookByEmail && !inOutlookById) {
-        console.log(`[Outlook Sync][DELETING] id=${crm.id} "${crm.fname} ${crm.lname}" — not found in Outlook`);
-        await pool.query(`DELETE FROM contacts WHERE id = $1`, [crm.id]);
-        deleted++;
-      }
+      console.log(`[Outlook Sync][KEEP] id=${crm.id} "${crm.fname} ${crm.lname}" outlookImported=${isOutlookImported}`);
     }
 
     // 4. Add new contacts and update phone numbers for existing ones
@@ -1786,37 +2001,66 @@ router.post('/contacts/sync', async (req, res) => {
 
     for (const oc of outlookContacts) {
       const primaryEmail = (oc.emailAddresses || []).map(e => e.address).filter(Boolean)[0] || null;
-      const graphMarker = `Outlook contact · Graph ID: ${oc.id}`;
+      const graphMarker = mergeOutlookGraphMarker('', oc.id);
 
-      let phone = (oc.mobilePhone && String(oc.mobilePhone).trim()) || null;
-      if (!phone && Array.isArray(oc.businessPhones) && oc.businessPhones.length) {
-        phone = String(oc.businessPhones[0]).trim() || null;
-      }
+      let phone = directoryPrimaryPhone(oc);
 
       // Check if already in CRM by email or Graph ID
       let existing = null;
       if (primaryEmail) {
         const r = await pool.query(
-          `SELECT id, phone FROM contacts WHERE email IS NOT NULL AND LOWER(TRIM(email)) = LOWER(TRIM($1))`,
+          `SELECT id, phone, fname, lname, company, designation, notes
+           FROM contacts WHERE email IS NOT NULL AND LOWER(TRIM(email)) = LOWER(TRIM($1))`,
           [primaryEmail]
         );
         if (r.rowCount) existing = r.rows[0];
       }
       if (!existing) {
-        const r = await pool.query(`SELECT id, phone FROM contacts WHERE notes LIKE $1`, [`%Graph ID: ${oc.id}%`]);
+        const r = await pool.query(
+          `SELECT id, phone, fname, lname, company, designation, notes FROM contacts WHERE notes LIKE $1`,
+          [`%Graph ID: ${oc.id}%`]
+        );
         if (r.rowCount) existing = r.rows[0];
       }
 
       if (existing) {
-        // Update phone if Outlook has one and CRM doesn't (or CRM phone is different)
-        if (phone && (!existing.phone || existing.phone.trim() !== phone)) {
-          console.log(`[Outlook Sync][UPDATE PHONE] id=${existing.id} — old="${existing.phone}" new="${phone}"`);
-          await pool.query(`UPDATE contacts SET phone = $1, notes = $2 WHERE id = $3`, [phone, graphMarker, existing.id]);
+        const { fname, lname } = splitOutlookContactName(oc);
+        const contactEmail = String(primaryEmail || '').trim().toLowerCase();
+        const displayName = String(oc.displayName || '').trim().toLowerCase();
+        const hasUsefulName = !!displayName && displayName !== contactEmail;
+        const nextFname = hasUsefulName ? fname : existing.fname;
+        const nextLname = hasUsefulName ? lname : existing.lname;
+        const nextCompany = (oc.companyName && String(oc.companyName).trim()) || existing.company || '-';
+        const nextDesignation = (oc.jobTitle && String(oc.jobTitle).trim()) || existing.designation || null;
+        const nextPhone = phone || existing.phone || null;
+        const nextNotes = mergeOutlookGraphMarker(existing.notes, oc.id);
+        const changed =
+          String(existing.phone || '') !== String(nextPhone || '') ||
+          String(existing.fname || '') !== String(nextFname || '') ||
+          String(existing.lname || '') !== String(nextLname || '') ||
+          String(existing.company || '') !== String(nextCompany || '') ||
+          String(existing.designation || '') !== String(nextDesignation || '') ||
+          String(existing.notes || '') !== String(nextNotes || '');
+
+        if (changed) {
+          console.log(`[Outlook Sync][UPDATE CRM] id=${existing.id} phone="${existing.phone || ''}" -> "${nextPhone || ''}"`);
+          await pool.query(
+            `UPDATE contacts
+             SET fname=$1, lname=$2, company=$3, designation=$4, phone=$5, notes=$6
+             WHERE id=$7`,
+            [nextFname, nextLname, nextCompany, nextDesignation, nextPhone, nextNotes, existing.id]
+          );
           updated++;
         } else {
-          console.log(`[Outlook Sync][SKIP UPDATE] id=${existing.id} — phone unchanged or Outlook has no phone. outlookPhone="${phone}" crmPhone="${existing.phone}"`);
+          console.log(`[Outlook Sync][SKIP UPDATE] id=${existing.id} - no CRM changes needed. outlookPhone="${phone}" crmPhone="${existing.phone}"`);
           skipped++;
         }
+        continue;
+      }
+
+      if (!phone) {
+        console.log(`[Outlook Sync][SKIP INSERT] "${oc.displayName}" email="${primaryEmail}" — no mobile number`);
+        skipped++;
         continue;
       }
 
@@ -1876,7 +2120,7 @@ router.post('/contacts/import', async (req, res) => {
     let skipped = 0;
     for (const oc of all) {
       const primaryEmail = (oc.emailAddresses || []).map((e) => e.address).filter(Boolean)[0] || null;
-      const graphMarker = `Outlook contact · Graph ID: ${oc.id}`;
+      const graphMarker = mergeOutlookGraphMarker('', oc.id);
       if (primaryEmail) {
         const dup = await pool.query(
           `SELECT id FROM contacts WHERE email IS NOT NULL AND LOWER(TRIM(email)) = LOWER(TRIM($1))`,
@@ -1896,9 +2140,10 @@ router.post('/contacts/import', async (req, res) => {
       const { fname, lname } = splitOutlookContactName(oc);
       const company = (oc.companyName && String(oc.companyName).trim()) || '-';
       const designation = (oc.jobTitle && String(oc.jobTitle).trim()) || null;
-      let phone = (oc.mobilePhone && String(oc.mobilePhone).trim()) || null;
-      if (!phone && Array.isArray(oc.businessPhones) && oc.businessPhones.length) {
-        phone = String(oc.businessPhones[0]).trim() || null;
+      let phone = directoryPrimaryPhone(oc);
+      if (!phone) {
+        skipped++;
+        continue;
       }
       const [avatar_color, avatar_bg] = palettes[Math.floor(Math.random() * palettes.length)];
       let initials = `${(fname[0] || '?')}${lname && lname !== '-' ? lname[0] : ''}`.toUpperCase();
@@ -2274,6 +2519,18 @@ router.delete('/settings/categories/:id', async (req, res) => {
     return res.json({ success: true });
   } catch (err) {
     return sendOutlookSettingsError(res, err);
+  }
+});
+
+// ── POST /api/outlook/disconnect ─────────────────────────────────────────
+// Clears stored OAuth tokens so user can reconnect with fresh permissions
+router.post('/disconnect', async (req, res) => {
+  try {
+    await pool.query(`DELETE FROM ms_tokens WHERE user_email = $1`, [MS_EMAIL]);
+    console.log('[Outlook] Disconnected — tokens cleared for', MS_EMAIL);
+    return res.json({ success: true, message: 'Outlook disconnected. Please reconnect to get fresh token.' });
+  } catch (err) {
+    return res.status(500).json({ error: err.message });
   }
 });
 

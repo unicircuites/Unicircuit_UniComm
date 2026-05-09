@@ -2,6 +2,12 @@
 
 Use this checklist when UniComm Pro is connected to Outlook/Microsoft 365, or when the mailbox is changed to a different account.
 
+## Current Granted Permissions Inventory
+
+The full Azure granted-permissions snapshot is documented in [AZURE_GRANTED_PERMISSIONS_INVENTORY.md](AZURE_GRANTED_PERMISSIONS_INVENTORY.md).
+
+Important contact-fetch note: `Contacts.Read`, `Contacts.ReadWrite`, `OrgContact.Read.All`, `People.Read`, and `People.Read.All` are already granted in the required delegated/application combinations for the current app. If contact fetch fails, first verify the runtime Graph token claims and reconnect/restart flow; do not assume missing Azure permissions without checking the token.
+
 ## Required Microsoft Graph Permissions
 
 Add these under **Azure Portal > App registrations > UniComm app > API permissions > Microsoft Graph**.
