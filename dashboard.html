@@ -644,6 +644,123 @@ select.inp option{background:#1a2035;color:var(--text);}
 .alp-service { font-weight:700;color:var(--text);text-transform:capitalize;margin-right:6px; }
 .alp-msg { color:var(--muted2); }
 .alp-ts { font-size:10.5px;color:var(--muted);flex-shrink:0;white-space:nowrap; }
+
+/* ── COMPOSE EMAIL MODAL ── */
+.compose-modal-box {
+  background: var(--bg3);
+  border: 1px solid var(--border2);
+  border-radius: 14px;
+  box-shadow: 0 20px 60px rgba(0,0,0,0.55);
+  width: 100%;
+  max-width: 660px;
+  max-height: 92vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  animation: modalIn 0.22s ease;
+}
+.compose-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 18px;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+  background: var(--bg2);
+  border-radius: 14px 14px 0 0;
+}
+.compose-modal-title {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  font-size: 15px;
+  font-weight: 800;
+  color: #fff;
+  letter-spacing: -0.2px;
+}
+.compose-modal-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 16px 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+.compose-template-bar {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  padding: 7px 10px;
+  background: rgba(59,130,246,0.06);
+  border: 1px solid rgba(59,130,246,0.15);
+  border-radius: 8px;
+  margin-bottom: 12px;
+}
+.compose-field-row {
+  display: grid;
+  grid-template-columns: 52px 1fr;
+  gap: 8px;
+  align-items: start;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--border);
+}
+.compose-field-row:last-of-type { border-bottom: none; }
+.compose-field-label {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--muted2);
+  padding-top: 9px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  position: relative;
+}
+.compose-field-inputs { flex: 1; padding: 4px 0; }
+.compose-editor-wrap {
+  margin-top: 10px;
+  border: 1px solid var(--border2);
+  border-radius: 8px;
+  overflow: hidden;
+}
+.compose-toolbar {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+  align-items: center;
+  padding: 6px 8px;
+  background: var(--card2);
+  border-bottom: 1px solid var(--border2);
+}
+.compose-toolbar-sep {
+  width: 1px;
+  height: 18px;
+  background: var(--border);
+  margin: 0 2px;
+  flex-shrink: 0;
+}
+.compose-editor-body {
+  min-height: 160px;
+  max-height: 240px;
+  overflow-y: auto;
+  background: #fff;
+  color: #222;
+  font-family: Calibri, Arial, sans-serif;
+  font-size: 14px;
+  line-height: 1.6;
+  padding: 10px 14px;
+  outline: none;
+}
+.compose-modal-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 18px;
+  border-top: 1px solid var(--border);
+  background: var(--bg2);
+  border-radius: 0 0 14px 14px;
+  flex-shrink: 0;
+  gap: 10px;
+}
 </style>
 <!-- Quill Rich Text Editor -->
 <link href="https://cdn.quilljs.com/1.3.7/quill.snow.css" rel="stylesheet">
@@ -10578,49 +10695,69 @@ function etUseInBroadcast() {
 
     <!-- Compose Email (Outlook) — modal so read pane can use full height -->
   <div class="modal-overlay" id="compose-email-modal">
-      <div class="modal-title">
-        <span><i class="fas fa-pen" style="color:var(--gold);margin-right:8px;"></i><span id="compose-title">Compose Email</span></span>
+    <div class="compose-modal-box">
+      <!-- Header -->
+      <div class="compose-modal-header">
+        <div class="compose-modal-title">
+          <i class="fas fa-pen" style="color:var(--gold);"></i>
+          <span id="compose-title">Compose Email</span>
+        </div>
         <span class="modal-close" onclick="closeComposeEmailModal()" title="Close"><i class="fas fa-times"></i></span>
       </div>
-      <div style="display:flex;flex-direction:column;gap:10px;">
+      <!-- Body -->
+      <div class="compose-modal-body">
         <!-- Template picker -->
-        <div style="display:flex;gap:8px;align-items:center;padding:8px 10px;background:rgba(59,130,246,0.06);border:1px solid rgba(59,130,246,0.15);border-radius:8px;">
+        <div class="compose-template-bar">
           <i class="fas fa-file-alt" style="color:var(--blue2);font-size:12px;flex-shrink:0;"></i>
           <select class="inp" id="compose-template-select" style="font-size:12px;padding:5px 8px;flex:1;background:transparent;border:none;outline:none;">
             <option value="">— Use a template —</option>
           </select>
           <button type="button" class="btn btn-blue btn-xs" onclick="applyComposeTemplate()"><i class="fas fa-check"></i> Apply</button>
         </div>
-        <div><label class="form-label" style="display:flex;align-items:center;gap:6px;">To
-          <span style="position:relative;display:inline-flex;align-items:center;" onmouseenter="this.querySelector('.tt').style.display='block'" onmouseleave="this.querySelector('.tt').style.display='none'">
-            <i class="fas fa-info-circle" style="font-size:11px;color:var(--muted);cursor:default;"></i>
-            <span class="tt" style="display:none;position:absolute;left:18px;top:-4px;background:#1a2035;border:1px solid var(--border2);border-radius:7px;padding:8px 11px;font-size:11.5px;color:var(--text);white-space:nowrap;z-index:999;box-shadow:0 4px 16px rgba(0,0,0,0.4);font-weight:400;">
-              Multiple emails: separate with <b style="color:var(--gold);">comma</b> or <b style="color:var(--gold);">semicolon</b><br>
-              <span style="color:var(--muted);font-size:10.5px;">e.g. a@gmail.com, b@company.com; c@yahoo.com</span>
+        <!-- To field -->
+        <div class="compose-field-row">
+          <label class="compose-field-label">To
+            <span style="position:relative;display:inline-flex;align-items:center;" onmouseenter="this.querySelector('.tt').style.display='block'" onmouseleave="this.querySelector('.tt').style.display='none'">
+              <i class="fas fa-info-circle" style="font-size:11px;color:var(--muted);cursor:default;"></i>
+              <span class="tt" style="display:none;position:absolute;left:18px;top:-4px;background:#1a2035;border:1px solid var(--border2);border-radius:7px;padding:8px 11px;font-size:11.5px;color:var(--text);white-space:nowrap;z-index:999;box-shadow:0 4px 16px rgba(0,0,0,0.4);font-weight:400;">
+                Multiple emails: separate with <b style="color:var(--gold);">comma</b> or <b style="color:var(--gold);">semicolon</b><br>
+                <span style="color:var(--muted);font-size:10.5px;">e.g. a@gmail.com, b@company.com; c@yahoo.com</span>
+              </span>
             </span>
-          </span>
-        </label>
-        <!-- Group loader for compose -->
-        <div style="display:flex;gap:6px;align-items:center;margin-bottom:6px;">
-          <select id="compose-group-select" class="inp" style="font-size:12px;padding:5px 8px;flex:1;background:transparent;">
-            <option value="">— Or load To from a group —</option>
-          </select>
-          <button type="button" class="btn btn-blue btn-xs" onclick="composeLoadFromGroup()"><i class="fas fa-users"></i> Load</button>
+          </label>
+          <div class="compose-field-inputs">
+            <div style="display:flex;gap:6px;align-items:center;margin-bottom:5px;">
+              <select id="compose-group-select" class="inp" style="font-size:12px;padding:5px 8px;flex:1;background:transparent;">
+                <option value="">— Or load To from a group —</option>
+              </select>
+              <button type="button" class="btn btn-blue btn-xs" onclick="composeLoadFromGroup()"><i class="fas fa-users"></i> Load</button>
+            </div>
+            <input class="inp" id="compose-to" placeholder="a@gmail.com, b@company.com, c@yahoo.com" style="font-size:12.5px;" autocomplete="off" />
+            <div id="compose-unknown-hint" style="font-size:11.5px;color:var(--muted2);margin-top:4px;display:none;"></div>
+          </div>
         </div>
-        <input class="inp" id="compose-to" placeholder="a@gmail.com, b@company.com, c@yahoo.com" style="font-size:12.5px;" autocomplete="off" />
-        <div id="compose-unknown-hint" style="font-size:11.5px;color:var(--muted2);margin-top:4px;display:none;"></div></div>
-        <div><label class="form-label" style="display:flex;align-items:center;gap:6px;">CC <span style="color:var(--muted);font-weight:400;">(optional)</span>
-          <span style="position:relative;display:inline-flex;align-items:center;" onmouseenter="this.querySelector('.tt').style.display='block'" onmouseleave="this.querySelector('.tt').style.display='none'">
-            <i class="fas fa-info-circle" style="font-size:11px;color:var(--muted);cursor:default;"></i>
-            <span class="tt" style="display:none;position:absolute;left:18px;top:-4px;background:#1a2035;border:1px solid var(--border2);border-radius:7px;padding:8px 11px;font-size:11.5px;color:var(--text);white-space:nowrap;z-index:999;box-shadow:0 4px 16px rgba(0,0,0,0.4);font-weight:400;">
-              Multiple emails: separate with <b style="color:var(--gold);">comma</b> or <b style="color:var(--gold);">semicolon</b><br>
-              <span style="color:var(--muted);font-size:10.5px;">e.g. a@gmail.com, b@company.com; c@yahoo.com</span>
+        <!-- CC field -->
+        <div class="compose-field-row">
+          <label class="compose-field-label">CC <span style="color:var(--muted);font-weight:400;font-size:10.5px;">(opt)</span>
+            <span style="position:relative;display:inline-flex;align-items:center;" onmouseenter="this.querySelector('.tt').style.display='block'" onmouseleave="this.querySelector('.tt').style.display='none'">
+              <i class="fas fa-info-circle" style="font-size:11px;color:var(--muted);cursor:default;"></i>
+              <span class="tt" style="display:none;position:absolute;left:18px;top:-4px;background:#1a2035;border:1px solid var(--border2);border-radius:7px;padding:8px 11px;font-size:11.5px;color:var(--text);white-space:nowrap;z-index:999;box-shadow:0 4px 16px rgba(0,0,0,0.4);font-weight:400;">
+                Multiple emails: separate with <b style="color:var(--gold);">comma</b> or <b style="color:var(--gold);">semicolon</b>
+              </span>
             </span>
-          </span>
-        </label><input class="inp" id="compose-cc" placeholder="cc@company.com, cc2@email.com" style="font-size:12.5px;" autocomplete="off" /></div>
-        <div><label class="form-label">Subject</label><input class="inp" id="compose-subject" placeholder="Email subject…" style="font-size:12.5px;" autocomplete="off" /></div>
-        <div>
-          <label class="form-label">Message</label>
+          </label>
+          <div class="compose-field-inputs">
+            <input class="inp" id="compose-cc" placeholder="cc@company.com, cc2@email.com" style="font-size:12.5px;" autocomplete="off" />
+          </div>
+        </div>
+        <!-- Subject field -->
+        <div class="compose-field-row">
+          <label class="compose-field-label">Subject</label>
+          <div class="compose-field-inputs">
+            <input class="inp" id="compose-subject" placeholder="Email subject…" style="font-size:12.5px;" autocomplete="off" />
+          </div>
+        </div>
+        <!-- Editor -->
           <!-- Full toolbar — exact copy of template editor -->
           <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;padding:6px 10px;background:var(--card2);border:1px solid var(--border2);border-radius:8px 8px 0 0;border-bottom:none;">
             <select id="compose-font-select" onmousedown="composeSaveSelection()" onchange="composeSetFont(this.value);this.value=''" style="font-size:11px;padding:3px 4px;background:var(--card2);border:1px solid var(--border);border-radius:5px;color:var(--text);cursor:pointer;max-width:130px;" title="Font family — select text first, then pick font">
@@ -10758,17 +10895,22 @@ function etUseInBroadcast() {
           </div>
           <div id="compose-body"
                contenteditable="true"
-               style="min-height:180px;max-height:320px;overflow-y:auto;background:#fff;color:#222;font-family:Calibri,Arial,sans-serif;font-size:14px;line-height:1.6;padding:10px 12px 10px 28px;border:1px solid var(--border2);border-radius:0 0 8px 8px;outline:none;"
+               class="compose-editor-body"
                placeholder="Write your message…"
                onmouseup="composeSaveSelection();composeUpdateToolbarState()"
                onkeyup="composeSaveSelection();composeUpdateToolbarState()"
                onfocus="composeUpdateToolbarState()"></div>
         </div>
-        <button type="button" class="btn btn-gold" style="justify-content:center;" id="send-btn" onclick="sendEmail()"><i class="fas fa-paper-plane"></i> Send via Outlook</button>
-        <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;">
+      </div>
+      <!-- Footer -->
+      <div class="compose-modal-footer">
+        <div style="display:flex;align-items:center;gap:8px;">
           <div id="compose-status" style="font-size:12px;display:none;"></div>
-          <button type="button" class="btn btn-ghost btn-xs" onclick="resetComposeForm()"><i class="fas fa-eraser"></i> Clear fields</button>
+          <button type="button" class="btn btn-ghost btn-xs" onclick="resetComposeForm()"><i class="fas fa-eraser"></i> Clear</button>
         </div>
+        <button type="button" class="btn btn-gold" id="send-btn" onclick="sendEmail()">
+          <i class="fas fa-paper-plane"></i> Send via Outlook
+        </button>
       </div>
     </div>
   </div>
