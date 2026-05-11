@@ -24,11 +24,16 @@ const wa         = require('./services/whatsapp');
 const smdr       = require('./services/matrixSmdr');
 const mktCron      = require('./services/marketingCron');
 const taskNotifier = require('./services/taskNotifier');
+const automatedAI  = require('./services/automatedAI');
+const aiTaskQueue  = require('./services/aiTaskQueue');
 const pool       = require('./db/pool');
 const activityLog  = require('./services/activityLog');
 const systemRoutes = require('./routes/system');
 const { serviceState } = systemRoutes;
 const msGraph      = require('./services/msGraph');
+const cron         = require('node-cron');
+const maintenance  = require('./services/maintenance');
+
 
 const app = express();
 
@@ -408,7 +413,25 @@ server.listen(PORT, HOST, () => {
 
   // Start Task Notification scheduler (WA + email reminders before due time)
   taskNotifier.start(pool);
+
+  // ✅ 1. DISABLE AUTOMATED AI SCHEDULER (Only manual trigger allowed)
+  // automatedAI.start(io, 4);
+
+  // AI System Initialization
+  aiTaskQueue.init(io);
+  aiTaskQueue.ensureTable();
+
+  // ✅ 2. START DAILY PRUNING (7-day policy)
+  cron.schedule('0 0 * * *', async () => {
+    console.log('[Maintenance] Running daily AI task history pruning (7-day policy)...');
+    await aiTaskQueue.pruneHistory(7);
+    await maintenance.pruneAntigravityLogs();
+  });
+
+  // Run initial maintenance on startup (async)
+  maintenance.pruneAntigravityLogs().catch(err => console.error('[Maintenance] Startup pruning failed:', err.message));
 });
+
 
 // Clear WhatsApp session on server stop so mobile shows disconnected
 process.on('SIGINT', async () => {

@@ -2057,7 +2057,7 @@ router.get('/deleted', async (req, res) => {
     // Store messages in database for fallback
     if (messages.length > 0) {
       try {
-        await storeMessagesInDB(messages, 'deleteditems');
+        await storeMessagesInDB(messages, 'deleted'); // Standardized tag
         console.log('[Outlook] ✓ Stored', messages.length, 'deleted messages in DB');
       } catch (dbErr) {
         console.warn('[Outlook] Failed to store deleted messages in DB:', dbErr.message);
@@ -2097,7 +2097,7 @@ router.get('/deleted/fallback', async (req, res) => {
         has_attachments,
         importance
       FROM outlook_emails_cache
-      WHERE folder = 'deleteditems'
+      WHERE folder = 'deleted'
       ORDER BY received_datetime DESC NULLS LAST
       LIMIT $1 OFFSET $2
     `, [top, skip]);
@@ -2130,15 +2130,76 @@ router.get('/deleted/fallback', async (req, res) => {
   }
 });
 
+// ── GET /api/outlook/folder/:folderName ─────────────────────────────────
+// Generic endpoint for Junk, Notes, Archive, or custom folders
+router.get('/folder/:folderName', async (req, res) => {
+  const folder = req.params.folderName;
+  const top = parseInt(req.query.top || '25');
+  const skip = parseInt(req.query.skip || '0');
+  
+  console.log(`[Outlook] GET /folder/${folder} — top:`, top, 'skip:', skip);
+  
+  try {
+    const data = await graph.graphGet(
+      `/me/mailFolders/${folder}/messages?$top=${top}&$skip=${skip}`
+      + `&$select=id,conversationId,subject,from,toRecipients,ccRecipients,receivedDateTime,sentDateTime,isRead,bodyPreview,hasAttachments,importance`
+      + `&$orderby=receivedDateTime desc`,
+      MS_EMAIL
+    );
+    
+    const messages = data.value || [];
+    
+    // Store in DB for fallback
+    if (messages.length > 0) {
+      try {
+        await storeMessagesInDB(messages, folder);
+      } catch (dbErr) {
+        console.warn(`[Outlook] Failed to store ${folder} messages in DB:`, dbErr.message);
+      }
+    }
+    
+    return res.json({ messages, source: 'api' });
+  } catch (err) {
+    console.error(`[Outlook] ❌ Folder ${folder} fetch error:`, err.message);
+    if (err.message === 'NOT_AUTHENTICATED') return res.status(401).json({ error: 'NOT_AUTHENTICATED' });
+    return res.status(500).json({ error: err.message });
+  }
+});
+
+// ── POST /api/outlook/update-category ────────────────────────────────────
+router.post('/update-category', async (req, res) => {
+  const { id, category } = req.body;
+  if (!id || !category) return res.status(400).json({ error: 'ID and category required' });
+  
+  try {
+    await pool.query(`
+      UPDATE outlook_emails_cache 
+      SET category = $1 
+      WHERE id = $2
+    `, [category, id]);
+    return res.json({ success: true });
+  } catch (err) {
+    console.error('[Outlook] Failed to update category in DB:', err.message);
+    return res.status(500).json({ error: err.message });
+  }
+});
+
 // ── GET /api/outlook/folders ──────────────────────────────────────────────
 router.get('/folders', async (req, res) => {
   try {
+    console.log('[Outlook] Fetching folder metadata (Stable Mode)...');
     const data = await graph.graphGet(
-      `/me/mailFolders?$select=id,displayName,unreadItemCount,totalItemCount`,
+      '/me/mailFolders?$select=id,displayName,unreadItemCount,totalItemCount',
       MS_EMAIL
     );
-    return res.json(data.value || []);
+    
+    if (!data || !data.value) {
+      return res.json([]);
+    }
+    
+    return res.json(data.value);
   } catch (err) {
+    console.error('[Outlook] ❌ Folders fetch error:', err.message);
     if (err.message === 'NOT_AUTHENTICATED') return res.status(401).json({ error: 'NOT_AUTHENTICATED' });
     return res.status(500).json({ error: err.message });
   }
@@ -3076,6 +3137,252 @@ router.delete('/settings/categories/:id', async (req, res) => {
     return sendOutlookSettingsError(res, err);
   }
 });
+
+// ── POST /api/outlook/ai-assistant/model-test ────────────────────────────
+// Sends "hi" to the cloud API (Groq) to measure actual lightning-fast response times.
+router.post('/ai-assistant/model-test', authenticate, async (req, res) => {
+  const fetch = require('node-fetch');
+  const aiHost  = process.env.AI_API_HOST  || 'https://api.groq.com/openai/v1';
+  const aiModel = process.env.AI_API_MODEL || 'llama-3.1-8b-instant';
+  const aiToken = process.env.AI_API_KEY   || '';
+  const AI_TIMEOUT_MS = 60000;
+
+  console.log(`\n[AI-TEST] ═══ Model Ping Test started ═══`);
+  console.log(`[AI-TEST] Target: ${aiHost} (${aiModel})`);
+
+  const t_start = Date.now();
+  const abortCtrl = new AbortController();
+  const abortTimer = setTimeout(() => abortCtrl.abort(), AI_TIMEOUT_MS);
+
+  let t_sent, t_received, responseData;
+
+  try {
+    t_sent = Date.now();
+    console.log(`[AI-TEST] 📤 Request sent at +${t_sent - t_start}ms`);
+
+    const headers = { 'Content-Type': 'application/json' };
+    if (aiToken) headers['Authorization'] = `Bearer ${aiToken}`;
+
+    const response = await fetch(`${aiHost}/chat/completions`, {
+      method: 'POST',
+      headers: headers,
+      body: JSON.stringify({
+        model: aiModel,
+        messages: [{ role: 'user', content: 'hi' }],
+        max_tokens: 20,
+        temperature: 0.1
+      }),
+      signal: abortCtrl.signal
+    });
+
+    clearTimeout(abortTimer);
+    t_received = Date.now();
+
+    if (!response.ok) {
+      const txt = await response.text();
+      return res.status(503).json({ error: `API error ${response.status}: ${txt}` });
+    }
+
+    responseData = await response.json();
+
+  } catch (fetchErr) {
+    clearTimeout(abortTimer);
+    const elapsed = Date.now() - t_start;
+    return res.status(503).json({ error: `Test failed after ${elapsed}ms: ${fetchErr.message}` });
+  }
+
+  const t_end = Date.now();
+
+  const network_send_ms    = t_sent - t_start;
+  const roundtrip_ms       = t_received - t_sent;
+  const parse_ms           = t_end - t_received;
+  const total_wall_ms      = t_end - t_start;
+
+  const timing = {
+    phases: {
+      js_send_overhead_ms:     network_send_ms,
+      response_generation_ms:  roundtrip_ms,
+      json_parse_ms:           parse_ms,
+    },
+    totals: {
+      wall_clock_ms:    total_wall_ms,
+      roundtrip_ms,
+    },
+    model: {
+      name:       aiModel,
+      response_text:  responseData.choices?.[0]?.message?.content || '',
+    },
+    status: 'online',
+  };
+
+  console.log(`[AI-TEST] ┌─ Groq Phase Breakdown ───────────────────────`);
+  console.log(`[AI-TEST] │ 📤 JS send overhead:      ${network_send_ms}ms`);
+  console.log(`[AI-TEST] │ 🤖 Response generation:   ${roundtrip_ms}ms  <-- (Instant!)`);
+  console.log(`[AI-TEST] │ ⚙️  JSON parse:             ${parse_ms}ms`);
+  console.log(`[AI-TEST] ├─ Totals ───────────────────────────────────`);
+  console.log(`[AI-TEST] │ Wall clock:    ${total_wall_ms}ms`);
+  console.log(`[AI-TEST] │ Reply: "${responseData.choices?.[0]?.message?.content || ''}"`);
+  console.log(`[AI-TEST] └────────────────────────────────────────────\n`);
+
+  return res.json({ success: true, timing });
+});
+
+// ── POST /api/outlook/ai-assistant/analyze ───────────────────────────────
+// MINIMAL SINGLE-CALL AI ANALYSIS — no queue, no polling, no complexity
+router.post('/ai-assistant/analyze', authenticate, async (req, res) => {
+  console.log('[AI] === AI request started ===');
+
+  try {
+    // --- 1. Fetch latest email ---
+    const emailRes = await pool.query(`
+      SELECT subject, from_name, from_address, received_datetime, body_preview, is_read, importance
+      FROM ms_messages 
+      WHERE user_email = $1
+      ORDER BY received_datetime DESC
+      LIMIT 1
+    `, [MS_EMAIL]);
+
+    if (!emailRes.rows.length) {
+      console.log('[AI] No emails found in cache.');
+      return res.status(400).json({ error: 'No emails found for analysis.' });
+    }
+
+    const email = emailRes.rows[0];
+    console.log(`[AI] Analyzing email: "${email.subject || '(no subject)'}"`);
+
+    // --- 2. Build a simple prompt ---
+    const prompt = [
+      'You are an AI email assistant for a B2B sales team in India.',
+      'Analyze the following email and reply in this exact format:',
+      '',
+      'Summary: <one sentence about what this email is about>',
+      'Insights:',
+      '- <insight 1>',
+      '- <insight 2>',
+      'Smart Actions:',
+      '1. <action 1>',
+      '2. <action 2>',
+      '',
+      '--- EMAIL ---',
+      `Subject: ${email.subject || '(no subject)'}`,
+      `From: ${email.from_name || email.from_address || 'Unknown'}`,
+      `Received: ${email.received_datetime ? new Date(email.received_datetime).toLocaleString('en-IN') : 'Unknown'}`,
+      `Status: ${email.is_read ? 'Read' : 'Unread'}${email.importance === 'high' ? ', HIGH IMPORTANCE' : ''}`,
+      `Preview: ${email.body_preview || '(no preview)'}`,
+    ].join('\n');
+
+    // --- 3. Call Fast Cloud API (OpenAI-compatible) ---
+    // Using generic variables so we can plug in Groq, OpenRouter, etc.
+    const aiHost  = process.env.AI_API_HOST  || 'https://api.groq.com/openai';
+    const aiModel = process.env.AI_API_MODEL || 'llama-3.1-8b-instant';
+    const aiToken = process.env.AI_API_KEY || '';
+    const AI_TIMEOUT_MS = parseInt(process.env.AI_TIMEOUT_MS || '60000', 10); // default 60s
+
+    console.log(`[AI] Sending to PicoClaw model: ${aiModel} @ ${aiHost} (timeout: ${AI_TIMEOUT_MS / 1000}s)`);
+    console.log('[AI] Waiting for lightning-fast response...');
+
+    const fetch = require('node-fetch');
+
+    const abortCtrl = new AbortController();
+    const abortTimer = setTimeout(() => {
+      abortCtrl.abort();
+      console.warn(`[AI] Hard timeout fired after ${AI_TIMEOUT_MS / 1000}s — aborting PicoClaw fetch`);
+    }, AI_TIMEOUT_MS);
+
+    let aiResponse;
+    try {
+      // PicoClaw uses the standard, fast OpenAI format
+      const headers = { 'Content-Type': 'application/json' };
+      if (aiToken) {
+        headers['Authorization'] = `Bearer ${aiToken}`;
+      }
+
+      aiResponse = await fetch(`${aiHost}/v1/chat/completions`, {
+        method: 'POST',
+        headers: headers,
+        body: JSON.stringify({
+          model: aiModel,
+          messages: [{ role: 'user', content: prompt }],
+          max_tokens: 300,
+          temperature: 0.3
+        }),
+        signal: abortCtrl.signal
+      });
+    } catch (fetchErr) {
+      clearTimeout(abortTimer);
+      if (fetchErr.name === 'AbortError') {
+        console.error(`[AI] Request aborted — PicoClaw took longer than ${AI_TIMEOUT_MS / 1000}s`);
+        return res.status(503).json({
+          error: `PicoClaw timed out after ${AI_TIMEOUT_MS / 1000}s. Check if the PicoClaw server is running on ${aiHost}.`
+        });
+      }
+      throw fetchErr;
+    }
+    clearTimeout(abortTimer);
+
+    if (!aiResponse.ok) {
+      const errText = await aiResponse.text();
+      console.error('[AI] PicoClaw API error:', aiResponse.status, errText);
+      return res.status(503).json({ error: `PicoClaw error: ${aiResponse.status}` });
+    }
+
+    const aiData = await aiResponse.json();
+    
+    // OpenAI/PicoClaw format extraction
+    const rawText = aiData.choices?.[0]?.message?.content || aiData.response || '';
+    console.log('[AI] Response received. Parsing...');
+
+    // --- 4. Parse the model's plain-text response ---
+    const lines = rawText.split('\n').map(l => l.trim()).filter(Boolean);
+    let summary = '';
+    const insights = [];
+    const smartActions = [];
+    let section = null;
+
+    for (const line of lines) {
+      if (/^Summary:/i.test(line)) {
+        summary = line.replace(/^Summary:/i, '').trim();
+        section = 'summary';
+      } else if (/^Insights:/i.test(line)) {
+        section = 'insights';
+      } else if (/^Smart Actions:/i.test(line)) {
+        section = 'actions';
+      } else if (section === 'summary' && !summary) {
+        summary = line;
+      } else if (section === 'insights' && (line.startsWith('-') || line.startsWith('•'))) {
+        insights.push(line.replace(/^[-•]\s*/, ''));
+      } else if (section === 'actions' && /^\d+\./.test(line)) {
+        smartActions.push(line);
+      }
+    }
+
+    if (!summary) summary = 'Analysis complete. See insights below.';
+    if (!insights.length) insights.push('Email reviewed successfully.');
+    if (!smartActions.length) smartActions.push('1. Review the email and respond if needed.');
+
+    console.log('[AI] === Analysis completed ===');
+
+    return res.json({
+      success: true,
+      fallback: false,
+      summary,
+      insights,
+      smartActions,
+      systemOptimization: [],
+      analyzedEmail: {
+        subject: email.subject,
+        from: email.from_name || email.from_address,
+        received: email.received_datetime
+      },
+      timestamp: new Date().toISOString()
+    });
+
+  } catch (err) {
+    console.error('[AI] Fatal error during analysis:', err.message);
+    return res.status(500).json({ error: err.message || 'AI analysis failed.' });
+  }
+});
+
 
 // ── POST /api/outlook/disconnect ─────────────────────────────────────────
 // Clears stored OAuth tokens so user can reconnect with fresh permissions

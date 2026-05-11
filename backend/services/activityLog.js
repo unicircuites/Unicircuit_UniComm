@@ -115,4 +115,32 @@ function size() {
   return _count;
 }
 
-module.exports = { init, append, getRecent, getAll, size };
+/**
+ * Persistent logging to audit_log table (User/AI Activity)
+ * @param {Object} data - { user_id, action, entity_type, entity_id, metadata, description }
+ */
+async function logEvent(data) {
+  if (!_pool) return;
+  try {
+    const { user_id, action, entity_type, entity_id, metadata, description } = data;
+    const detail = description || (metadata ? JSON.stringify(metadata) : null);
+    
+    await _pool.query(
+      `INSERT INTO audit_log (user_id, action, entity, entity_id, detail)
+       VALUES ($1, $2, $3, $4, $5)`,
+      [user_id, action, entity_type, entity_id, detail]
+    );
+  } catch (err) {
+    console.warn('[ActivityLog] DB Persist error:', err.message);
+  }
+}
+
+module.exports = { 
+  init, 
+  append, 
+  getRecent, 
+  getAll, 
+  size, 
+  log: logEvent, // Alias for backward compatibility
+  logEvent 
+};

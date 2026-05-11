@@ -138,6 +138,21 @@ async function init() {
       );
     `);
 
+    // ── AI TASKS ───────────────────────────────────────────────────────────
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS ai_tasks (
+        id          SERIAL PRIMARY KEY,
+        status      VARCHAR(20) NOT NULL DEFAULT 'pending',
+        type        VARCHAR(50) NOT NULL,
+        payload     JSONB NOT NULL,
+        result      JSONB,
+        error       TEXT,
+        created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        updated_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      );
+      CREATE INDEX IF NOT EXISTS idx_ai_tasks_status ON ai_tasks (status);
+    `);
+
     // ── AUDIT LOG ──────────────────────────────────────────────────────────
     await client.query(`
       CREATE TABLE IF NOT EXISTS audit_log (
