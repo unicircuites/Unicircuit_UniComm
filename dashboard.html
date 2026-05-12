@@ -931,7 +931,7 @@ select.inp option{background:#1a2035;color:var(--text);}
 }
 .compose-editor-body {
   min-height: 160px;
-  max-height: 240px;
+  max-height: 520px;
   overflow-y: auto;
   background: #fff;
   color: #222;
@@ -1093,90 +1093,7 @@ select.inp option{background:#1a2035;color:var(--text);}
 </style>
 
 <style>
-/* ── AI PIPELINE MONITOR ── */
-.ai-flow-container {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 20px 30px;
-  background: rgba(13, 17, 28, 0.6);
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  margin-bottom: 16px;
-  position: relative;
-  overflow: hidden;
-}
-.ai-node {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 8px;
-  z-index: 1;
-}
-.ai-node-icon {
-  width: 42px;
-  height: 42px;
-  border-radius: 10px;
-  background: var(--bg3);
-  border: 1px solid var(--border2);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 16px;
-  color: var(--muted2);
-  transition: all 0.3s;
-  position: relative;
-}
-.ai-node.active .ai-node-icon {
-  color: var(--gold);
-  border-color: var(--gold);
-  box-shadow: 0 0 15px rgba(245, 166, 35, 0.3);
-  background: rgba(245, 166, 35, 0.05);
-}
-.ai-node-label {
-  font-size: 10px;
-  font-weight: 700;
-  color: var(--muted);
-  text-transform: uppercase;
-  letter-spacing: 0.8px;
-}
-.ai-flow-arrow {
-  flex: 1;
-  height: 2px;
-  background: var(--border);
-  margin: 0 10px;
-  position: relative;
-  max-width: 60px;
-}
-.ai-flow-arrow::after {
-  content: '';
-  position: absolute;
-  top: 0; left: 0; width: 0; height: 100%;
-  background: var(--gold);
-  transition: width 0.5s ease;
-}
-.ai-node.active + .ai-flow-arrow::after {
-  width: 100%;
-  box-shadow: 0 0 8px var(--gold);
-}
-.ai-pipeline-status {
-  position: absolute;
-  top: 10px;
-  right: 12px;
-  font-size: 9px;
-  font-weight: 800;
-  color: var(--green);
-  display: flex;
-  align-items: center;
-  gap: 5px;
-}
-.ai-pipeline-status .pulse {
-  width: 5px;
-  height: 5px;
-  border-radius: 50%;
-  background: var(--green);
-  animation: pulse 2s infinite;
-}
+
 
 
 /* Font families */
@@ -1675,51 +1592,173 @@ select.inp option{background:#1a2035;color:var(--text);}
 
     <!-- PBX Status Bar -->
     <div style="margin-bottom:12px;">
-      <div style="background:rgba(245,166,35,0.06);border:1px solid rgba(245,166,35,0.2);border-radius:8px;padding:8px 16px;display:flex;align-items:center;gap:10px;">
+      <div style="background:rgba(245,166,35,0.06);border:1px solid rgba(245,166,35,0.2);border-radius:8px;padding:8px 16px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
         <span id="pbx-dot" style="width:8px;height:8px;border-radius:50%;background:var(--muted);flex-shrink:0;transition:background 0.3s;"></span>
         <span id="pbx-status-text" style="font-size:12.5px;font-weight:600;color:var(--muted);">Matrix PBX · Waiting for PBX connection...</span>
-        <span style="font-size:11px;color:var(--muted);">192.168.0.81:5001 SMDR</span>
+        <span style="font-size:11px;color:var(--muted);">192.168.0.81:5000 SMDR</span>
         <span id="pbx-call-count" style="font-size:11px;color:var(--muted2);margin-left:auto;"></span>
-        <button class="btn btn-ghost btn-xs" onclick="loadCallLogs()"><i class="fas fa-sync-alt"></i> Refresh</button>
+        <button class="btn btn-ghost btn-xs" onclick="pbxSyncNow()"><i class="fas fa-sync-alt"></i> Sync Latest</button>
+        <button class="btn btn-ghost btn-xs" onclick="pbxReconnect()" title="Reset TCP connection to PBX"><i class="fas fa-plug"></i> Reconnect</button>
+        <button class="btn btn-ghost btn-xs" onclick="pbxShowBackupPanel()"><i class="fas fa-archive"></i> Backup</button>
+        <button class="btn btn-ghost btn-xs" onclick="pbxShowRecordings()"><i class="fas fa-microphone"></i> Recordings</button>
         <button class="btn btn-gold btn-xs" onclick="doSummarizeCall('call-sum-full')"><i class="fas fa-magic"></i> AI Summarize</button>
       </div>
     </div>
 
-    <div class="card" style="margin-bottom:16px;">
-      <div class="card-header">
-        <h3><i class="fas fa-phone-alt" style="color:var(--gold);"></i> Live PBX Call Log &middot; Matrix Eternity
-          <span id="pbx-live-badge" class="badge b-green" style="margin-left:6px;display:none;"><i class="fas fa-circle" style="font-size:6px;"></i> LIVE</span>
-        </h3>
-        <div style="display:flex;gap:8px;align-items:center;">
-          <select class="inp" id="call-filter-type" style="width:auto;font-size:12px;padding:5px 10px;" onchange="loadCallLogs()">
-            <option value="">All Types</option>
-            <option value="In">Incoming</option>
-            <option value="Out">Outgoing</option>
-            <option value="Missed">Missed</option>
-            <option value="Internal">Internal</option>
-          </select>
-          <button class="btn btn-ghost btn-sm" onclick="exportCallCSV()"><i class="fas fa-download"></i> Export CSV</button>
+    <!-- PBX Tab Nav -->
+    <div style="display:flex;gap:0;background:var(--bg2);border:1px solid var(--border2);border-radius:8px 8px 0 0;border-bottom:2px solid var(--gold);margin-bottom:0;overflow:hidden;" id="pbx-tabs">
+      <button class="pbx-tab active" onclick="pbxShowTab('logs',this)" id="pbx-tab-logs" style="flex:1;padding:10px 16px;background:transparent;border:none;color:var(--gold);font-size:12.5px;font-weight:700;cursor:pointer;border-bottom:2px solid var(--gold);font-family:'Outfit',sans-serif;"><i class="fas fa-phone-alt"></i> Call Logs</button>
+      <button class="pbx-tab" onclick="pbxShowTab('contacts',this)" id="pbx-tab-contacts" style="flex:1;padding:10px 16px;background:transparent;border:none;color:var(--muted2);font-size:12.5px;font-weight:600;cursor:pointer;border-bottom:2px solid transparent;font-family:'Outfit',sans-serif;"><i class="fas fa-address-book"></i> PBX Contacts</button>
+      <button class="pbx-tab" onclick="pbxShowTab('recordings',this)" id="pbx-tab-recordings" style="flex:1;padding:10px 16px;background:transparent;border:none;color:var(--muted2);font-size:12.5px;font-weight:600;cursor:pointer;border-bottom:2px solid transparent;font-family:'Outfit',sans-serif;"><i class="fas fa-microphone"></i> Recordings</button>
+      <button class="pbx-tab" onclick="pbxShowTab('backup',this)" id="pbx-tab-backup" style="flex:1;padding:10px 16px;background:transparent;border:none;color:var(--muted2);font-size:12.5px;font-weight:600;cursor:pointer;border-bottom:2px solid transparent;font-family:'Outfit',sans-serif;"><i class="fas fa-database"></i> Backup / Restore</button>
+    </div>
+
+    <!-- ── TAB: CALL LOGS ── -->
+    <div id="pbx-panel-logs" class="pbx-panel">
+      <div class="card" style="border-radius:0 0 12px 12px;border-top:none;margin-bottom:14px;">
+        <div class="card-header">
+          <h3><i class="fas fa-phone-alt" style="color:var(--gold);"></i> Live PBX Call Log · Matrix Eternity
+            <span id="pbx-live-badge" class="badge b-green" style="margin-left:6px;display:none;"><i class="fas fa-circle" style="font-size:6px;"></i> LIVE</span>
+          </h3>
+          <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+            <input class="inp" id="call-search" placeholder="Search caller/dest…" style="width:160px;font-size:12px;padding:5px 10px;" oninput="loadCallLogs()">
+            <select class="inp" id="call-filter-type" style="width:auto;font-size:12px;padding:5px 10px;" onchange="loadCallLogs()">
+              <option value="">All Types</option>
+              <option value="In">Incoming</option>
+              <option value="Out">Outgoing</option>
+              <option value="Missed">Missed</option>
+              <option value="Internal">Internal</option>
+            </select>
+            <input type="date" class="inp" id="call-filter-from" style="width:auto;font-size:12px;padding:5px 8px;" onchange="loadCallLogs()">
+            <button class="btn btn-ghost btn-sm" onclick="exportCallCSV()"><i class="fas fa-download"></i> Export CSV</button>
+          </div>
+        </div>
+        <div style="overflow-x:auto;">
+          <table class="data-table" id="calls-table">
+            <thead><tr><th>Date / Time</th><th>Caller / Ext</th><th>Destination</th><th>Duration</th><th>Type</th><th>Trunk</th><th>AI Action</th></tr></thead>
+            <tbody id="calls-tbody">
+              <tr><td colspan="7" style="text-align:center;padding:30px;color:var(--muted);"><div class="spin-loader" style="margin:0 auto 10px;"></div>Loading call logs...</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div style="padding:8px 16px;border-top:1px solid var(--border);display:flex;gap:6px;align-items:center;">
+          <button class="btn btn-ghost btn-xs" id="calls-prev" onclick="callsPage(-1)" disabled><i class="fas fa-chevron-left"></i> Prev</button>
+          <span id="calls-page-info" style="font-size:11.5px;color:var(--muted);padding:4px 8px;">Page 1</span>
+          <button class="btn btn-ghost btn-xs" id="calls-next" onclick="callsPage(1)">Next <i class="fas fa-chevron-right"></i></button>
+          <span id="calls-total-info" style="font-size:11px;color:var(--muted);margin-left:8px;"></span>
         </div>
       </div>
-      <div style="overflow-x:auto;">
-        <table class="data-table" id="calls-table">
-          <thead><tr><th>Date / Time</th><th>Caller / Ext</th><th>Destination</th><th>Duration</th><th>Type</th><th>Trunk</th><th>AI Action</th></tr></thead>
-          <tbody id="calls-tbody">
-            <tr><td colspan="7" style="text-align:center;padding:30px;color:var(--muted);"><div class="spin-loader" style="margin:0 auto 10px;"></div>Loading call logs...</td></tr>
-          </tbody>
-        </table>
-      </div>
-      <div style="padding:8px 16px;border-top:1px solid var(--border);display:flex;gap:6px;align-items:center;">
-        <button class="btn btn-ghost btn-xs" id="calls-prev" onclick="callsPage(-1)" disabled><i class="fas fa-chevron-left"></i> Prev</button>
-        <span id="calls-page-info" style="font-size:11.5px;color:var(--muted);padding:4px 8px;">Page 1</span>
-        <button class="btn btn-ghost btn-xs" id="calls-next" onclick="callsPage(1)">Next <i class="fas fa-chevron-right"></i></button>
-        <span id="calls-total-info" style="font-size:11px;color:var(--muted);margin-left:8px;"></span>
+
+      <div class="card">
+        <div class="card-header"><h3><i class="fas fa-file-alt" style="color:var(--gold);"></i> AI Call Summary</h3></div>
+        <div class="card-body"><div id="call-sum-full" style="font-size:12.5px;color:var(--muted);font-style:italic;">Select a call and click Summarise, or click AI Summarize above.</div></div>
       </div>
     </div>
 
-    <div class="card">
-      <div class="card-header"><h3><i class="fas fa-file-alt" style="color:var(--gold);"></i> AI Call Summary</h3></div>
-      <div class="card-body"><div id="call-sum-full" style="font-size:12.5px;color:var(--muted);font-style:italic;">Select a call and click Summarise, or click AI Summarize above.</div></div>
+    <!-- ── TAB: PBX CONTACTS ── -->
+    <div id="pbx-panel-contacts" class="pbx-panel" style="display:none;">
+      <div style="display:grid;grid-template-columns:300px 1fr;gap:14px;align-items:start;">
+
+        <!-- Left: Contact List -->
+        <div class="card" style="border-radius:0 0 12px 12px;border-top:none;">
+          <div class="card-header">
+            <h3><i class="fas fa-address-book" style="color:var(--gold);"></i> PBX Numbers</h3>
+            <span id="pbx-contacts-count" class="badge b-gold">0</span>
+          </div>
+          <div style="padding:10px 14px;border-bottom:1px solid var(--border);">
+            <div class="search-box"><i class="fas fa-search"></i><input id="pbx-contact-search" placeholder="Search number or name…" oninput="filterPbxContacts()"></div>
+          </div>
+          <div id="pbx-contacts-list" style="max-height:calc(100vh - 300px);overflow-y:auto;padding:8px 0;">
+            <div style="padding:20px;text-align:center;color:var(--muted);"><div class="spin-loader" style="margin:0 auto 8px;"></div>Loading…</div>
+          </div>
+        </div>
+
+        <!-- Right: Contact Detail / History -->
+        <div id="pbx-contact-detail" class="card" style="border-radius:0 0 12px 12px;border-top:none;">
+          <div style="padding:60px 20px;text-align:center;color:var(--muted);">
+            <i class="fas fa-user-circle" style="font-size:48px;margin-bottom:12px;opacity:0.3;display:block;"></i>
+            Select a contact to view their call history
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── TAB: RECORDINGS ── -->
+    <div id="pbx-panel-recordings" class="pbx-panel" style="display:none;">
+      <div class="card" style="border-radius:0 0 12px 12px;border-top:none;">
+        <div class="card-header">
+          <h3><i class="fas fa-microphone" style="color:var(--gold);"></i> PBX Call Recordings</h3>
+          <div style="display:flex;gap:8px;align-items:center;">
+            <button class="btn btn-ghost btn-sm" onclick="pbxLoadRecordings()"><i class="fas fa-sync-alt"></i> Refresh</button>
+          </div>
+        </div>
+        <div id="pbx-recordings-list" style="padding:16px;">
+          <div style="text-align:center;padding:30px;color:var(--muted);">
+            <i class="fas fa-microphone-slash" style="font-size:32px;opacity:0.3;display:block;margin-bottom:10px;"></i>
+            Click Refresh to scan recordings directory
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── TAB: BACKUP / RESTORE ── -->
+    <div id="pbx-panel-backup" class="pbx-panel" style="display:none;">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;align-items:start;">
+
+        <!-- Create Backup -->
+        <div class="card" style="border-radius:0 0 12px 12px;border-top:none;">
+          <div class="card-header"><h3><i class="fas fa-archive" style="color:var(--gold);"></i> Create Backup</h3></div>
+          <div class="card-body">
+            <p style="font-size:12.5px;color:var(--muted2);margin-bottom:16px;">Snapshot all call log records to a JSON file stored on the server.</p>
+            <button class="btn btn-gold" style="width:100%;justify-content:center;" onclick="pbxCreateBackup()">
+              <i class="fas fa-download"></i> Create Backup Now
+            </button>
+            <div id="pbx-backup-status" style="margin-top:10px;font-size:12px;color:var(--muted);"></div>
+          </div>
+        </div>
+
+        <!-- Restore from Backup -->
+        <div class="card" style="border-radius:0 0 12px 12px;border-top:none;">
+          <div class="card-header">
+            <h3><i class="fas fa-undo" style="color:var(--cyan);"></i> Restore / Old Backups</h3>
+            <button class="btn btn-ghost btn-xs" onclick="pbxListBackups()"><i class="fas fa-sync-alt"></i> Refresh</button>
+          </div>
+          <div id="pbx-backup-list" style="padding:14px;max-height:380px;overflow-y:auto;">
+            <div style="color:var(--muted);font-size:12.5px;text-align:center;padding:20px;">Click Refresh to list backups</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ══ PBX CONTACT SAVE MODAL ══ -->
+  <div class="modal-overlay" id="pbx-save-contact-modal" onclick="if(event.target===this)closeModal('pbx-save-contact-modal')">
+    <div class="modal" style="max-width:440px;">
+      <div class="modal-title">
+        <span><i class="fas fa-user-tag" style="color:var(--gold);margin-right:8px;"></i>Save PBX Contact</span>
+        <span class="modal-close" onclick="closeModal('pbx-save-contact-modal')"><i class="fas fa-times"></i></span>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Phone Number</label>
+        <input class="inp" id="pbx-save-phone" readonly style="opacity:0.7;">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Name *</label>
+        <input class="inp" id="pbx-save-name" placeholder="e.g. Suresh Kumar">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Company</label>
+        <input class="inp" id="pbx-save-company" placeholder="e.g. L&T ECC">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Notes</label>
+        <textarea class="inp" id="pbx-save-notes" rows="2" placeholder="Any notes…"></textarea>
+      </div>
+      <div style="display:flex;gap:8px;margin-top:4px;">
+        <button class="btn btn-gold" style="flex:1;justify-content:center;" onclick="pbxSaveContactSubmit()"><i class="fas fa-save"></i> Save Contact</button>
+        <button class="btn btn-ghost" onclick="closeModal('pbx-save-contact-modal')">Cancel</button>
+      </div>
     </div>
   </div>
 
@@ -1950,6 +1989,7 @@ select.inp option{background:#1a2035;color:var(--text);}
           <div style="font-size:15px;font-weight:800;color:#fff;margin-bottom:6px;"><i class="fab fa-whatsapp" style="color:#25D366;margin-right:8px;"></i>Connect WhatsApp</div>
           <div style="font-size:12.5px;color:var(--muted);margin-bottom:14px;">Scan the QR code with your WhatsApp to connect. Old chats will auto-sync to database.</div>
           <button class="btn btn-green" id="wa-get-qr-btn" onclick="waGetQR()"><i class="fas fa-qrcode"></i> Show QR Code</button>
+          <button class="btn btn-red btn-sm" onclick="waResetConnection()" style="margin-left:8px;"><i class="fas fa-redo"></i> Reset & Reconnect</button>
         </div>
       </div>
     </div>
@@ -2373,6 +2413,7 @@ select.inp option{background:#1a2035;color:var(--text);}
             <button type="button" class="btn btn-ghost btn-xs" onmousedown="bcToolbarMousedown(event)" onclick="bcInsertMarquee()" title="Scrolling text"><i class="fas fa-arrows-alt-h"></i> Marquee</button>
             <button type="button" class="btn btn-ghost btn-xs" onmousedown="bcToolbarMousedown(event)" onclick="bcInsertTable()"   title="Table"><i class="fas fa-table"></i> Table</button>
             <button type="button" class="btn btn-ghost btn-xs" onmousedown="bcToolbarMousedown(event)" onclick="bcInsertButton()"  title="CTA Button"><i class="fas fa-hand-pointer"></i> Button</button>
+            <button type="button" class="btn btn-ghost btn-xs" onmousedown="bcToolbarMousedown(event);_bcSavedSel=window.getSelection()&&window.getSelection().rangeCount>0?window.getSelection().getRangeAt(0).cloneRange():null" onclick="openMediaInsertModal('bc-html')" title="Insert image, video, audio or document"><i class="fas fa-photo-video"></i> Media</button>
             <div style="position:relative;display:inline-block;">
               <button type="button" class="btn btn-ghost btn-xs" onmousedown="bcToolbarMousedown(event)" onclick="bcToggleEmoji(this)" title="Emoji"><i class="fas fa-smile"></i> Emoji</button>
               <div id="bc-emoji-picker" class="emoji-picker-popup" style="display:none;top:32px;left:0;">
@@ -2391,10 +2432,15 @@ select.inp option{background:#1a2035;color:var(--text);}
               </div>
             </div>
             <button type="button" class="btn btn-ghost btn-xs" onmousedown="bcToolbarMousedown(event)" onclick="bcInsertSignature()" title="Signature"><i class="fas fa-signature"></i> Signature</button>
+            <button type="button" class="btn btn-ghost btn-xs" onmousedown="bcToolbarMousedown(event);_bcSavedSel=window.getSelection()&&window.getSelection().rangeCount>0?window.getSelection().getRangeAt(0).cloneRange():null" onclick="openInsertHtmlModal('bc-html')" title="Insert HTML (Auto-transforms for Outlook)
+✓ Inlines CSS, resolves CSS variables
+✗ Removes: box-shadow, border-radius, animations, transforms, filters, grid/flex properties
+⚠ Note: Grid/flex layouts preserved but properties removed - use tables for Outlook"><i class="fas fa-code"></i> HTML</button>
+            <button type="button" class="btn btn-ghost btn-xs" onmousedown="event.preventDefault()" onclick="previewEditorContent('bc-html')" title="Preview email full-screen"><i class="fas fa-eye"></i> Preview</button>
           </div>
           <div id="bc-html"
                contenteditable="true"
-               style="min-height:180px;max-height:320px;overflow-y:auto;background:#fff;color:#222;font-family:Calibri,Arial,sans-serif;font-size:14px;line-height:1.6;padding:10px 12px 10px 28px;border:1px solid var(--border2);border-radius:0 0 8px 8px;outline:none;"
+               style="min-height:180px;max-height:520px;overflow-y:auto;background:#fff;color:#222;font-family:Calibri,Arial,sans-serif;font-size:14px;line-height:1.6;padding:10px 12px 10px 28px;border:1px solid var(--border2);border-radius:0 0 8px 8px;outline:none;"
                placeholder="Write your email here… Use {{name}} for personalization."
                onmouseup="bcSaveSelection();bcUpdateActiveButtons()"
                onkeyup="bcSaveSelection();bcUpdateActiveButtons()">
@@ -2565,40 +2611,26 @@ select.inp option{background:#1a2035;color:var(--text);}
 
     <!-- ██████ AI ASSISTANT ██████ -->
   <div class="section-view fu" id="sec-ai">
-    <div style="max-width:840px;margin:0 auto;">
+    <div style="height:calc(100vh - 100px);display:flex;flex-direction:column;">
+      <div style="display:grid;grid-template-columns:260px 1fr;gap:16px;height:100%;">
       
-      <!-- AI Pipeline Visualization -->
-      <div class="ai-flow-container fu">
-        <div class="ai-pipeline-status"><div class="pulse"></div> PIPELINE ACTIVE</div>
-        
-        <div class="ai-node active" id="node-input">
-          <div class="ai-node-icon"><i class="fas fa-keyboard"></i></div>
-          <div class="ai-node-label">Input</div>
+      <!-- Copilot Style Sidebar -->
+      <div class="card" style="display:flex;flex-direction:column;height:100%;">
+        <div style="padding:14px 16px;border-bottom:1px solid var(--border);">
+          <button class="btn btn-ghost" style="width:100%;justify-content:center;background:var(--bg3);border:1px solid var(--border);" onclick="aiNewChat()">
+            <i class="fas fa-plus"></i> New chat
+          </button>
         </div>
-        
-        <div class="ai-flow-arrow"></div>
-        
-        <div class="ai-node" id="node-context">
-          <div class="ai-node-icon"><i class="fas fa-database"></i></div>
-          <div class="ai-node-label">Context</div>
+        <div style="padding:16px 16px 8px;font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:1px;">
+          Recent
         </div>
-        
-        <div class="ai-flow-arrow"></div>
-        
-        <div class="ai-node" id="node-model">
-          <div class="ai-node-icon"><i class="fas fa-brain"></i></div>
-          <div class="ai-node-label">Claude 3.5</div>
-        </div>
-        
-        <div class="ai-flow-arrow"></div>
-        
-        <div class="ai-node" id="node-output">
-          <div class="ai-node-icon"><i class="fas fa-comment-dots"></i></div>
-          <div class="ai-node-label">Output</div>
+        <div id="ai-chat-history" style="flex:1;overflow-y:auto;padding:8px;display:flex;flex-direction:column;gap:4px;">
+          <!-- Sessions rendered via JS -->
         </div>
       </div>
 
-      <div class="card" style="display:flex;flex-direction:column;height:calc(100vh - 240px);">
+      <!-- Main Chat Area -->
+      <div class="card" style="display:flex;flex-direction:column;height:100%;">
         <div class="card-header">
           <h3><i class="fas fa-robot" style="color:var(--gold);"></i> UniComm AI · Powered by Claude</h3>
 
@@ -2622,6 +2654,169 @@ select.inp option{background:#1a2035;color:var(--text);}
       </div>
     </div>
   </div>
+</div>
+  <script>
+    // Core Configuration
+    const API_BASE = `${window.location.origin}/api`;
+    
+    function getAuthHeaders() {
+      const token = localStorage.getItem('uc_token') || sessionStorage.getItem('uc_token');
+      return {
+        'Authorization': 'Bearer ' + (token || ''),
+        'Content-Type': 'application/json'
+      };
+    }
+  </script>
+  <script>
+    let aiSessions = [];
+    let aiCurrentSessionId = null;
+
+    function renderAIChatSidebar() {
+      const container = document.getElementById('ai-chat-history');
+      if (!container) return;
+      container.innerHTML = aiSessions.map(s => {
+        const isActive = s.id === aiCurrentSessionId;
+        return `<div class="nav-item ${isActive ? 'active' : ''}" style="font-size:12.5px;padding:8px 10px;margin-bottom:2px;cursor:pointer;" onclick="aiLoadSession('${s.id}')">
+          <i class="fas ${isActive ? 'fa-comment-dots' : 'fa-comment-alt'}" style="${isActive ? 'color:var(--gold);' : 'opacity:0.5;'}"></i>
+          <span style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-left:8px;flex:1;">${s.title}</span>
+        </div>`;
+      }).join('');
+    }
+
+    function aiLoadSession(id) {
+      const msgs = document.getElementById('ai-messages');
+      // Save current session state before switching
+      if (msgs && aiCurrentSessionId) {
+        const currentSession = aiSessions.find(s => s.id === aiCurrentSessionId);
+        if (currentSession && !msgs.innerHTML.includes('What can I help you with today?')) {
+          currentSession.messagesHtml = msgs.innerHTML;
+          if (currentSession.messages && currentSession.messages.length > 0) {
+            fetch(`${API_BASE}/system/ai/sessions`, {
+              method: 'POST',
+              headers: typeof getAuthHeaders === 'function' ? getAuthHeaders() : { 'Content-Type': 'application/json' },
+              body: JSON.stringify(currentSession)
+            }).catch(e => console.error(e));
+          }
+        }
+      }
+
+      aiCurrentSessionId = id;
+      renderAIChatSidebar();
+      
+      const session = aiSessions.find(s => s.id === id);
+      if (session) {
+        if (typeof aiHistory !== 'undefined') aiHistory = session.messages || [];
+      } else {
+        if (typeof aiHistory !== 'undefined') aiHistory = [];
+      }
+
+      if (msgs) {
+        msgs.innerHTML = '';
+        if (!session || (!session.messagesHtml && (!session.messages || session.messages.length === 0))) {
+          msgs.innerHTML = `<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;color:var(--muted);text-align:center;">
+            <i class="fas fa-robot" style="font-size:32px;margin-bottom:16px;opacity:0.5;"></i>
+            <div style="font-size:16px;font-weight:600;color:var(--text);">What can I help you with today?</div>
+            <div style="font-size:12.5px;margin-top:6px;max-width:300px;">I'm your AI assistant for Unicircuit Engineering Services LLP.</div>
+          </div>`;
+        } else if (session.messages && session.messages.length > 0) {
+          // Robust reconstruction from messages array
+          let html = '';
+          session.messages.forEach(m => {
+            if (m.role === 'system') return;
+            const isUser = m.role === 'user';
+            let content = m.content;
+            if (!isUser) {
+              // Same formatting as sendAI
+              content = content.replace(/(?:\|.*\|\n?)+/g, match => {
+                let rows = match.trim().split('\n');
+                let out = '<table style="width:100%; border-collapse:collapse; margin:14px 0; font-size:12px; background:var(--card2); border:1px solid var(--border); border-radius:6px; overflow:hidden;">';
+                rows.forEach((row, i) => {
+                  if(row.replace(/\|/g, '').replace(/-/g, '').trim() === '') return;
+                  out += '<tr>';
+                  let cols = row.split('|').map(c => c.trim());
+                  if (cols[0] === '') cols.shift();
+                  if (cols[cols.length-1] === '') cols.pop();
+                  let tag = i === 0 ? 'th' : 'td';
+                  let align = i === 0 ? 'left' : 'left';
+                  cols.forEach(c => {
+                    out += `<${tag} style="border-bottom:1px solid var(--border); padding:8px 12px; text-align:${align}; font-weight:${i===0?'700':'400'}; color:${i===0?'var(--gold)':'var(--text)'};">${c}</${tag}>`;
+                  });
+                  out += '</tr>';
+                });
+                return out + '</table>';
+              });
+              content = `<div class="ai-tag"><i class="fas fa-robot"></i> UNICOMM AI</div>${content}`;
+            }
+            html += `<div class="chat-msg ${isUser ? 'user' : 'ai'} fu">${content}</div>`;
+          });
+          msgs.innerHTML = html;
+        } else {
+          msgs.innerHTML = session.messagesHtml || '';
+        }
+        // Scroll to bottom
+        msgs.scrollTop = msgs.scrollHeight;
+      }
+    }
+
+    function aiNewChat() {
+      // Autosave current before creating new
+      const msgs = document.getElementById('ai-messages');
+      if (aiCurrentSessionId && msgs) {
+        const currentSession = aiSessions.find(s => s.id === aiCurrentSessionId);
+        
+        // Prevent creating a new chat if the current one is already completely empty
+        if (currentSession && (!currentSession.messages || currentSession.messages.length === 0)) {
+          document.getElementById('ai-input')?.focus();
+          return;
+        }
+
+        if (currentSession && !msgs.innerHTML.includes('What can I help you with today?')) {
+          currentSession.messagesHtml = msgs.innerHTML;
+          if (currentSession.messages && currentSession.messages.length > 0) {
+            fetch('/api/system/ai/sessions', {
+              method: 'POST',
+              headers: typeof getAuthHeaders === 'function' ? getAuthHeaders() : { 'Content-Type': 'application/json' },
+              body: JSON.stringify(currentSession)
+            }).catch(e => console.error(e));
+          }
+        }
+      }
+
+      const newId = 'session_' + Date.now();
+      aiSessions.unshift({ id: newId, title: 'New Conversation', messages: [], messagesHtml: '' });
+      aiLoadSession(newId);
+    }
+
+    // Initialize sidebar on load
+    document.addEventListener('DOMContentLoaded', async () => {
+      try {
+        const res = await fetch(`${API_BASE}/system/ai/sessions`, { headers: typeof getAuthHeaders === 'function' ? getAuthHeaders() : { 'Content-Type': 'application/json' } });
+        if (res.ok) {
+          const data = await res.json();
+          if (data.sessions && data.sessions.length > 0) {
+            aiSessions = data.sessions.map(s => ({
+              id: s.id,
+              title: s.title,
+              messages: s.messages || [],
+              messagesHtml: s.messages_html || ''
+            }));
+            aiCurrentSessionId = aiSessions[0].id;
+          }
+        }
+      } catch (e) {
+        console.error('Failed to fetch AI sessions', e);
+      }
+      
+      if (aiSessions.length === 0) {
+        const newId = 'session_' + Date.now();
+        aiSessions = [{ id: newId, title: 'New Conversation', messages: [], messagesHtml: '' }];
+        aiCurrentSessionId = newId;
+      }
+      
+      renderAIChatSidebar();
+      aiLoadSession(aiCurrentSessionId);
+    });
+  </script>
 
   <!-- ██████ ANALYTICS ██████ -->
   <div class="section-view fu" id="sec-analytics">
@@ -3472,7 +3667,7 @@ function showOutlookDirectoryDetail(graphId, cardEl) {
             ${email ? `<button class="btn btn-gold btn-sm" onclick="draftEmailTo(${jsArg(email)})"><i class="fas fa-envelope"></i> Draft Email</button>` : ''}
             ${email ? `<a class="btn btn-blue btn-sm" href="https://teams.microsoft.com/l/chat/0/0?users=${encodeURIComponent(email)}" target="_blank" rel="noopener" style="text-decoration:none;"><i class="fab fa-microsoft"></i> Teams Chat</a>` : ''}
             <a class="btn btn-blue btn-sm" href="${escAttr(outlookUrl)}" target="_blank" rel="noopener" style="text-decoration:none;"><i class="fab fa-microsoft"></i> Open in Outlook</a>
-            ${email ? `<button class="btn btn-ghost btn-sm" onclick="openQuickSaveModal(${jsArg(email)}, ${jsArg(editableGraphId)}, ${jsArg(title === email ? '' : title)})"><i class="fa fa-pen"></i> ${title === email ? 'Add Name' : 'Edit Contact'}</button>` : ''}
+            ${email ? `<button class="btn btn-ghost btn-sm" onclick="openQuickSaveModal(${jsArg(email)}, ${jsArg(editableGraphId)}, ${jsArg(title === email ? '' : title)}, ${jsArg(company)}, ${jsArg(jobTitle)}, ${jsArg(phone)})"><i class="fa fa-pen"></i> ${title === email ? 'Add Name' : 'Edit Contact'}</button>` : ''}
           </div>
         </div>
       </div>
@@ -3494,7 +3689,7 @@ function showOutlookDirectoryDetail(graphId, cardEl) {
         </div>` : ''}
         <div style="display:flex;justify-content:center;margin-top:28px;">
           <a class="btn btn-blue btn-sm" href="${escAttr(outlookUrl)}" target="_blank" rel="noopener" style="text-decoration:none;"><i class="fab fa-microsoft"></i> Open in Outlook</a>
-          ${email ? `<button class="btn btn-ghost btn-sm" onclick="openQuickSaveModal(${jsArg(email)}, ${jsArg(editableGraphId)}, ${jsArg(title === email ? '' : title)})" style="margin-left:8px;"><i class="fas fa-pen"></i> Edit contact</button>` : ''}
+          ${email ? `<button class="btn btn-ghost btn-sm" onclick="openQuickSaveModal(${jsArg(email)}, ${jsArg(editableGraphId)}, ${jsArg(title === email ? '' : title)}, ${jsArg(company)}, ${jsArg(jobTitle)}, ${jsArg(phone)})" style="margin-left:8px;"><i class="fas fa-pen"></i> Edit contact</button>` : ''}
         </div>
       </div>
 
@@ -5273,6 +5468,17 @@ async function sendAI() {
   const btn = document.getElementById('ai-send');
   btn.disabled = true;
   aiHistory.push({ role: 'user', content: msg });
+
+  // Sync to current session and update title if it's the first message
+  const currentSession = aiSessions.find(s => s.id === aiCurrentSessionId);
+  if (currentSession) {
+    currentSession.messages = aiHistory;
+    if (aiHistory.length === 1 || currentSession.title === 'New Conversation') {
+      currentSession.title = msg.substring(0, 30) + (msg.length > 30 ? '...' : '');
+      renderAIChatSidebar();
+    }
+  }
+
   const loaderId = 'ai-loader-' + Date.now();
   const container = document.getElementById('ai-messages');
   const loader = document.createElement('div');
@@ -5292,6 +5498,17 @@ async function sendAI() {
     const reply = data.reply || 'Sorry, I could not generate a response.';
     aiHistory.push({ role: 'assistant', content: reply });
     document.getElementById(loaderId)?.remove();
+
+    if (currentSession) {
+      currentSession.messages = aiHistory;
+      // Re-fetch HTML state without the loader
+      currentSession.messagesHtml = document.getElementById('ai-messages').innerHTML;
+      fetch('/api/system/ai/sessions', {
+        method: 'POST',
+        headers: typeof getAuthHeaders === 'function' ? getAuthHeaders() : { 'Content-Type': 'application/json' },
+        body: JSON.stringify(currentSession)
+      }).catch(e => console.error(e));
+    }
 
     // Parse Markdown tables into beautiful HTML tables
     let formattedReply = reply.replace(/(?:\|.*\|\n?)+/g, match => {
@@ -5420,6 +5637,7 @@ window.addEventListener('DOMContentLoaded', () => {
   // ── LOAD DATA FROM API (with fallback to local data) ────────────────────
   loadDashboardData();
   initSystemStatus();
+  initWASocket();
 
   // Render all sections
   renderWAList();
@@ -5432,6 +5650,7 @@ window.addEventListener('DOMContentLoaded', () => {
       el.style.width = '0';
       setTimeout(() => el.style.width = w, 50);
     });
+    startPbxWatchdog();
   }, 200);
 });
 
@@ -5453,13 +5672,8 @@ async function doLogout() {
   window.location.href = 'login.html';
 }
 
-// ── API BASE ─────────────────────────────────────────────────────────────────
-const API_BASE = `${window.location.origin}/api`;
+// API_BASE and getAuthHeaders moved to top for early availability
 
-function getAuthHeaders() {
-  const token = localStorage.getItem('uc_token') || sessionStorage.getItem('uc_token');
-  return { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' };
-}
 
 // Global 401 handler — if token expired, redirect to login
 async function apiFetch(url, options) {
@@ -5613,94 +5827,8 @@ function updateKPIs(stats) {
   }
 }
 
-// ── PBX CALLS ─────────────────────────────────────────────────────────────
-let callsCurrentPage = 0;
-const CALLS_PER_PAGE = 50;
+// ── LEGACY PBX CALLS (REMOVED: COLLIDES WITH MATRIX INTEGRATION) ──
 
-async function loadCallLogs() {
-  const tbody = document.getElementById('calls-tbody');
-  if (!tbody) return;
-  tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:20px;color:var(--muted);"><div class="spin-loader" style="margin:0 auto;"></div></td></tr>';
-  try {
-    const offset = callsCurrentPage * CALLS_PER_PAGE;
-    const res = await fetch(API_BASE + '/calls?limit=' + CALLS_PER_PAGE + '&offset=' + offset, { headers: getAuthHeaders() });
-    const data = await res.json();
-    const calls = data.calls || [];
-    const total = data.total || 0;
-    const countEl = document.getElementById('pbx-call-count');
-    if (countEl) countEl.textContent = total + ' total calls';
-    const totalEl = document.getElementById('calls-total-info');
-    if (totalEl) totalEl.textContent = 'Showing ' + (offset+1) + '–' + Math.min(offset+calls.length, total) + ' of ' + total;
-    const pageEl = document.getElementById('calls-page-info');
-    if (pageEl) pageEl.textContent = 'Page ' + (callsCurrentPage+1);
-    const prevBtn = document.getElementById('calls-prev');
-    const nextBtn = document.getElementById('calls-next');
-    if (prevBtn) prevBtn.disabled = callsCurrentPage === 0;
-    if (nextBtn) nextBtn.disabled = offset + calls.length >= total;
-    if (!calls.length) {
-      tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:30px;color:var(--muted);">No call records yet. Waiting for SMDR data from Matrix PBX...</td></tr>';
-      return;
-    }
-    tbody.innerHTML = calls.map(function(c) {
-      var dt = '';
-      if (c.call_date) {
-        // Parse DATE string directly (YYYY-MM-DD) to avoid timezone shift
-        var dp = c.call_date.substring(0,10).split('-');
-        var dObj = new Date(parseInt(dp[0]), parseInt(dp[1])-1, parseInt(dp[2]));
-        dt = dObj.toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'2-digit'});
-      } else if (c.created_at) {
-        dt = new Date(c.created_at).toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'2-digit'});
-      }
-      var tm = c.call_time ? c.call_time.substring(0,5) : (c.created_at ? new Date(c.created_at).toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'}) : '');
-      var typeBadge = c.call_type === 'In' ? 'b-blue' : c.call_type === 'Missed' ? 'b-red' : c.call_type === 'Internal' ? 'b-gold' : 'b-green';
-      var typeLabel = c.call_type === 'In' ? 'Incoming' : c.call_type === 'Out' ? 'Outgoing' : c.call_type || '—';
-      var extHtml = (c.extension && c.extension !== c.caller) ? '<br><span style="font-size:10.5px;color:var(--muted);">Ext. ' + c.extension + '</span>' : '';
-      var aiHtml = c.ai_summary
-        ? '<span class="badge b-green" title="' + (c.ai_summary||'').substring(0,80) + '"><i class="fas fa-check"></i> Done</span>'
-        : '<button class="btn btn-blue btn-xs" onclick="quickCallSummaryById(' + c.id + ',this)"><i class="fas fa-robot"></i> Summarise</button>';
-      return '<tr>' +
-        '<td style="white-space:nowrap;"><b>' + dt + '</b><br><span style="font-size:10.5px;color:var(--muted);">' + tm + '</span></td>' +
-        '<td><b>' + (c.caller||'—') + '</b>' + extHtml + '</td>' +
-        '<td>' + (c.destination||'—') + '</td>' +
-        '<td style="font-family:monospace;font-size:12px;">' + (c.duration||'\u2014') + '</td>' +
-        '<td><span class="badge ' + typeBadge + '">' + typeLabel + '</span></td>' +
-        '<td style="font-size:11px;color:var(--muted);">' + (c.trunk||'—') + '</td>' +
-        '<td>' + aiHtml + '</td>' +
-        '</tr>';
-    }).join('');
-  } catch(err) {
-    tbody.innerHTML = '<tr><td colspan="7" style="color:var(--red2);padding:16px;">' + err.message + '</td></tr>';
-  }
-}
-
-function callsPage(dir) {
-  callsCurrentPage = Math.max(0, callsCurrentPage + dir);
-  loadCallLogs();
-}
-
-function exportCallCSV() {
-  window.open(API_BASE + '/calls?limit=10000&offset=0', '_blank');
-}
-
-async function quickCallSummaryById(id, btn) {
-  var el = document.getElementById('call-sum-full');
-  if (el) el.textContent = 'Generating AI summary...';
-  if (btn) { btn.disabled = true; btn.innerHTML = '<span class="spin-loader"></span>'; }
-  try {
-    var res = await fetch(API_BASE + '/calls?limit=1000&offset=0', { headers: getAuthHeaders() });
-    var data = await res.json();
-    var call = (data.calls||[]).find(function(c){ return c.id === id; });
-    if (!call) { if (el) el.textContent = 'Call not found.'; return; }
-    var summary = await callClaude('Summarize this PBX call in 2 sentences for a B2B sales team. Type: ' + call.call_type + ', Caller: ' + call.caller + ', Destination: ' + call.destination + ', Duration: ' + call.duration);
-    if (el) el.textContent = summary;
-    await fetch(API_BASE + '/calls/' + id + '/summary', { method:'PATCH', headers: getAuthHeaders(), body: JSON.stringify({ ai_summary: summary }) });
-    if (btn) { btn.innerHTML = '<i class="fas fa-check"></i> Done'; btn.className = 'btn b-green btn-xs'; }
-    loadCallLogs();
-  } catch(err) {
-    if (el) el.textContent = 'Error: ' + err.message;
-    if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fas fa-robot"></i> Summarise'; }
-  }
-}
 
 function pbxOnConnected(data) {
   var dot = document.getElementById('pbx-dot');
@@ -6146,16 +6274,16 @@ function renderRecipientCell(toAddresses, ccAddresses) {
 // ── Quick Save Contact Modal ──────────────────────────────────────────────
 let _qsGraphId = null; // stores Graph contact ID when editing existing contact
 
-async function openQuickSaveModal(email, graphId, existingName) {
+async function openQuickSaveModal(email, graphId, existingName, existingCompany, existingJob, existingPhone) {
   _qsGraphId = (graphId && !String(graphId).startsWith('mail:')) ? graphId : null;
   
   // Reset all fields first
   document.getElementById('qs-email').value   = email || '';
   document.getElementById('qs-fname').value   = '';
   document.getElementById('qs-lname').value   = '';
-  document.getElementById('qs-company').value = '';
-  document.getElementById('qs-job').value     = '';
-  document.getElementById('qs-phone').value   = '';
+  document.getElementById('qs-company').value = existingCompany || '';
+  document.getElementById('qs-job').value     = existingJob || '';
+  document.getElementById('qs-phone').value   = existingPhone || '';
   document.getElementById('qs-notes').value   = '';
   document.getElementById('qs-status').style.display = 'none';
 
@@ -6185,11 +6313,11 @@ async function openQuickSaveModal(email, graphId, existingName) {
         // Find exact match by email
         const match = matches.find(m => String(m.email).toLowerCase() === email.toLowerCase());
         if (match) {
-          document.getElementById('qs-fname').value   = match.fname || '';
-          document.getElementById('qs-lname').value   = match.lname || '';
-          document.getElementById('qs-company').value = match.company || '';
-          document.getElementById('qs-job').value     = match.designation || '';
-          document.getElementById('qs-phone').value   = match.phone || match.wa || '';
+          document.getElementById('qs-fname').value   = match.fname || document.getElementById('qs-fname').value;
+          document.getElementById('qs-lname').value   = match.lname || document.getElementById('qs-lname').value;
+          document.getElementById('qs-company').value = match.company || document.getElementById('qs-company').value;
+          document.getElementById('qs-job').value     = match.designation || document.getElementById('qs-job').value;
+          document.getElementById('qs-phone').value   = match.phone || match.wa || document.getElementById('qs-phone').value;
           document.getElementById('qs-notes').value   = match.notes || '';
           // Save internal CRM ID for later PUT
           window._qsCrmId = match.id;
@@ -6220,8 +6348,13 @@ async function submitQuickSave() {
   const lname   = document.getElementById('qs-lname').value.trim();
   const company = document.getElementById('qs-company').value.trim();
   const job     = document.getElementById('qs-job').value.trim();
-  const phone   = document.getElementById('qs-phone').value.trim();
+  let phone     = document.getElementById('qs-phone').value.trim();
   const notes   = document.getElementById('qs-notes').value.trim();
+
+  // Ensure WhatsApp country code format for notifications
+  if (phone && !phone.startsWith('+')) {
+    phone = '+91' + phone;
+  }
 
   if (!email || (!fname && !lname)) {
     notify('Email and at least one name field required', 'error');
@@ -7263,6 +7396,9 @@ function oaAutoHtmlEditor(id, html, disabled, placeholder) {
       <button type="button" class="btn btn-ghost btn-xs" data-cmd="justifyRight" ${dis} onmousedown="event.preventDefault();oaAutoRestoreSelection('${id}')" onclick="oaAutoFmt('${id}','justifyRight')" title="Align right"><i class="fas fa-align-right"></i></button>
       <button type="button" class="btn btn-ghost btn-xs" ${dis} onmousedown="event.preventDefault();oaAutoRestoreSelection('${id}')" onclick="oaAutoLink('${id}')" title="Insert link"><i class="fas fa-link"></i></button>
       <button type="button" class="btn btn-ghost btn-xs" ${dis} onmousedown="event.preventDefault();oaAutoRestoreSelection('${id}')" onclick="oaAutoFmt('${id}','unlink')" title="Remove link"><i class="fas fa-unlink"></i></button>
+      <button type="button" class="btn btn-ghost btn-xs" ${dis} onmousedown="event.preventDefault();oaAutoSaveSelection('${id}')" onclick="openInsertHtmlModal('${id}')" title="Insert HTML (Auto-transforms for Outlook)
+✓ Converts: grid→table, flex→table, CSS vars→colors
+✗ Removes: box-shadow, border-radius, animations, JavaScript"><i class="fas fa-code"></i></button>
       <span class="oa-html-more">
         <button type="button" class="btn btn-ghost btn-xs" ${dis} onmousedown="event.preventDefault();oaAutoRestoreSelection('${id}')" onclick="oaAutoToggleMore(this, '${id}')" title="More"><i class="fas fa-ellipsis-h"></i></button>
         <span class="oa-html-more-menu">
@@ -8996,44 +9132,88 @@ function getComposeFormData() {
 }
 
 /**
- * Save draft to localStorage
+ * Save draft — saves to Outlook Drafts folder via Graph API (primary)
+ * and also to localStorage as fallback.
  * @param {boolean} manual - If true, show success message
  */
-function saveComposeDraft(manual = false) {
+async function saveComposeDraft(manual = false) {
   if (!composeHasContent()) {
-    if (manual) {
-      notify('Nothing to save', 'info');
-    }
+    if (manual) notify('Nothing to save', 'Add some content first', 'var(--muted)', 'fas fa-info-circle');
     return;
   }
-  
+
+  const statusEl = document.getElementById('compose-draft-status');
+
   try {
     const draftData = getComposeFormData();
+
+    // Always save to localStorage first (instant, no network needed)
     localStorage.setItem(DRAFT_STORAGE_KEY, JSON.stringify(draftData));
     draftHasUnsavedChanges = false;
-    
-    // Show status indicator
-    const statusEl = document.getElementById('compose-draft-status');
+    console.log('[Draft] Saved to localStorage at', draftData.savedAt);
+
+    if (!manual) return; // Auto-save stops here — only localStorage
+
+    // Show saving indicator
     if (statusEl) {
       statusEl.style.display = 'block';
-      statusEl.innerHTML = '<i class="fas fa-check-circle" style="color:var(--green2);"></i> Draft saved';
-      
-      // Hide after 3 seconds
-      setTimeout(() => {
-        if (statusEl) statusEl.style.display = 'none';
-      }, 3000);
+      statusEl.innerHTML = '<span class="spin-loader" style="width:10px;height:10px;border-width:1.5px;"></span> Saving to Outlook…';
     }
-    
-    if (manual) {
-      notify('Draft saved', 'success');
+
+    // Get the processed body (with CSS inlined for Outlook)
+    const bodyEl = document.getElementById('compose-body');
+    let processedBody = draftData.body;
+
+    console.log('[Draft] Editor body length:', processedBody.length);
+    console.log('[Draft] HTML embeds in editor:', bodyEl ? bodyEl.querySelectorAll('[data-html-uid]').length : 0);
+    console.log('[Draft] _htmlEmbedStore size:', _htmlEmbedStore.size);
+
+    try {
+      processedBody = await getEmailBodyForSend(bodyEl);
+      console.log('[Draft] Processed body length:', processedBody.length);
+    } catch(e) {
+      console.warn('[Draft] CSS inlining failed, using raw body:', e.message);
     }
-    
-    console.log('[Draft] Saved at', draftData.savedAt);
+
+    // Parse To/CC
+    const parseEmails = (raw) => (raw || '').split(/[,;]+/).map(e => e.trim()).filter(e => e.includes('@'));
+    const to = parseEmails(draftData.to);
+    const cc = parseEmails(draftData.cc);
+
+    // Save to Outlook Drafts folder via Graph API
+    const res = await fetch(`${API_BASE}/outlook/drafts`, {
+      method: 'POST',
+      headers: getAuthHeaders(),
+      body: JSON.stringify({
+        to: to.length ? to : undefined,
+        cc: cc.length ? cc : undefined,
+        subject: draftData.subject || '(No subject)',
+        body: processedBody
+      })
+    });
+
+    const data = await res.json();
+
+    if (res.ok && data.success) {
+      console.log('[Draft] ✅ Saved to Outlook Drafts, id:', data.draftId);
+      if (statusEl) {
+        statusEl.style.display = 'block';
+        statusEl.innerHTML = '<i class="fas fa-check-circle" style="color:var(--green2);"></i> Saved to Outlook Drafts';
+        setTimeout(() => { if (statusEl) statusEl.style.display = 'none'; }, 4000);
+      }
+      notify('Draft saved to Outlook', 'Check your Drafts folder to preview rendering', 'var(--green)', 'fas fa-save');
+    } else {
+      throw new Error(data.error || 'Unknown error');
+    }
+
   } catch (err) {
-    console.error('[Draft] Save failed:', err);
-    if (manual) {
-      notify('Failed to save draft: ' + err.message, 'error');
+    console.error('[Draft] Outlook save failed:', err.message);
+    if (statusEl) {
+      statusEl.style.display = 'block';
+      statusEl.innerHTML = '<i class="fas fa-check-circle" style="color:var(--gold2);"></i> Saved locally (Outlook: ' + err.message + ')';
+      setTimeout(() => { if (statusEl) statusEl.style.display = 'none'; }, 5000);
     }
+    if (manual) notify('Saved locally only', err.message, 'var(--gold)', 'fas fa-save');
   }
 }
 
@@ -9044,12 +9224,32 @@ function loadComposeDraft() {
   try {
     const draftJson = localStorage.getItem(DRAFT_STORAGE_KEY);
     if (!draftJson) return null;
-    
+
     const draft = JSON.parse(draftJson);
+
+    // Sanity check: if body looks like JS/HTML source code (corrupted draft),
+    // discard it automatically
+    const body = draft.body || '';
+    const looksCorrupted = (
+      body.includes('function ') ||
+      body.includes('const ') ||
+      body.includes('var ') ||
+      body.includes('<!DOCTYPE') ||
+      body.includes('<html') ||
+      body.length > 500000  // > 500KB is almost certainly wrong
+    );
+
+    if (looksCorrupted) {
+      console.warn('[Draft] Discarding corrupted draft (body looks like source code), length:', body.length);
+      localStorage.removeItem(DRAFT_STORAGE_KEY);
+      return null;
+    }
+
     console.log('[Draft] Loaded draft from', draft.savedAt);
     return draft;
   } catch (err) {
     console.error('[Draft] Load failed:', err);
+    localStorage.removeItem(DRAFT_STORAGE_KEY);
     return null;
   }
 }
@@ -9088,18 +9288,33 @@ function deleteComposeDraft() {
 }
 
 /**
- * Start auto-save timer
+ * Start auto-save timer — saves to localStorage only (no Outlook API call)
  */
 function startDraftAutoSave() {
   stopDraftAutoSave();
-  
+
   draftAutoSaveTimer = setInterval(() => {
     if (draftHasUnsavedChanges && composeHasContent()) {
-      saveComposeDraft(false);
+      // Auto-save: localStorage only — never call Outlook API automatically
+      // to avoid creating duplicate drafts
+      try {
+        const draftData = getComposeFormData();
+        localStorage.setItem(DRAFT_STORAGE_KEY, JSON.stringify(draftData));
+        draftHasUnsavedChanges = false;
+        console.log('[Draft] Auto-saved to localStorage at', draftData.savedAt);
+        const statusEl = document.getElementById('compose-draft-status');
+        if (statusEl) {
+          statusEl.style.display = 'block';
+          statusEl.innerHTML = '<i class="fas fa-circle" style="color:var(--muted);font-size:8px;"></i> Auto-saved locally';
+          setTimeout(() => { if (statusEl) statusEl.style.display = 'none'; }, 2000);
+        }
+      } catch(e) {
+        console.warn('[Draft] Auto-save failed:', e.message);
+      }
     }
   }, DRAFT_AUTO_SAVE_INTERVAL);
-  
-  console.log('[Draft] Auto-save started (every 10s)');
+
+  console.log('[Draft] Auto-save started (every 10s, localStorage only)');
 }
 
 /**
@@ -10507,17 +10722,269 @@ async function aiDraftReply() {
   bodyEl.contentEditable = 'true';
 }
 
+/**
+ * Global store for raw HTML inserted via the HTML button.
+ * Keyed by uid (e.g. 'html-embed-1715000000000').
+ */
+var _htmlEmbedStore = new Map();
+
+/**
+ * SIMPLE Outlook CSS Inliner - Just inline CSS and remove unsupported properties
+ * NO layout conversion (no grid→table, no flex→table)
+ * JUST: inline styles + remove unsupported CSS
+ */
+function inlineHtmlForOutlook(rawHtml, callback) {
+  console.group('[EMAIL-INLINE] Simple Outlook CSS inliner');
+  console.log('[EMAIL-INLINE] Input length:', rawHtml.length);
+
+  try {
+    // Parse HTML
+    var parser = new DOMParser();
+    var doc = parser.parseFromString(rawHtml, 'text/html');
+
+    // Collect all CSS from <style> blocks
+    var allCssText = '';
+    doc.querySelectorAll('style').forEach(function(s) {
+      allCssText += s.textContent + '\n';
+    });
+
+    // Parse CSS using browser's CSSOM
+    var tempStyle = document.createElement('style');
+    tempStyle.textContent = allCssText;
+    document.head.appendChild(tempStyle);
+
+    var rules = [];
+    try {
+      var sheet = tempStyle.sheet;
+      if (sheet) {
+        for (var i = 0; i < sheet.cssRules.length; i++) {
+          var rule = sheet.cssRules[i];
+          if (rule.type === 1 && rule.selectorText && rule.style) {
+            rules.push({
+              selector: rule.selectorText,
+              cssText: rule.style.cssText
+            });
+          }
+          // Handle @media rules
+          if (rule.type === 4 && rule.cssRules) {
+            for (var j = 0; j < rule.cssRules.length; j++) {
+              var inner = rule.cssRules[j];
+              if (inner.type === 1 && inner.selectorText && inner.style) {
+                rules.push({
+                  selector: inner.selectorText,
+                  cssText: inner.style.cssText
+                });
+              }
+            }
+          }
+        }
+      }
+    } catch(cssErr) {
+      console.warn('[EMAIL-INLINE] CSS parse error:', cssErr.message);
+    }
+    document.head.removeChild(tempStyle);
+
+    console.log('[EMAIL-INLINE] Parsed', rules.length, 'CSS rules');
+
+    // Extract CSS variables from :root
+    var cssVarMap = {};
+    rules.forEach(function(rule) {
+      if (rule.selector === ':root' || rule.selector === '*') {
+        var props = rule.cssText.split(';');
+        props.forEach(function(prop) {
+          var match = prop.match(/^\s*(--[\w-]+)\s*:\s*(.+?)\s*$/);
+          if (match) {
+            cssVarMap[match[1]] = match[2];
+          }
+        });
+      }
+    });
+
+    // Apply CSS rules to matching elements
+    rules.forEach(function(rule) {
+      var sel = rule.selector;
+      // Remove pseudo-classes/elements for matching
+      var baseSel = sel.replace(/::?[\w-]+(\([^)]*\))?/g, '').trim();
+      if (!baseSel || baseSel === ':root' || baseSel === '*') return;
+
+      try {
+        var elements = doc.querySelectorAll(baseSel);
+        elements.forEach(function(el) {
+          var existing = el.getAttribute('style') || '';
+          var merged = existing ? rule.cssText + ';' + existing : rule.cssText;
+          el.setAttribute('style', merged);
+        });
+      } catch(selErr) {
+        // Skip invalid selectors
+      }
+    });
+
+    // Outlook-unsupported properties to remove
+    var UNSUPPORTED_PROPS = [
+      'box-shadow', '-webkit-box-shadow', '-moz-box-shadow',
+      'border-radius', '-webkit-border-radius', '-moz-border-radius',
+      'text-shadow',
+      'transform', '-webkit-transform', '-moz-transform',
+      'transition', '-webkit-transition', '-moz-transition',
+      'animation', '-webkit-animation', '-moz-animation',
+      'filter', '-webkit-filter',
+      'backdrop-filter', '-webkit-backdrop-filter',
+      'clip-path', '-webkit-clip-path',
+      'mask', '-webkit-mask',
+      'mix-blend-mode',
+      'object-fit', 'object-position',
+      'gap', 'grid-gap', 'column-gap', 'row-gap',
+      'grid-template-columns', 'grid-template-rows', 'grid-template-areas',
+      'grid-auto-columns', 'grid-auto-rows', 'grid-auto-flow',
+      'grid-column', 'grid-row', 'grid-area',
+      'justify-content', 'align-items', 'align-content', 'align-self', 'justify-self',
+      'flex', 'flex-direction', 'flex-wrap', 'flex-flow',
+      'flex-grow', 'flex-shrink', 'flex-basis',
+      'order'
+    ];
+
+    // Clean up inline styles - remove unsupported properties
+    var cleanedCount = 0;
+    doc.querySelectorAll('[style]').forEach(function(el) {
+      var style = el.getAttribute('style') || '';
+      var originalStyle = style;
+
+      // Resolve CSS variables
+      style = style.replace(/var\((--[\w-]+)\)/g, function(match, varName) {
+        return cssVarMap[varName] || 'inherit';
+      });
+
+      // Split into individual properties
+      var props = style.split(';').filter(function(prop) {
+        prop = prop.trim();
+        if (!prop) return false;
+
+        var propName = prop.split(':')[0].trim().toLowerCase();
+
+        // Remove if in unsupported list
+        if (UNSUPPORTED_PROPS.indexOf(propName) !== -1) return false;
+
+        // Remove if starts with grid- or flex-
+        if (propName.startsWith('grid-') || propName.startsWith('flex-')) return false;
+
+        // Remove if contains var()
+        if (prop.indexOf('var(') !== -1) return false;
+
+        return true;
+      });
+
+      var cleanStyle = props.join('; ');
+      if (cleanStyle && !cleanStyle.endsWith(';')) cleanStyle += ';';
+
+      if (cleanStyle !== originalStyle) {
+        cleanedCount++;
+        if (cleanStyle.trim()) {
+          el.setAttribute('style', cleanStyle);
+        } else {
+          el.removeAttribute('style');
+        }
+      }
+    });
+
+    console.log('[EMAIL-INLINE] Cleaned', cleanedCount, 'elements (removed unsupported CSS)');
+
+    // Remove <style>, <script>, <link> tags
+    doc.querySelectorAll('style, script, link').forEach(function(s) {
+      s.remove();
+    });
+
+    // Remove class attributes (Outlook prefixes with x_)
+    doc.querySelectorAll('[class]').forEach(function(el) {
+      el.removeAttribute('class');
+    });
+
+    // Remove id attributes (not needed in email)
+    doc.querySelectorAll('[id]').forEach(function(el) {
+      el.removeAttribute('id');
+    });
+
+    var result = doc.body ? doc.body.innerHTML : rawHtml;
+    console.log('[EMAIL-INLINE] ✅ Output length:', result.length);
+    console.groupEnd();
+
+    callback(result);
+
+  } catch(err) {
+    console.error('[EMAIL-INLINE] Error:', err);
+    // Fallback: return body content
+    try {
+      var p = new DOMParser();
+      var d = p.parseFromString(rawHtml, 'text/html');
+      callback(d.body ? d.body.innerHTML : rawHtml);
+    } catch(_) {
+      callback(rawHtml);
+    }
+  }
+}
+
+
+/**
+ * Extract the email body from a contenteditable editor for sending.
+ * Returns a Promise that resolves with the processed HTML string.
+ */
+function getEmailBodyForSend(editorEl) {
+  var wrappers = editorEl.querySelectorAll('[data-html-uid]');
+
+  if (wrappers.length === 0) {
+    console.log('[EMAIL-SEND] No HTML embeds found, sending editor content directly');
+    return Promise.resolve(editorEl.innerHTML.trim());
+  }
+
+  console.log('[EMAIL-SEND] Found', wrappers.length, 'HTML embed(s) - already transformed on insert!');
+
+  // Clone the editor content
+  var clone = editorEl.cloneNode(true);
+  
+  // Replace each wrapper with the stored HTML (already transformed)
+  clone.querySelectorAll('[data-html-uid]').forEach(function(wrapper) {
+    var uid = wrapper.getAttribute('data-html-uid') || '';
+    var transformedHtml = _htmlEmbedStore.get(uid) || '';
+    console.log('[EMAIL-SEND] Embed uid:', uid, '| stored HTML length:', transformedHtml.length, '(already Outlook-compatible)');
+    
+    if (transformedHtml.trim()) {
+      var replacement = document.createElement('div');
+      replacement.style.cssText = 'width:100%;margin:0;padding:0;';
+      replacement.innerHTML = transformedHtml;
+      wrapper.replaceWith(replacement);
+    } else {
+      console.warn('[EMAIL-SEND] ⚠ No stored HTML for uid:', uid, '— removing wrapper');
+      wrapper.remove();
+    }
+  });
+
+  var result = clone.innerHTML.trim();
+  console.log('[EMAIL-SEND] ✅ All embeds processed. Final body length:', result.length);
+  return Promise.resolve(result);
+}
+
 async function sendEmail() {
   const toRaw   = document.getElementById('compose-to')?.value.trim();
   const ccRaw   = document.getElementById('compose-cc')?.value.trim();
   const subject = document.getElementById('compose-subject')?.value.trim();
   const bodyEl  = document.getElementById('compose-body');
-  const body    = bodyEl ? bodyEl.innerHTML.trim() : '';
   const statusEl = document.getElementById('compose-status');
 
   const btn = document.getElementById('send-btn');
-  // Guard against double-send
   if (btn && btn.disabled) return;
+
+  // Show processing state while CSS inlining happens
+  if (btn) { btn.disabled = true; btn.innerHTML = '<span class="spin-loader"></span> Preparing…'; }
+
+  // getEmailBodyForSend now returns a Promise (async CSS inlining)
+  let body = '';
+  try {
+    body = await getEmailBodyForSend(bodyEl);
+  } catch(err) {
+    console.error('[SEND] getEmailBodyForSend failed:', err);
+    body = bodyEl ? bodyEl.innerHTML.trim() : '';
+  }
+
+  console.log('[SEND] Final body to send — length:', body.length, 'preview:', body.substring(0, 200));
 
   // Split comma/semicolon separated emails
   const parseEmails = (raw) => (raw || '').split(/[,;]+/).map(e => e.trim()).filter(e => e.includes('@'));
@@ -10543,7 +11010,7 @@ async function sendEmail() {
     }
   }
 
-  if (btn) { btn.disabled = true; btn.innerHTML = '<span class="spin-loader"></span> Sending…'; }
+  if (btn) { btn.innerHTML = '<span class="spin-loader"></span> Sending…'; }
 
   try {
     let res, data;
@@ -10732,6 +11199,7 @@ function searchInbox(val) {
 // ── THEME TOGGLE ─────────────────────────────────────────────────────────────
 // ── WHATSAPP REAL-TIME ────────────────────────────────────────────────────────
 let waSocket     = null;
+let socket       = null; // Unified alias for waSocket
 let waActiveJid  = null;
 let waAllChats   = [];
 var waLidMap = {};
@@ -10739,6 +11207,7 @@ var waLidMap = {};
 function initWASocket() {
   if (waSocket) return;
   waSocket = io(window.location.origin);
+  socket = waSocket;
   waSocket.on('wa:qr', ({ qr }) => {
     const img = document.getElementById('wa-qr-img');
     const wrap = document.getElementById('wa-qr-wrap');
@@ -10785,21 +11254,49 @@ function initWASocket() {
   });
 
   // PBX real-time events
-  console.log('[PBX] 🔌 Registering Socket.IO listeners: pbx:connected, pbx:disconnected, pbx:call');
-  console.log('[PBX]    Waiting for Matrix PBX (192.168.0.81) to push SMDR data on port 5000...');
-  console.log('[PBX]    If this log appears but no pbx:connected ever fires → firewall or PBX config issue');
   waSocket.on('pbx:connected', (data) => {
-    console.log('[PBX] 📡 Socket.IO event received: pbx:connected', data);
+    console.log('[PBX] Connected:', data);
     pbxOnConnected(data);
   });
   waSocket.on('pbx:disconnected', (data) => {
-    console.warn('[PBX] 📡 Socket.IO event received: pbx:disconnected', data);
-    pbxOnDisconnected(data);
+    console.warn('[PBX] Disconnected:', data);
+    pbxOnDisconnected();
   });
   waSocket.on('pbx:call', (call) => {
     console.log('[PBX] 📞 New call record received via Socket.IO:', call);
+    
+    // Update live status bar
+    const dot = document.getElementById('pbx-dot');
+    const statusText = document.getElementById('pbx-status-text');
+    const liveBadge = document.getElementById('pbx-live-badge');
+    
+    if (dot) dot.style.background = 'var(--green2)';
+    if (statusText) statusText.textContent = `Matrix PBX · Connected · Last call: ${call.caller_ext} → ${call.destination}`;
+    if (liveBadge) {
+      liveBadge.style.display = 'inline-flex';
+      setTimeout(() => liveBadge.style.display = 'none', 10000);
+    }
+    
+    // If we are on the logs tab, refresh automatically
+    if (document.getElementById('sec-calls').style.display !== 'none' && 
+        document.getElementById('pbx-panel-logs').style.display !== 'none') {
+      loadCallLogs(1);
+    }
+    
+    // Desktop notification
+    if (Notification.permission === 'granted') {
+      new Notification(`UniComm PBX: ${call.call_type} Call`, {
+        body: `${call.caller_ext} is calling ${call.destination}\nDuration: ${call.duration}`,
+        icon: '/favicon.ico'
+      });
+    }
+
     notify('New Call: ' + (call.call_type||'') + ' ' + (call.caller||'') + ' → ' + (call.destination||''), call.duration||'', 'var(--gold)', 'fas fa-phone-alt');
-    loadCallLogs();
+  });
+
+  waSocket.on('pbx:binding_error', (data) => {
+    console.error('[PBX] Backend binding error:', data);
+    notify('PBX Connection Error', `${data.mode === 'server' ? 'Listener' : 'Client'} failure: ${data.error}`, 'var(--red2)', 'fas fa-exclamation-triangle');
   });
 
   // System health events
@@ -10833,6 +11330,60 @@ function initWASocket() {
     if (document.getElementById('sec-marketing') && document.getElementById('sec-marketing').classList.contains('active')) {
       setTimeout(openMarketingModal, 1500);
     }
+  });
+
+  // ── SOCKET CONNECTION RESILIENCE ─────────────────────────────────────────
+  waSocket.on('disconnect', (reason) => {
+    console.warn('[Socket] Disconnected:', reason);
+    // Don't change WA UI on transport disconnect — server may just be restarting
+    const indicator = document.querySelector('[data-service="server"]');
+    if (indicator) indicator.style.color = 'var(--muted)';
+  });
+
+  waSocket.on('connect', () => {
+    console.log('[Socket] Connected/Reconnected to server');
+    // Re-check WA status after reconnect so UI reflects actual state.
+    // Use a longer delay to let checkWAStatus() complete first on initial load.
+    setTimeout(async () => {
+      try {
+        // If already showing connected state, no need to re-check
+        const sb = document.getElementById('wa-status-bar');
+        if (sb && sb.style.display === 'block') return;
+
+        const res = await fetch(API_BASE + '/wa/status');
+        if (!res.ok) return;
+        const data = await res.json();
+        if (data.connected) {
+          waOnConnected(data.phone, data.name);
+        } else if (data.hasQR) {
+          // QR is available — fetch and show it, but only if not already connected in UI
+          if (sb && sb.style.display === 'block') return; // connected in the meantime
+          const qRes = await fetch(API_BASE + '/wa/qr');
+          const qData = await qRes.json();
+          if (qData.qr) {
+            const img = document.getElementById('wa-qr-img');
+            const wrap = document.getElementById('wa-qr-wrap');
+            const btn = document.getElementById('wa-get-qr-btn');
+            if (img) img.src = qData.qr;
+            if (wrap) wrap.style.display = 'flex';
+            if (btn) btn.style.display = 'none';
+            const cb = document.getElementById('wa-connect-banner');
+            if (cb) cb.style.display = 'block';
+            if (sb) sb.style.display = 'none';
+          }
+        } else {
+          // Not connected and no QR — only show connect banner if not already showing connected state
+          if (sb && sb.style.display === 'block') return; // connected in the meantime
+          const cb = document.getElementById('wa-connect-banner');
+          if (cb) cb.style.display = 'block';
+          if (sb) sb.style.display = 'none';
+        }
+      } catch (_) {}
+    }, 2000);
+  });
+
+  waSocket.on('connect_error', (err) => {
+    console.warn('[Socket] Connection error:', err.message);
   });
 }
 
@@ -11360,6 +11911,48 @@ async function waLogout() {
     waActiveJid = null; waAllChats = [];
     notify('WhatsApp disconnected', '', 'var(--gold)', 'fab fa-whatsapp');
   } catch (_) {}
+}
+
+async function waResetConnection() {
+  const btn = event?.target;
+  if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Resetting...'; }
+  try {
+    // Force logout on backend (clears socket + session)
+    await fetch(API_BASE + '/wa/logout', { method: 'POST', headers: getAuthHeaders() });
+
+    // Reset UI
+    const sb = document.getElementById('wa-status-bar');
+    const cb = document.getElementById('wa-connect-banner');
+    const qw = document.getElementById('wa-qr-wrap');
+    const qb = document.getElementById('wa-get-qr-btn');
+    if (sb) sb.style.display = 'none';
+    if (cb) cb.style.display = 'block';
+    if (qw) qw.style.display = 'none';
+    if (qb) { qb.style.display = 'inline-flex'; }
+
+    notify('Resetting WhatsApp…', 'Fresh QR will appear in ~3 seconds', 'var(--gold)', 'fas fa-redo');
+
+    // Wait for backend to restart socket and emit new QR via socket.io
+    setTimeout(async () => {
+      try {
+        const res = await fetch(API_BASE + '/wa/qr');
+        const data = await res.json();
+        if (data.qr) {
+          const img = document.getElementById('wa-qr-img');
+          if (img) img.src = data.qr;
+          if (qw) qw.style.display = 'flex';
+          if (qb) qb.style.display = 'none';
+          notify('Fresh QR ready', 'Scan now with WhatsApp Business', 'var(--green)', 'fas fa-qrcode');
+        } else {
+          notify('Waiting for QR…', 'Click "Show QR Code" in a moment', 'var(--muted2)', 'fas fa-clock');
+        }
+      } catch(e) {}
+      if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fas fa-redo"></i> Reset & Reconnect'; }
+    }, 3500);
+  } catch (err) {
+    notify('Reset failed', err.message, 'var(--red)', 'fas fa-times');
+    if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fas fa-redo"></i> Reset & Reconnect'; }
+  }
 }
 
 async function aiWADraft() {
@@ -13139,6 +13732,936 @@ async function testAIModel() {
   }
 }
 
+// ══════════════════════════════════════════════════════════════
+// MEDIA INSERT — shared by Compose, Template, Broadcast editors
+// Supports: Image, Video, Audio, Document (PDF inline / others as link)
+// ══════════════════════════════════════════════════════════════
+var _mediaInsertEditorId   = null;
+var _mediaInsertSavedRange = null;
+var _mediaInsertTab        = 'image';
+var _mediaInsertDataUrl    = null; // base64 data URL from file upload
+var _mediaInsertFileName   = '';
+
+function openMediaInsertModal(editorId) {
+  _mediaInsertEditorId = editorId || null;
+  const sel = window.getSelection();
+  _mediaInsertSavedRange = (sel && sel.rangeCount > 0) ? sel.getRangeAt(0).cloneRange() : null;
+  _mediaInsertDataUrl  = null;
+  _mediaInsertFileName = '';
+
+  // Reset all inputs
+  ['media-img-file','media-vid-file','media-aud-file','media-doc-file'].forEach(function(id) {
+    var el = document.getElementById(id); if (el) el.value = '';
+  });
+  ['media-img-url','media-vid-url','media-aud-url'].forEach(function(id) {
+    var el = document.getElementById(id); if (el) el.value = '';
+  });
+  ['media-img-preview','media-vid-preview','media-aud-preview','media-doc-preview'].forEach(function(id) {
+    var el = document.getElementById(id); if (el) el.style.display = 'none';
+  });
+  var docLabel = document.getElementById('media-doc-label');
+  if (docLabel) docLabel.value = '';
+
+  switchMediaTab('image');
+  var overlay = document.getElementById('media-insert-modal');
+  if (overlay) overlay.classList.add('open');
+}
+
+function closeMediaInsertModal() {
+  var overlay = document.getElementById('media-insert-modal');
+  if (overlay) overlay.classList.remove('open');
+  _mediaInsertEditorId   = null;
+  _mediaInsertSavedRange = null;
+  _mediaInsertDataUrl    = null;
+  _mediaInsertFileName   = '';
+}
+
+function switchMediaTab(tab) {
+  _mediaInsertTab = tab;
+  ['image','video','audio','document'].forEach(function(t) {
+    var panel = document.getElementById('mpanel-' + t);
+    var btn   = document.getElementById('mtab-' + t);
+    if (panel) panel.style.display = (t === tab) ? '' : 'none';
+    if (btn) {
+      btn.style.borderBottom = (t === tab) ? '2px solid var(--blue2)' : '2px solid transparent';
+      btn.classList.toggle('active', t === tab);
+    }
+  });
+}
+
+function mediaPreviewFile(type, input) {
+  var file = input.files && input.files[0];
+  if (!file) return;
+  _mediaInsertFileName = file.name;
+  var label = document.getElementById('media-doc-label');
+
+  if (type === 'document') {
+    var nameEl = document.getElementById('media-doc-name');
+    var sizeEl = document.getElementById('media-doc-size');
+    var prev   = document.getElementById('media-doc-preview');
+    if (nameEl) nameEl.textContent = file.name;
+    if (sizeEl) sizeEl.textContent = '(' + (file.size / 1024).toFixed(1) + ' KB)';
+    if (prev)   prev.style.display = '';
+    if (label && !label.value) label.value = file.name.replace(/\.[^.]+$/, '');
+    // Read as base64 for PDF embed or download link
+    var reader = new FileReader();
+    reader.onload = function(e) { _mediaInsertDataUrl = e.target.result; };
+    reader.readAsDataURL(file);
+    return;
+  }
+
+  var reader = new FileReader();
+  reader.onload = function(e) {
+    _mediaInsertDataUrl = e.target.result;
+    if (type === 'image') {
+      var img  = document.getElementById('media-img-preview-el');
+      var prev = document.getElementById('media-img-preview');
+      if (img)  img.src = e.target.result;
+      if (prev) prev.style.display = '';
+    } else if (type === 'video') {
+      var vid  = document.getElementById('media-vid-preview-el');
+      var prev = document.getElementById('media-vid-preview');
+      if (vid)  { vid.src = e.target.result; vid.load(); }
+      if (prev) prev.style.display = '';
+    } else if (type === 'audio') {
+      var aud  = document.getElementById('media-aud-preview-el');
+      var prev = document.getElementById('media-aud-preview');
+      if (aud)  { aud.src = e.target.result; aud.load(); }
+      if (prev) prev.style.display = '';
+    }
+  };
+  reader.readAsDataURL(file);
+}
+
+function mediaPreviewUrl(type, url) {
+  if (!url) return;
+  if (type === 'image') {
+    var img  = document.getElementById('media-img-preview-el');
+    var prev = document.getElementById('media-img-preview');
+    if (img)  img.src = url;
+    if (prev) prev.style.display = '';
+  }
+}
+
+/** Convert a YouTube/Vimeo watch URL to an embed URL */
+function mediaToEmbedUrl(url) {
+  // YouTube: https://www.youtube.com/watch?v=ID or https://youtu.be/ID
+  var ytMatch = url.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/)([A-Za-z0-9_-]{11})/);
+  if (ytMatch) return 'https://www.youtube.com/embed/' + ytMatch[1];
+  // Vimeo: https://vimeo.com/ID
+  var vmMatch = url.match(/vimeo\.com\/(\d+)/);
+  if (vmMatch) return 'https://player.vimeo.com/video/' + vmMatch[1];
+  return null; // direct URL — use <video> tag
+}
+
+function applyMediaInsert() {
+  var editorId   = _mediaInsertEditorId;
+  var savedRange = _mediaInsertSavedRange;
+  var tab        = _mediaInsertTab;
+  var dataUrl    = _mediaInsertDataUrl;
+  var fileName   = _mediaInsertFileName;
+
+  closeMediaInsertModal();
+
+  if (!editorId) return;
+  var ed = document.getElementById(editorId);
+  if (!ed) return;
+
+  var html = '';
+
+  if (tab === 'image') {
+    var src   = dataUrl || (document.getElementById('media-img-url') ? document.getElementById('media-img-url').value.trim() : '');
+    var width = (document.getElementById('media-img-width') ? document.getElementById('media-img-width').value.trim() : '100%') || '100%';
+    var alt   = (document.getElementById('media-img-alt')   ? document.getElementById('media-img-alt').value.trim()   : '') || '';
+    if (!src) return;
+    var wStyle = /^\d+$/.test(width) ? 'width:' + width + 'px;' : 'width:' + width + ';';
+    html = '<img src="' + src + '" alt="' + escHtml(alt) + '" style="' + wStyle + 'max-width:100%;display:block;margin:6px 0;" /><br>';
+
+  } else if (tab === 'video') {
+    var vidUrl   = dataUrl || (document.getElementById('media-vid-url') ? document.getElementById('media-vid-url').value.trim() : '');
+    var vidW     = (document.getElementById('media-vid-width')  ? document.getElementById('media-vid-width').value.trim()  : '100%') || '100%';
+    var vidH     = (document.getElementById('media-vid-height') ? document.getElementById('media-vid-height').value.trim() : '360') || '360';
+    if (!vidUrl) return;
+    var embedUrl = mediaToEmbedUrl(vidUrl);
+    var wStyle   = /^\d+$/.test(vidW) ? 'width:' + vidW + 'px;' : 'width:' + vidW + ';';
+    if (embedUrl) {
+      // YouTube / Vimeo — use iframe embed
+      html = '<div style="' + wStyle + 'max-width:100%;margin:8px 0;">' +
+             '<iframe src="' + embedUrl + '" width="100%" height="' + vidH + '" frameborder="0" allowfullscreen style="border-radius:6px;display:block;"></iframe>' +
+             '</div><br>';
+    } else {
+      // Direct video file
+      html = '<video controls style="' + wStyle + 'max-width:100%;height:' + vidH + 'px;display:block;margin:6px 0;border-radius:6px;">' +
+             '<source src="' + vidUrl + '">' +
+             'Your email client does not support embedded video.</video><br>';
+    }
+
+  } else if (tab === 'audio') {
+    var audUrl = dataUrl || (document.getElementById('media-aud-url') ? document.getElementById('media-aud-url').value.trim() : '');
+    if (!audUrl) return;
+    html = '<audio controls style="width:100%;max-width:480px;display:block;margin:6px 0;">' +
+           '<source src="' + audUrl + '">' +
+           'Your email client does not support embedded audio.</audio><br>';
+
+  } else if (tab === 'document') {
+    if (!dataUrl || !fileName) return;
+    var docLabel = (document.getElementById('media-doc-label') ? document.getElementById('media-doc-label').value.trim() : '') || fileName;
+    var isPdf    = /\.pdf$/i.test(fileName);
+    if (isPdf) {
+      // Embed PDF inline
+      html = '<div style="width:100%;margin:8px 0;border:1px solid #ddd;border-radius:6px;overflow:hidden;">' +
+             '<div style="background:#f0f4f8;padding:6px 12px;font-size:12px;color:#555;border-bottom:1px solid #ddd;">' +
+             '<i class="fas fa-file-pdf" style="color:#e53e3e;margin-right:6px;"></i>' + escHtml(fileName) + '</div>' +
+             '<iframe src="' + dataUrl + '" style="width:100%;height:500px;border:none;display:block;"></iframe>' +
+             '</div>' +
+             '<p style="margin:4px 0 8px;font-size:12px;"><a href="' + dataUrl + '" download="' + escHtml(fileName) + '" style="color:#0078d4;">⬇ Download ' + escHtml(docLabel) + '</a></p><br>';
+    } else {
+      // Non-PDF: download link with icon
+      var ext  = fileName.split('.').pop().toLowerCase();
+      var icon = {doc:'fa-file-word',docx:'fa-file-word',xls:'fa-file-excel',xlsx:'fa-file-excel',
+                  ppt:'fa-file-powerpoint',pptx:'fa-file-powerpoint',pdf:'fa-file-pdf',
+                  zip:'fa-file-archive',rar:'fa-file-archive',txt:'fa-file-alt',csv:'fa-file-csv'}[ext] || 'fa-file';
+      var color = {doc:'#2b579a',docx:'#2b579a',xls:'#217346',xlsx:'#217346',
+                   ppt:'#d24726',pptx:'#d24726',pdf:'#e53e3e',zip:'#805ad5',rar:'#805ad5'}[ext] || '#555';
+      html = '<div style="display:inline-flex;align-items:center;gap:10px;padding:10px 16px;background:#f8fafd;border:1px solid #dde3ed;border-radius:8px;margin:6px 0;text-decoration:none;">' +
+             '<i class="fas ' + icon + '" style="font-size:22px;color:' + color + ';flex-shrink:0;"></i>' +
+             '<div><a href="' + dataUrl + '" download="' + escHtml(fileName) + '" style="color:#0a2942;font-weight:600;font-size:13px;text-decoration:none;">' + escHtml(docLabel) + '</a>' +
+             '<div style="font-size:11px;color:#888;margin-top:2px;">' + ext.toUpperCase() + ' file · click to download</div></div>' +
+             '</div><br>';
+    }
+  }
+
+  if (!html) return;
+
+  // Insert into editor
+  ed.focus();
+  var inserted = false;
+  if (savedRange) {
+    try {
+      var sel = window.getSelection();
+      sel.removeAllRanges();
+      sel.addRange(savedRange);
+      document.execCommand('insertHTML', false, html);
+      inserted = true;
+    } catch(_) {}
+  }
+  if (!inserted) {
+    var tmp = document.createElement('div');
+    tmp.innerHTML = html;
+    while (tmp.firstChild) ed.appendChild(tmp.firstChild);
+  }
+}
+
+// ══════════════════════════════════════════════════════════════
+// INSERT HTML CODE — shared by Compose, Template, Broadcast,
+//                    and Out-of-Office editors
+// ══════════════════════════════════════════════════════════════
+var _insertHtmlTargetEditorId = null;
+var _insertHtmlSavedRange     = null;
+
+/**
+ * Open the Insert HTML modal for a given editor element ID.
+ * Saves the current cursor position so we can restore it on insert.
+ */
+function openInsertHtmlModal(editorId) {
+  _insertHtmlTargetEditorId = editorId || null;
+
+  // Save current selection so we can restore it after the modal opens
+  const sel = window.getSelection();
+  _insertHtmlSavedRange = (sel && sel.rangeCount > 0) ? sel.getRangeAt(0).cloneRange() : null;
+
+  // Clear previous content
+  const ta = document.getElementById('insert-html-code');
+  if (ta) { ta.value = ''; }
+
+  // Open modal
+  const overlay = document.getElementById('insert-html-modal');
+  if (overlay) { overlay.classList.add('open'); }
+
+  // Focus textarea after a tick
+  setTimeout(function() {
+    if (ta) ta.focus();
+  }, 80);
+}
+
+function closeInsertHtmlModal() {
+  const overlay = document.getElementById('insert-html-modal');
+  if (overlay) overlay.classList.remove('open');
+  _insertHtmlTargetEditorId = null;
+  _insertHtmlSavedRange     = null;
+}
+
+/**
+ * Show a full-screen iframe preview of the HTML in the textarea.
+ */
+function previewInsertHtml() {
+  const ta = document.getElementById('insert-html-code');
+  if (!ta || !ta.value.trim()) return;
+  const html = ta.value.trim();
+  const iframe = document.getElementById('html-preview-iframe');
+  if (!iframe) return;
+  // Use srcdoc so the full HTML page (including <!DOCTYPE>, <style>, etc.) renders correctly
+  iframe.srcdoc = html;
+  const overlay = document.getElementById('html-preview-modal');
+  if (overlay) overlay.classList.add('open');
+}
+
+function closeHtmlPreview() {
+  const overlay = document.getElementById('html-preview-modal');
+  if (overlay) overlay.classList.remove('open');
+  // Clear iframe to stop any scripts
+  const iframe = document.getElementById('html-preview-iframe');
+  if (iframe) iframe.srcdoc = '';
+}
+
+/**
+ * Apply the HTML from the textarea into the target editor.
+ * Handles both snippets and full HTML documents (<!DOCTYPE html>...).
+ * NOW TRANSFORMS HTML IMMEDIATELY for Outlook compatibility!
+ */
+function applyInsertHtml() {
+  const ta = document.getElementById('insert-html-code');
+  if (!ta) return;
+  const raw = ta.value.trim();
+
+  // Capture everything we need into locals BEFORE closing the modal
+  const editorId   = _insertHtmlTargetEditorId;
+  const savedRange = _insertHtmlSavedRange;
+
+  // Close modal first so it doesn't interfere with focus/selection
+  closeInsertHtmlModal();
+
+  if (!raw || !editorId) return;
+  const ed = document.getElementById(editorId);
+  if (!ed) return;
+
+  // Detect if this is a full HTML document (has <html> or <!DOCTYPE)
+  const isFullDoc = /<!doctype\s+html/i.test(raw) || /<html[\s>]/i.test(raw);
+
+  // Build the HTML to inject
+  const uid = 'html-embed-' + Date.now();
+  var htmlToInsert;
+
+  if (isFullDoc) {
+    // ✨ NEW: Transform HTML immediately for Outlook compatibility
+    console.log('[HTML-INSERT] Transforming HTML for Outlook compatibility...');
+    
+    // Show loading indicator
+    notify('Transforming HTML...', 'Converting to Outlook-compatible format', 'var(--gold)', 'fas fa-magic');
+    
+    // Transform the HTML using our Outlook compatibility function
+    inlineHtmlForOutlook(raw, function(transformedHtml) {
+      console.log('[HTML-INSERT] Transformation complete! Original:', raw.length, 'bytes → Transformed:', transformedHtml.length, 'bytes');
+      
+      // Store the TRANSFORMED HTML (not the raw HTML)
+      _htmlEmbedStore.set(uid, transformedHtml);
+      
+      // Create wrapper with transformed HTML
+      htmlToInsert =
+        `<div contenteditable="false" data-html-uid="${uid}" style="width:100%;margin:8px 0;border:1px solid #ddd;border-radius:6px;overflow:hidden;display:block;position:relative;">` +
+        `<div style="position:absolute;top:5px;right:5px;background:rgba(245,166,35,0.9);color:#fff;padding:3px 8px;font-size:10px;font-weight:600;border-radius:4px;z-index:10;">✓ Outlook Compatible</div>` +
+        `<iframe id="${uid}" sandbox="allow-scripts allow-same-origin" srcdoc="" style="width:100%;min-height:500px;border:none;display:block;" scrolling="yes"></iframe>` +
+        `</div><br>`;
+      
+      // Insert the transformed HTML
+      insertTransformedHtml(ed, savedRange, htmlToInsert, uid, transformedHtml);
+      
+      notify('HTML Transformed!', 'Now Outlook-compatible (grid→table, CSS vars resolved)', 'var(--green)', 'fas fa-check-circle');
+    });
+    
+    // Return early - the callback will handle insertion
+    return;
+  } else {
+    htmlToInsert = raw + '<br>';
+  }
+
+  // Focus editor, restore cursor, insert
+  ed.focus();
+  var inserted = false;
+
+  if (savedRange) {
+    try {
+      const sel = window.getSelection();
+      sel.removeAllRanges();
+      sel.addRange(savedRange);
+      document.execCommand('insertHTML', false, htmlToInsert);
+      inserted = true;
+    } catch(_) {}
+  }
+
+  if (!inserted) {
+    // Fallback: append at end without replacing existing content
+    const tmp = document.createElement('div');
+    tmp.innerHTML = htmlToInsert;
+    while (tmp.firstChild) ed.appendChild(tmp.firstChild);
+    // Move cursor to end
+    try {
+      const sel = window.getSelection();
+      const range = document.createRange();
+      range.selectNodeContents(ed);
+      range.collapse(false);
+      sel.removeAllRanges();
+      sel.addRange(range);
+    } catch(_) {}
+  }
+
+  // After insert: if it was a full doc, set srcdoc (no transformation needed for snippets)
+  if (isFullDoc) {
+    // This is handled by insertTransformedHtml callback now
+  }
+}
+
+/**
+ * Helper function to insert transformed HTML into editor
+ */
+function insertTransformedHtml(ed, savedRange, htmlToInsert, uid, transformedHtml) {
+  // Focus editor, restore cursor, insert
+  ed.focus();
+  var inserted = false;
+
+  if (savedRange) {
+    try {
+      const sel = window.getSelection();
+      sel.removeAllRanges();
+      sel.addRange(savedRange);
+      document.execCommand('insertHTML', false, htmlToInsert);
+      inserted = true;
+    } catch(_) {}
+  }
+
+  if (!inserted) {
+    // Fallback: append at end without replacing existing content
+    const tmp = document.createElement('div');
+    tmp.innerHTML = htmlToInsert;
+    while (tmp.firstChild) ed.appendChild(tmp.firstChild);
+    // Move cursor to end
+    try {
+      const sel = window.getSelection();
+      const range = document.createRange();
+      range.selectNodeContents(ed);
+      range.collapse(false);
+      sel.removeAllRanges();
+      sel.addRange(range);
+    } catch(_) {}
+  }
+
+  // After insert: set srcdoc with TRANSFORMED HTML
+  setTimeout(function() {
+    const iframe = document.getElementById(uid);
+    if (!iframe) return;
+    iframe.srcdoc = transformedHtml;
+    iframe.onload = function() {
+      try {
+        const h = iframe.contentDocument.documentElement.scrollHeight ||
+                  iframe.contentDocument.body.scrollHeight;
+        if (h > 100) iframe.style.minHeight = (h + 20) + 'px';
+      } catch(_) {}
+    };
+  }, 60);
+}
+
+/**
+ * Preview the current content of any editor in the full-screen iframe modal.
+ * For compose/reply/forward: previews compose-body.
+ * Can also be called with a specific editorId.
+ */
+function previewEditorContent(editorId) {
+  const ed = document.getElementById(editorId || 'compose-body');
+  if (!ed) return;
+  const iframe = document.getElementById('html-preview-iframe');
+  if (!iframe) return;
+  // Wrap the editor's innerHTML in a basic HTML shell so styles render properly
+  const content = ed.innerHTML;
+  iframe.srcdoc =
+    '<!DOCTYPE html><html><head><meta charset="UTF-8">' +
+    '<style>body{font-family:Calibri,Arial,sans-serif;font-size:14px;line-height:1.6;color:#222;padding:16px;margin:0;}' +
+    'img{max-width:100%;}iframe{max-width:100%;}</style></head>' +
+    '<body>' + content + '</body></html>';
+  const overlay = document.getElementById('html-preview-modal');
+  if (overlay) overlay.classList.add('open');
+}
+
+// ── Matrix PBX Telephony Integration ─────────────────────────────────────────
+let callsCurrentPage = 1;
+let callsLimit = 25;
+
+function pbxShowTab(tab, btn) {
+  // Update Tabs
+  document.querySelectorAll('#pbx-tabs .pbx-tab').forEach(b => {
+    b.classList.remove('active');
+    b.style.color = 'var(--muted2)';
+    b.style.borderBottom = '2px solid transparent';
+    b.style.fontWeight = '600';
+  });
+  if (btn) {
+    btn.classList.add('active');
+    btn.style.color = 'var(--gold)';
+    btn.style.borderBottom = '2px solid var(--gold)';
+    btn.style.fontWeight = '700';
+  }
+
+  // Update Panels
+  document.querySelectorAll('.pbx-panel').forEach(p => p.style.display = 'none');
+  const target = document.getElementById('pbx-panel-' + tab);
+  if (target) target.style.display = 'block';
+
+  // Load data
+  if (tab === 'logs') loadCallLogs();
+  if (tab === 'contacts') loadPbxContacts();
+  if (tab === 'recordings') pbxLoadRecordings();
+  if (tab === 'backup') pbxListBackups();
+}
+
+async function loadCallLogs(page = 1) {
+  callsCurrentPage = page;
+  const tbody = document.getElementById('calls-tbody');
+  const search = document.getElementById('call-search').value;
+  const type = document.getElementById('call-filter-type').value;
+  const fromDate = document.getElementById('call-filter-from').value;
+
+  try {
+    const res = await fetch(`${API_BASE}/calls?offset=${(page - 1) * callsLimit}&limit=${callsLimit}&search=${encodeURIComponent(search)}&type=${type}&from=${fromDate}`, {
+      headers: getAuthHeaders()
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Failed to load logs');
+
+    if (!data.calls.length) {
+      tbody.innerHTML = `<tr><td colspan="7" style="text-align:center;padding:40px;color:var(--muted);">No call records found.</td></tr>`;
+    } else {
+      tbody.innerHTML = data.calls.map(log => {
+        const dateObj = (log.call_date && log.call_time) ? new Date(`${log.call_date}T${log.call_time}`) : new Date(log.created_at);
+        const date = isNaN(dateObj.getTime()) ? '—' : dateObj.toLocaleString('en-IN', { dateStyle: 'short', timeStyle: 'short' });
+        const typeClass = log.call_type === 'Missed' ? 'b-red' : (log.call_type === 'In' ? 'b-blue' : 'b-gold');
+        const contactName = log.saved_name || log.contact_name;
+        const callerDisplay = contactName ? `<div><b>${escHtml(contactName)}</b></div><div style="font-size:11px;color:var(--muted);">${escHtml(log.caller)}</div>` : escHtml(log.caller);
+        
+        return `
+          <tr onclick="selectCallRecord(this, ${log.id})">
+            <td style="font-size:11.5px;">${date}</td>
+            <td>${callerDisplay}</td>
+            <td style="font-family:'JetBrains Mono';font-size:12px;">${escHtml(log.destination)}</td>
+            <td>${escHtml(log.duration)}</td>
+            <td><span class="badge ${typeClass}">${log.call_type}</span></td>
+            <td style="font-size:11px;color:var(--muted2);">${escHtml(log.trunk || '—')}</td>
+            <td>
+              <div style="display:flex;gap:4px;">
+                ${!log.contact_name ? `<button class="btn btn-ghost btn-xs" onclick="event.stopPropagation();pbxSaveContactModal('${log.caller_ext}')" title="Save Contact"><i class="fas fa-user-plus"></i></button>` : ''}
+                <button class="btn btn-ghost btn-xs" onclick="event.stopPropagation();doSummarizeCall(${log.id})" title="AI Summarize"><i class="fas fa-magic"></i></button>
+              </div>
+            </td>
+          </tr>
+        `;
+      }).join('');
+    }
+
+    // Pagination info
+    const totalPages = Math.ceil(data.total / callsLimit);
+    document.getElementById('calls-page-info').textContent = `Page ${page} of ${totalPages || 1}`;
+    document.getElementById('calls-total-info').textContent = `Total: ${data.total}`;
+    document.getElementById('calls-prev').disabled = page <= 1;
+    document.getElementById('calls-next').disabled = page >= totalPages;
+
+  } catch (err) {
+    tbody.innerHTML = `<tr><td colspan="7" style="text-align:center;padding:30px;color:var(--red2);">${escHtml(err.message)}</td></tr>`;
+  }
+}
+
+function callsPage(delta) {
+  loadCallLogs(callsCurrentPage + delta);
+}
+
+function pbxOnConnected(data) {
+  const dot = document.getElementById('pbx-dot');
+  const txt = document.getElementById('pbx-status-text');
+  if (dot) dot.style.background = 'var(--green)';
+  if (txt) txt.textContent = `Matrix PBX · Connected (${data.mode || 'active'})`;
+  updateServiceIndicator('pbx', true);
+}
+
+function pbxOnDisconnected() {
+  const dot = document.getElementById('pbx-dot');
+  const txt = document.getElementById('pbx-status-text');
+  if (dot) dot.style.background = 'var(--muted)';
+  if (txt) txt.textContent = 'Matrix PBX · Waiting for connection...';
+  updateServiceIndicator('pbx', false);
+}
+
+async function pbxSyncNow() {
+  notify('PBX Sync', 'Fetching latest logs from Matrix...', 'var(--gold)', 'fas fa-sync-alt');
+  try {
+    const res = await fetch(`${API_BASE}/calls/sync`, { method: 'POST', headers: getAuthHeaders() });
+    const data = await res.json();
+    if (res.ok) {
+      notify('PBX Sync Complete', `Synced ${data.count} new records`, 'var(--green2)', 'fas fa-check-circle');
+      loadCallLogs();
+    } else {
+      throw new Error(data.error);
+    }
+  } catch (err) {
+    notify('Sync Failed', err.message, 'var(--red2)', 'fas fa-exclamation-circle');
+  }
+}
+
+function pbxReconnect() {
+  if (!confirm('Force reset PBX TCP connection? This will restart the SMDR listener.')) return;
+  
+  if (socket && socket.connected) {
+    notify('PBX Reconnect', 'Requesting TCP reset...', 'var(--gold)', 'fas fa-plug');
+    socket.emit('pbx:reconnect');
+  } else {
+    notify('Socket Offline', 'Dashboard is not connected to the backend. Please check your internet or server status.', 'var(--red2)', 'fas fa-wifi-slash');
+    console.error('[PBX] pbxReconnect failed: socket.connected is false');
+  }
+}
+
+async function loadPbxContacts() {
+  const list = document.getElementById('pbx-contacts-list');
+  try {
+    const res = await fetch(`${API_BASE}/calls/contacts`, { headers: getAuthHeaders() });
+    pbxContactsCache = await res.json();
+    document.getElementById('pbx-contacts-count').textContent = pbxContactsCache.length;
+    renderPbxContactsList(pbxContactsCache);
+  } catch (err) {
+    list.innerHTML = `<div style="padding:20px;color:var(--red2);">${escHtml(err.message)}</div>`;
+  }
+}
+
+function renderPbxContactsList(contacts) {
+  const list = document.getElementById('pbx-contacts-list');
+  if (!contacts.length) {
+    list.innerHTML = `<div style="padding:40px 20px;text-align:center;color:var(--muted);font-size:12.5px;">No contacts saved yet.</div>`;
+    return;
+  }
+  list.innerHTML = contacts.map(c => `
+    <div class="contact-item" onclick="selectPbxContact(this, '${c.phone}')" style="padding:10px 14px;cursor:pointer;border-bottom:1px solid rgba(255,255,255,0.03);transition:background 0.2s;display:flex;justify-content:space-between;align-items:center;">
+      <div>
+        <div style="font-weight:700;font-size:13px;color:var(--text);">${escHtml(c.name)}</div>
+        <div style="font-size:11.5px;color:var(--gold);font-family:'JetBrains Mono';">${escHtml(c.phone)}</div>
+        ${c.company ? `<div style="font-size:10.5px;color:var(--muted);margin-top:2px;">${escHtml(c.company)}</div>` : ''}
+      </div>
+      <button class="btn btn-ghost btn-xs" onclick="event.stopPropagation();pbxDial('${c.phone}')" title="Dial"><i class="fas fa-phone-alt" style="color:var(--green2);"></i></button>
+    </div>
+  `).join('');
+}
+
+function filterPbxContacts() {
+  const q = document.getElementById('pbx-contact-search').value.toLowerCase();
+  const filtered = pbxContactsCache.filter(c => 
+    c.name.toLowerCase().includes(q) || 
+    c.phone.includes(q) || 
+    (c.company && c.company.toLowerCase().includes(q))
+  );
+  renderPbxContactsList(filtered);
+}
+
+async function selectPbxContact(el, phone) {
+  document.querySelectorAll('#pbx-contacts-list .contact-item').forEach(i => i.style.background = '');
+  el.style.background = 'rgba(245,166,35,0.08)';
+  
+  const detail = document.getElementById('pbx-contact-detail');
+  detail.innerHTML = `<div style="padding:60px 20px;text-align:center;"><div class="spin-loader" style="margin:0 auto;"></div></div>`;
+  
+  try {
+    const res = await fetch(`${API_BASE}/calls/contact/${encodeURIComponent(phone)}`, { headers: getAuthHeaders() });
+    const data = await res.json();
+    
+    const contactName = data.calls[0]?.saved_name || phone;
+    const contactCompany = data.calls[0]?.saved_company || '';
+
+    detail.innerHTML = `
+      <div style="padding:16px 20px;border-bottom:1px solid var(--border);">
+        <div style="display:flex;justify-content:space-between;align-items:start;">
+          <div>
+            <h2 style="font-size:18px;margin-bottom:4px;">${escHtml(contactName)}</h2>
+            <div style="color:var(--gold);font-family:'JetBrains Mono';font-size:14px;">${escHtml(phone)}</div>
+            ${contactCompany ? `<div style="color:var(--muted2);font-size:12.5px;margin-top:4px;"><i class="far fa-building"></i> ${escHtml(contactCompany)}</div>` : ''}
+          </div>
+          <div style="display:flex;gap:6px;">
+            <button class="btn btn-gold btn-xs" onclick="pbxDial('${phone}')"><i class="fas fa-phone-alt"></i> Call</button>
+            <button class="btn btn-red btn-xs" onclick="deletePbxContact('${phone}')"><i class="fas fa-trash"></i> Delete</button>
+          </div>
+        </div>
+      </div>
+      <div style="padding:16px 20px;">
+        <h4 style="font-size:12px;text-transform:uppercase;color:var(--muted);margin-bottom:12px;letter-spacing:1px;">Call History</h4>
+        <div style="max-height:400px;overflow-y:auto;">
+          ${data.calls.map(h => {
+            const date = new Date(h.call_time || h.created_at).toLocaleString('en-IN', { dateStyle: 'short', timeStyle: 'short' });
+            return `
+              <div style="display:flex;justify-content:space-between;padding:10px 0;border-bottom:1px solid rgba(255,255,255,0.03);">
+                <div>
+                  <div style="font-size:12.5px;color:var(--text);">${date}</div>
+                  <div style="font-size:11px;color:var(--muted2);">${h.call_type} · ${h.duration}</div>
+                </div>
+                <div style="font-size:11px;color:var(--muted);">${escHtml(h.trunk || '')}</div>
+              </div>
+            `;
+          }).join('')}
+        </div>
+      </div>
+    `;
+  } catch (err) {
+    detail.innerHTML = `<div style="padding:40px;color:var(--red2);">${escHtml(err.message)}</div>`;
+  }
+}
+
+function pbxSaveContactModal(phone) {
+  document.getElementById('pbx-save-phone').value = phone;
+  document.getElementById('pbx-save-name').value = '';
+  document.getElementById('pbx-save-company').value = '';
+  document.getElementById('pbx-save-notes').value = '';
+  openModal('pbx-save-contact-modal');
+  setTimeout(() => document.getElementById('pbx-save-name').focus(), 100);
+}
+
+async function pbxSaveContactSubmit() {
+  const phone = document.getElementById('pbx-save-phone').value;
+  const name = document.getElementById('pbx-save-name').value.trim();
+  const company = document.getElementById('pbx-save-company').value.trim();
+  const notes = document.getElementById('pbx-save-notes').value.trim();
+
+  if (!name) return notify('Required', 'Please enter a name', 'var(--red2)', 'fas fa-exclamation');
+
+  try {
+    const res = await fetch(`${API_BASE}/calls/contacts/save`, {
+      method: 'POST',
+      headers: getAuthHeaders(),
+      body: JSON.stringify({ phone, name, company, notes })
+    });
+    if (res.ok) {
+      notify('Contact Saved', name, 'var(--green2)', 'fas fa-user-check');
+      closeModal('pbx-save-contact-modal');
+      loadCallLogs(callsCurrentPage);
+      if (document.getElementById('pbx-panel-contacts').style.display !== 'none') loadPbxContacts();
+    } else {
+      const d = await res.json();
+      throw new Error(d.error);
+    }
+  } catch (err) {
+    notify('Error', err.message, 'var(--red2)', 'fas fa-exclamation-circle');
+  }
+}
+
+async function pbxLoadRecordings() {
+  const list = document.getElementById('pbx-recordings-list');
+  list.innerHTML = `<div style="text-align:center;padding:40px;"><div class="spin-loader" style="margin:0 auto 10px;"></div>Scanning recordings...</div>`;
+  
+  try {
+    const res = await fetch(`${API_BASE}/calls/recordings`, { headers: getAuthHeaders() });
+    const data = await res.json();
+    
+    if (!data.recordings || !data.recordings.length) {
+      list.innerHTML = `<div style="text-align:center;padding:40px;color:var(--muted);"><i class="fas fa-microphone-slash" style="font-size:32px;display:block;margin-bottom:10px;opacity:0.3;"></i>No recordings found in server directory.</div>`;
+      return;
+    }
+    
+    list.innerHTML = `
+      <div style="display:grid;grid-template-columns:repeat(auto-fill, minmax(300px, 1fr));gap:12px;">
+        ${data.recordings.map(r => `
+          <div class="card" style="padding:12px;background:var(--bg2);">
+            <div style="display:flex;justify-content:space-between;margin-bottom:8px;">
+              <div style="font-size:12.5px;font-weight:700;color:var(--text);">${escHtml(r.filename)}</div>
+              <div style="font-size:11px;color:var(--muted);">${r.size_label}</div>
+            </div>
+            <div style="font-size:11px;color:var(--muted2);margin-bottom:10px;">Modified: ${new Date(r.created_at).toLocaleString()}</div>
+            <audio controls style="width:100%;height:32px;">
+              <source src="${API_BASE}/calls/recordings/${encodeURIComponent(r.filename)}" type="audio/mpeg">
+            </audio>
+          </div>
+        `).join('')}
+      </div>
+    `;
+  } catch (err) {
+    list.innerHTML = `<div style="padding:20px;color:var(--red2);">${escHtml(err.message)}</div>`;
+  }
+}
+
+async function pbxCreateBackup() {
+  const status = document.getElementById('pbx-backup-status');
+  status.innerHTML = `<span class="spin-loader" style="width:12px;height:12px;"></span> Creating backup...`;
+  try {
+    const res = await fetch(`${API_BASE}/calls/backup/create`, { method: 'POST', headers: getAuthHeaders() });
+    const data = await res.json();
+    if (res.ok) {
+      status.innerHTML = `<span style="color:var(--green2);"><i class="fas fa-check"></i> ${data.message}</span>`;
+      pbxListBackups();
+    } else {
+      throw new Error(data.error);
+    }
+  } catch (err) {
+    status.innerHTML = `<span style="color:var(--red2);"><i class="fas fa-exclamation-triangle"></i> ${err.message}</span>`;
+  }
+}
+
+async function pbxListBackups() {
+  const list = document.getElementById('pbx-backup-list');
+  try {
+    const res = await fetch(`${API_BASE}/calls/backup/list`, { headers: getAuthHeaders() });
+    const data = await res.json();
+    if (!data.backups || !data.backups.length) {
+      list.innerHTML = `<div style="color:var(--muted);text-align:center;padding:20px;">No backups found.</div>`;
+      return;
+    }
+    list.innerHTML = data.backups.map(b => `
+      <div style="display:flex;justify-content:space-between;align-items:center;padding:10px;background:rgba(255,255,255,0.02);border-radius:6px;margin-bottom:8px;border:1px solid var(--border);">
+        <div>
+          <div style="font-size:12.5px;font-weight:700;">${escHtml(b.filename)}</div>
+          <div style="font-size:11px;color:var(--muted2);">${(b.size / 1024).toFixed(1)} KB · ${new Date(b.mtime).toLocaleString()}</div>
+        </div>
+        <button class="btn btn-ghost btn-xs" onclick="pbxRestoreBackup('${b.filename}')" title="Restore"><i class="fas fa-undo"></i> Restore</button>
+      </div>
+    `).join('');
+  } catch (err) {
+    list.innerHTML = `<div style="color:var(--red2);">${escHtml(err.message)}</div>`;
+  }
+}
+
+async function pbxRestoreBackup(filename) {
+  if (!confirm(`Are you sure you want to restore from ${filename}? Existing records with same IDs will be updated.`)) return;
+  notify('Restoring', 'Processing backup file...', 'var(--gold)', 'fas fa-sync-alt');
+  try {
+    const res = await fetch(`${API_BASE}/calls/backup/restore`, {
+      method: 'POST',
+      headers: getAuthHeaders(),
+      body: JSON.stringify({ filename })
+    });
+    const data = await res.json();
+    if (res.ok) {
+      notify('Restore Complete', `Restored ${data.count} records`, 'var(--green2)', 'fas fa-check-circle');
+      loadCallLogs();
+    } else {
+      throw new Error(data.error);
+    }
+  } catch (err) {
+    notify('Restore Failed', err.message, 'var(--red2)', 'fas fa-exclamation-circle');
+  }
+}
+
+async function deletePbxContact(phone) {
+  if (!confirm(`Delete contact for ${phone}?`)) return;
+  try {
+    const res = await fetch(`${API_BASE}/calls/contacts/${phone}`, { method: 'DELETE', headers: getAuthHeaders() });
+    if (res.ok) {
+      notify('Contact Deleted', '', 'var(--muted)', 'fas fa-trash');
+      loadPbxContacts();
+      document.getElementById('pbx-contact-detail').innerHTML = `
+        <div style="padding:60px 20px;text-align:center;color:var(--muted);">
+          <i class="fas fa-user-circle" style="font-size:48px;margin-bottom:12px;opacity:0.3;display:block;"></i>
+          Select a contact to view their call history
+        </div>`;
+      loadCallLogs(callsCurrentPage);
+    }
+  } catch (err) {
+    notify('Error', err.message, 'var(--red2)', 'fas fa-exclamation-circle');
+  }
+}
+
+function selectCallRecord(row, id) {
+  document.querySelectorAll('#calls-tbody tr').forEach(r => r.style.background = '');
+  row.style.background = 'rgba(245,166,35,0.06)';
+}
+
+
+// PBX Connection Watchdog (15s)
+let _pbxWatchdogTimer = null;
+function startPbxWatchdog() {
+  if (_pbxWatchdogTimer) clearInterval(_pbxWatchdogTimer);
+  _pbxWatchdogTimer = setInterval(() => {
+    if (socket && !socket.connected) {
+      console.warn('[Watchdog] Socket.IO disconnected — PBX status may be stale.');
+      const txt = document.getElementById('pbx-status-text');
+      if (txt && !txt.textContent.includes('Timed Out')) {
+        txt.textContent = 'Matrix PBX · Connection Timed Out (Reconnecting...)';
+        txt.style.color = 'var(--red2)';
+      }
+    }
+  }, 15000);
+}
+
+async function pbxDial(destination) {
+  const sourceExt = localStorage.getItem('pbx_extension') || prompt('Enter your extension (e.g. 201):', '201');
+  if (!sourceExt) return;
+  localStorage.setItem('pbx_extension', sourceExt);
+
+  notify('Dialing', `${sourceExt} → ${destination}`, 'var(--gold)', 'fas fa-phone-alt');
+  
+  try {
+    const res = await fetch(`${API_BASE}/calls/dial`, {
+      method: 'POST',
+      headers: getAuthHeaders(),
+      body: JSON.stringify({ sourceExt, destination })
+    });
+    const data = await res.json();
+    if (res.ok) {
+      notify('Dial Success', `Response: ${data.response || 'Call initiated'}`, 'var(--green2)', 'fas fa-check-circle');
+    } else {
+      throw new Error(data.error);
+    }
+  } catch (err) {
+    notify('Dial Failed', err.message, 'var(--red2)', 'fas fa-exclamation-triangle');
+  }
+}
+
+// Initialize PBX sections when navigating
+document.addEventListener('navigated', (e) => {
+  if (e.detail.section === 'calls') {
+    loadCallLogs();
+    // Default tab
+    pbxShowTab('logs', document.getElementById('pbx-tab-logs'));
+  }
+});
+
+async function doSummarizeCall(id) {
+  const displayId = typeof id === 'string' ? id : 'call-sum-full';
+  const callId = typeof id === 'number' ? id : null;
+  const container = document.getElementById(displayId);
+  
+  if (!callId) {
+    // If no specific ID, summarize today's activity or selected row
+    notify('Summarizing', 'Analyzing recent call activity...', 'var(--gold)', 'fas fa-magic');
+    // For now just error if no ID
+    if (container) container.innerHTML = '<div style="color:var(--red2);">Please select a specific call record to summarize.</div>';
+    return;
+  }
+
+  if (container) container.innerHTML = `<div style="display:flex;align-items:center;gap:8px;"><div class="spin-loader" style="width:14px;height:14px;"></div> Generating AI summary...</div>`;
+  
+  try {
+    const res = await fetch(`${API_BASE}/calls/${callId}/summarize`, { method: 'POST', headers: getAuthHeaders() });
+    const data = await res.json();
+    if (res.ok) {
+      if (container) container.innerHTML = `<div style="line-height:1.6;color:var(--text);">${escHtml(data.summary)}</div>`;
+      notify('AI Summary', 'Call analysis complete', 'var(--green2)', 'fas fa-check');
+      loadCallLogs(callsCurrentPage); // Refresh to show summary in table if needed
+    } else {
+      throw new Error(data.error);
+    }
+  } catch (err) {
+    if (container) container.innerHTML = `<div style="color:var(--red2);"><i class="fas fa-exclamation-circle"></i> AI Error: ${escHtml(err.message)}</div>`;
+    notify('Summarize Failed', err.message, 'var(--red2)', 'fas fa-exclamation-triangle');
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+
+// Allow Ctrl+Enter to insert from the textarea
+document.addEventListener('DOMContentLoaded', function() {
+  var ta = document.getElementById('insert-html-code');
+  if (ta) {
+    ta.addEventListener('keydown', function(e) {
+      if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+        e.preventDefault();
+        applyInsertHtml();
+      }
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        closeInsertHtmlModal();
+      }
+    });
+  }
+});
+
 </script>
 
   <div class="modal-overlay" id="assign-mail-task-modal">
@@ -13556,6 +15079,7 @@ async function testAIModel() {
             <button type="button" class="btn btn-ghost btn-xs" onmousedown="composeToolbarMousedown(event)" onclick="composeInsertMarquee()" title="Scrolling text"><i class="fas fa-arrows-alt-h"></i> Marquee</button>
             <button type="button" class="btn btn-ghost btn-xs" onmousedown="composeToolbarMousedown(event)" onclick="composeInsertTable()" title="Insert Table"><i class="fas fa-table"></i> Table</button>
             <button type="button" class="btn btn-ghost btn-xs" onmousedown="composeToolbarMousedown(event)" onclick="composeInsertButton()" title="CTA Button"><i class="fas fa-hand-pointer"></i> Button</button>
+            <button type="button" class="btn btn-ghost btn-xs" onmousedown="composeSaveSelection();event.preventDefault()" onclick="openMediaInsertModal('compose-body')" title="Insert image, video, audio or document"><i class="fas fa-photo-video"></i> Media</button>
             <div style="position:relative;display:inline-block;">
               <button type="button" class="btn btn-ghost btn-xs" onmousedown="composeToolbarMousedown(event)" onclick="composeToggleEmoji(this)" title="Emoji"><i class="fas fa-smile"></i> Emoji</button>
               <div id="compose-emoji-picker" class="emoji-picker-popup" style="display:none;top:32px;left:0;">
@@ -13575,6 +15099,11 @@ async function testAIModel() {
               </div>
             </div>
             <button type="button" class="btn btn-ghost btn-xs" onmousedown="composeToolbarMousedown(event)" onclick="composeInsertSignature()" title="Company Signature"><i class="fas fa-signature"></i> Signature</button>
+            <button type="button" class="btn btn-ghost btn-xs" onmousedown="composeSaveSelection();event.preventDefault()" onclick="openInsertHtmlModal('compose-body')" title="Insert HTML (Auto-transforms for Outlook)
+✓ Inlines CSS, resolves CSS variables
+✗ Removes: box-shadow, border-radius, animations, transforms, filters, grid/flex properties
+⚠ Note: Grid/flex layouts preserved but properties removed - use tables for Outlook"><i class="fas fa-code"></i> HTML</button>
+            <button type="button" class="btn btn-ghost btn-xs" onmousedown="event.preventDefault()" onclick="previewEditorContent('compose-body')" title="Preview email full-screen"><i class="fas fa-eye"></i> Preview</button>
           </div>
           <div id="compose-body"
                contenteditable="true"
@@ -13773,6 +15302,7 @@ async function testAIModel() {
             <button class="btn btn-ghost btn-xs" onmousedown="event.preventDefault()" onclick="etInsertMarquee()" title="Scrolling text"><i class="fas fa-arrows-alt-h"></i> Marquee</button>
             <button class="btn btn-ghost btn-xs" onmousedown="event.preventDefault()" onclick="etInsertTable()" title="Insert Table"><i class="fas fa-table"></i> Table</button>
             <button class="btn btn-ghost btn-xs" onmousedown="event.preventDefault()" onclick="etInsertButton()" title="CTA Button"><i class="fas fa-hand-pointer"></i> Button</button>
+            <button class="btn btn-ghost btn-xs" onmousedown="etSaveSelection();event.preventDefault()" onclick="openMediaInsertModal('et-html-editor')" title="Insert image, video, audio or document"><i class="fas fa-photo-video"></i> Media</button>
             <div style="position:relative;display:inline-block;">
               <button class="btn btn-ghost btn-xs" onmousedown="event.preventDefault()" onclick="etToggleEmoji(this)" title="Emoji"><i class="fas fa-smile"></i> Emoji</button>
               <div id="et-emoji-picker" class="emoji-picker-popup" style="display:none;top:32px;left:0;">
@@ -13792,6 +15322,10 @@ async function testAIModel() {
               </div>
             </div>
             <button class="btn btn-ghost btn-xs" onmousedown="event.preventDefault()" onclick="etInsertSignature()" title="Company Signature"><i class="fas fa-signature"></i> Signature</button>
+            <button class="btn btn-ghost btn-xs" onmousedown="etSaveSelection();event.preventDefault()" onclick="openInsertHtmlModal('et-html-editor')" title="Insert HTML (Auto-transforms for Outlook)
+✓ Converts: grid→table, flex→table, CSS vars→colors
+✗ Removes: box-shadow, border-radius, animations, JavaScript
+Preview shows final Outlook-compatible version"><i class="fas fa-code"></i> HTML</button>
             <button class="btn btn-ghost btn-xs" onmousedown="event.preventDefault()" onclick="etPreviewTemplate()" title="Preview"><i class="fas fa-eye"></i> Preview</button>
             <button class="btn btn-ghost btn-xs" onmousedown="event.preventDefault()" onclick="etUseInBroadcast()" title="Use in Broadcast"><i class="fas fa-paper-plane"></i> Use</button>
           </div>
@@ -14249,6 +15783,148 @@ Nagpur, Maharashtra, 440017, India<br>
       <button class="oem-btn-cancel" onclick="closeModal('qs-modal-overlay')">Cancel</button>
       <div id="qs-status" style="margin-left: auto; align-self: center; font-size: 12px; color: #0078d4; display: none;">Saving...</div>
     </div>
+  </div>
+</div>
+
+<!-- ── MEDIA INSERT MODAL (shared by all editors) ── -->
+<div class="modal-overlay" id="media-insert-modal" onclick="if(event.target===this)closeMediaInsertModal()" style="z-index:10002;">
+  <div class="modal" style="max-width:560px;width:94vw;">
+    <div class="modal-title">
+      <span><i class="fas fa-photo-video" style="color:var(--blue2);margin-right:8px;"></i>Insert Media / Document</span>
+      <span class="modal-close" onclick="closeMediaInsertModal()"><i class="fas fa-times"></i></span>
+    </div>
+
+    <!-- Tab bar -->
+    <div style="display:flex;gap:0;border-bottom:1px solid var(--border);margin-bottom:16px;">
+      <button class="btn btn-ghost btn-xs media-tab active" id="mtab-image"    onclick="switchMediaTab('image')"    style="border-radius:6px 6px 0 0;border-bottom:2px solid var(--blue2);"><i class="fas fa-image"></i> Image</button>
+      <button class="btn btn-ghost btn-xs media-tab"        id="mtab-video"    onclick="switchMediaTab('video')"    style="border-radius:6px 6px 0 0;"><i class="fas fa-film"></i> Video</button>
+      <button class="btn btn-ghost btn-xs media-tab"        id="mtab-audio"    onclick="switchMediaTab('audio')"    style="border-radius:6px 6px 0 0;"><i class="fas fa-music"></i> Audio</button>
+      <button class="btn btn-ghost btn-xs media-tab"        id="mtab-document" onclick="switchMediaTab('document')" style="border-radius:6px 6px 0 0;"><i class="fas fa-file-alt"></i> Document</button>
+    </div>
+
+    <!-- IMAGE tab -->
+    <div id="mpanel-image">
+      <div style="font-size:11.5px;color:var(--muted);margin-bottom:10px;">Upload an image file or paste a URL. It will be embedded inline in the email.</div>
+      <div style="display:flex;gap:8px;margin-bottom:10px;">
+        <label class="btn btn-blue btn-sm" style="cursor:pointer;"><i class="fas fa-upload"></i> Upload Image
+          <input type="file" id="media-img-file" accept="image/*" style="display:none;" onchange="mediaPreviewFile('image',this)">
+        </label>
+        <span style="font-size:11px;color:var(--muted);align-self:center;">or</span>
+        <input id="media-img-url" class="inp" placeholder="https://example.com/image.jpg" style="flex:1;font-size:12px;" oninput="mediaPreviewUrl('image',this.value)">
+      </div>
+      <div id="media-img-preview" style="display:none;margin-bottom:10px;text-align:center;background:#f8fafd;border:1px solid var(--border);border-radius:8px;padding:8px;">
+        <img id="media-img-preview-el" src="" style="max-width:100%;max-height:200px;border-radius:6px;" alt="preview">
+      </div>
+      <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
+        <div style="flex:1;min-width:100px;">
+          <label class="form-label">Width (px or %)</label>
+          <input id="media-img-width" class="inp" placeholder="e.g. 100% or 400" value="100%" style="font-size:12px;">
+        </div>
+        <div style="flex:1;min-width:100px;">
+          <label class="form-label">Alt text</label>
+          <input id="media-img-alt" class="inp" placeholder="Image description" style="font-size:12px;">
+        </div>
+      </div>
+    </div>
+
+    <!-- VIDEO tab -->
+    <div id="mpanel-video" style="display:none;">
+      <div style="font-size:11.5px;color:var(--muted);margin-bottom:10px;">Upload a video file (MP4/WebM) or paste a YouTube/Vimeo URL.</div>
+      <div style="display:flex;gap:8px;margin-bottom:10px;">
+        <label class="btn btn-blue btn-sm" style="cursor:pointer;"><i class="fas fa-upload"></i> Upload Video
+          <input type="file" id="media-vid-file" accept="video/*" style="display:none;" onchange="mediaPreviewFile('video',this)">
+        </label>
+        <span style="font-size:11px;color:var(--muted);align-self:center;">or</span>
+        <input id="media-vid-url" class="inp" placeholder="https://youtube.com/watch?v=... or direct .mp4 URL" style="flex:1;font-size:12px;">
+      </div>
+      <div id="media-vid-preview" style="display:none;margin-bottom:10px;text-align:center;background:#f8fafd;border:1px solid var(--border);border-radius:8px;padding:8px;">
+        <video id="media-vid-preview-el" controls style="max-width:100%;max-height:180px;border-radius:6px;"></video>
+      </div>
+      <div style="display:flex;gap:10px;align-items:center;">
+        <div style="flex:1;">
+          <label class="form-label">Width</label>
+          <input id="media-vid-width" class="inp" placeholder="100%" value="100%" style="font-size:12px;">
+        </div>
+        <div style="flex:1;">
+          <label class="form-label">Height (px)</label>
+          <input id="media-vid-height" class="inp" placeholder="360" value="360" style="font-size:12px;">
+        </div>
+      </div>
+    </div>
+
+    <!-- AUDIO tab -->
+    <div id="mpanel-audio" style="display:none;">
+      <div style="font-size:11.5px;color:var(--muted);margin-bottom:10px;">Upload an audio file (MP3/WAV/OGG) or paste a direct URL.</div>
+      <div style="display:flex;gap:8px;margin-bottom:10px;">
+        <label class="btn btn-blue btn-sm" style="cursor:pointer;"><i class="fas fa-upload"></i> Upload Audio
+          <input type="file" id="media-aud-file" accept="audio/*" style="display:none;" onchange="mediaPreviewFile('audio',this)">
+        </label>
+        <span style="font-size:11px;color:var(--muted);align-self:center;">or</span>
+        <input id="media-aud-url" class="inp" placeholder="https://example.com/audio.mp3" style="flex:1;font-size:12px;">
+      </div>
+      <div id="media-aud-preview" style="display:none;margin-bottom:10px;background:#f8fafd;border:1px solid var(--border);border-radius:8px;padding:8px;">
+        <audio id="media-aud-preview-el" controls style="width:100%;"></audio>
+      </div>
+    </div>
+
+    <!-- DOCUMENT tab -->
+    <div id="mpanel-document" style="display:none;">
+      <div style="font-size:11.5px;color:var(--muted);margin-bottom:10px;">Upload a document. PDFs will be embedded inline; other files (Word, Excel, ZIP, etc.) will be inserted as a download link.</div>
+      <div style="display:flex;gap:8px;margin-bottom:10px;">
+        <label class="btn btn-blue btn-sm" style="cursor:pointer;"><i class="fas fa-upload"></i> Upload Document
+          <input type="file" id="media-doc-file" accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.csv,.zip,.rar" style="display:none;" onchange="mediaPreviewFile('document',this)">
+        </label>
+      </div>
+      <div id="media-doc-preview" style="display:none;margin-bottom:10px;background:#f8fafd;border:1px solid var(--border);border-radius:8px;padding:10px;font-size:12.5px;color:var(--text);">
+        <i class="fas fa-file-alt" style="color:var(--blue2);margin-right:6px;"></i>
+        <span id="media-doc-name"></span>
+        <span id="media-doc-size" style="color:var(--muted);margin-left:8px;font-size:11px;"></span>
+      </div>
+      <div>
+        <label class="form-label">Display label (for download link)</label>
+        <input id="media-doc-label" class="inp" placeholder="e.g. Download Brochure" style="font-size:12px;">
+      </div>
+    </div>
+
+    <!-- Footer -->
+    <div style="display:flex;gap:8px;margin-top:18px;justify-content:flex-end;">
+      <button class="btn btn-ghost" onclick="closeMediaInsertModal()">Cancel</button>
+      <button class="btn btn-gold" onclick="applyMediaInsert()"><i class="fas fa-check"></i> Insert</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── INSERT HTML CODE MODAL (shared by all editors) ── -->
+<div class="modal-overlay" id="insert-html-modal" onclick="if(event.target===this)closeInsertHtmlModal()">
+  <div class="modal" style="max-width:600px;width:94vw;">
+    <div class="modal-title">
+      <span><i class="fas fa-code" style="color:var(--blue2);margin-right:8px;"></i>Insert HTML Code</span>
+      <span class="modal-close" onclick="closeInsertHtmlModal()"><i class="fas fa-times"></i></span>
+    </div>
+    <div style="font-size:12px;color:var(--muted);margin-bottom:10px;">Paste your HTML snippet below. It will be rendered in the editor at the cursor position.</div>
+    <textarea id="insert-html-code"
+      class="inp mono"
+      rows="10"
+      style="font-family:'JetBrains Mono',monospace;font-size:12.5px;resize:vertical;min-height:160px;white-space:pre;"
+      placeholder='e.g. &lt;p style="color:red;font-weight:bold;"&gt;Hello World&lt;/p&gt;'></textarea>
+    <div style="display:flex;gap:8px;margin-top:14px;justify-content:space-between;align-items:center;">
+      <button class="btn btn-blue btn-sm" onclick="previewInsertHtml()"><i class="fas fa-eye"></i> Preview</button>
+      <div style="display:flex;gap:8px;">
+        <button class="btn btn-ghost" onclick="closeInsertHtmlModal()">Cancel</button>
+        <button class="btn btn-gold" onclick="applyInsertHtml()"><i class="fas fa-check"></i> Insert</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── HTML PREVIEW MODAL (full-screen iframe) ── -->
+<div class="modal-overlay" id="html-preview-modal" onclick="if(event.target===this)closeHtmlPreview()" style="z-index:10001;">
+  <div class="modal" style="max-width:96vw;width:96vw;max-height:96vh;height:96vh;padding:0;border-radius:12px;overflow:hidden;display:flex;flex-direction:column;">
+    <div class="modal-title" style="padding:14px 20px;border-bottom:1px solid var(--border);flex-shrink:0;">
+      <span><i class="fas fa-eye" style="color:var(--blue2);margin-right:8px;"></i>HTML Preview</span>
+      <span class="modal-close" onclick="closeHtmlPreview()"><i class="fas fa-times"></i></span>
+    </div>
+    <iframe id="html-preview-iframe" sandbox="allow-scripts allow-same-origin" style="flex:1;border:none;background:#fff;width:100%;height:100%;"></iframe>
   </div>
 </div>
 
