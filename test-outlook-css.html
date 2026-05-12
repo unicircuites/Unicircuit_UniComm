@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Outlook CSS Transformation Test</title>
+</head>
+<body>
+  <h1>Test Results</h1>
+  <div id="results"></div>
+
+  <script>
+    // Test HTML with unsupported CSS
+    var testHtml = `
+      <style>
+        :root {
+          --primary: #0078d4;
+          --card: #f5f5f5;
+          --text: #333;
+        }
+        .grid-2 {
+          display: grid;
+          grid-template-columns: 1fr 1fr;
+          gap: 20px;
+          background-color: var(--card);
+        }
+        .flex-row {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          gap: 10px;
+        }
+        .rounded {
+          border-radius: 8px;
+          box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+          padding: 10px;
+        }
+      </style>
+      <div class="grid-2">
+        <div class="rounded">Item 1</div>
+        <div class="rounded">Item 2</div>
+      </div>
+      <div class="flex-row">
+        <span>Left</span>
+        <span>Right</span>
+      </div>
+    `;
+
+    // Copy the inlineHtmlForOutlook function from dashboard.html
+    // (In real test, this would be loaded from the actual file)
+    
+    var results = document.getElementById('results');
+    results.innerHTML = '<p>Test HTML prepared. Open browser console to see transformation results.</p>';
+    results.innerHTML += '<h2>Input HTML:</h2><pre>' + testHtml.replace(/</g, '&lt;') + '</pre>';
+    
+    console.log('Test HTML:', testHtml);
+    console.log('To test: Load dashboard.html in browser and call inlineHtmlForOutlook(testHtml, function(result) { console.log(result); })');
+  </script>
+</body>
+</html>

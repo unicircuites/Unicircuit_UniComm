@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>UniComm Pro - Accordion Email (Limited Support)</title>
+<style>
+/* Checkbox hack for accordions */
+.toggle {
+  display: none;
+}
+
+.content {
+  max-height: 0;
+  overflow: hidden;
+  transition: max-height 0.3s ease;
+}
+
+.toggle:checked + .header + .content {
+  max-height: 500px;
+}
+
+.header {
+  background: #1a2035;
+  padding: 15px;
+  cursor: pointer;
+  border: 1px solid rgba(255,255,255,0.07);
+  margin-bottom: 2px;
+}
+
+.header:hover {
+  background: #1f2640;
+}
+</style>
+</head>
+<body style="margin:0;padding:20px;background:#0c0f1a;font-family:Arial,sans-serif;color:#e8ecf4;">
+
+<h1 style="color:#f5a623;">Accordion Pattern Test</h1>
+<p style="color:#6b7a99;">Click sections to expand/collapse (works in some clients)</p>
+
+<!-- Dashboard Section -->
+<input type="checkbox" id="toggle1" class="toggle" checked>
+<label for="toggle1" class="header">
+  <strong style="color:#fff;">📊 Dashboard</strong>
+  <span style="float:right;color:#6b7a99;">▼</span>
+</label>
+<div class="content" style="background:#1a2035;padding:15px;border:1px solid rgba(255,255,255,0.07);">
+  <p><strong>KPIs:</strong></p>
+  <ul>
+    <li>Calls: 1,284 (+12%)</li>
+    <li>Emails: 3,245</li>
+    <li>WhatsApp: 847 (+23)</li>
+  </ul>
+</div>
+
+<!-- Calls Section -->
+<input type="checkbox" id="toggle2" class="toggle">
+<label for="toggle2" class="header">
+  <strong style="color:#fff;">📞 Call Logs</strong>
+  <span style="float:right;color:#6b7a99;">▼</span>
+</label>
+<div class="content" style="background:#1a2035;padding:15px;border:1px solid rgba(255,255,255,0.07);">
+  <ul>
+    <li><strong>Amit Sharma</strong> → +91 98200 44512 (4m 12s)</li>
+    <li><strong>L&T ECC</strong> → Ext. 305 Sales (18m 47s)</li>
+    <li><strong>Priya Nair</strong> → Missed call</li>
+  </ul>
+</div>
+
+<!-- Email Section -->
+<input type="checkbox" id="toggle3" class="toggle">
+<label for="toggle3" class="header">
+  <strong style="color:#fff;">📧 Email / Outlook</strong>
+  <span style="float:right;color:#6b7a99;">▼</span>
+</label>
+<div class="content" style="background:#1a2035;padding:15px;border:1px solid rgba(255,255,255,0.07);">
+  <ul>
+    <li><strong>L&T ECC:</strong> Revised Quote Request</li>
+    <li><strong>BHEL:</strong> VFD & PLC Panel Pricing</li>
+    <li><strong>Siemens:</strong> Product Demo Request</li>
+  </ul>
+</div>
+
+<hr style="margin:30px 0;border:1px solid rgba(255,255,255,0.07);">
+
+<h3 style="color:#f5a623;">Email Client Support:</h3>
+<table style="width:100%;border-collapse:collapse;color:#e8ecf4;">
+  <tr style="background:rgba(255,255,255,0.02);">
+    <th style="padding:10px;text-align:left;border:1px solid rgba(255,255,255,0.07);">Client</th>
+    <th style="padding:10px;text-align:left;border:1px solid rgba(255,255,255,0.07);">Checkbox Hack</th>
+  </tr>
+  <tr>
+    <td style="padding:10px;border:1px solid rgba(255,255,255,0.07);">Gmail</td>
+    <td style="padding:10px;border:1px solid rgba(255,255,255,0.07);color:#ef4444;">❌ No (strips input elements)</td>
+  </tr>
+  <tr>
+    <td style="padding:10px;border:1px solid rgba(255,255,255,0.07);">Outlook Desktop</td>
+    <td style="padding:10px;border:1px solid rgba(255,255,255,0.07);color:#ef4444;">❌ No</td>
+  </tr>
+  <tr>
+    <td style="padding:10px;border:1px solid rgba(255,255,255,0.07);">Outlook Web</td>
+    <td style="padding:10px;border:1px solid rgba(255,255,255,0.07);color:#ef4444;">❌ No</td>
+  </tr>
+  <tr>
+    <td style="padding:10px;border:1px solid rgba(255,255,255,0.07);">Apple Mail</td>
+    <td style="padding:10px;border:1px solid rgba(255,255,255,0.07);color:#10b981;">✅ Yes</td>
+  </tr>
+  <tr>
+    <td style="padding:10px;border:1px solid rgba(255,255,255,0.07);">Thunderbird</td>
+    <td style="padding:10px;border:1px solid rgba(255,255,255,0.07);color:#ffc659;">⚠️ Partial</td>
+  </tr>
+</table>
+
+<p style="color:#8b9ab8;margin-top:20px;"><strong>Conclusion:</strong> Even the checkbox hack doesn't work in Gmail/Outlook. Email interactivity is extremely limited.</p>
+
+</body>
+</html>

@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CSS-Only Navigation Test for Email</title>
+<style>
+/* Hide all sections by default */
+.section {
+  display: none;
+}
+
+/* Show the targeted section */
+.section:target {
+  display: block;
+}
+
+/* Show dashboard by default (when no hash) */
+#dashboard {
+  display: block;
+}
+
+/* If any section is targeted, hide dashboard */
+.section:target ~ #dashboard {
+  display: none;
+}
+
+/* Navigation styling */
+.nav {
+  background: #111520;
+  padding: 10px;
+  margin-bottom: 20px;
+}
+
+.nav a {
+  display: inline-block;
+  padding: 8px 16px;
+  margin: 4px;
+  background: #1a2035;
+  color: #e8ecf4;
+  text-decoration: none;
+  border: 1px solid rgba(255,255,255,0.07);
+}
+
+.nav a:hover {
+  background: #1f2640;
+}
+
+/* Content styling */
+.section {
+  background: #1a2035;
+  padding: 20px;
+  color: #e8ecf4;
+  border: 1px solid rgba(255,255,255,0.07);
+}
+</style>
+</head>
+<body style="margin:0;padding:20px;background:#0c0f1a;font-family:Arial,sans-serif;">
+
+<h1 style="color:#f5a623;">CSS-Only Navigation Test</h1>
+<p style="color:#6b7a99;">Testing if :target pseudo-class works in email clients</p>
+
+<!-- Navigation -->
+<div class="nav">
+  <a href="#dashboard">📊 Dashboard</a>
+  <a href="#calls">📞 Calls</a>
+  <a href="#email">📧 Email</a>
+  <a href="#whatsapp">💬 WhatsApp</a>
+  <a href="#contacts">👥 Contacts</a>
+</div>
+
+<!-- Sections -->
+<div class="section" id="dashboard">
+  <h2 style="color:#fff;">📊 Dashboard</h2>
+  <p>Welcome to the dashboard! This is the default view.</p>
+  <p><strong>KPIs:</strong> Calls: 1,284 | Emails: 3,245 | WhatsApp: 847</p>
+</div>
+
+<div class="section" id="calls">
+  <h2 style="color:#fff;">📞 Call Logs</h2>
+  <p>Recent calls from Matrix PBX:</p>
+  <ul>
+    <li>Amit Sharma → +91 98200 44512 (4m 12s)</li>
+    <li>L&T ECC → Ext. 305 Sales (18m 47s)</li>
+    <li>Priya Nair → +91 80 4112 3390 (Missed)</li>
+  </ul>
+</div>
+
+<div class="section" id="email">
+  <h2 style="color:#fff;">📧 Email / Outlook</h2>
+  <p>Recent emails:</p>
+  <ul>
+    <li><strong>L&T ECC:</strong> Revised Quote Request</li>
+    <li><strong>BHEL:</strong> VFD & PLC Panel Pricing</li>
+    <li><strong>Siemens:</strong> Product Demo Request</li>
+  </ul>
+</div>
+
+<div class="section" id="whatsapp">
+  <h2 style="color:#fff;">💬 WhatsApp Business</h2>
+  <p>Active conversations:</p>
+  <ul>
+    <li><strong>Suresh Kumar (L&T):</strong> Can you share the invoice?</li>
+    <li><strong>Vijay Rao (BHEL):</strong> Need pricing list urgently</li>
+    <li><strong>Manish Gupta (Adani):</strong> Confirm site visit Tuesday?</li>
+  </ul>
+</div>
+
+<div class="section" id="contacts">
+  <h2 style="color:#fff;">👥 Contacts</h2>
+  <p>Top contacts:</p>
+  <ul>
+    <li><strong>L&T ECC</strong> - Hot Lead (Score: 88)</li>
+    <li><strong>BHEL</strong> - Client (Score: 74)</li>
+    <li><strong>Siemens Partner</strong> - Prospect (Score: 61)</li>
+  </ul>
+</div>
+
+<hr style="margin:30px 0;border:1px solid rgba(255,255,255,0.07);">
+
+<h3 style="color:#f5a623;">How This Works:</h3>
+<ol style="color:#8b9ab8;">
+  <li>Click a navigation link (e.g., "Calls")</li>
+  <li>URL changes to <code>#calls</code></li>
+  <li>CSS <code>:target</code> selector shows that section</li>
+  <li><strong>No JavaScript required!</strong></li>
+</ol>
+
+<h3 style="color:#f5a623;">Email Client Support:</h3>
+<table style="width:100%;border-collapse:collapse;color:#e8ecf4;">
+  <tr style="background:rgba(255,255,255,0.02);">
+    <th style="padding:10px;text-align:left;border:1px solid rgba(255,255,255,0.07);">Client</th>
+    <th style="padding:10px;text-align:left;border:1px solid rgba(255,255,255,0.07);">:target Support</th>
+    <th style="padding:10px;text-align:left;border:1px solid rgba(255,255,255,0.07);">Notes</th>
+  </tr>
+  <tr>
+    <td style="padding:10px;border:1px solid rgba(255,255,255,0.07);">Gmail</td>
+    <td style="padding:10px;border:1px solid rgba(255,255,255,0.07);color:#ef4444;">❌ No</td>
+    <td style="padding:10px;border:1px solid rgba(255,255,255,0.07);">Strips :target CSS</td>
+  </tr>
+  <tr>
+    <td style="padding:10px;border:1px solid rgba(255,255,255,0.07);">Outlook Desktop</td>
+    <td style="padding:10px;border:1px solid rgba(255,255,255,0.07);color:#ef4444;">❌ No</td>
+    <td style="padding:10px;border:1px solid rgba(255,255,255,0.07);">Word rendering engine</td>
+  </tr>
+  <tr>
+    <td style="padding:10px;border:1px solid rgba(255,255,255,0.07);">Outlook Web</td>
+    <td style="padding:10px;border:1px solid rgba(255,255,255,0.07);color:#ffc659;">⚠️ Partial</td>
+    <td style="padding:10px;border:1px solid rgba(255,255,255,0.07);">May work but unreliable</td>
+  </tr>
+  <tr>
+    <td style="padding:10px;border:1px solid rgba(255,255,255,0.07);">Apple Mail</td>
+    <td style="padding:10px;border:1px solid rgba(255,255,255,0.07);color:#10b981;">✅ Yes</td>
+    <td style="padding:10px;border:1px solid rgba(255,255,255,0.07);">Full WebKit support</td>
+  </tr>
+  <tr>
+    <td style="padding:10px;border:1px solid rgba(255,255,255,0.07);">Thunderbird</td>
+    <td style="padding:10px;border:1px solid rgba(255,255,255,0.07);color:#10b981;">✅ Yes</td>
+    <td style="padding:10px;border:1px solid rgba(255,255,255,0.07);">Gecko engine</td>
+  </tr>
+  <tr>
+    <td style="padding:10px;border:1px solid rgba(255,255,255,0.07);">Yahoo Mail</td>
+    <td style="padding:10px;border:1px solid rgba(255,255,255,0.07);color:#ef4444;">❌ No</td>
+    <td style="padding:10px;border:1px solid rgba(255,255,255,0.07);">Strips advanced CSS</td>
+  </tr>
+</table>
+
+</body>
+</html>

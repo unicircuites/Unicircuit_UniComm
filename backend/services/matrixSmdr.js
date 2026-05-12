@@ -181,6 +181,82 @@ function processBuffer() {
   }
 }
 
+// ── TCP CLIENT — Proactively connect TO the PBX ──────────────────────────
+let smdrClient = null;
+let clientRetryTimer = null;
+
+function startClient() {
+  if (smdrClient) {
+    try { smdrClient.destroy(); } catch (_) {}
+    smdrClient = null;
+  }
+
+  console.log('[SMDR] ── startClient() ──────────────────────────────────');
+  console.log(`[SMDR]   Attempting to connect to Matrix PBX at ${PBX_HOST}:${SMDR_PORT}...`);
+  console.log('[SMDR]   PBX setup: System → SMDR Settings → Output: TCP Client');
+  console.log('[SMDR]              (Or PBX acting as a TCP Server)');
+
+  smdrClient = new net.Socket();
+  smdrClient.setTimeout(10000);
+
+  smdrClient.connect(SMDR_PORT, PBX_HOST, () => {
+    isConnected = true;
+    console.log('[SMDR] ── OUTBOUND CONNECTION SUCCESS ─────────────────────');
+    console.log(`[SMDR]   Connected to PBX at ${PBX_HOST}:${SMDR_PORT}`);
+    emit('pbx:connected', { host: PBX_HOST, port: SMDR_PORT, mode: 'client' });
+    
+    if (clientRetryTimer) {
+      clearInterval(clientRetryTimer);
+      clientRetryTimer = null;
+    }
+  });
+
+  smdrClient.on('data', (data) => {
+    const raw = data.toString();
+    console.log(`[SMDR] 📥 Data from PBX (${data.length} bytes): ${JSON.stringify(raw)}`);
+    buffer += raw;
+    processBuffer();
+  });
+
+  smdrClient.on('close', () => {
+    if (isConnected) {
+      console.log('[SMDR] ── OUTBOUND DISCONNECTED ──────────────────────────');
+      isConnected = false;
+      emit('pbx:disconnected', {});
+    }
+    // Schedule retry if not already scheduled
+    if (!clientRetryTimer) {
+      console.log('[SMDR]   Retrying outbound connection in 30s...');
+      clientRetryTimer = setInterval(startClient, 30000);
+    }
+  });
+
+  smdrClient.on('error', (err) => {
+    console.error(`[SMDR] ⚠️  Outbound client error: ${err.message} (code=${err.code})`);
+    emit('pbx:binding_error', { 
+      service: 'matrixSmdr', 
+      mode: 'client', 
+      error: err.message, 
+      code: err.code,
+      host: PBX_HOST,
+      port: SMDR_PORT
+    });
+    // Close will handle the retry
+  });
+
+  smdrClient.on('timeout', () => {
+    console.warn('[SMDR] ⏱️  Outbound client timeout — no data from PBX');
+    emit('pbx:binding_error', { 
+      service: 'matrixSmdr', 
+      mode: 'client', 
+      error: 'Connection timeout', 
+      host: PBX_HOST, 
+      port: SMDR_PORT 
+    });
+    smdrClient.destroy();
+  });
+}
+
 // ── TCP SERVER — PBX connects TO us ──────────────────────────────────────
 let tcpServer     = null;
 let connectedPeers = 0;  // track simultaneous connections
@@ -209,7 +285,7 @@ function startServer() {
     if (!isPBX) {
       console.warn(`[SMDR]   ⚠️  Connection from unknown host ${socket.remoteAddress} — check PBX_HOST in .env`);
     }
-    emit('pbx:connected', { host: PBX_HOST, port: SMDR_PORT });
+    emit('pbx:connected', { host: PBX_HOST, port: SMDR_PORT, mode: 'server' });
 
     socket.on('data', (data) => {
       const raw = data.toString();
@@ -220,65 +296,129 @@ function startServer() {
 
     socket.on('close', (hadError) => {
       connectedPeers = Math.max(0, connectedPeers - 1);
-      isConnected    = connectedPeers > 0;
-      console.log('[SMDR] ── DISCONNECTED ───────────────────────────────────');
+      isConnected    = connectedPeers > 0 || (smdrClient && !smdrClient.destroyed);
+      console.log('[SMDR] ── INBOUND DISCONNECTED ───────────────────────────');
       console.log(`[SMDR]   Remote  : ${remote}`);
       console.log(`[SMDR]   hadError: ${hadError}`);
       console.log(`[SMDR]   Active connections remaining: ${connectedPeers}`);
       if (!isConnected) {
         console.log('[SMDR]   No PBX connections — waiting for Matrix PBX to reconnect...');
-        console.log(`[SMDR]   Verify PBX SMDR output is set to TCP Server → ${SMDR_PORT}`);
       }
       emit('pbx:disconnected', {});
     });
 
     socket.on('error', (err) => {
       console.error(`[SMDR] ⚠️  Socket error from ${remote}: ${err.message} (code=${err.code})`);
-      if (err.code === 'ECONNRESET') {
-        console.error('[SMDR]   PBX reset the connection — may be a PBX restart or config change');
-      }
-    });
-
-    socket.on('timeout', () => {
-      console.warn(`[SMDR] ⏱️  Socket timeout from ${remote} — no data received`);
-      console.warn('[SMDR]   Check PBX SMDR is enabled and sending data');
     });
   });
 
   tcpServer.listen(SMDR_PORT, '0.0.0.0', () => {
     console.log('[SMDR] ── SERVER READY ───────────────────────────────────');
     console.log(`[SMDR]   ✅ Listening on 0.0.0.0:${SMDR_PORT}`);
-    console.log(`[SMDR]   Waiting for Matrix PBX (${PBX_HOST}) to connect...`);
-    console.log('[SMDR]   If PBX does not connect within 60s, check:');
-    console.log(`[SMDR]     1. PBX SMDR output IP = this machine's LAN IP`);
-    console.log(`[SMDR]     2. PBX SMDR port      = ${SMDR_PORT}`);
-    console.log(`[SMDR]     3. Windows Firewall inbound rule for TCP ${SMDR_PORT}`);
-    console.log('[SMDR]        Run as admin: New-NetFirewallRule -DisplayName "UniComm SMDR"');
-    console.log(`[SMDR]          -Direction Inbound -Protocol TCP -LocalPort ${SMDR_PORT} -Action Allow`);
   });
 
   tcpServer.on('error', (err) => {
     console.error('[SMDR] ❌ Server error:', err.message, `(code=${err.code})`);
+    emit('pbx:binding_error', { 
+      service: 'matrixSmdr', 
+      mode: 'server', 
+      error: err.message, 
+      code: err.code,
+      port: SMDR_PORT
+    });
     if (err.code === 'EADDRINUSE') {
       console.error(`[SMDR]   Port ${SMDR_PORT} already in use.`);
-      console.error('[SMDR]   Find the process: netstat -ano | findstr :' + SMDR_PORT);
-      console.error('[SMDR]   Kill it:          taskkill /PID <pid> /F');
     }
-    if (err.code === 'EACCES') {
-      console.error(`[SMDR]   Permission denied on port ${SMDR_PORT} — ports below 1024 need admin`);
-    }
-    console.log('[SMDR]   Retrying in 10 seconds...');
-    setTimeout(startServer, 10000);
+    console.log('[SMDR]   Retrying server in 30 seconds...');
+    setTimeout(startServer, 30000);
   });
 }
 
 function getStatus() {
-  return { connected: isConnected, host: PBX_HOST, port: SMDR_PORT };
+  return { connected: isConnected, host: PBX_HOST, port: SMDR_PORT, peers: connectedPeers };
 }
 
 async function start() {
   await ensureTable();
+  // Start both modes to ensure connectivity regardless of PBX config
   startServer();
+  startClient();
 }
 
-module.exports = { start, setIO, getStatus };
+
+/**
+ * Click-to-Dial via Matrix CTI Port
+ * @param {string} sourceExt - The internal extension to start the call from
+ * @param {string} destination - The number to dial
+ */
+async function dial(sourceExt, destination) {
+  return new Promise((resolve, reject) => {
+    if (!sourceExt || !destination) return reject(new Error('Source extension and destination required'));
+    
+    console.log(`[CTI] Attempting Click-to-Dial: ${sourceExt} → ${destination}`);
+    
+    const client = new net.Socket();
+    client.setTimeout(5000);
+
+    client.connect(CTI_PORT, PBX_HOST, () => {
+      // Matrix Eternity CTI Command: CALL <SrcExt> <DestNum>
+      // Some versions require a password or specific login, but basic CTI often allows direct CALL.
+      const cmd = `CALL ${sourceExt} ${destination}\r\n`;
+      client.write(cmd);
+      console.log(`[CTI] Sent: ${cmd.trim()}`);
+    });
+
+    client.on('data', (data) => {
+      const resp = data.toString().trim();
+      console.log(`[CTI] Response: ${resp}`);
+      client.destroy();
+      resolve(resp);
+    });
+
+    client.on('error', (err) => {
+      console.error(`[CTI] Connection error: ${err.message}`);
+      client.destroy();
+      reject(err);
+    });
+
+    client.on('timeout', () => {
+      console.error('[CTI] Connection timed out');
+      client.destroy();
+      reject(new Error('CTI timeout'));
+    });
+  });
+}
+
+async function reconnect() {
+  console.log('[SMDR] 🔄 Manual reconnect requested...');
+  
+  // Close outbound client
+  if (smdrClient) {
+    try { smdrClient.destroy(); } catch (_) {}
+    smdrClient = null;
+  }
+  if (clientRetryTimer) {
+    clearInterval(clientRetryTimer);
+    clientRetryTimer = null;
+  }
+  
+  // Close inbound server
+  if (tcpServer) {
+    try {
+      tcpServer.close();
+      console.log('[SMDR] Inbound server closed for restart');
+    } catch (_) {}
+    tcpServer = null;
+  }
+  
+  isConnected = false;
+  connectedPeers = 0;
+  emit('pbx:disconnected', { reason: 'manual_reconnect' });
+  
+  // Small delay then restart
+  setTimeout(() => {
+    start();
+  }, 1000);
+}
+
+module.exports = { start, setIO, getStatus, dial, reconnect };

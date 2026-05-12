@@ -6,7 +6,8 @@
   "scripts": {
     "start": "node server.js",
     "dev": "nodemon --ignore '.env' --ignore 'wa_auth/' server.js",
-    "db:init": "node db/init.js"
+    "db:init": "node db/init.js",
+    "test": "jest"
   },
   "dependencies": {
     "@azure/msal-node": "^5.1.5",
@@ -27,6 +28,9 @@
     "socket.io": "^4.8.3"
   },
   "devDependencies": {
+    "fast-check": "^4.8.0",
+    "jest": "^30.4.2",
+    "jsdom": "^24.0.0",
     "nodemon": "3.1.0"
   }
 }

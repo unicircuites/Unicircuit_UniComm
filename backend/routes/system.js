@@ -170,5 +170,50 @@ router.post('/ai/chat', async (req, res) => {
   }
 });
 
+// ── POST /api/system/ai/sessions ──────────────────────────────────────────────
+router.post('/ai/sessions', authenticate, async (req, res) => {
+  try {
+    await pool.query(`CREATE TABLE IF NOT EXISTS ai_chat_sessions (
+      id VARCHAR(100) PRIMARY KEY,
+      title VARCHAR(255),
+      messages JSONB,
+      messages_html TEXT,
+      updated_at TIMESTAMPTZ DEFAULT NOW()
+    )`);
+    const { id, title, messages, messagesHtml } = req.body;
+    if (!messages || messages.length === 0) {
+      return res.json({ success: true, ignored: true });
+    }
+    await pool.query(
+      `INSERT INTO ai_chat_sessions (id, title, messages, messages_html, updated_at) 
+       VALUES ($1, $2, $3, $4, NOW())
+       ON CONFLICT (id) DO UPDATE SET title = EXCLUDED.title, messages = EXCLUDED.messages, messages_html = EXCLUDED.messages_html, updated_at = NOW()`,
+      [id, title, JSON.stringify(messages), messagesHtml]
+    );
+    res.json({ success: true });
+  } catch (err) {
+    console.error('[AI-SESSIONS] Error saving:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ── GET /api/system/ai/sessions ──────────────────────────────────────────────
+router.get('/ai/sessions', authenticate, async (req, res) => {
+  try {
+    await pool.query(`CREATE TABLE IF NOT EXISTS ai_chat_sessions (
+      id VARCHAR(100) PRIMARY KEY,
+      title VARCHAR(255),
+      messages JSONB,
+      messages_html TEXT,
+      updated_at TIMESTAMPTZ DEFAULT NOW()
+    )`);
+    const result = await pool.query('SELECT id, title, messages, messages_html FROM ai_chat_sessions ORDER BY updated_at DESC');
+    res.json({ sessions: result.rows });
+  } catch (err) {
+    console.error('[AI-SESSIONS] Error fetching:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 module.exports = router;
 module.exports.serviceState = serviceState;

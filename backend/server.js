@@ -185,6 +185,11 @@ io.emit = function(event, ...args) {
 // Send activity log snapshot to newly connected Socket.IO clients
 io.on('connection', (socket) => {
   socket.emit('system:log_snapshot', { events: activityLog.getRecent(100) });
+
+  socket.on('pbx:reconnect', () => {
+    console.log('[Socket] PBX reconnect requested by client');
+    smdr.reconnect();
+  });
 });
 
 // PostgreSQL pool error → mark offline

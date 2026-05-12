@@ -2037,6 +2037,44 @@ router.get('/drafts/fallback', async (req, res) => {
   }
 });
 
+// ── POST /api/outlook/drafts ─────────────────────────────────────────────
+// Create a draft message in Outlook Drafts folder via Microsoft Graph API
+router.post('/drafts', async (req, res) => {
+  const { to, subject, body, cc } = req.body;
+
+  console.log('[Outlook] POST /drafts — subject:', subject, '| body length:', (body||'').length);
+
+  const toRecipients = to
+    ? (Array.isArray(to) ? to : [to])
+        .filter(Boolean)
+        .map(addr => ({ emailAddress: { address: addr } }))
+    : [];
+
+  const ccRecipients = cc
+    ? (Array.isArray(cc) ? cc : [cc])
+        .filter(Boolean)
+        .map(addr => ({ emailAddress: { address: addr } }))
+    : [];
+
+  const message = {
+    subject: subject || '(No subject)',
+    body: { contentType: 'HTML', content: body || '' },
+    ...(toRecipients.length ? { toRecipients } : {}),
+    ...(ccRecipients.length ? { ccRecipients } : {}),
+  };
+
+  try {
+    // POST to /me/messages creates a draft in the Drafts folder
+    const draft = await graph.graphPost('/me/messages', message, MS_EMAIL);
+    console.log('[Outlook] ✓ Draft created, id:', draft.id);
+    return res.json({ success: true, draftId: draft.id });
+  } catch (err) {
+    console.error('[Outlook] ❌ Create draft error:', err.message);
+    if (err.message === 'NOT_AUTHENTICATED') return res.status(401).json({ error: 'NOT_AUTHENTICATED' });
+    return res.status(500).json({ error: err.message });
+  }
+});
+
 // ── GET /api/outlook/deleted ─────────────────────────────────────────────
 router.get('/deleted', async (req, res) => {
   const top = parseInt(req.query.top || '25');

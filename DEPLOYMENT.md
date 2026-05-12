@@ -5,7 +5,7 @@
 ## Tower Server Info
 - **IP:** 192.168.0.205
 - **Port:** 8088
-- **URL:** http://192.168.0.205:8088
+- **URL:** https://192.168.0.205:8088
 - **Project Path:** `C:\UniComm\Unicircuit_UniComm-main`
 - **OS:** Windows
 - **Node:** v24+
@@ -55,9 +55,9 @@ CTI_PORT=5001
 MS_TENANT_ID=407ec761-e4ad-4d41-9ea4-6ae7fe391047
 MS_CLIENT_ID=d6224f70-6728-4f68-93aa-75a91f4adaa8
 MS_CLIENT_SECRET=nzF8Q~v7eZui9WgYylxIebCoD2hCjzWao6gDpazR
-MS_REDIRECT_URI=http://192.168.0.205:8088/auth/callback
+MS_REDIRECT_URI=https://192.168.0.205:8088/auth/callback
 MS_USER_EMAIL=sales@unicircuites.com
-APP_PUBLIC_URL=http://192.168.0.205:8088
+APP_PUBLIC_URL=https://192.168.0.205:8088
 ENGAGEBAY_API_KEY=your_engagebay_api_key_here
 SMTP_HOST=smtp.office365.com
 SMTP_PORT=587
@@ -65,6 +65,9 @@ SMTP_USER=noreply@unicircuites.live
 SMTP_PASS=V&z7GfwMNy4pVm&
 SMTP_FROM=noreply@unicircuites.live
 SMTP_FROM_NAME=Unicircuit Engineering Services LLP
+AI_API_HOST=https://api.groq.com/openai/v1
+AI_API_MODEL=llama-3.1-8b-instant
+AI_API_KEY=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
 "@ | Set-Content -Path "C:\UniComm\Unicircuit_UniComm-main\backend\.env" -Encoding UTF8
 ```
 
@@ -99,6 +102,31 @@ netsh advfirewall firewall add rule name="UniComm 8088" dir=in action=allow prot
 
 ---
 
+## HTTPS Requirement & SSL Setup (MANDATORY)
+
+The Tower server **MUST** run on HTTPS for Microsoft Graph (Outlook) authentication to work. If HTTPS is not configured, the login will fail.
+
+### 1. SSL Certificate Location
+Certificates must be placed in:
+`C:\UniComm\Unicircuit_UniComm-main\backend\certs\`
+
+Required files:
+- `server.crt`
+- `server.key`
+
+### 2. How to Generate Self-Signed Cert (Admin PowerShell)
+If you don't have a real certificate, run this in an Administrative PowerShell:
+```powershell
+mkdir -Path "C:\UniComm\Unicircuit_UniComm-main\backend\certs" -ErrorAction SilentlyContinue
+$cert = New-SelfSignedCertificate -DnsName "192.168.0.205" -CertStoreLocation "cert:\LocalMachine\My"
+$bin = [System.Convert]::ToBase64String($cert.RawData, "InsertLineBreaks")
+"-----BEGIN CERTIFICATE-----`n$bin`n-----END CERTIFICATE-----" | Set-Content "C:\UniComm\Unicircuit_UniComm-main\backend\certs\server.crt"
+# Use the same file for key if you just want to stop the crash, but ideally export the real key.
+Set-Content -Path "C:\UniComm\Unicircuit_UniComm-main\backend\certs\server.key" -Value (Get-Content "C:\UniComm\Unicircuit_UniComm-main\backend\certs\server.crt")
+```
+
+---
+
 ## Update Server (Pull latest from GitHub)
 
 Dev machine pe changes karo → GitHub pe push karo → Tower pe run karo:
@@ -116,8 +144,8 @@ Invoke-WebRequest -Uri 'https://github.com/unicircuites/Unicircuit_UniComm/archi
 Write-Host "Extracting..." -ForegroundColor Cyan
 Expand-Archive -Path 'C:\UniComm_update.zip' -DestinationPath 'C:\UniComm_update' -Force
 
-Write-Host "Copying files (keeping .env)..." -ForegroundColor Cyan
-Copy-Item -Path 'C:\UniComm_update\Unicircuit_UniComm-main\*' -Destination 'C:\UniComm\Unicircuit_UniComm-main\' -Recurse -Force -Exclude '.env'
+Write-Host "Copying files (keeping .env and certs)..." -ForegroundColor Cyan
+Copy-Item -Path 'C:\UniComm_update\Unicircuit_UniComm-main\*' -Destination 'C:\UniComm\Unicircuit_UniComm-main\' -Recurse -Force -Exclude '.env', 'certs'
 
 Write-Host "Installing dependencies..." -ForegroundColor Cyan
 Set-Location 'C:\UniComm\Unicircuit_UniComm-main\backend'

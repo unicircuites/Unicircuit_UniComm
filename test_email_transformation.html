@@ -1,0 +1,492 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Email Transformation Test</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      padding: 20px;
+      background: #f5f5f5;
+    }
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+      background: white;
+      padding: 20px;
+      border-radius: 8px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    }
+    .section {
+      margin-bottom: 30px;
+    }
+    .section h2 {
+      color: #0078d4;
+      border-bottom: 2px solid #0078d4;
+      padding-bottom: 10px;
+    }
+    .output {
+      background: #f9f9f9;
+      border: 1px solid #ddd;
+      padding: 15px;
+      border-radius: 4px;
+      font-family: 'Courier New', monospace;
+      font-size: 12px;
+      max-height: 400px;
+      overflow-y: auto;
+      white-space: pre-wrap;
+      word-wrap: break-word;
+    }
+    .stats {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 15px;
+      margin-top: 15px;
+    }
+    .stat-card {
+      background: #e8f4fd;
+      padding: 15px;
+      border-radius: 4px;
+      border-left: 4px solid #0078d4;
+    }
+    .stat-card h3 {
+      margin: 0 0 5px 0;
+      color: #0078d4;
+      font-size: 14px;
+    }
+    .stat-card p {
+      margin: 0;
+      font-size: 24px;
+      font-weight: bold;
+      color: #424242;
+    }
+    button {
+      background: #0078d4;
+      color: white;
+      border: none;
+      padding: 12px 24px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 16px;
+      margin-right: 10px;
+    }
+    button:hover {
+      background: #005a9e;
+    }
+    button:disabled {
+      background: #ccc;
+      cursor: not-allowed;
+    }
+    .success {
+      color: #107c10;
+      font-weight: bold;
+    }
+    .warning {
+      color: #d83b01;
+      font-weight: bold;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>📧 Email Transformation Test Tool</h1>
+    <p>This tool tests the Outlook CSS compatibility transformation without causing system lag.</p>
+    
+    <div class="section">
+      <h2>1. Load Template</h2>
+      <button onclick="loadExampleTemplate()">Load Example Template</button>
+      <button onclick="loadCustomTemplate()">Load Custom HTML</button>
+      <div id="templateStatus" style="margin-top: 10px;"></div>
+    </div>
+    
+    <div class="section">
+      <h2>2. Run Transformation</h2>
+      <button onclick="runTransformation()" id="transformBtn" disabled>Transform HTML</button>
+      <div id="transformStatus" style="margin-top: 10px;"></div>
+    </div>
+    
+    <div class="section">
+      <h2>3. Transformation Statistics</h2>
+      <div class="stats">
+        <div class="stat-card">
+          <h3>CSS Variables Resolved</h3>
+          <p id="statVars">0</p>
+        </div>
+        <div class="stat-card">
+          <h3>Grid Layouts Converted</h3>
+          <p id="statGrid">0</p>
+        </div>
+        <div class="stat-card">
+          <h3>Flex Layouts Converted</h3>
+          <p id="statFlex">0</p>
+        </div>
+        <div class="stat-card">
+          <h3>Properties Removed</h3>
+          <p id="statProps">0</p>
+        </div>
+      </div>
+    </div>
+    
+    <div class="section">
+      <h2>4. Validation Results</h2>
+      <div class="stats">
+        <div class="stat-card">
+          <h3>display:grid remaining</h3>
+          <p id="valGrid">-</p>
+        </div>
+        <div class="stat-card">
+          <h3>display:flex remaining</h3>
+          <p id="valFlex">-</p>
+        </div>
+        <div class="stat-card">
+          <h3>CSS var() remaining</h3>
+          <p id="valVars">-</p>
+        </div>
+        <div class="stat-card">
+          <h3>box-shadow remaining</h3>
+          <p id="valShadow">-</p>
+        </div>
+      </div>
+    </div>
+    
+    <div class="section">
+      <h2>5. Output Preview (First 2000 chars)</h2>
+      <div class="output" id="outputPreview">No output yet. Run transformation first.</div>
+    </div>
+    
+    <div class="section">
+      <h2>6. Actions</h2>
+      <button onclick="copyOutput()">Copy Full Output</button>
+      <button onclick="downloadOutput()">Download as HTML</button>
+      <button onclick="viewFullOutput()">View Full Output</button>
+    </div>
+  </div>
+  
+  <textarea id="hiddenInput" style="display:none;"></textarea>
+  <textarea id="hiddenOutput" style="display:none;"></textarea>
+  
+  <script>
+    let currentTemplate = '';
+    let transformedOutput = '';
+    
+    function loadExampleTemplate() {
+      // Simple example template with all features
+      currentTemplate = `<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    :root {
+      --primary: #0078d4;
+      --bg: #f5f5f5;
+      --text: #424242;
+    }
+  </style>
+</head>
+<body style="background: var(--bg); padding: 20px;">
+  <div style="background: var(--primary); color: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+    <h1>Newsletter Header</h1>
+  </div>
+  
+  <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-top: 20px;">
+    <div style="background: white; padding: 15px; border-radius: 4px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
+      <h2 style="color: var(--primary);">Card 1</h2>
+      <p style="color: var(--text);">Grid layout content</p>
+    </div>
+    <div style="background: white; padding: 15px; border-radius: 4px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
+      <h2 style="color: var(--primary);">Card 2</h2>
+      <p style="color: var(--text);">Grid layout content</p>
+    </div>
+  </div>
+  
+  <div style="display: flex; gap: 10px; justify-content: space-between; margin-top: 20px; background: white; padding: 15px; border-radius: 4px;">
+    <div><strong>Stat 1:</strong> 100</div>
+    <div><strong>Stat 2:</strong> 200</div>
+    <div><strong>Stat 3:</strong> 300</div>
+  </div>
+</body>
+</html>`;
+      
+      document.getElementById('templateStatus').innerHTML = '<span class="success">✓ Example template loaded (' + currentTemplate.length + ' chars)</span>';
+      document.getElementById('transformBtn').disabled = false;
+    }
+    
+    function loadCustomTemplate() {
+      const html = prompt('Paste your HTML template:');
+      if (html) {
+        currentTemplate = html;
+        document.getElementById('templateStatus').innerHTML = '<span class="success">✓ Custom template loaded (' + currentTemplate.length + ' chars)</span>';
+        document.getElementById('transformBtn').disabled = false;
+      }
+    }
+    
+    function runTransformation() {
+      if (!currentTemplate) {
+        alert('Please load a template first');
+        return;
+      }
+      
+      document.getElementById('transformStatus').innerHTML = '⏳ Transforming...';
+      
+      // Run transformation in a setTimeout to avoid blocking UI
+      setTimeout(() => {
+        try {
+          transformedOutput = inlineHtmlForOutlook(currentTemplate);
+          
+          // Update preview
+          document.getElementById('outputPreview').textContent = transformedOutput.substring(0, 2000) + 
+            (transformedOutput.length > 2000 ? '\n\n... (truncated, use "View Full Output" to see all)' : '');
+          
+          document.getElementById('transformStatus').innerHTML = '<span class="success">✓ Transformation complete!</span>';
+        } catch (error) {
+          document.getElementById('transformStatus').innerHTML = '<span class="warning">✗ Error: ' + error.message + '</span>';
+          console.error('Transformation error:', error);
+        }
+      }, 100);
+    }
+    
+    function copyOutput() {
+      if (!transformedOutput) {
+        alert('No output to copy. Run transformation first.');
+        return;
+      }
+      navigator.clipboard.writeText(transformedOutput).then(() => {
+        alert('Output copied to clipboard!');
+      });
+    }
+    
+    function downloadOutput() {
+      if (!transformedOutput) {
+        alert('No output to download. Run transformation first.');
+        return;
+      }
+      const blob = new Blob([transformedOutput], { type: 'text/html' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'transformed_email.html';
+      a.click();
+      URL.revokeObjectURL(url);
+    }
+    
+    function viewFullOutput() {
+      if (!transformedOutput) {
+        alert('No output to view. Run transformation first.');
+        return;
+      }
+      const win = window.open('', '_blank');
+      win.document.write('<pre style="white-space: pre-wrap; word-wrap: break-word; font-family: monospace; padding: 20px;">' + 
+        transformedOutput.replace(/</g, '&lt;').replace(/>/g, '&gt;') + '</pre>');
+    }
+    
+    // Simplified version of inlineHtmlForOutlook for testing
+    function inlineHtmlForOutlook(rawHtml) {
+      const parser = new DOMParser();
+      const doc = parser.parseFromString(rawHtml, 'text/html');
+      
+      const transformCounts = {
+        cssVarsResolved: 0,
+        gridConverted: 0,
+        flexConverted: 0,
+        propsRemoved: 0
+      };
+      
+      // Phase 1: Extract and resolve CSS variables
+      const cssVarMap = {};
+      doc.querySelectorAll('style').forEach(styleEl => {
+        const cssText = styleEl.textContent;
+        const rootMatch = cssText.match(/:root\s*{([^}]+)}/);
+        if (rootMatch) {
+          const props = rootMatch[1].split(';');
+          props.forEach(prop => {
+            const match = prop.match(/^\s*(--[\w-]+)\s*:\s*(.+?)\s*$/);
+            if (match) {
+              cssVarMap[match[1]] = match[2];
+            }
+          });
+        }
+      });
+      
+      // Replace CSS variables in inline styles
+      doc.querySelectorAll('[style]').forEach(el => {
+        let style = el.getAttribute('style');
+        const originalStyle = style;
+        style = style.replace(/var\((--[\w-]+)\)/g, (match, varName) => {
+          if (cssVarMap[varName]) {
+            transformCounts.cssVarsResolved++;
+            return cssVarMap[varName];
+          }
+          return match;
+        });
+        if (style !== originalStyle) {
+          el.setAttribute('style', style);
+        }
+      });
+      
+      // Phase 2: Convert grid to tables
+      doc.querySelectorAll('[style]').forEach(el => {
+        const style = el.getAttribute('style') || '';
+        if (/display:\s*grid/i.test(style)) {
+          const gap = (style.match(/gap:\s*(\d+px)/i) || ['', '0'])[1];
+          const cols = (style.match(/grid-template-columns:\s*([^;]+)/i) || ['', '1fr'])[1].split(/\s+/).length;
+          
+          const table = doc.createElement('table');
+          table.setAttribute('cellpadding', '0');
+          table.setAttribute('cellspacing', '0');
+          table.setAttribute('border', '0');
+          table.setAttribute('width', '100%');
+          
+          const cleanStyle = style
+            .replace(/display:\s*grid[^;]*/gi, '')
+            .replace(/grid-[^:]+:[^;]*/gi, '')
+            .replace(/gap:[^;]*/gi, '');
+          if (cleanStyle.trim()) table.setAttribute('style', cleanStyle);
+          
+          const tbody = doc.createElement('tbody');
+          const children = Array.from(el.children);
+          let currentRow = null;
+          
+          children.forEach((child, idx) => {
+            if (idx % cols === 0) {
+              currentRow = doc.createElement('tr');
+              tbody.appendChild(currentRow);
+            }
+            const td = doc.createElement('td');
+            const cellStyle = child.getAttribute('style') || '';
+            if (gap !== '0') {
+              td.setAttribute('style', cellStyle + '; padding: ' + gap);
+            } else if (cellStyle) {
+              td.setAttribute('style', cellStyle);
+            }
+            td.innerHTML = child.innerHTML;
+            currentRow.appendChild(td);
+          });
+          
+          table.appendChild(tbody);
+          el.parentNode.replaceChild(table, el);
+          transformCounts.gridConverted++;
+        }
+      });
+      
+      // Phase 3: Convert flex to tables
+      doc.querySelectorAll('[style]').forEach(el => {
+        const style = el.getAttribute('style') || '';
+        if (/display:\s*flex/i.test(style)) {
+          const direction = (style.match(/flex-direction:\s*(row|column)/i) || ['', 'row'])[1];
+          const gap = (style.match(/gap:\s*(\d+px)/i) || ['', '0'])[1];
+          
+          const table = doc.createElement('table');
+          table.setAttribute('cellpadding', '0');
+          table.setAttribute('cellspacing', '0');
+          table.setAttribute('border', '0');
+          
+          const cleanStyle = style
+            .replace(/display:\s*flex[^;]*/gi, '')
+            .replace(/flex-[^:]+:[^;]*/gi, '')
+            .replace(/justify-content:[^;]*/gi, '')
+            .replace(/align-items:[^;]*/gi, '')
+            .replace(/gap:[^;]*/gi, '');
+          if (cleanStyle.trim()) table.setAttribute('style', cleanStyle);
+          
+          const tbody = doc.createElement('tbody');
+          const children = Array.from(el.children);
+          
+          if (direction === 'column') {
+            children.forEach(child => {
+              const tr = doc.createElement('tr');
+              const td = doc.createElement('td');
+              const cellStyle = child.getAttribute('style') || '';
+              if (gap !== '0') {
+                td.setAttribute('style', cellStyle + '; padding: ' + gap);
+              } else if (cellStyle) {
+                td.setAttribute('style', cellStyle);
+              }
+              td.innerHTML = child.innerHTML;
+              tr.appendChild(td);
+              tbody.appendChild(tr);
+            });
+          } else {
+            const tr = doc.createElement('tr');
+            children.forEach(child => {
+              const td = doc.createElement('td');
+              const cellStyle = child.getAttribute('style') || '';
+              if (gap !== '0') {
+                td.setAttribute('style', cellStyle + '; padding: ' + gap);
+              } else if (cellStyle) {
+                td.setAttribute('style', cellStyle);
+              }
+              td.innerHTML = child.innerHTML;
+              tr.appendChild(td);
+            });
+            tbody.appendChild(tr);
+          }
+          
+          table.appendChild(tbody);
+          el.parentNode.replaceChild(table, el);
+          transformCounts.flexConverted++;
+        }
+      });
+      
+      // Phase 4 & 5: Remove unsupported properties
+      doc.querySelectorAll('[style]').forEach(el => {
+        let style = el.getAttribute('style') || '';
+        const originalStyle = style;
+        
+        style = style
+          .replace(/box-shadow\s*:\s*[^;]+;?/gi, '')
+          .replace(/-webkit-box-shadow\s*:\s*[^;]+;?/gi, '')
+          .replace(/-moz-box-shadow\s*:\s*[^;]+;?/gi, '')
+          .replace(/border-radius\s*:[^;]*/gi, '')
+          .replace(/-webkit-border-radius\s*:[^;]*/gi, '')
+          .replace(/-moz-border-radius\s*:[^;]*/gi, '')
+          .replace(/display\s*:\s*grid[^;]*/gi, '')
+          .replace(/display\s*:\s*flex[^;]*/gi, '')
+          .replace(/grid-[^:]+\s*:[^;]*/gi, '')
+          .replace(/flex-[^:]+\s*:[^;]*/gi, '')
+          .replace(/justify-content\s*:[^;]*/gi, '')
+          .replace(/align-items\s*:[^;]*/gi, '')
+          .replace(/gap\s*:[^;]*/gi, '')
+          .replace(/var\s*\([^)]+\)/gi, 'inherit')
+          .replace(/;\s*;+/g, ';')
+          .replace(/^\s*;+\s*/, '')
+          .replace(/\s*;+\s*$/, '');
+        
+        if (style !== originalStyle) {
+          transformCounts.propsRemoved++;
+          if (style.trim()) {
+            el.setAttribute('style', style);
+          } else {
+            el.removeAttribute('style');
+          }
+        }
+      });
+      
+      // Remove style tags
+      doc.querySelectorAll('style, script, link').forEach(el => el.remove());
+      
+      // Update stats
+      document.getElementById('statVars').textContent = transformCounts.cssVarsResolved;
+      document.getElementById('statGrid').textContent = transformCounts.gridConverted;
+      document.getElementById('statFlex').textContent = transformCounts.flexConverted;
+      document.getElementById('statProps').textContent = transformCounts.propsRemoved;
+      
+      // Validate output
+      const result = doc.body ? doc.body.innerHTML : rawHtml;
+      const gridCount = (result.match(/display:\s*grid/g) || []).length;
+      const flexCount = (result.match(/display:\s*flex/g) || []).length;
+      const varCount = (result.match(/var\(--/g) || []).length;
+      const shadowCount = (result.match(/box-shadow/g) || []).length;
+      
+      document.getElementById('valGrid').textContent = gridCount;
+      document.getElementById('valGrid').className = gridCount === 0 ? 'success' : 'warning';
+      document.getElementById('valFlex').textContent = flexCount;
+      document.getElementById('valFlex').className = flexCount === 0 ? 'success' : 'warning';
+      document.getElementById('valVars').textContent = varCount;
+      document.getElementById('valVars').className = varCount === 0 ? 'success' : 'warning';
+      document.getElementById('valShadow').textContent = shadowCount;
+      document.getElementById('valShadow').className = shadowCount === 0 ? 'success' : 'warning';
+      
+      return result;
+    }
+  </script>
+</body>
+</html>

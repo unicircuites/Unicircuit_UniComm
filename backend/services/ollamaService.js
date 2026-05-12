@@ -15,12 +15,23 @@ const { fork } = require('child_process');
 const path = require('path');
 
 async function callOllamaService(prompt, preprocessedEmails, onWorker = null) {
+  // ── GROQ CLOUD API (Priority) ──────────────────────────────────────────
+  if (process.env.AI_API_KEY) {
+    try {
+      console.log('[AI] Using Groq Cloud API for analysis...');
+      return await callGroqService(prompt, preprocessedEmails);
+    } catch (err) {
+      console.warn('[AI] Groq failed, falling back to local Ollama:', err.message);
+    }
+  }
+
+  // ── LOCAL OLLAMA (Fallback) ─────────────────────────────────────────────
   const ollamaHost = process.env.OLLAMA_HOST || 'http://localhost:11434';
   const ollamaModel = process.env.OLLAMA_MODEL || 'phi3:mini';
   
-  const systemInstructions = prepareSystemInstructions();
-  const userPrompt = buildUserPrompt(preprocessedEmails);
-  const constructedPrompt = `${systemInstructions}\n\n${userPrompt}`;
+  const systemInstructions = (preprocessedEmails && preprocessedEmails.length > 0) ? prepareSystemInstructions() : '';
+  const userPrompt = (preprocessedEmails && preprocessedEmails.length > 0) ? buildUserPrompt(preprocessedEmails) : prompt;
+  const constructedPrompt = systemInstructions ? `${systemInstructions}\n\n${userPrompt}` : userPrompt;
 
   console.log('[AI] Starting AI worker...');
 
@@ -297,8 +308,48 @@ async function callAnthropic(prompt, emails) {
   return data.content[0].text;
 }
 
+/**
+ * Groq Cloud API implementation
+ * @param {string} prompt - Full prompt or system instructions
+ * @param {Array} emails - Optional email data for context
+ */
+async function callGroqService(prompt, emails) {
+  const apiKey = process.env.AI_API_KEY;
+  const host   = process.env.AI_API_HOST || 'https://api.groq.com/openai/v1';
+  const model  = process.env.AI_API_MODEL || 'llama-3.1-8b-instant';
+
+  const systemContent = (emails && emails.length > 0) ? prepareSystemInstructions() : 'You are a professional CRM assistant.';
+  const userContent   = (emails && emails.length > 0) ? buildUserPrompt(emails) : prompt;
+
+  const response = await fetch(`${host}/chat/completions`, {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${apiKey}`,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      model: model,
+      messages: [
+        { role: 'system', content: systemContent },
+        { role: 'user', content: userContent }
+      ],
+      temperature: 0.5,
+      max_tokens: 1024
+    })
+  });
+
+  if (!response.ok) {
+    const errData = await response.json().catch(() => ({}));
+    throw new Error(`Groq API error: ${response.status} ${errData.error?.message || ''}`);
+  }
+
+  const data = await response.json();
+  return data.choices[0].message.content.trim();
+}
+
 module.exports = {
   callOllamaService,
+  callGroqService,
   callAIService,
   prepareSystemInstructions,
   buildUserPrompt

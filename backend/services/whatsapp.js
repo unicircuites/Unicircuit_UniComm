@@ -436,7 +436,9 @@ async function startWA() {
         clearSession();
         setTimeout(startWA, 500);
       } else if (code === 408) {
-        console.log('[WA] QR timeout - waiting for manual scan.');
+        // QR expired — restart to generate a fresh QR
+        console.log('[WA] QR timeout — restarting to generate fresh QR');
+        setTimeout(startWA, 2000);
       } else {
         setTimeout(startWA, 5000);
       }
