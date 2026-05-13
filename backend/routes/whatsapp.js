@@ -21,19 +21,42 @@ router.post('/logout', authenticate, async (req, res) => {
 // GET /api/wa/lid-map — returns LID number -> {name, phone} map for @mention replacement
 router.get('/lid-map', authenticate, async (req, res) => {
   try {
+    // Merge wa_chats + wa_contacts to cover ALL LID contacts:
+    // - wa_chats: LIDs that have a direct chat (2388 entries)
+    // - wa_contacts: LIDs that are group-only members, never had a direct chat
+    // UNION gives full coverage for any group size, any number of members
     const result = await pool.query(`
-      SELECT
-        split_part(id, '@', 1) AS lid_num,
-        name,
-        phone
-      FROM wa_chats
-      WHERE id LIKE '%@lid'
-        AND phone IS NOT NULL
-        AND phone != ''
+      SELECT lid_num, name, phone FROM (
+        SELECT
+          split_part(id, '@', 1) AS lid_num,
+          name,
+          phone
+        FROM wa_chats
+        WHERE id LIKE '%@lid'
+          AND phone IS NOT NULL AND phone != ''
+        UNION
+        SELECT
+          split_part(jid, '@', 1) AS lid_num,
+          name,
+          phone
+        FROM wa_contacts
+        WHERE jid LIKE '%@lid'
+          AND phone IS NOT NULL AND phone != ''
+          AND phone ~ '^[0-9]'
+      ) combined
     `);
     const map = {};
     result.rows.forEach(r => {
-      map[r.lid_num] = { name: r.name, phone: r.phone };
+      // Format phone for display if it's raw digits
+      let phone = r.phone || '';
+      if (phone && !phone.startsWith('+')) {
+        if (phone.startsWith('91') && phone.length === 12) {
+          phone = '+91 ' + phone.slice(2, 7) + ' ' + phone.slice(7);
+        } else {
+          phone = '+' + phone;
+        }
+      }
+      map[r.lid_num] = { name: r.name, phone };
     });
     res.json(map);
   } catch (err) { res.status(500).json({ error: err.message }); }
@@ -97,16 +120,43 @@ router.get('/group/:jid', authenticate, async (req, res) => {
 });
 
 router.get('/messages/:jid', authenticate, async (req, res) => {
-  const jid   = decodeURIComponent(req.params.jid);
+  const jid   = decodeURIComponent(req.params.jid).replace(/@g\.us@g\.us$/, '@g.us').replace(/@s\.whatsapp\.net@s\.whatsapp\.net$/, '@s.whatsapp.net');
   const limit = parseInt(req.query.limit || '100');
   try {
+    // If this is a group chat, populate LID phone numbers from group metadata first
+    if (jid.endsWith('@g.us')) {
+      try {
+        const groupMeta = await wa.getGroupMetadata(jid);
+        let updated = 0;
+        for (const p of groupMeta.participants) {
+          if (p.jid && p.jid.endsWith('@lid') && p.phone) {
+            const realPhone = p.phone.replace(/[^0-9]/g, '');
+            if (realPhone && realPhone.length >= 7) {
+              await pool.query(`
+                INSERT INTO wa_contacts (jid, name, phone)
+                VALUES ($1, $2, $3)
+                ON CONFLICT (jid) DO UPDATE SET
+                  phone = EXCLUDED.phone,
+                  name = COALESCE(EXCLUDED.name, wa_contacts.name),
+                  updated_at = NOW()
+              `, [p.jid, p.name, realPhone]);
+              updated++;
+            }
+          }
+        }
+        if (updated > 0) console.log(`[WA] Updated ${updated} LID contacts for group ${jid}`);
+      } catch (metaErr) {
+        console.warn(`[WA] Failed to fetch group metadata for ${jid}:`, metaErr.message);
+      }
+    }
+    
     // For @lid JIDs, also search by the LID number as phone JID
     // e.g. 183357119950912@lid -> also try 183357119950912@s.whatsapp.net
     const lidNum = jid.endsWith('@lid') ? jid.split('@')[0] : null;
     const result = await pool.query(
       `SELECT m.*,
         CASE
-          WHEN m.sender LIKE '%@lid' AND c.phone IS NOT NULL AND c.phone ~ '^[0-9]{7,15}$'
+          WHEN m.sender LIKE '%@lid' AND c.phone IS NOT NULL AND c.phone ~ '^[0-9]{7,}$'
             THEN CASE
               WHEN c.phone LIKE '91%' AND length(c.phone) = 12
               THEN '+91 ' || substring(c.phone, 3, 5) || ' ' || substring(c.phone, 8, 5)

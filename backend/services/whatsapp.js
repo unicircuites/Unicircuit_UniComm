@@ -37,6 +37,8 @@ const RECONNECT_DELAYS = [2000, 5000, 10000, 15000, 30000]; // Progressive delay
 const contactsStore = {};
 // In-memory imported chat checkpoint to protect against history sync duplicates
 let importedLastTsMap = {};
+// In-memory group metadata cache to prevent hangs on large groups
+const groupMetadataCache = new Map();
 
 const AUTH_DIR = path.join(__dirname, '../wa_auth');
 
@@ -269,20 +271,20 @@ async function saveChat(rawJid, name, lastMsg, lastTime, unread, isGroup) {
 async function saveContact(contact) {
   if (!contact?.id) return;
   const jid    = contact.id;
-  const phone  = jid.split('@')[0].split(':')[0];
+  let phone  = jid.split('@')[0].split(':')[0];
   const name   = contact.name || contact.verifiedName || null;
   const notify = contact.notify || null;
 
   // Update in-memory store
   contactsStore[jid] = { name, notify };
 
-  // Identity Mapping: If this is an LID, link it to the phone number
+  // Identity Mapping: If this is an LID, extract the real phone number
   if (jid.endsWith('@lid') && contact.phoneNumber) {
     const pNum = typeof contact.phoneNumber === 'string' ? contact.phoneNumber : contact.phoneNumber.jid;
-    const phoneJid = pNum.replace(/\D/g,'') + '@s.whatsapp.net';
+    const realPhone = pNum.replace(/\D/g,'');
+    phone = realPhone; // Use real phone instead of LID number
+    const phoneJid = realPhone + '@s.whatsapp.net';
     contactsStore[jid].phoneJid = phoneJid;
-    // Save mapping to DB too for persistence
-    pool.query('UPDATE wa_contacts SET phone=$1 WHERE jid=$2', [pNum.replace(/\D/g,''), jid]).catch(()=>{});
   }
 
   try {
@@ -292,37 +294,12 @@ async function saveContact(contact) {
       ON CONFLICT (jid) DO UPDATE SET
         name   = COALESCE(EXCLUDED.name,   wa_contacts.name),
         notify = COALESCE(EXCLUDED.notify, wa_contacts.notify),
+        phone  = COALESCE(EXCLUDED.phone,  wa_contacts.phone),
         updated_at = NOW()
     `, [jid, name, notify, phone]);
   } catch (_) {}
 }
 
-// â”€â”€ SAVE CHAT â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-async function saveChat(jid, name, lastMsg, lastTime, unread, isGroup) {
-  const phone = jid.split('@')[0].split(':')[0];
-  // Format Indian number properly
-  let displayPhone;
-  if (phone.startsWith('91') && phone.length === 12) {
-    displayPhone = '+91 ' + phone.slice(2, 7) + ' ' + phone.slice(7);
-  } else {
-    displayPhone = '+' + phone;
-  }
-  const ts = lastTime instanceof Date ? lastTime : toDate(lastTime);
-  try {
-    await pool.query(`
-      INSERT INTO wa_chats (id, name, phone, is_group, last_message, last_time, unread)
-      VALUES ($1,$2,$3,$4,$5,$6,$7)
-      ON CONFLICT (id) DO UPDATE SET
-        name         = COALESCE(EXCLUDED.name, wa_chats.name),
-        last_message = CASE WHEN EXCLUDED.last_message != '' THEN EXCLUDED.last_message ELSE wa_chats.last_message END,
-        last_time    = GREATEST(EXCLUDED.last_time, wa_chats.last_time),
-        unread       = wa_chats.unread + EXCLUDED.unread,
-        updated_at   = NOW()
-    `, [jid, name || displayPhone, displayPhone, isGroup || false, lastMsg || '', ts, unread || 0]);
-  } catch (err) {
-    console.error(`[WA-DB] saveChat error ${jid}:`, err.message);
-  }
-}
 
 // â”€â”€ SAVE MESSAGE â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 async function saveMessage(msg) {
@@ -472,6 +449,10 @@ async function startWA() {
       phoneNumber = idPart || rawId;
       console.log('[WA] Connected as', phoneNumber, '| raw id:', rawId);
       emit('wa:connected', { phone: phoneNumber, name: sock.user?.name });
+      
+      // After connect: scan ALL groups and populate LID→phone in wa_contacts
+      // Delay 8s to let WhatsApp settle before making group metadata requests
+      setTimeout(() => syncAllGroupParticipants(), 8000);
     }
 
     if (connection === 'close') {
@@ -484,26 +465,27 @@ async function startWA() {
         // User logged out - clear session and restart
         console.log('[WA] Logged out - clearing session');
         clearSession();
-        setTimeout(startWA, 500);
+        reconnectAttempts = 0; // Reset attempts for a fresh start
+        scheduleReconnect('logged out');
       } else if (code === 408) {
         // QR expired — restart to generate a fresh QR
         console.log('[WA] QR timeout — restarting to generate fresh QR');
-        setTimeout(startWA, 2000);
+        scheduleReconnect('qr timeout');
       } else if (code === 515) {
         // Connection replaced (scanned QR again or on another device)
         // This is NORMAL when re-scanning QR - just reconnect with new session
         console.log('[WA] Connection replaced - reconnecting with new session');
         reconnectAttempts = 0;
-        setTimeout(startWA, 2000);
+        scheduleReconnect('connection replaced');
       } else if (code === 401) {
         // Unauthorized - session invalid
         console.log('[WA] Unauthorized - clearing session');
         clearSession();
-        setTimeout(startWA, 500);
+        reconnectAttempts = 0;
+        scheduleReconnect('unauthorized');
       } else if (code === 500 || code === 503 || !code) {
-        // Server error or network issue - retry after delay
-        console.log('[WA] Server error or network issue - reconnecting in 5s');
-        setTimeout(startWA, 5000);
+        // Server error or network issue - retry with exponential backoff
+        scheduleReconnect('server error or network issue');
       } else {
         // Unknown error - log and don't reconnect automatically
         console.log('[WA] Unknown disconnect code:', code, '- NOT auto-reconnecting');
@@ -734,6 +716,51 @@ async function updateChatNames() {
   }
 }
 
+// ── SYNC ALL GROUP PARTICIPANTS → populate LID→phone in wa_contacts ────────
+// Runs once after connect. Scans every group, saves all @lid participant
+// phone numbers to wa_contacts so waLidMap covers 100% of members.
+async function syncAllGroupParticipants() {
+  if (!sock || !isConnected) return;
+  try {
+    const groups = await pool.query(`SELECT id FROM wa_chats WHERE is_group = true`);
+    if (groups.rows.length === 0) return;
+    console.log(`[WA] Syncing participants for ${groups.rows.length} groups...`);
+    let total = 0;
+    for (const group of groups.rows) {
+      if (!isConnected) break; // Stop sync if disconnected
+      try {
+        // Throttling: Add 1s delay between group metadata requests
+        // This prevents WhatsApp from flagging the connection as a bot and disconnecting (Code 401/500)
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        const meta = await sock.groupMetadata(group.id);
+        for (const p of meta.participants) {
+          if (!p.id || !p.id.endsWith('@lid')) continue;
+          // Baileys provides p.phoneNumber for @lid participants
+          if (!p.phoneNumber) continue;
+          const pNum = typeof p.phoneNumber === 'string' ? p.phoneNumber : (p.phoneNumber?.jid || '');
+          const rawPhone = pNum.replace(/\D/g, '');
+          if (!rawPhone || rawPhone.length < 7) continue;
+          await pool.query(`
+            INSERT INTO wa_contacts (jid, name, phone)
+            VALUES ($1, $2, $3)
+            ON CONFLICT (jid) DO UPDATE SET
+              phone = EXCLUDED.phone,
+              name  = COALESCE(EXCLUDED.name, wa_contacts.name),
+              updated_at = NOW()
+          `, [p.id, null, rawPhone]);
+          total++;
+        }
+      } catch (_) {
+        // Skip groups we can't access (left, banned, etc.)
+      }
+    }
+    console.log(`[WA] ✅ Group participant sync done — ${total} LID→phone entries saved`);
+    emit('wa:participants_synced', { total });
+  } catch (err) {
+    console.error('[WA] syncAllGroupParticipants error:', err.message);
+  }
+}
+
 // â”€â”€ CLEAR SESSION â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function clearSession() {
   try {
@@ -792,46 +819,56 @@ async function sendMessage(jid, text, quotedMsgId) {
 // ── GROUP METADATA ─────────────────────────────────────────────────────────
 async function getGroupMetadata(jid) {
   if (!sock || !isConnected) throw new Error('WhatsApp not connected');
+
+  // Check cache first (15 min TTL)
+  const CACHE_TTL = 15 * 60 * 1000;
+  const cached = groupMetadataCache.get(jid);
+  if (cached && (Date.now() - cached.ts < CACHE_TTL)) {
+    // console.log(`[WA] Using cached metadata for group ${jid}`);
+    return cached.data;
+  }
+
   const meta = await sock.groupMetadata(jid);
 
-  // Load contacts from DB
-  const contactsRes = await pool.query(`SELECT jid, name, notify FROM wa_contacts`);
-  const dbContacts = {};
-  contactsRes.rows.forEach(c => { dbContacts[c.jid] = c; });
+  const processedParticipants = meta.participants.map(p => {
+    const pJid = p.id;
 
-  return {
+    // Baileys provides p.phoneNumber for @lid participants — use it directly
+    const phoneJid = p.phoneNumber || (pJid.endsWith('@lid') ? null : pJid);
+    const rawPhone = phoneJid ? phoneJid.split('@')[0].split(':')[0] : '';
+
+    // Format phone display
+    let phoneDisplay = '';
+    if (rawPhone && /^\d{7,15}$/.test(rawPhone)) {
+      phoneDisplay = rawPhone.startsWith('91') && rawPhone.length === 12
+        ? '+91 ' + rawPhone.slice(2,7) + ' ' + rawPhone.slice(7)
+        : '+' + rawPhone;
+    }
+
+    // Name: Use in-memory contactsStore directly (much faster than DB query for 1000+ members)
+    const realJid = phoneJid || pJid;
+    const stored  = contactsStore[realJid] || contactsStore[pJid];
+    const displayName = stored?.name || stored?.notify || phoneDisplay || null;
+
+    return {
+      jid:   pJid,
+      phone: phoneDisplay,
+      name:  displayName,
+      admin: p.admin === 'admin' || p.admin === 'superadmin',
+    };
+  });
+
+  const result = {
     id: meta.id,
     name: meta.subject,
     description: meta.desc || '',
-    participants: meta.participants.map(p => {
-      const pJid = p.id;
-
-      // Baileys provides p.phoneNumber for @lid participants — use it directly
-      const phoneJid = p.phoneNumber || (pJid.endsWith('@lid') ? null : pJid);
-      const rawPhone = phoneJid ? phoneJid.split('@')[0].split(':')[0] : '';
-
-      // Format phone display
-      let phoneDisplay = '';
-      if (rawPhone && /^\d{7,15}$/.test(rawPhone)) {
-        phoneDisplay = rawPhone.startsWith('91') && rawPhone.length === 12
-          ? '+91 ' + rawPhone.slice(2,7) + ' ' + rawPhone.slice(7)
-          : '+' + rawPhone;
-      }
-
-      // Name: DB contact (by real phone JID) → in-memory store → phone number
-      const realJid = phoneJid || pJid;
-      const stored  = dbContacts[realJid] || dbContacts[pJid]
-        || contactsStore[realJid] || contactsStore[pJid];
-      const displayName = stored?.name || stored?.notify || phoneDisplay || null;
-
-      return {
-        jid:   pJid,
-        phone: phoneDisplay,
-        name:  displayName,
-        admin: p.admin === 'admin' || p.admin === 'superadmin',
-      };
-    })
+    participants: processedParticipants
   };
+
+  // Update cache
+  groupMetadataCache.set(jid, { ts: Date.now(), data: result });
+
+  return result;
 }
 
 // ── MEDIA CACHE + DOWNLOAD ─────────────────────────────────────────────────
