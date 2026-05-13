@@ -1,0 +1,248 @@
+✅ Unified Communication + Pico Claw AI Platform — Implementation Checklist
+
+Use this checklist with coding agents to track what is implemented vs pending.
+
+STATUS:
+[ ] Not started
+[~] In progress
+[x] Completed
+
+====================
+L1 — UNIT & API VALIDATION
+====================
+
+API Coverage
+[ ] Outlook Sync API (POST /sync/emails)
+[ ] PBX Call History API (GET /calls/history)
+[ ] WhatsApp Webhook API (POST /webhook/message)
+[ ] Contact Merge API (PUT /contacts/merge)
+[ ] Pico Claw Trigger API (POST /ai/analyze)
+
+Edge Cases
+[ ] 50k+ email incremental sync (delta tokens)
+[ ] PBX timeout → circuit breaker
+[ ] WhatsApp rate limit → exponential backoff
+[ ] Contact with 15+ numbers → primary heuristic
+[ ] AI null context graceful fallback
+
+====================
+L2 — MULTI-CHANNEL INTEGRATION
+====================
+
+Data Flow
+[ ] Unified Contact Graph implemented
+[ ] Outlook integration
+[ ] PBX integration
+[ ] WhatsApp integration
+[ ] Contacts integration
+[ ] AI pipeline into dashboard
+[ ] Action recommendation engine
+
+Sync Scenarios
+[ ] Email ↔ Call linking
+[ ] WhatsApp reply detection
+[ ] Contact enrichment from Outlook
+[ ] Duplicate resolution (fuzzy)
+[ ] Channel preference learning
+
+Conflict Resolution
+[ ] Name mismatch handling
+[ ] Email prioritization logic
+[ ] Phone ownership resolution
+[ ] Timezone normalization
+[ ] Deleted contact recovery
+
+====================
+L3 — AI ENGINE (PICO CLAW)
+====================
+
+Core Engine
+[ ] ReAct loop implemented
+[ ] Structured outputs (ForLLM / ForUser)
+[ ] Subagent delegation
+[ ] Context cancellation support
+
+AI Capabilities
+[ ] Lead scoring
+[ ] Channel optimization
+[ ] Sentiment detection
+[ ] Gene creation & solidification
+[ ] Subagent spawning
+[ ] Cross-channel anomaly detection
+[ ] Talking point generation
+[ ] Follow-up drafting
+[ ] Deal risk prediction
+[ ] Next-best-action engine
+
+Gene Pool
+[ ] Gene creation logic
+[ ] Verification rules (min 2 instances)
+[ ] Confidence scoring lifecycle
+[ ] Gene retirement logic
+[ ] Anti-spam protection
+[ ] Max genes per domain enforcement
+[ ] Auto purge (<30% confidence)
+
+AI Safety
+[ ] Hallucination detection
+[ ] Uncertain data flagging
+[ ] Human verification queues
+[ ] Bias detection alerts
+[ ] Insufficient data handling
+
+====================
+L4 — SECURITY & COMPLIANCE
+====================
+
+Security Fixes
+[ ] Symlink bypass patched
+[ ] Config file secured (chmod 600)
+[ ] Secrets encryption
+[ ] SSRF protection added
+[ ] Command injection prevention
+[ ] Token encryption
+
+Data Security
+[ ] Email encryption at rest
+[ ] PBX RBAC access control
+[ ] WhatsApp E2E integrity
+[ ] PII masking
+[ ] AI data isolation
+[ ] Session timeout
+[ ] API rate limiting
+[ ] SQL injection protection
+
+Compliance
+[ ] Consent tracking
+[ ] Right to erasure
+[ ] Data portability export
+[ ] Breach notification workflow
+[ ] AI explainability logs
+
+====================
+L5 — PERFORMANCE & LOAD
+====================
+
+Scalability
+[ ] 500 concurrent users
+[ ] 200k contacts
+[ ] 500k daily API calls
+[ ] Gene pool scaling
+[ ] Dashboard performance
+[ ] Search latency
+[ ] Email batch sync
+[ ] WhatsApp throughput
+
+Resources
+[ ] RAM validation
+[ ] CPU validation
+[ ] Concurrent AI load
+[ ] Subagent memory control
+[ ] Memory leak testing
+[ ] ARM compatibility
+
+Degradation
+[ ] Outlook fallback
+[ ] PBX delay handling
+[ ] WhatsApp fallback
+[ ] AI timeout handling
+[ ] DB fallback
+
+====================
+L6 — UAT
+====================
+
+Cognitive Load
+[ ] Call prep
+[ ] Deal research
+[ ] AI drafting
+[ ] Lead prioritization
+[ ] Unified dashboard usage
+
+Trust Phases
+[ ] Suggest-only
+[ ] Assisted
+[ ] Trusted
+[ ] Autonomous
+
+Scenarios
+[ ] Ghost prospect
+[ ] Channel hopper
+[ ] Committee sale
+[ ] Competitor response
+
+====================
+L7 — REGRESSION & CHAOS
+====================
+
+Regression
+[ ] Daily API tests
+[ ] Smoke tests
+[ ] Weekly integration
+[ ] Monthly security
+[ ] Chaos testing
+
+Chaos
+[ ] AI engine kill recovery
+[ ] DB corruption recovery
+[ ] WhatsApp delay
+[ ] CPU autoscale
+[ ] Gene restore
+
+====================
+ANALYTICS
+====================
+
+[ ] Pipeline velocity
+[ ] AI adoption tracking
+[ ] Channel performance
+[ ] Lead score validation
+[ ] Revenue attribution
+
+====================
+GO / NO-GO
+====================
+
+Hard Gates
+[ ] P0 tests pass
+[ ] <1% sync errors
+[ ] Zero vulnerabilities
+[ ] AI accuracy >85%
+[ ] Latency <3s
+[ ] GDPR compliant
+[ ] >80% adoption
+
+Soft Gates
+[ ] Email quality
+[ ] Time reduction
+[ ] Cross-sell lift
+[ ] Mobile usability
+[ ] Manager visibility
+[ ] Onboarding speed
+[ ] Support load
+[ ] Uptime
+[ ] AI explainability
+
+====================
+POST LAUNCH
+====================
+
+[ ] AI health monitoring
+[ ] Sync lag alerts
+[ ] API error tracking
+[ ] Adoption tracking
+[ ] Security monitoring
+[ ] Model drift detection
+
+====================
+ARTIFACTS
+====================
+
+[ ] Test plan
+[ ] API scripts
+[ ] Integration matrix
+[ ] AI validation report
+[ ] Security report
+[ ] Performance report
+[ ] UAT sign-off
+[ ] Go/No-Go record
