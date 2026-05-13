@@ -3,246 +3,246 @@
 Use this checklist with coding agents to track what is implemented vs pending.
 
 STATUS:
-[ ] Not started
-[~] In progress
-[x] Completed
+[✓] Completed (done)
+[O] Planned to work on
+[X] Not done
 
 ====================
 L1 — UNIT & API VALIDATION
 ====================
 
 API Coverage
-[ ] Outlook Sync API (POST /sync/emails)
-[ ] PBX Call History API (GET /calls/history)
-[ ] WhatsApp Webhook API (POST /webhook/message)
-[ ] Contact Merge API (PUT /contacts/merge)
-[ ] Pico Claw Trigger API (POST /ai/analyze)
+[~] Outlook Sync API (POST /sync/emails) — /api/outlook/inbox exists, no dedicated sync endpoint
+[✓] PBX Call History API (GET /calls/history) — /api/calls implemented with Matrix SMDR
+[~] WhatsApp Webhook API (POST /webhook/message) — Baileys (not webhook), /api/wa/* exists
+[O] Contact Merge API (PUT /contacts/merge) — Planned for Phase 1
+[X] Pico Claw Trigger API (POST /ai/analyze) — Pico Claw not implemented
 
 Edge Cases
-[ ] 50k+ email incremental sync (delta tokens)
-[ ] PBX timeout → circuit breaker
-[ ] WhatsApp rate limit → exponential backoff
-[ ] Contact with 15+ numbers → primary heuristic
-[ ] AI null context graceful fallback
+[O] 50k+ email incremental sync (delta tokens) — Planned for Phase 1
+[~] PBX timeout → circuit breaker — Reconnect logic exists, no circuit breaker pattern
+[O] WhatsApp rate limit → exponential backoff — Planned for Phase 2
+[X] Contact with 15+ numbers → primary heuristic
+[X] AI null context graceful fallback — Pico Claw not implemented
 
 ====================
 L2 — MULTI-CHANNEL INTEGRATION
 ====================
 
 Data Flow
-[ ] Unified Contact Graph implemented
-[ ] Outlook integration
-[ ] PBX integration
-[ ] WhatsApp integration
-[ ] Contacts integration
-[ ] AI pipeline into dashboard
-[ ] Action recommendation engine
+[~] Unified Contact Graph implemented — Contacts exist, no unified graph linking
+[✓] Outlook integration — Graph API, inbox, sent, contacts, send
+[✓] PBX integration — Matrix Eternity SMDR live
+[✓] WhatsApp integration — Baileys, chat, messages, media
+[✓] Contacts integration — CRM contacts, Outlook import
+[~] AI pipeline into dashboard — AI drafts exist, no pipeline
+[X] Action recommendation engine — Pico Claw not implemented
 
 Sync Scenarios
-[ ] Email ↔ Call linking
-[ ] WhatsApp reply detection
-[ ] Contact enrichment from Outlook
-[ ] Duplicate resolution (fuzzy)
-[ ] Channel preference learning
+[O] Email ↔ Call linking — Planned for Phase 2
+[~] WhatsApp reply detection — Messages stored, no reply detection
+[~] Contact enrichment from Outlook — Import exists, no auto-enrichment
+[O] Duplicate resolution (fuzzy) — Planned for Phase 1
+[X] Channel preference learning — Pico Claw not implemented
 
 Conflict Resolution
-[ ] Name mismatch handling
-[ ] Email prioritization logic
-[ ] Phone ownership resolution
-[ ] Timezone normalization
-[ ] Deleted contact recovery
+[O] Name mismatch handling — Planned for Phase 1
+[X] Email prioritization logic
+[X] Phone ownership resolution
+[X] Timezone normalization
+[X] Deleted contact recovery
 
 ====================
 L3 — AI ENGINE (PICO CLAW)
 ====================
 
 Core Engine
-[ ] ReAct loop implemented
-[ ] Structured outputs (ForLLM / ForUser)
-[ ] Subagent delegation
-[ ] Context cancellation support
+[X] ReAct loop implemented — Pico Claw not implemented
+[X] Structured outputs (ForLLM / ForUser) — Pico Claw not implemented
+[X] Subagent delegation — Pico Claw not implemented
+[X] Context cancellation support — Pico Claw not implemented
 
 AI Capabilities
-[ ] Lead scoring
-[ ] Channel optimization
-[ ] Sentiment detection
-[ ] Gene creation & solidification
-[ ] Subagent spawning
-[ ] Cross-channel anomaly detection
-[ ] Talking point generation
-[ ] Follow-up drafting
-[ ] Deal risk prediction
-[ ] Next-best-action engine
+[~] Lead scoring — Score field exists, no AI auto-scoring
+[X] Channel optimization — Pico Claw not implemented
+[X] Sentiment detection
+[X] Gene creation & solidification — Pico Claw not implemented
+[X] Subagent spawning — Pico Claw not implemented
+[X] Cross-channel anomaly detection — Pico Claw not implemented
+[~] Talking point generation — AI drafts exist, no talking points
+[~] Follow-up drafting — AI email/WA drafts exist
+[X] Deal risk prediction
+[X] Next-best-action engine — Pico Claw not implemented
 
 Gene Pool
-[ ] Gene creation logic
-[ ] Verification rules (min 2 instances)
-[ ] Confidence scoring lifecycle
-[ ] Gene retirement logic
-[ ] Anti-spam protection
-[ ] Max genes per domain enforcement
-[ ] Auto purge (<30% confidence)
+[X] Gene creation logic — Pico Claw not implemented
+[X] Verification rules (min 2 instances) — Pico Claw not implemented
+[X] Confidence scoring lifecycle — Pico Claw not implemented
+[X] Gene retirement logic — Pico Claw not implemented
+[X] Anti-spam protection — Pico Claw not implemented
+[X] Max genes per domain enforcement — Pico Claw not implemented
+[X] Auto purge (<30% confidence) — Pico Claw not implemented
 
 AI Safety
-[ ] Hallucination detection
-[ ] Uncertain data flagging
-[ ] Human verification queues
-[ ] Bias detection alerts
-[ ] Insufficient data handling
+[X] Hallucination detection
+[X] Uncertain data flagging
+[X] Human verification queues
+[X] Bias detection alerts
+[X] Insufficient data handling
 
 ====================
 L4 — SECURITY & COMPLIANCE
 ====================
 
 Security Fixes
-[ ] Symlink bypass patched
-[ ] Config file secured (chmod 600)
-[ ] Secrets encryption
-[ ] SSRF protection added
-[ ] Command injection prevention
-[ ] Token encryption
+[X] Symlink bypass patched
+[~] Config file secured (chmod 600) — .env exists, no chmod enforcement
+[O] Secrets encryption — Planned for Phase 1
+[X] SSRF protection added
+[~] Command injection prevention — Some validation, not comprehensive
+[O] Token encryption — Planned for Phase 1
 
 Data Security
-[ ] Email encryption at rest
-[ ] PBX RBAC access control
-[ ] WhatsApp E2E integrity
-[ ] PII masking
-[ ] AI data isolation
-[ ] Session timeout
-[ ] API rate limiting
-[ ] SQL injection protection
+[O] Email encryption at rest — Planned for Phase 2
+[~] PBX RBAC access control — JWT auth exists, no RBAC
+[✓] WhatsApp E2E integrity — Baileys handles E2E
+[X] PII masking
+[X] AI data isolation — Pico Claw not implemented
+[~] Session timeout — JWT expiry exists, no idle timeout
+[✓] API rate limiting — Express rate limiter implemented
+[✓] SQL injection protection — Parameterized queries used
 
 Compliance
-[ ] Consent tracking
-[ ] Right to erasure
-[ ] Data portability export
-[ ] Breach notification workflow
-[ ] AI explainability logs
+[O] Consent tracking — Planned for Phase 2
+[O] Right to erasure — Planned for Phase 2
+[O] Data portability export — Planned for Phase 2
+[X] Breach notification workflow
+[X] AI explainability logs — Pico Claw not implemented
 
 ====================
 L5 — PERFORMANCE & LOAD
 ====================
 
 Scalability
-[ ] 500 concurrent users
-[ ] 200k contacts
-[ ] 500k daily API calls
-[ ] Gene pool scaling
-[ ] Dashboard performance
-[ ] Search latency
-[ ] Email batch sync
-[ ] WhatsApp throughput
+[X] 500 concurrent users — Not tested
+[X] 200k contacts — Not tested
+[X] 500k daily API calls — Not tested
+[X] Gene pool scaling — Pico Claw not implemented
+[~] Dashboard performance — Works, no optimization
+[X] Search latency — Not tested
+[X] Email batch sync
+[X] WhatsApp throughput — Not tested
 
 Resources
-[ ] RAM validation
-[ ] CPU validation
-[ ] Concurrent AI load
-[ ] Subagent memory control
-[ ] Memory leak testing
-[ ] ARM compatibility
+[X] RAM validation — Not tested
+[X] CPU validation — Not tested
+[X] Concurrent AI load — Not tested
+[X] Subagent memory control — Pico Claw not implemented
+[X] Memory leak testing — Not tested
+[X] ARM compatibility — Not required
 
 Degradation
-[ ] Outlook fallback
-[ ] PBX delay handling
-[ ] WhatsApp fallback
-[ ] AI timeout handling
-[ ] DB fallback
+[~] Outlook fallback — Offline mode exists, no graceful degradation
+[~] PBX delay handling — Reconnect exists, no timeout handling
+[~] WhatsApp fallback — Reconnect exists, no fallback mode
+[X] AI timeout handling — Pico Claw not implemented
+[X] DB fallback
 
 ====================
 L6 — UAT
 ====================
 
 Cognitive Load
-[ ] Call prep
-[ ] Deal research
-[ ] AI drafting
-[ ] Lead prioritization
-[ ] Unified dashboard usage
+[X] Call prep — Not tested
+[X] Deal research — Not tested
+[~] AI drafting — Feature exists, no UAT
+[X] Lead prioritization — Not tested
+[X] Unified dashboard usage — Not tested
 
 Trust Phases
-[ ] Suggest-only
-[ ] Assisted
-[ ] Trusted
-[ ] Autonomous
+[~] Suggest-only — AI drafts are suggestions
+[X] Assisted — Pico Claw not implemented
+[X] Trusted — Pico Claw not implemented
+[X] Autonomous — Pico Claw not implemented
 
 Scenarios
-[ ] Ghost prospect
-[ ] Channel hopper
-[ ] Committee sale
-[ ] Competitor response
+[X] Ghost prospect — Not tested
+[X] Channel hopper — Not tested
+[X] Committee sale — Not tested
+[X] Competitor response — Not tested
 
 ====================
 L7 — REGRESSION & CHAOS
 ====================
 
 Regression
-[ ] Daily API tests
-[ ] Smoke tests
-[ ] Weekly integration
-[ ] Monthly security
-[ ] Chaos testing
+[O] Daily API tests — Planned for Phase 1
+[O] Smoke tests — Planned for Phase 1
+[O] Weekly integration — Planned for Phase 1
+[X] Monthly security
+[X] Chaos testing
 
 Chaos
-[ ] AI engine kill recovery
-[ ] DB corruption recovery
-[ ] WhatsApp delay
-[ ] CPU autoscale
-[ ] Gene restore
+[X] AI engine kill recovery — Pico Claw not implemented
+[X] DB corruption recovery
+[X] WhatsApp delay — Not tested
+[X] CPU autoscale
+[X] Gene restore — Pico Claw not implemented
 
 ====================
 ANALYTICS
 ====================
 
-[ ] Pipeline velocity
-[ ] AI adoption tracking
-[ ] Channel performance
-[ ] Lead score validation
-[ ] Revenue attribution
+[X] Pipeline velocity
+[X] AI adoption tracking — Pico Claw not implemented
+[~] Channel performance — Basic stats exist, no analytics
+[X] Lead score validation
+[X] Revenue attribution
 
 ====================
 GO / NO-GO
 ====================
 
 Hard Gates
-[ ] P0 tests pass
-[ ] <1% sync errors
-[ ] Zero vulnerabilities
-[ ] AI accuracy >85%
-[ ] Latency <3s
-[ ] GDPR compliant
-[ ] >80% adoption
+[O] P0 tests pass — Planned for Phase 1
+[X] <1% sync errors — Not measured
+[X] Zero vulnerabilities — Not scanned
+[X] AI accuracy >85% — Pico Claw not implemented
+[X] Latency <3s — Not measured
+[O] GDPR compliant — Planned for Phase 2
+[X] >80% adoption — Not measured
 
 Soft Gates
-[ ] Email quality
-[ ] Time reduction
-[ ] Cross-sell lift
-[ ] Mobile usability
-[ ] Manager visibility
-[ ] Onboarding speed
-[ ] Support load
-[ ] Uptime
-[ ] AI explainability
+[~] Email quality — Works, no quality metrics
+[X] Time reduction — Not measured
+[X] Cross-sell lift — Not measured
+[X] Mobile usability — Desktop only
+[~] Manager visibility — Dashboard exists, no reports
+[X] Onboarding speed — Not measured
+[X] Support load — Not measured
+[X] Uptime — Not measured
+[X] AI explainability — Pico Claw not implemented
 
 ====================
 POST LAUNCH
 ====================
 
-[ ] AI health monitoring
-[ ] Sync lag alerts
-[ ] API error tracking
-[ ] Adoption tracking
-[ ] Security monitoring
-[ ] Model drift detection
+[X] AI health monitoring — Pico Claw not implemented
+[X] Sync lag alerts
+[~] API error tracking — Logs exist, no tracking
+[X] Adoption tracking
+[X] Security monitoring
+[X] Model drift detection — Pico Claw not implemented
 
 ====================
 ARTIFACTS
 ====================
 
-[ ] Test plan
-[ ] API scripts
-[ ] Integration matrix
-[ ] AI validation report
-[ ] Security report
-[ ] Performance report
-[ ] UAT sign-off
-[ ] Go/No-Go record
+[O] Test plan — Planned for Phase 1
+[O] API scripts — Planned for Phase 1
+[X] Integration matrix
+[X] AI validation report — Pico Claw not implemented
+[X] Security report
+[X] Performance report
+[X] UAT sign-off
+[X] Go/No-Go record
