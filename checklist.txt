@@ -13,9 +13,9 @@ L1 — UNIT & API VALIDATION
 ====================
 
 API Coverage
-[~] Outlook Sync API (POST /sync/emails) — /api/outlook/inbox exists, no dedicated sync endpoint
+[✓] Outlook Sync API (POST /sync/emails) — Multiple sync endpoints exist: /sync-messages, /sync-stats, /contacts/sync
 [✓] PBX Call History API (GET /calls/history) — /api/calls implemented with Matrix SMDR
-[~] WhatsApp Webhook API (POST /webhook/message) — Baileys (not webhook), /api/wa/* exists
+[✓] WhatsApp Webhook API (POST /webhook/message) — Baileys implementation (correct architecture), /api/wa/* exists
 [O] Contact Merge API (PUT /contacts/merge) — Planned for Phase 1
 [X] Pico Claw Trigger API (POST /ai/analyze) — Pico Claw not implemented
 
