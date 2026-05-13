@@ -28,6 +28,10 @@ let isConnected = false;
 let phoneNumber = null; // This will store the REAL phone number
 let userJid     = null; // This will store the active JID (Phone or LID)
 let io          = null;
+let currentState = 'INIT'; // INIT | QR_READY | CONNECTED | DISCONNECTED | RECONNECTING
+let reconnectAttempts = 0;
+const MAX_RECONNECT_ATTEMPTS = 10;
+const RECONNECT_DELAYS = [2000, 5000, 10000, 15000, 30000]; // Progressive delays
 
 // In-memory contacts store (name lookup)
 const contactsStore = {};
@@ -40,6 +44,29 @@ function setIO(socketIO) { io = socketIO; }
 
 function emit(event, data) {
   if (io) io.emit(event, data);
+}
+
+// Helper: Schedule reconnect with exponential backoff
+function scheduleReconnect(reason) {
+  if (reconnectAttempts >= MAX_RECONNECT_ATTEMPTS) {
+    console.log(`[WA] Max reconnect attempts (${MAX_RECONNECT_ATTEMPTS}) reached. Stopping auto-reconnect.`);
+    currentState = 'DISCONNECTED';
+    emit('wa:reconnect_failed', { attempts: reconnectAttempts });
+    return;
+  }
+  
+  const delayIndex = Math.min(reconnectAttempts, RECONNECT_DELAYS.length - 1);
+  const delay = RECONNECT_DELAYS[delayIndex];
+  reconnectAttempts++;
+  currentState = 'RECONNECTING';
+  
+  console.log(`[WA] Reconnect attempt ${reconnectAttempts}/${MAX_RECONNECT_ATTEMPTS} in ${delay}ms (reason: ${reason})`);
+  emit('wa:reconnecting', { attempt: reconnectAttempts, delay, reason });
+  
+  setTimeout(() => {
+    console.log(`[WA] Executing reconnect attempt ${reconnectAttempts}`);
+    startWA();
+  }, delay);
 }
 
 // â”€â”€ SAFE TIMESTAMP â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
@@ -1083,21 +1110,10 @@ function getConnectedPhone() {
 }
 
 
-// ── SESSION EXPIRE ON SERVER STOP ─────────────────────────────────────────
-// Clear wa_auth when server stops so fresh QR is required on next start
-function _clearSessionOnExit() {
-  try {
-    if (require('fs').existsSync(AUTH_DIR)) {
-      require('fs').readdirSync(AUTH_DIR).forEach(f => {
-        try { require('fs').unlinkSync(require('path').join(AUTH_DIR, f)); } catch(_) {}
-      });
-      console.log('[WA] Session cleared on exit');
-    }
-  } catch(_) {}
-}
-process.on('exit', _clearSessionOnExit);
-process.on('SIGINT', () => { _clearSessionOnExit(); process.exit(0); });
-process.on('SIGTERM', () => { _clearSessionOnExit(); process.exit(0); });
+// ── SESSION PERSISTENCE ON SERVER RESTART ─────────────────────────────────────────
+// DO NOT clear session on server restart - this allows persistent login
+// Session is only cleared on explicit logout or when connection is replaced (code 515)
+// This enables WhatsApp to auto-reconnect after server restart without QR scan
 
 module.exports = { startWA, sendMessage, logout, getStatus, getQR, setIO, getGroupMetadata, downloadMedia, msgCache, importExportedChat, getConnectedPhone };
 
