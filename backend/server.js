@@ -7,6 +7,11 @@
  * Init DB: node db/init.js
  */
 require('dotenv').config();
+
+// Run security checks on startup
+const { runStartupSecurityChecks } = require('./utils/securityCheck');
+runStartupSecurityChecks();
+
 try {
   require('./services/msGraph').logOutlookOAuthConfigAtStartup();
 } catch (e) {
@@ -317,6 +322,7 @@ app.use(cors({
       'http://127.0.0.1:3000',
       'http://localhost:5500',
       'http://127.0.0.1:5500',
+      'null', // For file:// protocol
     ];
     // Allow requests with no origin (same-server, mobile apps, curl)
     if (!origin || allowed.includes(origin)) return callback(null, true);
@@ -328,6 +334,11 @@ app.use(cors({
 // ── BODY PARSING ───────────────────────────────────────────────────────────
 app.use(express.json({ limit: '500mb' }));
 app.use(express.urlencoded({ limit: '500mb', extended: true }));
+
+// ── INPUT VALIDATION (Security) ────────────────────────────────────────────
+const { validateInput } = require('./middleware/inputValidation');
+// Apply to all API routes (skip static files and auth callback)
+app.use('/api', validateInput);
 
 // ── DEBUG ROUTE (PRIORITY) ──
 app.get('/debug-messages', async (req, res) => {

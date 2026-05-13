@@ -1,8 +1,15 @@
 const jwt = require('jsonwebtoken');
 
+// Store last activity time for each user session
+const sessionActivity = new Map();
+
+// Idle timeout in milliseconds (default: 30 minutes)
+const IDLE_TIMEOUT_MS = parseInt(process.env.IDLE_TIMEOUT_MS, 10) || (30 * 60 * 1000);
+
 /**
  * Verifies JWT from Authorization: Bearer <token> header.
  * Attaches decoded payload to req.user.
+ * Implements idle timeout - sessions expire after 30 minutes of inactivity.
  */
 function authenticate(req, res, next) {
   const header = req.headers['authorization'];
@@ -11,7 +18,26 @@ function authenticate(req, res, next) {
   }
   const token = header.slice(7);
   try {
-    req.user = jwt.verify(token, process.env.JWT_SECRET || 'unicomm_secret');
+    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'unicomm_secret');
+    
+    // Check idle timeout
+    const sessionKey = `${decoded.id}_${decoded.email}`;
+    const lastActivity = sessionActivity.get(sessionKey);
+    const now = Date.now();
+    
+    if (lastActivity && (now - lastActivity) > IDLE_TIMEOUT_MS) {
+      // Session expired due to inactivity
+      sessionActivity.delete(sessionKey);
+      return res.status(401).json({ 
+        error: 'Session expired due to inactivity. Please log in again.',
+        reason: 'idle_timeout'
+      });
+    }
+    
+    // Update last activity time
+    sessionActivity.set(sessionKey, now);
+    
+    req.user = decoded;
     next();
   } catch (_) {
     return res.status(401).json({ error: 'Invalid or expired token. Please log in again.' });
@@ -26,4 +52,12 @@ function requireAdmin(req, res, next) {
   next();
 }
 
-module.exports = { authenticate, requireAdmin };
+/**
+ * Clears session activity for a user (called on logout).
+ */
+function clearSession(userId, email) {
+  const sessionKey = `${userId}_${email}`;
+  sessionActivity.delete(sessionKey);
+}
+
+module.exports = { authenticate, requireAdmin, clearSession };

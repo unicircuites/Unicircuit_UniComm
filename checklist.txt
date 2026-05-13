@@ -97,10 +97,10 @@ L4 — SECURITY & COMPLIANCE
 
 Security Fixes
 [X] Symlink bypass patched
-[~] Config file secured (chmod 600) — .env exists, no chmod enforcement
+[✓] Config file secured (chmod 600) — Security check on startup validates .env permissions
 [O] Secrets encryption — Planned for Phase 1
 [X] SSRF protection added
-[~] Command injection prevention — Some validation, not comprehensive
+[✓] Command injection prevention — Comprehensive input validation middleware implemented
 [O] Token encryption — Planned for Phase 1
 
 Data Security
@@ -109,7 +109,7 @@ Data Security
 [✓] WhatsApp E2E integrity — Baileys handles E2E
 [X] PII masking
 [X] AI data isolation — Pico Claw not implemented
-[~] Session timeout — JWT expiry exists, no idle timeout
+[✓] Session timeout — JWT expiry + idle timeout (30 min inactivity) implemented
 [✓] API rate limiting — Express rate limiter implemented
 [✓] SQL injection protection — Parameterized queries used
 
