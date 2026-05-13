@@ -232,7 +232,13 @@ function startClient() {
   });
 
   smdrClient.on('error', (err) => {
-    console.error(`[SMDR] ⚠️  Outbound client error: ${err.message} (code=${err.code})`);
+    // Only log first error, then suppress repeated connection refused errors
+    if (err.code === 'ECONNREFUSED' && !smdrClient._firstErrorLogged) {
+      console.error(`[SMDR] ⚠️  PBX not reachable at ${PBX_HOST}:${SMDR_PORT} (will retry silently every 30s)`);
+      smdrClient._firstErrorLogged = true;
+    } else if (err.code !== 'ECONNREFUSED') {
+      console.error(`[SMDR] ⚠️  Outbound client error: ${err.message} (code=${err.code})`);
+    }
     emit('pbx:binding_error', { 
       service: 'matrixSmdr', 
       mode: 'client', 

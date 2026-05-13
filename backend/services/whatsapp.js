@@ -490,9 +490,11 @@ async function startWA() {
         console.log('[WA] QR timeout — restarting to generate fresh QR');
         setTimeout(startWA, 2000);
       } else if (code === 515) {
-        // Connection replaced (scanned QR on another device) - DO NOT reconnect
-        console.log('[WA] Connection replaced on another device - NOT reconnecting');
-        clearSession();
+        // Connection replaced (scanned QR again or on another device)
+        // This is NORMAL when re-scanning QR - just reconnect with new session
+        console.log('[WA] Connection replaced - reconnecting with new session');
+        reconnectAttempts = 0;
+        setTimeout(startWA, 2000);
       } else if (code === 401) {
         // Unauthorized - session invalid
         console.log('[WA] Unauthorized - clearing session');
