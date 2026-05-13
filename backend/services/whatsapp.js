@@ -452,15 +452,32 @@ async function startWA() {
       const code  = lastDisconnect?.error?.output?.statusCode;
       console.log('[WA] Disconnected. Code:', code);
       emit('wa:disconnected', { code });
+      
       if (code === DisconnectReason.loggedOut) {
+        // User logged out - clear session and restart
+        console.log('[WA] Logged out - clearing session');
         clearSession();
         setTimeout(startWA, 500);
       } else if (code === 408) {
         // QR expired — restart to generate a fresh QR
         console.log('[WA] QR timeout — restarting to generate fresh QR');
         setTimeout(startWA, 2000);
-      } else {
+      } else if (code === 515) {
+        // Connection replaced (scanned QR on another device) - DO NOT reconnect
+        console.log('[WA] Connection replaced on another device - NOT reconnecting');
+        clearSession();
+      } else if (code === 401) {
+        // Unauthorized - session invalid
+        console.log('[WA] Unauthorized - clearing session');
+        clearSession();
+        setTimeout(startWA, 500);
+      } else if (code === 500 || code === 503 || !code) {
+        // Server error or network issue - retry after delay
+        console.log('[WA] Server error or network issue - reconnecting in 5s');
         setTimeout(startWA, 5000);
+      } else {
+        // Unknown error - log and don't reconnect automatically
+        console.log('[WA] Unknown disconnect code:', code, '- NOT auto-reconnecting');
       }
     }
   });
