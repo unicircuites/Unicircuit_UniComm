@@ -11727,12 +11727,21 @@ function waAppendMessage(msg) {
   var senderPhone = '';
   if (!fromMe && isGroup) {
     senderPhone = msg.senderPhone || msg.sender_phone || '';
+    
+    // Debug: log to see what data we have
+    if (!senderPhone) {
+      console.log('[WA-Debug] No sender_phone for message:', msg.id, 'sender:', msg.sender, 'senderName:', senderName);
+    }
+    
     if (senderName && senderName !== 'You' && senderName !== 'Unknown' && senderName !== '') {
       senderDisplay = senderName;
-      // Always show phone number in groups (don't hide even if it matches name)
+      // Keep senderPhone to display below name
     } else if (senderPhone) {
       senderDisplay = senderPhone;
       senderPhone = ''; // Don't duplicate if phone is the display name
+    } else {
+      // Fallback: show sender JID if no name or phone
+      senderDisplay = msg.sender ? msg.sender.split('@')[0] : 'Unknown';
     }
   }
 
