@@ -25,11 +25,7 @@ $action = New-ScheduledTaskAction -Execute "powershell.exe" -Argument "-Executio
 
 $trigger = New-ScheduledTaskTrigger -Daily -At "18:00:00"
 
-$settings = New-ScheduledTaskSettingsSet `
-    -AllowStartIfOnBatteries `
-    -DontStopIfGoingOnBatteries `
-    -StartWhenAvailable `
-    -RunOnlyIfNetworkAvailable $false
+$settings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -StartWhenAvailable
 
 $principal = New-ScheduledTaskPrincipal -UserId "$env:USERNAME" -LogonType Interactive -RunLevel Highest
 

@@ -31,7 +31,7 @@ Add-Type -AssemblyName System.Drawing
 
 # Create form
 $form = New-Object System.Windows.Forms.Form
-$form.Text = "⏰ Git Push - 18:00:00 Reminder"
+$form.Text = "Git Push - 18:00:00 Reminder"
 $form.Size = New-Object System.Drawing.Size(550, 300)
 $form.StartPosition = 'CenterScreen'
 $form.FormBorderStyle = 'FixedDialog'
@@ -44,7 +44,7 @@ $form.Icon = [System.Drawing.SystemIcons]::Information
 $titleLabel = New-Object System.Windows.Forms.Label
 $titleLabel.Location = New-Object System.Drawing.Point(20, 20)
 $titleLabel.Size = New-Object System.Drawing.Size(500, 30)
-$titleLabel.Text = "🕐 It's 18:00:00 - Time to push to GitHub!"
+$titleLabel.Text = "It's 18:00:00 - Time to push to GitHub!"
 $titleLabel.Font = New-Object System.Drawing.Font("Segoe UI", 12, [System.Drawing.FontStyle]::Bold)
 $titleLabel.ForeColor = [System.Drawing.Color]::DarkGreen
 $form.Controls.Add($titleLabel)
@@ -70,7 +70,7 @@ $form.Controls.Add($commitsLabel)
 $yesButton = New-Object System.Windows.Forms.Button
 $yesButton.Location = New-Object System.Drawing.Point(50, 220)
 $yesButton.Size = New-Object System.Drawing.Size(150, 40)
-$yesButton.Text = "✓ Yes, Push Now"
+$yesButton.Text = "Yes, Push Now"
 $yesButton.Font = New-Object System.Drawing.Font("Segoe UI", 10, [System.Drawing.FontStyle]::Bold)
 $yesButton.BackColor = [System.Drawing.Color]::LightGreen
 $yesButton.DialogResult = [System.Windows.Forms.DialogResult]::Yes
@@ -80,7 +80,7 @@ $form.Controls.Add($yesButton)
 $noButton = New-Object System.Windows.Forms.Button
 $noButton.Location = New-Object System.Drawing.Point(210, 220)
 $noButton.Size = New-Object System.Drawing.Size(150, 40)
-$noButton.Text = "✗ Not Now"
+$noButton.Text = "Not Now"
 $noButton.Font = New-Object System.Drawing.Font("Segoe UI", 10)
 $noButton.BackColor = [System.Drawing.Color]::LightCoral
 $noButton.DialogResult = [System.Windows.Forms.DialogResult]::No
@@ -90,7 +90,7 @@ $form.Controls.Add($noButton)
 $remindButton = New-Object System.Windows.Forms.Button
 $remindButton.Location = New-Object System.Drawing.Point(370, 220)
 $remindButton.Size = New-Object System.Drawing.Size(150, 40)
-$remindButton.Text = "⏰ Remind in 10 min"
+$remindButton.Text = "Remind in 10 min"
 $remindButton.Font = New-Object System.Drawing.Font("Segoe UI", 10)
 $remindButton.BackColor = [System.Drawing.Color]::LightYellow
 $remindButton.DialogResult = [System.Windows.Forms.DialogResult]::Retry
