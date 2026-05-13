@@ -875,12 +875,32 @@ async function downloadMedia(msgId) {
 // ── LOGOUT ────────────────────────────────────────────────────────────────
 async function logout() {
   console.log('[WA] Logging out...');
+  currentState = 'DISCONNECTED';
+  
   if (sock) {
-    try { await sock.logout(); } catch (_) {}
-    sock = null; isConnected = false; qrString = null; phoneNumber = null;
+    try {
+      console.log('[WA] Sending logout command to WhatsApp servers...');
+      await sock.logout(); // This removes device from phone's linked devices
+      console.log('[WA] Logout command sent successfully');
+    } catch (e) {
+      console.warn('[WA] Logout error:', e.message);
+    }
+    sock = null;
+    isConnected = false;
+    qrString = null;
+    phoneNumber = null;
+    reconnectAttempts = 0;
   }
+  
+  // Clear session files completely
   clearSession();
-  setTimeout(startWA, 500);
+  
+  // Wait 2 seconds before restarting to ensure logout is processed
+  console.log('[WA] Waiting 2s for logout to complete...');
+  setTimeout(() => {
+    console.log('[WA] Restarting WhatsApp service...');
+    startWA();
+  }, 2000);
 }
 
 // ── STATUS / QR ───────────────────────────────────────────────────────────

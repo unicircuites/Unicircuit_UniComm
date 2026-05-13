@@ -11897,8 +11897,9 @@ async function waSync() {
 
 
 async function waLogout() {
-  if (!confirm('Disconnect WhatsApp? You will need to scan QR again.')) return;
+  if (!confirm('Disconnect WhatsApp? You will need to scan QR again.\n\nThis will remove the device from your phone\'s linked devices.')) return;
   try {
+    notify('Logging out from WhatsApp...', 'Please wait', 'var(--gold)', 'fab fa-whatsapp');
     await fetch(API_BASE + '/wa/logout', { method:'POST', headers:getAuthHeaders() });
     var sb = document.getElementById('wa-status-bar');
     var cb = document.getElementById('wa-connect-banner');
@@ -11911,8 +11912,10 @@ async function waLogout() {
     document.getElementById('wa-convo-list').innerHTML = '<div style="text-align:center;padding:40px;color:var(--muted);">Connect WhatsApp to see chats</div>';
     document.getElementById('wa-chat-area').innerHTML = '';
     waActiveJid = null; waAllChats = [];
-    notify('WhatsApp disconnected', '', 'var(--gold)', 'fab fa-whatsapp');
-  } catch (_) {}
+    notify('WhatsApp disconnected', 'Device removed from phone. Check your phone\'s linked devices after 10 seconds.', 'var(--green2)', 'fab fa-whatsapp');
+  } catch (_) {
+    notify('Logout failed', 'Please try again', 'var(--red)', 'fas fa-exclamation-circle');
+  }
 }
 
 async function waResetConnection() {
