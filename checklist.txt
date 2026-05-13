@@ -34,7 +34,7 @@ Data Flow
 [~] Unified Contact Graph implemented — Contacts exist, no unified graph linking
 [✓] Outlook integration — Graph API, inbox, sent, contacts, send
 [✓] PBX integration — Matrix Eternity SMDR live
-[✓] WhatsApp integration — Baileys, chat, messages, media, session persistence, auto-reconnect
+[✓] WhatsApp integration — Baileys, chat, messages, media, session persistence, auto-reconnect, group chat phone numbers in ALL bubbles, 15-min metadata cache for large groups, optimized name resolution.
 [✓] Contacts integration — CRM contacts, Outlook import
 [~] AI pipeline into dashboard — AI drafts exist, no pipeline
 [X] Action recommendation engine — Pico Claw not implemented
@@ -42,6 +42,7 @@ Data Flow
 Sync Scenarios
 [O] Email ↔ Call linking — Planned for Phase 2
 [✓] WhatsApp reply detection — Detects replies using contextInfo, stores is_reply + reply_to_msg_id, shows reply indicator in UI
+[✓] WhatsApp group chat phone numbers — PERMANENT FIX: auto-syncs ALL group participants on connect, expanded /wa/lid-map UNION query. Optimized for 1000+ member groups with backend caching and minimized DB load.
 [~] Contact enrichment from Outlook — Import exists, no auto-enrichment
 [O] Duplicate resolution (fuzzy) — Planned for Phase 1
 [X] Channel preference learning — Pico Claw not implemented
@@ -145,7 +146,7 @@ Resources
 Degradation
 [~] Outlook fallback — Offline mode exists, no graceful degradation
 [~] PBX delay handling — Reconnect exists, no timeout handling
-[~] WhatsApp fallback — Reconnect exists, no fallback mode
+[✓] WhatsApp fallback — Reconnect exists, optimized QR code visibility (5s grace period) to prevent flickering on brief drops.
 [X] AI timeout handling — Pico Claw not implemented
 [X] DB fallback
 

@@ -11217,14 +11217,25 @@ function initWASocket() {
     if (btn) btn.style.display = 'none';
   });
   waSocket.on('wa:connected', ({ phone, name }) => {
+    // Clear any pending disconnect banner timeout
+    clearTimeout(window._waDisconnectTimeout);
     waOnConnected(phone, name);
     waLoadChats();
+    // Reload LID map after connect — backend will sync group participants in ~8s
+    // Reload immediately for existing data, then again after sync completes
+    waLoadLidMap();
+    setTimeout(waLoadLidMap, 12000); // reload after backend group sync finishes
   });
   waSocket.on('wa:disconnected', () => {
-    const sb = document.getElementById('wa-status-bar');
-    const cb = document.getElementById('wa-connect-banner');
-    if (sb) sb.style.display = 'none';
-    if (cb) cb.style.display = 'block';
+    // Only show connect banner if disconnected for more than 5 seconds
+    // This prevents the QR from "popping out" during brief server restarts
+    clearTimeout(window._waDisconnectTimeout);
+    window._waDisconnectTimeout = setTimeout(() => {
+      const sb = document.getElementById('wa-status-bar');
+      const cb = document.getElementById('wa-connect-banner');
+      if (sb) sb.style.display = 'none';
+      if (cb) cb.style.display = 'block';
+    }, 5000);
   });
   waSocket.on('wa:message', function(msg) {
     // Handle both raw Baileys structure and our flat backend structure
@@ -11233,6 +11244,17 @@ function initWASocket() {
     
     var cleanJid = rawJid.includes('@') ? (rawJid.split(':')[0] + '@' + rawJid.split('@')[1]) : rawJid;
     
+    // Update local chat info for immediate sorting and preview (mobile-like behavior)
+    var chat = waAllChats.find(function(c) { return c.id === cleanJid; });
+    if (chat) {
+      chat.last_message = msg.body;
+      chat.last_time = msg.ts || new Date().toISOString();
+      if (cleanJid !== waActiveJid) {
+        chat.unread = (chat.unread || 0) + 1;
+      }
+      waRenderChats(waAllChats);
+    }
+
     if (cleanJid === waActiveJid) {
       waAppendMessage(msg);
       var area = document.getElementById('wa-chat-area');
@@ -11241,12 +11263,16 @@ function initWASocket() {
       var sender = msg.senderName || msg.pushName || cleanJid.split('@')[0];
       notify("New WhatsApp from " + sender, "", "var(--green)", "fab fa-whatsapp");
     }
-    waLoadChats();
+    waLoadChats(); // Sync with database in background
   });
   waSocket.on('wa:chats_updated', () => waLoadChats());
   waSocket.on('wa:sync_complete', () => {
     console.log('[WA-UI] Full sync complete — loading all chats');
     waLoadChats();
+  });
+  waSocket.on('wa:participants_synced', function(data) {
+    console.log('[WA] Group participants synced — reloading LID map (' + (data.total||0) + ' entries)');
+    waLoadLidMap(); // Reload so all new LID→phone mappings are available immediately
   });
   waSocket.on('wa:syncing', ({ status }) => {
     const el = document.getElementById('wa-sync-status');
@@ -11460,14 +11486,21 @@ async function waLoadChats() {
     }
     waAllChats = await res.json();
     waRenderChats(waAllChats);
-  waLoadLidMap();
   } catch (_) {}
 }
 
 function waRenderChats(chats) {
   var el = document.getElementById('wa-convo-list');
   if (!el) return;
-  var totalUnread = chats.reduce(function(s,c){ return s + (c.unread||0); }, 0);
+
+  // Sort chats chronologically: most recent at the top
+  chats.sort(function(a, b) {
+    var ta = a.last_time ? new Date(a.last_time).getTime() : 0;
+    var tb = b.last_time ? new Date(b.last_time).getTime() : 0;
+    return tb - ta;
+  });
+
+  var totalUnread = waAllChats.reduce(function(s,c){ return s + (c.unread||0); }, 0);
   var badge = document.getElementById('wa-unread-total');
   if (badge) { badge.textContent = totalUnread; badge.style.display = totalUnread ? 'inline-flex' : 'none'; }
   var count = document.getElementById('wa-chat-count');
@@ -11728,9 +11761,13 @@ function waAppendMessage(msg) {
   if (!fromMe && isGroup) {
     senderPhone = msg.senderPhone || msg.sender_phone || '';
     
-    // Debug: log to see what data we have
-    if (!senderPhone) {
-      console.log('[WA-Debug] No sender_phone for message:', msg.id, 'sender:', msg.sender, 'senderName:', senderName);
+    // Fallback: look up phone from waLidMap (keyed by LID number, e.g. "272893648851001")
+    if (!senderPhone && msg.sender && msg.sender.endsWith('@lid')) {
+      var lidNum = msg.sender.split('@')[0];
+      var lidEntry = waLidMap[lidNum];
+      if (lidEntry && lidEntry.phone) {
+        senderPhone = lidEntry.phone;
+      }
     }
     
     if (senderName && senderName !== 'You' && senderName !== 'Unknown' && senderName !== '') {
