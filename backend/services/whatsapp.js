@@ -136,6 +136,23 @@ function getQuotedBody(msg) {
   } catch (_) { return null; }
 }
 
+// Get reply information (is this message a reply + what message ID it's replying to)
+function getReplyInfo(msg) {
+  try {
+    const ctx = msg.message?.extendedTextMessage?.contextInfo
+      || msg.message?.imageMessage?.contextInfo
+      || msg.message?.videoMessage?.contextInfo
+      || msg.message?.documentMessage?.contextInfo
+      || msg.message?.audioMessage?.contextInfo;
+    if (!ctx?.quotedMessage || !ctx?.stanzaId) {
+      return { isReply: false, replyToMsgId: null };
+    }
+    return { isReply: true, replyToMsgId: ctx.stanzaId };
+  } catch (_) {
+    return { isReply: false, replyToMsgId: null };
+  }
+}
+
 // â”€â”€ ENSURE DB TABLES â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 async function ensureTables() {
   await pool.query(`
@@ -178,6 +195,8 @@ async function ensureTables() {
     )
   `);
   await pool.query(`ALTER TABLE wa_messages ADD COLUMN IF NOT EXISTS quoted_body TEXT`);
+  await pool.query(`ALTER TABLE wa_messages ADD COLUMN IF NOT EXISTS is_reply BOOLEAN DEFAULT FALSE`);
+  await pool.query(`ALTER TABLE wa_messages ADD COLUMN IF NOT EXISTS reply_to_msg_id VARCHAR(200)`);
   await pool.query(`ALTER TABLE wa_chats ADD COLUMN IF NOT EXISTS imported_last_ts TIMESTAMPTZ`);
 
   // Load imported checkpoints into memory
@@ -333,14 +352,15 @@ async function saveMessage(msg) {
     const type        = getContentType(msg.message) || 'text';
     const body        = getBody(msg);
     const quotedBody  = getQuotedBody(msg);
+    const replyInfo   = getReplyInfo(msg);
 
     await pool.query(`
-      INSERT INTO wa_messages (id, chat_id, from_me, sender, sender_name, body, msg_type, timestamp, is_read, quoted_body)
-      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
+      INSERT INTO wa_messages (id, chat_id, from_me, sender, sender_name, body, msg_type, timestamp, is_read, quoted_body, is_reply, reply_to_msg_id)
+      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
       ON CONFLICT (id, chat_id) DO NOTHING
-    `, [id, jid, fromMe, senderJid, senderName, body, type, ts, fromMe, quotedBody]);
+    `, [id, jid, fromMe, senderJid, senderName, body, type, ts, fromMe, quotedBody, replyInfo.isReply, replyInfo.replyToMsgId]);
 
-    return { id, jid, fromMe, sender: senderJid, senderName, body, type, ts, quotedBody };
+    return { id, jid, fromMe, sender: senderJid, senderName, body, type, ts, quotedBody, isReply: replyInfo.isReply, replyToMsgId: replyInfo.replyToMsgId };
   } catch (err) {
     console.error('[WA-DB] saveMessage error:', err.message);
     return null;

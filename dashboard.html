@@ -11719,6 +11719,7 @@ function waAppendMessage(msg) {
   }
 
   var quotedBody = msg.quotedBody || msg.quoted_body || '';
+  var isReply = msg.isReply || msg.is_reply || false;
   var isGroup = waActiveJid && waActiveJid.endsWith('@g.us');
 
   // Sender display in group: name + phone (sender_phone comes from DB JOIN in messages route)
@@ -11751,8 +11752,9 @@ function waAppendMessage(msg) {
       '</div>';
   }
 
-  // Quoted reply block
-  var quotedBlock = quotedBody ? '<div style="background:rgba(255,255,255,0.06);border-left:3px solid var(--green2);padding:5px 8px;border-radius:4px;font-size:11px;color:var(--muted2);margin-bottom:4px;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + quotedBody + '</div>' : '';
+  // Quoted reply block with reply indicator
+  var replyIndicator = isReply ? '<i class="fas fa-reply" style="color:var(--green2);font-size:10px;margin-right:4px;"></i>' : '';
+  var quotedBlock = quotedBody ? '<div style="background:rgba(255,255,255,0.06);border-left:3px solid var(--green2);padding:5px 8px;border-radius:4px;font-size:11px;color:var(--muted2);margin-bottom:4px;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + replyIndicator + quotedBody + '</div>' : '';
 
   // Media block
   var mediaBlock = waMediaHTML(type, body, msg.id || msg.key_id || '');

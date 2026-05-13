@@ -41,7 +41,7 @@ Data Flow
 
 Sync Scenarios
 [O] Email ↔ Call linking — Planned for Phase 2
-[~] WhatsApp reply detection — Messages stored, no reply detection
+[✓] WhatsApp reply detection — Detects replies using contextInfo, stores is_reply + reply_to_msg_id, shows reply indicator in UI
 [~] Contact enrichment from Outlook — Import exists, no auto-enrichment
 [O] Duplicate resolution (fuzzy) — Planned for Phase 1
 [X] Channel preference learning — Pico Claw not implemented
