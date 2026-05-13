@@ -3,9 +3,10 @@
 Use this checklist with coding agents to track what is implemented vs pending.
 
 STATUS:
-[✓] Completed (done)
-[O] Planned to work on
-[X] Not done
+[✓] Completed (fully working)
+[~] Partially worked (started but incomplete)
+[O] Planned to work on (next priority)
+[X] Not done (not started)
 
 ====================
 L1 — UNIT & API VALIDATION
