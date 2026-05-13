@@ -11882,17 +11882,18 @@ async function waSync() {
     if (res.status === 401) { localStorage.clear(); sessionStorage.clear(); window.location.href = 'login.html'; return; }
     var data = await res.json();
     if (res.ok) {
+      // Reload chats to show latest messages
       await waLoadChats();
       var s = data.stats;
       var msg = 'Groups: ' + s.groups + ' | Numbers: ' + s.indian_numbers + ' | Unread: ' + ((parseInt(s.unread_individual)||0)+(parseInt(s.unread_groups)||0));
-      notify('Sync complete', msg, 'var(--green)', 'fas fa-check-circle');
+      notify('Chats refreshed', msg, 'var(--green)', 'fas fa-check-circle');
     } else {
       notify('Sync failed', data.error, 'var(--red)', 'fas fa-exclamation-circle');
     }
   } catch (err) {
     notify('Sync error', err.message, 'var(--red)', 'fas fa-exclamation-circle');
   }
-  if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fas fa-sync-alt"></i> Sync Chats'; }
+  if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fas fa-sync-alt"></i> Sync'; }
 }
 
 
