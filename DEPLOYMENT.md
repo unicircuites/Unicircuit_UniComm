@@ -132,40 +132,18 @@ Set-Content -Path "C:\UniComm\Unicircuit_UniComm-main\backend\certs\server.key" 
 Dev machine pe changes karo → GitHub pe push karo → Tower pe run karo:
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File C:\update-unicomm.ps1
-```
-
-### Update script banane ka command (ek baar)
-```powershell
-@"
-Write-Host "Downloading latest code..." -ForegroundColor Cyan
-Invoke-WebRequest -Uri 'https://github.com/unicircuites/Unicircuit_UniComm/archive/refs/heads/main.zip' -Headers @{Authorization='token GITHUB_TOKEN_HERE'} -OutFile 'C:\UniComm_update.zip'
-
-Write-Host "Extracting..." -ForegroundColor Cyan
-Expand-Archive -Path 'C:\UniComm_update.zip' -DestinationPath 'C:\UniComm_update' -Force
-
-Write-Host "Copying files (keeping .env and certs)..." -ForegroundColor Cyan
-Copy-Item -Path 'C:\UniComm_update\Unicircuit_UniComm-main\*' -Destination 'C:\UniComm\Unicircuit_UniComm-main\' -Recurse -Force -Exclude '.env', 'certs'
-
-Write-Host "Installing dependencies..." -ForegroundColor Cyan
-Set-Location 'C:\UniComm\Unicircuit_UniComm-main\backend'
+cd C:\UniComm\Unicircuit_UniComm-main
+git stash
+git pull origin master
+cd backend
 npm install
-
-Write-Host "Restarting server..." -ForegroundColor Cyan
 pm2 restart unicomm
-
-Write-Host "Cleaning up..." -ForegroundColor Cyan
-Remove-Item 'C:\UniComm_update.zip' -Force
-Remove-Item 'C:\UniComm_update' -Recurse -Force
-
-Write-Host "Done! Server updated and restarted." -ForegroundColor Green
 pm2 status
-"@ | Set-Content -Path "C:\update-unicomm.ps1" -Encoding UTF8
 ```
 
-> **Note:** `GITHUB_TOKEN_HERE` ki jagah apna GitHub Personal Access Token daalo.
-> Token banane ka link: https://github.com/settings/tokens/new
-> Scope: `repo` only
+> **Note:** `git stash` saves any local changes on Tower server before pulling.
+> If you want to see what was stashed: `git stash list`
+> To restore stashed changes: `git stash pop`
 
 ---
 
