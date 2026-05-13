@@ -11729,12 +11729,10 @@ function waAppendMessage(msg) {
     senderPhone = msg.senderPhone || msg.sender_phone || '';
     if (senderName && senderName !== 'You' && senderName !== 'Unknown' && senderName !== '') {
       senderDisplay = senderName;
-      if (senderPhone && senderPhone.replace(/\s/g,'') === senderDisplay.replace(/\s/g,'')) {
-        senderPhone = '';
-      }
+      // Always show phone number in groups (don't hide even if it matches name)
     } else if (senderPhone) {
       senderDisplay = senderPhone;
-      senderPhone = '';
+      senderPhone = ''; // Don't duplicate if phone is the display name
     }
   }
 
