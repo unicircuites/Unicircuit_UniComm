@@ -34,7 +34,7 @@ Data Flow
 [~] Unified Contact Graph implemented — Contacts exist, no unified graph linking
 [✓] Outlook integration — Graph API, inbox, sent, contacts, send
 [✓] PBX integration — Matrix Eternity SMDR live
-[✓] WhatsApp integration — Baileys, chat, messages, media
+[✓] WhatsApp integration — Baileys, chat, messages, media, session persistence, auto-reconnect
 [✓] Contacts integration — CRM contacts, Outlook import
 [~] AI pipeline into dashboard — AI drafts exist, no pipeline
 [X] Action recommendation engine — Pico Claw not implemented
