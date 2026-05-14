@@ -182,59 +182,69 @@ function getReplyInfo(msg) {
   }
 }
 
-// â”€â”€ ENSURE DB TABLES â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-async function ensureTables() {
-  await pool.query(`
-    CREATE TABLE IF NOT EXISTS wa_contacts (
-      jid          VARCHAR(100) PRIMARY KEY,
-      name         VARCHAR(200),
-      notify       VARCHAR(200),
-      phone        VARCHAR(50),
-      updated_at   TIMESTAMPTZ DEFAULT NOW()
-    )
-  `);
-  await pool.query(`
-    CREATE TABLE IF NOT EXISTS wa_chats (
-      id           VARCHAR(100) PRIMARY KEY,
-      name         VARCHAR(200),
-      phone        VARCHAR(50),
-      is_group     BOOLEAN DEFAULT FALSE,
-      last_message TEXT,
-      last_time    TIMESTAMPTZ,
-      unread       INT DEFAULT 0,
-      updated_at   TIMESTAMPTZ DEFAULT NOW(),
-      imported_last_ts TIMESTAMPTZ
-    )
-  `);
-  await pool.query(`
-    CREATE TABLE IF NOT EXISTS wa_messages (
-      id           VARCHAR(200),
-      chat_id      VARCHAR(100) NOT NULL,
-      from_me      BOOLEAN DEFAULT FALSE,
-      sender       VARCHAR(100),
-      sender_name  VARCHAR(200),
-      body         TEXT,
-      msg_type     VARCHAR(30) DEFAULT 'text',
-      quoted_body  TEXT,
-      timestamp    TIMESTAMPTZ,
-      is_read      BOOLEAN DEFAULT FALSE,
-      status       VARCHAR(20) DEFAULT 'sent',
-      created_at   TIMESTAMPTZ DEFAULT NOW(),
-      PRIMARY KEY (id, chat_id)
-    )
-  `);
-  await pool.query(`ALTER TABLE wa_messages ADD COLUMN IF NOT EXISTS quoted_body TEXT`);
-  await pool.query(`ALTER TABLE wa_messages ADD COLUMN IF NOT EXISTS is_reply BOOLEAN DEFAULT FALSE`);
-  await pool.query(`ALTER TABLE wa_messages ADD COLUMN IF NOT EXISTS reply_to_msg_id VARCHAR(200)`);
-  await pool.query(`ALTER TABLE wa_chats ADD COLUMN IF NOT EXISTS imported_last_ts TIMESTAMPTZ`);
+// ── ENSURE DB TABLES ──────────────────────────────────────────────────────────
+async function ensureTables(retries = 3) {
+  for (let i = 0; i < retries; i++) {
+    try {
+      await pool.query(`
+        CREATE TABLE IF NOT EXISTS wa_contacts (
+          jid          VARCHAR(100) PRIMARY KEY,
+          name         VARCHAR(200),
+          notify       VARCHAR(200),
+          phone        VARCHAR(50),
+          updated_at   TIMESTAMPTZ DEFAULT NOW()
+        )
+      `);
+      await pool.query(`
+        CREATE TABLE IF NOT EXISTS wa_chats (
+          id           VARCHAR(100) PRIMARY KEY,
+          name         VARCHAR(200),
+          phone        VARCHAR(50),
+          is_group     BOOLEAN DEFAULT FALSE,
+          last_message TEXT,
+          last_time    TIMESTAMPTZ,
+          unread       INT DEFAULT 0,
+          updated_at   TIMESTAMPTZ DEFAULT NOW(),
+          imported_last_ts TIMESTAMPTZ
+        )
+      `);
+      await pool.query(`
+        CREATE TABLE IF NOT EXISTS wa_messages (
+          id           VARCHAR(200),
+          chat_id      VARCHAR(100) NOT NULL,
+          from_me      BOOLEAN DEFAULT FALSE,
+          sender       VARCHAR(100),
+          sender_name  VARCHAR(200),
+          body         TEXT,
+          msg_type     VARCHAR(30) DEFAULT 'text',
+          quoted_body  TEXT,
+          timestamp    TIMESTAMPTZ,
+          is_read      BOOLEAN DEFAULT FALSE,
+          status       VARCHAR(20) DEFAULT 'sent',
+          created_at   TIMESTAMPTZ DEFAULT NOW(),
+          PRIMARY KEY (id, chat_id)
+        )
+      `);
+      await pool.query(`ALTER TABLE wa_messages ADD COLUMN IF NOT EXISTS quoted_body TEXT`).catch(() => {});
+      await pool.query(`ALTER TABLE wa_messages ADD COLUMN IF NOT EXISTS is_reply BOOLEAN DEFAULT FALSE`).catch(() => {});
+      await pool.query(`ALTER TABLE wa_messages ADD COLUMN IF NOT EXISTS reply_to_msg_id VARCHAR(200)`).catch(() => {});
+      await pool.query(`ALTER TABLE wa_chats ADD COLUMN IF NOT EXISTS imported_last_ts TIMESTAMPTZ`).catch(() => {});
 
-  // Load imported checkpoints into memory
-  try {
-    const res = await pool.query(`SELECT id, imported_last_ts FROM wa_chats WHERE imported_last_ts IS NOT NULL`);
-    for (const r of res.rows) {
-      importedLastTsMap[r.id] = new Date(r.imported_last_ts).getTime();
+      // Load imported checkpoints into memory
+      try {
+        const res = await pool.query(`SELECT id, imported_last_ts FROM wa_chats WHERE imported_last_ts IS NOT NULL`);
+        for (const r of res.rows) {
+          importedLastTsMap[r.id] = new Date(r.imported_last_ts).getTime();
+        }
+      } catch(e) {}
+      
+      return; // Success
+    } catch (err) {
+      console.warn(`[WA] Table ensure attempt ${i+1} failed: ${err.message}`);
+      if (i === retries - 1) throw err;
+      await new Promise(resolve => setTimeout(resolve, 2000));
     }
-  } catch(e) {}
+  }
 }
 
 // ── SAVE CHAT ────────────────────────────────────────────────────────────────────────

@@ -89,76 +89,26 @@ async function callOllamaService(prompt, preprocessedEmails, onWorker = null) {
  * @returns {string} - System instructions for Ollama
  */
 function prepareSystemInstructions() {
-  return `You are an advanced AI Email Intelligence Assistant designed to behave like a JARVIS-style decision system.
-Your role is to analyze email data and generate intelligent, structured, and actionable outputs efficiently.
+  return `You are an AI email intelligence assistant (JARVIS-style) for a B2B sales CRM.
+Analyze emails and respond ONLY in this exact format — no extra text:
 
-ADAPTIVE THINKING RULES:
-You MUST adjust your thinking depth based on input size:
-- SMALL input (≤10 emails):
-  Perform fast and focused analysis.
-  Only identify urgent and important items.
-  Keep output concise.
-- MEDIUM input (11–20 emails):
-  Perform balanced analysis.
-  Identify urgency, follow-ups, and simple patterns.
-- LARGE input (>20 emails):
-  Perform deeper analysis.
-  Include urgency, sentiment, intent, patterns, and inefficiencies.
-
-CRITICAL PERFORMANCE RULE:
-- Always prioritize speed and clarity over unnecessary detail.
-- Avoid long explanations when not required.
-- Only expand analysis when complexity is high.
-
-DECISION INTELLIGENCE:
-You MUST detect and act on:
-- Urgent emails requiring immediate response
-- Emails unread for long duration
-- Missed replies or pending conversations
-- Customer dissatisfaction
-- Business opportunities or leads
-- Inbox clutter or inefficiencies
-
-OUTPUT FORMAT (STRICT):
 Summary:
-(2–4 lines describing overall situation clearly.)
+(1-2 sentences on the overall situation.)
 
 Insights:
-- 🔴 Urgent issues
-- 🟡 Follow-ups needed
-- 📈 Behavioral patterns
+- 🔴 [urgent issue or critical item]
+- 🟡 [follow-up needed]
+- 📈 [pattern or opportunity]
 
 Smart Actions:
-1. Action with reason.
-2. Action with reason.
-3. Action with reason.
+1. [action + reason]
+2. [action + reason]
+3. [action + reason]
 
 System Optimization:
-- Cleanup recommendations.
-- Efficiency improvements.
+- [cleanup or efficiency tip]
 
-BEHAVIOR RULES:
-- DO NOT ask questions.
-- DO NOT explain your internal reasoning.
-- ALWAYS write complete sentences.
-- Every sentence must end with ".", "!", or "?".
-- DO NOT generate unnecessary verbosity.
-- DO NOT return empty insights unless truly no data exists.
-
-EFFICIENCY CONTROL:
-- Reduce verbosity for small inputs.
-- Expand only when needed.
-- Keep response precise and useful.
-
-SYSTEM CONTEXT:
-- Emails are temporary.
-- Focus on extracting decisions, not raw data.
-- Follow "Reduce, Reuse, Recycle":
-  → Keep insights
-  → Remove noise
-
-FINAL INSTRUCTION:
-Produce a complete, structured, and intelligent report that adapts to input size and remains efficient, actionable, and clear at all times.`;
+Rules: Be concise. No questions. No reasoning. End every sentence with punctuation.`;
 }
 
 /**
@@ -313,7 +263,7 @@ async function callAnthropic(prompt, emails) {
  * @param {string} prompt - Full prompt or system instructions
  * @param {Array} emails - Optional email data for context
  */
-async function callGroqService(prompt, emails) {
+async function callGroqService(prompt, emails, retryCount = 0) {
   const apiKey = process.env.AI_API_KEY;
   const host   = process.env.AI_API_HOST || 'https://api.groq.com/openai/v1';
   const model  = process.env.AI_API_MODEL || 'llama-3.1-8b-instant';
@@ -334,12 +284,20 @@ async function callGroqService(prompt, emails) {
         { role: 'user', content: userContent }
       ],
       temperature: 0.5,
-      max_tokens: 1024
+      max_tokens: parseInt(process.env.AI_MAX_TOKENS || '800', 10)
     })
   });
 
   if (!response.ok) {
     const errData = await response.json().catch(() => ({}));
+    
+    // Handle Rate Limit with a single retry after a delay
+    if (response.status === 429 && retryCount < 1) {
+      console.warn('[AI] Groq Rate Limit hit. Retrying in 12 seconds...');
+      await new Promise(resolve => setTimeout(resolve, 12000));
+      return callGroqService(prompt, emails, retryCount + 1);
+    }
+
     throw new Error(`Groq API error: ${response.status} ${errData.error?.message || ''}`);
   }
 

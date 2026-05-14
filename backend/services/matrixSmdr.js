@@ -17,6 +17,9 @@ const pool = require('../db/pool');
 
 // ── CONFIG (from .env) ────────────────────────────────────────────────────
 const PBX_HOST  = process.env.PBX_HOST  || '192.168.0.81';
+if (PBX_HOST === '192.168.0.205') {
+  console.warn('[SMDR] ⚠️ WARNING: PBX_HOST is set to local server IP (192.168.0.205). Ensure this is the PBX IP (192.168.0.81).');
+}
 const SMDR_PORT = parseInt(process.env.SMDR_PORT || '5000');
 const CTI_PORT  = parseInt(process.env.CTI_PORT  || '5001');
 
@@ -39,123 +42,225 @@ let buffer      = '';
 function setIO(socketIO) { io = socketIO; }
 
 function emit(event, data) {
-  if (io) io.emit(event, data);
+  if (io) {
+    console.log(`[SMDR] 📡 Emitting Socket.IO event: "${event}"`, data ? JSON.stringify(data) : '(no data)');
+    io.emit(event, data);
+  } else {
+    console.warn(`[SMDR] ⚠️ Cannot emit "${event}" - Socket.IO (io) is not initialized`);
+  }
 }
 
 // ── ENSURE TABLE ──────────────────────────────────────────────────────────
-async function ensureTable() {
-  await pool.query(`
-    CREATE TABLE IF NOT EXISTS call_logs (
-      id           SERIAL PRIMARY KEY,
-      call_date    DATE,
-      call_time    TIME,
-      duration     VARCHAR(20),
-      call_type    VARCHAR(20),
-      caller       VARCHAR(100),
-      extension    VARCHAR(20),
-      destination  VARCHAR(100),
-      trunk        VARCHAR(50),
-      ai_summary   TEXT,
-      raw_line     TEXT,
-      created_at   TIMESTAMPTZ DEFAULT NOW()
-    )
-  `);
-  // Add columns if they don't exist (for existing tables)
-  const cols = ['call_date DATE', 'call_time TIME', 'trunk VARCHAR(50)', 'raw_line TEXT'];
-  for (const col of cols) {
-    const name = col.split(' ')[0];
-    await pool.query(`ALTER TABLE call_logs ADD COLUMN IF NOT EXISTS ${name} ${col.split(' ').slice(1).join(' ')}`).catch(() => {});
+async function ensureTable(retries = 3) {
+  for (let i = 0; i < retries; i++) {
+    try {
+      await pool.query(`
+        CREATE TABLE IF NOT EXISTS call_logs (
+          id           SERIAL PRIMARY KEY,
+          call_date    DATE,
+          call_time    TIME,
+          duration     VARCHAR(20),
+          call_type    VARCHAR(20),
+          caller       VARCHAR(100),
+          extension    VARCHAR(20),
+          destination  VARCHAR(100),
+          trunk        VARCHAR(50),
+          ai_summary   TEXT,
+          raw_line     TEXT,
+          created_at   TIMESTAMPTZ DEFAULT NOW()
+        )
+      `);
+      // Add columns if they don't exist (for existing tables)
+      const cols = ['call_date DATE', 'call_time TIME', 'trunk VARCHAR(50)', 'raw_line TEXT'];
+      for (const col of cols) {
+        const name = col.split(' ')[0];
+        await pool.query(`ALTER TABLE call_logs ADD COLUMN IF NOT EXISTS ${name} ${col.split(' ').slice(1).join(' ')}`).catch(() => {});
+      }
+      return; // Success
+    } catch (err) {
+      console.warn(`[SMDR] Table ensure attempt ${i+1} failed: ${err.message}`);
+      if (i === retries - 1) throw err;
+      await new Promise(resolve => setTimeout(resolve, 2000));
+    }
   }
 }
 
 // ── PARSE MATRIX SMDR LINE ────────────────────────────────────────────────
-// Matrix Eternity SMDR format (space/tab delimited):
-// Date      Time     Duration  Type  Ext   Trunk  Destination
-// 30/04/26  14:23:45  00:02:15  OUT   201   T1     9198765XXXXX
-//
-// Some versions use fixed-width, some use comma/tab. We handle both.
 function parseSMDR(line) {
-  line = line.trim();
-  if (!line || line.length < 10) return null;
+  if (!line) return null;
+  const trimmedLine = line.trim();
+  if (!trimmedLine) return null;
 
-  // Try comma-separated first
-  let parts;
-  if (line.includes(',')) {
-    parts = line.split(',').map(s => s.trim());
-  } else {
-    // Split on 2+ spaces or tabs
-    parts = line.split(/\s{2,}|\t/).map(s => s.trim()).filter(Boolean);
+  // Matrix Eternity SMDR lines can be fixed-width (70+ chars) or space-delimited
+  // Let's try space-delimited first if it looks like the user's reported format:
+  // [ID] [Date] [Time] [Duration] [Type] [Number] [Ext]
+  const parts = trimmedLine.split(/\s+/);
+  
+  let record = null;
+
+  if (parts.length >= 6) {
+    // Check if parts[1] looks like a date (DD-MM-YY or YYYY-MM-DD)
+    const isDate = /^\d{2,4}-\d{2}-\d{2}$/.test(parts[1]);
+    const isTime = /^\d{2}:\d{2}:\d{2}$/.test(parts[2]);
+
+    if (isDate && isTime) {
+      // Space-delimited format detected
+      console.log(`[SMDR] ℹ️  Space-delimited format detected (${parts.length} parts)`);
+      
+      let rawDate = parts[1];
+      let rawTime = parts[2];
+      let rawDur  = parts[3]; // Might be HH:MM:SS or seconds
+      let type    = parts[4] || 'Out';
+      let num     = parts[5] || '';
+      let ext     = parts[6] || '';
+
+      // Normalize Date
+      let callDate = rawDate;
+      if (rawDate.includes('-')) {
+        const dp = rawDate.split('-');
+        if (dp[0].length === 2 && dp[2].length === 2) { // DD-MM-YY
+          callDate = `20${dp[2]}-${dp[1].padStart(2, '0')}-${dp[0].padStart(2, '0')}`;
+        } else if (dp[0].length === 4) { // YYYY-MM-DD
+          callDate = rawDate;
+        }
+      }
+
+      // Normalize Duration
+      let duration = rawDur;
+      if (!rawDur.includes(':')) {
+        const sec = parseInt(rawDur) || 0;
+        const h = Math.floor(sec / 3600);
+        const m = Math.floor((sec % 3600) / 60);
+        const s = sec % 60;
+        duration = [h, m, s].map(v => v.toString().padStart(2, '0')).join(':');
+      }
+
+      record = {
+        call_date:   callDate,
+        call_time:   rawTime,
+        duration:    duration,
+        call_type:   type,
+        caller:      (type === 'In') ? num : ext,
+        extension:   ext || (type === 'Out' ? ext : num),
+        destination: (type === 'In') ? ext : num,
+        trunk:       null,
+        raw_line:    trimmedLine,
+      };
+    }
   }
 
-  if (parts.length < 4) return null;
+  // ── ATTEMPT 2: Fixed-Width Parsing (For Matrix SARVAM / ETERNITY) ──────
+  // Note: We use the raw line (not trimmed) because Matrix depends on exact column positions.
+  const rawLine = line; 
+  if (rawLine.length >= 70) {
+    // Helper to extract by position (1-indexed as per Matrix manuals)
+    const get = (start, len) => rawLine.substring(start - 1, (start - 1) + len).trim();
 
-  // Matrix Eternity typical field order:
-  // [0] Date (DD/MM/YY or DD-MM-YYYY)
-  // [1] Time (HH:MM:SS)
-  // [2] Duration (HH:MM:SS or MM:SS)
-  // [3] Call Type (IN/OUT/INT/MISSED)
-  // [4] Extension / Caller
-  // [5] Trunk (T1, T2, SIP1 etc)
-  // [6] Destination / Called number
+    const callingNum   = get(6, 16);
+    const trunk        = get(23, 5);
+    const connectedNum = get(29, 8);
+    const rawDate      = get(38, 8); // DD-MM-YY
+    const rawTime      = get(47, 8); // HH:MM:SS
+    const speechSec    = parseInt(get(64, 5)) || 0;
+    
+    // RECORDING FILENAME: Standard Matrix position is usually 80+ if enabled
+    const recordingId  = rawLine.length > 80 ? get(80, 30) : null;
 
-  const rawDate = parts[0] || '';
-  const rawTime = parts[1] || '';
-  const duration = parts[2] || '';
-  const callType = (parts[3] || '').toUpperCase();
-  const ext = parts[4] || '';
-  const trunk = parts[5] || '';
-  const destination = parts[6] || '';
-
-  // Parse date
-  let callDate = null;
-  try {
-    // Handle DD/MM/YY or DD/MM/YYYY or DD-MM-YYYY
-    const d = rawDate.replace(/-/g, '/');
-    const dp = d.split('/');
-    if (dp.length === 3) {
-      const yr = dp[2].length === 2 ? '20' + dp[2] : dp[2];
-      callDate = `${yr}-${dp[1].padStart(2,'0')}-${dp[0].padStart(2,'0')}`;
+    // VALIDATION: If the date or time fields contain dashes or non-digits, it's a summary line
+    if (!rawDate || rawDate.includes('-') && rawDate.length < 5 || rawTime.includes('-')) {
+      return null; 
     }
-  } catch (_) {}
 
-  // Determine call type label
-  let type = 'Out';
-  if (callType.includes('IN'))     type = 'In';
-  else if (callType.includes('OUT')) type = 'Out';
-  else if (callType.includes('INT') || callType.includes('INTERNAL')) type = 'Internal';
-  else if (callType.includes('MISS')) type = 'Missed';
+    let callDate = null;
+    try {
+      const dp = rawDate.split('-');
+      if (dp.length === 3) {
+        const yr = dp[2].length === 2 ? '20' + dp[2] : dp[2];
+        callDate = `${yr}-${dp[1].padStart(2, '0')}-${dp[0].padStart(2, '0')}`;
+      }
+    } catch (_) {}
 
-  // Caller: for outgoing = extension, for incoming = destination field may have CLI
-  const caller = type === 'In' ? destination : ext;
-  const dest   = type === 'In' ? ext : destination;
+    const h = Math.floor(speechSec / 3600);
+    const m = Math.floor((speechSec % 3600) / 60);
+    const s = speechSec % 60;
+    const duration = [h, m, s].map(v => v.toString().padStart(2, '0')).join(':');
 
-  return {
-    call_date:   callDate,
-    call_time:   rawTime || null,
-    duration:    duration || null,
-    call_type:   type,
-    caller:      caller || null,
-    extension:   ext || null,
-    destination: dest || null,
-    trunk:       trunk || null,
-    raw_line:    line,
-  };
+    let type = 'Out';
+    if (callingNum.length > 5) type = 'In';
+    else if (connectedNum.length <= 5 && connectedNum.length > 0) type = 'Internal';
+
+    record = {
+      call_date:   callDate,
+      call_time:   rawTime || null,
+      duration:    duration,
+      call_type:   type,
+      caller:      callingNum || null,
+      extension:   (type === 'Out' || type === 'Internal') ? callingNum : connectedNum,
+      destination: connectedNum,
+      trunk:       trunk || null,
+      raw_line:    rawLine.trim(),
+      recording_file: recordingId
+    };
+
+    if (type === 'In') {
+      record.caller = callingNum;
+      record.destination = connectedNum;
+      record.extension = connectedNum;
+    }
+  }
+
+  if (record && record.call_time && !record.call_time.includes('-')) {
+    console.log(`[SMDR] ✅ Parsed successfully: ${record.call_type} | ${record.caller} -> ${record.destination}`);
+    return record;
+  }
+
+  return null;
 }
 
 // ── SAVE TO DB ────────────────────────────────────────────────────────────
 async function saveCallLog(record) {
   try {
     const result = await pool.query(`
-      INSERT INTO call_logs (call_date, call_time, duration, call_type, caller, extension, destination, trunk, raw_line)
-      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
+      INSERT INTO call_logs (call_date, call_time, duration, call_type, caller, extension, destination, trunk, raw_line, recording_file)
+      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
       RETURNING *
     `, [
       record.call_date, record.call_time, record.duration,
       record.call_type, record.caller, record.extension,
-      record.destination, record.trunk, record.raw_line
+      record.destination, record.trunk, record.raw_line,
+      record.recording_file
     ]);
     const row = result.rows[0];
-    console.log(`[SMDR] Saved: ${record.call_type} | ${record.caller} → ${record.destination} | ${record.duration}`);
+    console.log(`[SMDR] Saved to call_logs: ${record.call_type} | ${record.caller} → ${record.destination}`);
+    
+    // ── SYNC WITH CRM CONTACTS ──────────────────────────────────────────
+    // Find external number to match against CRM contacts
+    const externalNum = (record.call_type === 'In') ? record.caller : record.destination;
+    
+    if (externalNum && externalNum.length > 5) {
+      // Normalize number for search (remove spaces, match last 10 digits or +91)
+      const cleanNum = externalNum.replace(/\s+/g, '');
+      const last10   = cleanNum.slice(-10);
+      
+      const updateResult = await pool.query(`
+        UPDATE contacts 
+        SET calls = COALESCE(calls, 0) + 1,
+            last_contact = $1
+        WHERE phone LIKE $2 OR wa LIKE $2 OR phone LIKE $3 OR wa LIKE $3
+        RETURNING id, fname, lname
+      `, [
+        new Date().toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' }),
+        `%${last10}`,
+        `%${cleanNum}%`
+      ]);
+
+      if (updateResult.rowCount > 0) {
+        updateResult.rows.forEach(c => {
+          console.log(`[SMDR] 📈 Incremented call count for CRM contact: ${c.fname} ${c.lname} (ID: ${c.id})`);
+        });
+      }
+    }
+
     emit('pbx:call', row);
     return row;
   } catch (err) {
@@ -165,19 +270,29 @@ async function saveCallLog(record) {
 
 // ── PROCESS BUFFER ────────────────────────────────────────────────────────
 function processBuffer() {
+  if (!buffer.includes('\n')) {
+    if (buffer.length > 0) {
+      console.log(`[SMDR] ⏳ Buffer accumulating (${buffer.length} bytes), but no newline character (\\n) found yet.`);
+      console.log(`[SMDR]    Current Buffer Hex: ${Buffer.from(buffer).toString('hex')}`);
+    }
+    return;
+  }
   const lines = buffer.split('\n');
   buffer = lines.pop(); // keep incomplete last line
   for (const line of lines) {
-    const trimmed = line.trim();
-    if (!trimmed) continue;
-    console.log('[SMDR] 📋 Raw line:', JSON.stringify(trimmed));
-    const record = parseSMDR(trimmed);
+    if (!line || line.trim().length < 10) continue;
+    
+    // Ignore explicit header/summary lines
+    if (line.includes('---') || line.includes('Total Calls') || line.includes('Trunk    :') || line.includes('Page :')) {
+      continue;
+    }
+
+    console.log('[SMDR] 📋 Raw line:', JSON.stringify(line));
+    const record = parseSMDR(line);
     if (record) {
       console.log('[SMDR] ✅ Parsed:', JSON.stringify(record));
       saveCallLog(record);
-    } else {
-      console.log('[SMDR] ⚠️ Could not parse line — check SMDR format');
-    }
+    } 
   }
 }
 
@@ -272,9 +387,14 @@ function startServer() {
 
   console.log('[SMDR] ── startServer() ──────────────────────────────────');
   console.log(`[SMDR]   Binding TCP server on 0.0.0.0:${SMDR_PORT}`);
-  console.log(`[SMDR]   Expecting Matrix PBX at ${PBX_HOST} to connect`);
-  console.log('[SMDR]   PBX setup: System → SMDR Settings → Output: TCP Server');
-  console.log(`[SMDR]              SMDR Port must be set to ${SMDR_PORT} on the PBX`);
+  console.log(`[SMDR]   Verify PBX_HOST : "${PBX_HOST}" (Type: ${typeof PBX_HOST})`);
+  if (PBX_HOST === '192.168.0.205') {
+    console.error('[SMDR] ⚠️  CRITICAL CONFIG ERROR: PBX_HOST is set to the Tower Server IP (192.168.0.205).');
+    console.error('[SMDR]    It MUST be set to the PBX Hardware IP (likely 192.168.0.81).');
+  }
+
+  // Debug: Ensure port is open in Windows Firewall
+  console.log('[SMDR]   💡 HINT: Run `netsh advfirewall firewall add rule name="PBX-SMDR" dir=in action=allow protocol=TCP localport=5001` if connection is timed out.');
 
   tcpServer = net.createServer((socket) => {
     connectedPeers++;
@@ -291,7 +411,7 @@ function startServer() {
     if (!isPBX) {
       console.warn(`[SMDR]   ⚠️  Connection from unknown host ${socket.remoteAddress} — check PBX_HOST in .env`);
     }
-    emit('pbx:connected', { host: PBX_HOST, port: SMDR_PORT, mode: 'server' });
+    emit('pbx:connected', { host: socket.remoteAddress, port: SMDR_PORT, mode: 'server' });
 
     socket.on('data', (data) => {
       const raw = data.toString();
@@ -307,27 +427,45 @@ function startServer() {
       console.log(`[SMDR]   Remote  : ${remote}`);
       console.log(`[SMDR]   hadError: ${hadError}`);
       console.log(`[SMDR]   Active connections remaining: ${connectedPeers}`);
-      if (!isConnected) {
-        console.log('[SMDR]   No PBX connections — waiting for Matrix PBX to reconnect...');
-      }
-      emit('pbx:disconnected', {});
+      console.log(`[SMDR]   No PBX connections — waiting for Matrix PBX to reconnect...`);
+      emit('pbx:disconnected', { fatal: false, reason: 'Peer disconnected', peers: connectedPeers });
     });
 
     socket.on('error', (err) => {
-      console.error(`[SMDR] ⚠️  Socket error from ${remote}: ${err.message} (code=${err.code})`);
+      console.error(`[SMDR] ❌ Socket error from ${remote}: ${err.message} (code=${err.code})`);
+      emit('pbx:binding_error', { 
+        service: 'matrixSmdr', 
+        mode: 'server_socket', 
+        error: err.message, 
+        code: err.code,
+        remote: remote
+      });
     });
   });
 
   tcpServer.listen(SMDR_PORT, '0.0.0.0', () => {
     console.log('[SMDR] ── SERVER READY ───────────────────────────────────');
     console.log(`[SMDR]   ✅ Listening on 0.0.0.0:${SMDR_PORT}`);
+    console.log('[SMDR]   Waiting for Matrix PBX (192.168.0.81) to initiate TCP handshake...');
+    emit('pbx:ready', { mode: 'server', port: SMDR_PORT });
   });
+
+  // Heartbeat to keep logs moving and show service is alive
+  if (global.smdrHeartbeat) clearInterval(global.smdrHeartbeat);
+  global.smdrHeartbeat = setInterval(() => {
+    if (connectedPeers === 0) {
+      console.log(`[SMDR] 💓 Heartbeat: Still listening on port ${SMDR_PORT}... (No active PBX connection yet)`);
+    } else {
+      console.log(`[SMDR] 💓 Heartbeat: Active connection maintained. (Peers: ${connectedPeers})`);
+    }
+  }, 60000);
 
   tcpServer.on('error', (err) => {
     console.error('[SMDR] ❌ Server error:', err.message, `(code=${err.code})`);
-    emit('pbx:binding_error', { 
+    emit('pbx:disconnected', { 
       service: 'matrixSmdr', 
       mode: 'server', 
+      fatal: true,
       error: err.message, 
       code: err.code,
       port: SMDR_PORT
@@ -346,9 +484,10 @@ function getStatus() {
 
 async function start() {
   await ensureTable();
-  // Start both modes to ensure connectivity regardless of PBX config
+  // We only start the Server mode because the Matrix PBX is configured to PUSH data to us.
+  // This avoids the ECONNREFUSED error when trying to connect to the PBX as a client.
   startServer();
-  startClient();
+  // startClient(); 
 }
 
 

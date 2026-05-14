@@ -10,9 +10,9 @@ const pool = new Pool({
   database: process.env.DB_NAME     || 'unicomm_db',
   user:     process.env.DB_USER     || 'postgres',
   password: process.env.DB_PASSWORD || '',
-  max: 10,
-  idleTimeoutMillis: 30000,
-  connectionTimeoutMillis: 3000,
+  max: 20, // Increase max connections
+  idleTimeoutMillis: 60000, // 60s
+  connectionTimeoutMillis: 10000, // 10s
   options: '-c client_encoding=UTF8',
 });
 

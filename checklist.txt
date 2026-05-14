@@ -8,23 +8,44 @@ STATUS:
 [O] Planned to work on (next priority)
 [X] Not done (not started)
 
+LATEST UPDATE - MAY 14, 2026:
+[✓] Outlook practical email action menu added
+    - Removed unnecessary AI-only context menu entries now covered by the AI assistant.
+    - Added Copy to Folder, Move to Folder, Mark as Unread, Pin to UniCRM Top, Block Sender.
+    - Added Download as EML, Download as MSG, and Advanced Options -> Create Task.
+    - Added backend copy endpoint and unread endpoint support.
+    - Pin/block behavior is stored locally for the CRM inbox view.
+    - Note: Outlook Graph exposes flag but not a normal pinned message field, so UniCRM pin no longer changes Outlook follow-up flag.
+    - Copy/Move folder picker and email action confirmations now use custom UniCRM modals instead of browser prompt/confirm popups.
+    - Categorize action now loads Account Info / Outlook master categories first, including their colors, with fallback defaults.
+
+PARTIAL TASKS THAT LOOK EASY TO COMPLETE NEXT:
+[✓] AI prompt output tightened — PicoClaw validated against 5 real cached Outlook emails; output had Summary/Insights/Smart Actions, 3 actions, and 119 words.
+[✓] PBX backup/restore hardened — New backups include call_logs and pbx_contacts; restore supports old call-only backups and v2 backups with saved contacts.
+[~] PostgreSQL pool tuned — Needs normal dashboard runtime observation; no major code expected.
+[~] AI drafting UAT — Existing feature needs a short smoke test and sign-off notes.
+[~] Suggest-only trust phase — Mostly already true; needs UI wording/checklist confirmation.
+[~] Email quality — Add simple quality checks/metrics for drafts, replies, and downloads.
+[~] API error tracking — Logs already exist; add a small centralized error summary or dashboard counter.
+[~] Contact enrichment from Outlook — Import exists; easy next step is adding a one-click "update missing fields from Outlook" action.
+
 ====================
 L1 — UNIT & API VALIDATION
 ====================
 
 API Coverage
 [✓] Outlook Sync API (POST /sync/emails) — Multiple sync endpoints exist: /sync-messages, /sync-stats, /contacts/sync
-[✓] PBX Call History API (GET /calls/history) — /api/calls implemented with Matrix SMDR
+[✓] PBX Call History API (GET /calls/history) — /api/calls implemented with Matrix SMDR; live logs, recordings schema, sync stats, PBX contact materialization from call_logs
 [✓] WhatsApp Webhook API (POST /webhook/message) — Baileys implementation (correct architecture), /api/wa/* exists
 [O] Contact Merge API (PUT /contacts/merge) — Planned for Phase 1
-[X] Pico Claw Trigger API (POST /ai/analyze) — Pico Claw not implemented
+[~] Pico Claw Trigger API (POST /ai/analyze) — Outlook AI assistant route exists with PicoClaw/OpenAI-format call, timeout and 429 handling; dedicated /ai/analyze API still not finalized
 
 Edge Cases
 [O] 50k+ email incremental sync (delta tokens) — Planned for Phase 1
-[~] PBX timeout → circuit breaker — Reconnect logic exists, no circuit breaker pattern
+[~] PBX timeout → circuit breaker — Passive listener ready/connected/disconnected states improved; reconnect exists, full circuit breaker still pending
 [O] WhatsApp rate limit → exponential backoff — Planned for Phase 2
 [X] Contact with 15+ numbers → primary heuristic
-[X] AI null context graceful fallback — Pico Claw not implemented
+[~] AI null context graceful fallback — AI task queue orphan cleanup/retries and AI service error handling improved; full null-context policy still pending
 
 ====================
 L2 — MULTI-CHANNEL INTEGRATION
@@ -32,11 +53,11 @@ L2 — MULTI-CHANNEL INTEGRATION
 
 Data Flow
 [~] Unified Contact Graph implemented — Contacts exist, no unified graph linking
-[✓] Outlook integration — Graph API, inbox, sent, contacts, send
-[✓] PBX integration — Matrix Eternity SMDR live
+[✓] Outlook integration — Graph API, inbox/sent/drafts/deleted/custom folders, folder sidebar, category filters, contacts, send, practical email actions menu
+[✓] PBX integration — Matrix Eternity SMDR live, passive server status, call logs, recordings, PBX contact backfill
 [✓] WhatsApp integration — Baileys, chat, messages, media, session persistence, auto-reconnect, group chat phone numbers in ALL bubbles, 15-min metadata cache for large groups, optimized name resolution.
 [✓] Contacts integration — CRM contacts, Outlook import
-[~] AI pipeline into dashboard — AI drafts exist, no pipeline
+[~] AI pipeline into dashboard — AI drafts/assistant/task queue exist, queue schema retries and orphan cleanup improved; full pipeline still pending
 [X] Action recommendation engine — Pico Claw not implemented
 
 Sync Scenarios
@@ -49,7 +70,7 @@ Sync Scenarios
 
 Conflict Resolution
 [O] Name mismatch handling — Planned for Phase 1
-[X] Email prioritization logic
+[~] Email prioritization logic — Outlook category filters classify confident leads/important/reply-needed mail; full prioritization engine pending
 [X] Phone ownership resolution
 [X] Timezone normalization
 [X] Deleted contact recovery
@@ -144,11 +165,11 @@ Resources
 [X] ARM compatibility — Not required
 
 Degradation
-[~] Outlook fallback — Offline mode exists, no graceful degradation
-[~] PBX delay handling — Reconnect exists, no timeout handling
+[✓] Outlook fallback — Offline DB fallback exists for inbox/sent/drafts/deleted/custom folders with folder-aware cache reads
+[~] PBX delay handling — Passive/ready status and disconnect handling improved; formal timeout/circuit breaker still pending
 [✓] WhatsApp fallback — Reconnect exists, optimized QR code visibility (5s grace period) to prevent flickering on brief drops.
-[X] AI timeout handling — Pico Claw not implemented
-[X] DB fallback
+[~] AI timeout handling — Outlook AI assistant has hard timeout and 429 handling; full AI engine timeout policy pending
+[~] DB fallback — Outlook mail cache fallback exists for inbox/sent/drafts/deleted/custom folders; system-wide fallback pending
 
 ====================
 L6 — UAT

@@ -570,6 +570,28 @@ select.inp option{background:#1a2035;color:var(--text);}
   text-align: center;
 }
 .mail-category-filter.active .count-pill { background: #0078d4; color: #fff; }
+.smart-mail-menu{position:fixed;z-index:20000;min-width:230px;background:var(--card);border:1px solid var(--border2);border-radius:8px;box-shadow:0 16px 40px rgba(0,0,0,0.38);padding:6px;}
+.smart-mail-menu-item{display:flex;align-items:center;gap:10px;width:100%;padding:9px 10px;border:0;background:transparent;color:var(--text);font:inherit;font-size:12.5px;text-align:left;border-radius:6px;cursor:pointer;white-space:nowrap;}
+.smart-mail-menu-item:hover{background:rgba(0,120,212,0.12);color:#60a5fa;}
+.smart-mail-menu-item.danger:hover{background:rgba(239,68,68,0.12);color:var(--red2);}
+.smart-mail-menu-item i{width:16px;text-align:center;color:inherit;opacity:.9;}
+.smart-mail-menu-divider{height:1px;background:var(--border);margin:5px 4px;}
+.smart-reply-option{border:1px solid var(--border);background:rgba(255,255,255,0.03);border-radius:8px;padding:10px 12px;margin:8px 0;cursor:pointer;color:var(--text);font-size:12.5px;line-height:1.45;}
+.smart-reply-option:hover{border-color:#0078d4;background:rgba(0,120,212,0.08);}
+.smart-folder-picker .modal{max-width:460px;width:92vw;padding:0;overflow:hidden;}
+.smart-folder-picker-head{display:flex;align-items:center;justify-content:space-between;padding:15px 18px;border-bottom:1px solid var(--border);}
+.smart-folder-picker-title{display:flex;align-items:center;gap:10px;font-size:15px;font-weight:800;color:var(--text);}
+.smart-folder-picker-body{padding:14px 16px 16px;}
+.smart-folder-search{display:flex;align-items:center;gap:8px;background:var(--bg2);border:1px solid var(--border2);border-radius:8px;padding:9px 11px;margin-bottom:12px;}
+.smart-folder-search input{flex:1;border:0;background:transparent;color:var(--text);outline:none;font:inherit;font-size:12.5px;}
+.smart-folder-list{max-height:340px;overflow-y:auto;border:1px solid var(--border);border-radius:8px;background:rgba(255,255,255,0.02);}
+.smart-folder-row{width:100%;border:0;background:transparent;color:var(--text);display:flex;align-items:center;gap:10px;padding:10px 12px;text-align:left;cursor:pointer;font:inherit;font-size:12.5px;border-bottom:1px solid rgba(255,255,255,0.04);}
+.smart-folder-row:last-child{border-bottom:0;}
+.smart-folder-row:hover{background:rgba(0,120,212,0.12);color:#60a5fa;}
+.smart-folder-row i{width:16px;text-align:center;opacity:.85;}
+.smart-folder-empty{padding:22px;text-align:center;color:var(--muted);font-size:12.5px;}
+.smart-folder-picker-foot{display:flex;justify-content:flex-end;gap:8px;padding:12px 16px;border-top:1px solid var(--border);background:rgba(255,255,255,0.02);}
+.smart-category-dot{width:12px;height:12px;border-radius:50%;display:inline-block;box-shadow:0 0 0 1px rgba(255,255,255,0.24) inset;}
 .outlook-folder-item {
   display: flex;
   align-items: center;
@@ -1594,9 +1616,10 @@ select.inp option{background:#1a2035;color:var(--text);}
     <div style="margin-bottom:12px;">
       <div style="background:rgba(245,166,35,0.06);border:1px solid rgba(245,166,35,0.2);border-radius:8px;padding:8px 16px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
         <span id="pbx-dot" style="width:8px;height:8px;border-radius:50%;background:var(--muted);flex-shrink:0;transition:background 0.3s;"></span>
-        <span id="pbx-status-text" style="font-size:12.5px;font-weight:600;color:var(--muted);">Matrix PBX · Waiting for PBX connection...</span>
-        <span style="font-size:11px;color:var(--muted);">192.168.0.81:5000 SMDR</span>
+        <span id="pbx-status-text" style="font-size:12.5px;font-weight:600;color:var(--muted);">Matrix PBX · Passive Mode · Waiting for connection...</span>
+        <span id="pbx-listener-info" style="font-size:11px;color:var(--muted);">Listening on port 5001</span>
         <span id="pbx-call-count" style="font-size:11px;color:var(--muted2);margin-left:auto;"></span>
+        <button class="btn btn-ghost btn-xs" onclick="reconcilePbxCounts()" title="Sync CRM contact call counts with logs"><i class="fas fa-calculator"></i> Recalculate Counts</button>
         <button class="btn btn-ghost btn-xs" onclick="pbxSyncNow()"><i class="fas fa-sync-alt"></i> Sync Latest</button>
         <button class="btn btn-ghost btn-xs" onclick="pbxReconnect()" title="Reset TCP connection to PBX"><i class="fas fa-plug"></i> Reconnect</button>
         <button class="btn btn-ghost btn-xs" onclick="pbxShowBackupPanel()"><i class="fas fa-archive"></i> Backup</button>
@@ -1608,7 +1631,6 @@ select.inp option{background:#1a2035;color:var(--text);}
     <!-- PBX Tab Nav -->
     <div style="display:flex;gap:0;background:var(--bg2);border:1px solid var(--border2);border-radius:8px 8px 0 0;border-bottom:2px solid var(--gold);margin-bottom:0;overflow:hidden;" id="pbx-tabs">
       <button class="pbx-tab active" onclick="pbxShowTab('logs',this)" id="pbx-tab-logs" style="flex:1;padding:10px 16px;background:transparent;border:none;color:var(--gold);font-size:12.5px;font-weight:700;cursor:pointer;border-bottom:2px solid var(--gold);font-family:'Outfit',sans-serif;"><i class="fas fa-phone-alt"></i> Call Logs</button>
-      <button class="pbx-tab" onclick="pbxShowTab('contacts',this)" id="pbx-tab-contacts" style="flex:1;padding:10px 16px;background:transparent;border:none;color:var(--muted2);font-size:12.5px;font-weight:600;cursor:pointer;border-bottom:2px solid transparent;font-family:'Outfit',sans-serif;"><i class="fas fa-address-book"></i> PBX Contacts</button>
       <button class="pbx-tab" onclick="pbxShowTab('recordings',this)" id="pbx-tab-recordings" style="flex:1;padding:10px 16px;background:transparent;border:none;color:var(--muted2);font-size:12.5px;font-weight:600;cursor:pointer;border-bottom:2px solid transparent;font-family:'Outfit',sans-serif;"><i class="fas fa-microphone"></i> Recordings</button>
       <button class="pbx-tab" onclick="pbxShowTab('backup',this)" id="pbx-tab-backup" style="flex:1;padding:10px 16px;background:transparent;border:none;color:var(--muted2);font-size:12.5px;font-weight:600;cursor:pointer;border-bottom:2px solid transparent;font-family:'Outfit',sans-serif;"><i class="fas fa-database"></i> Backup / Restore</button>
     </div>
@@ -1652,34 +1674,6 @@ select.inp option{background:#1a2035;color:var(--text);}
       <div class="card">
         <div class="card-header"><h3><i class="fas fa-file-alt" style="color:var(--gold);"></i> AI Call Summary</h3></div>
         <div class="card-body"><div id="call-sum-full" style="font-size:12.5px;color:var(--muted);font-style:italic;">Select a call and click Summarise, or click AI Summarize above.</div></div>
-      </div>
-    </div>
-
-    <!-- ── TAB: PBX CONTACTS ── -->
-    <div id="pbx-panel-contacts" class="pbx-panel" style="display:none;">
-      <div style="display:grid;grid-template-columns:300px 1fr;gap:14px;align-items:start;">
-
-        <!-- Left: Contact List -->
-        <div class="card" style="border-radius:0 0 12px 12px;border-top:none;">
-          <div class="card-header">
-            <h3><i class="fas fa-address-book" style="color:var(--gold);"></i> PBX Numbers</h3>
-            <span id="pbx-contacts-count" class="badge b-gold">0</span>
-          </div>
-          <div style="padding:10px 14px;border-bottom:1px solid var(--border);">
-            <div class="search-box"><i class="fas fa-search"></i><input id="pbx-contact-search" placeholder="Search number or name…" oninput="filterPbxContacts()"></div>
-          </div>
-          <div id="pbx-contacts-list" style="max-height:calc(100vh - 300px);overflow-y:auto;padding:8px 0;">
-            <div style="padding:20px;text-align:center;color:var(--muted);"><div class="spin-loader" style="margin:0 auto 8px;"></div>Loading…</div>
-          </div>
-        </div>
-
-        <!-- Right: Contact Detail / History -->
-        <div id="pbx-contact-detail" class="card" style="border-radius:0 0 12px 12px;border-top:none;">
-          <div style="padding:60px 20px;text-align:center;color:var(--muted);">
-            <i class="fas fa-user-circle" style="font-size:48px;margin-bottom:12px;opacity:0.3;display:block;"></i>
-            Select a contact to view their call history
-          </div>
-        </div>
       </div>
     </div>
 
@@ -1766,7 +1760,7 @@ select.inp option{background:#1a2035;color:var(--text);}
   <div class="section-view fu" id="sec-email">
 
     <!-- Outlook-style menu toolbar -->
-    <div id="outlook-menu-bar" style="display:flex;align-items:center;gap:0;background:var(--bg2);border:1px solid var(--border2);border-radius:8px 8px 0 0;border-bottom:2px solid #0078d4;padding:0 8px;margin-bottom:0;flex-shrink:0;position:relative;z-index:10;min-height:32px;">
+    <div id="outlook-menu-bar" style="display:flex;align-items:center;gap:0;background:var(--bg2);border:1px solid var(--border2);border-radius:8px 8px 0 0;border-bottom:2px solid #0078d4;padding:0 8px;margin-bottom:0;flex-shrink:0;position:relative;z-index:10;min-height:40px;flex-wrap:wrap;">
       <!-- File menu -->
       <div class="outlook-menu-item" onclick="toggleOutlookMenu('menu-file')" id="menu-btn-file">
         <span>File</span>
@@ -1818,6 +1812,12 @@ select.inp option{background:#1a2035;color:var(--text);}
       </div>
       <div style="flex:1;"></div>
       <!-- Quick action buttons in toolbar -->
+      <div style="display:flex;gap:7px;align-items:center;flex-wrap:wrap;margin-left:10px;">
+        <span id="outlook-status-dot" class="badge b-gray" style="font-size:10px;white-space:nowrap;">⌛ Checking...</span>
+        <button class="btn btn-blue btn-xs" onclick="loadInbox(true)" style="white-space:nowrap;"><i class="fas fa-sync-alt"></i> Sync</button>
+        <button class="btn btn-gold btn-xs" onclick="openAIAssistant()" title="AI Email Intelligence Assistant" style="white-space:nowrap;"><i class="fas fa-brain"></i> AI Assistant</button>
+        <button class="btn btn-ghost btn-xs" id="sync-stats-btn" onclick="syncOutlookStats()" title="Scan all mail and update contact counts" style="white-space:nowrap;"><i class="fas fa-database"></i> Sync Mail Stats</button>
+      </div>
       <button class="btn btn-ghost btn-xs" style="margin:4px 3px;color:var(--gold);" onclick="openFollowUpPanel()"><i class="fas fa-tasks"></i> Follow-Up</button>
     </div>
 
@@ -1840,57 +1840,19 @@ select.inp option{background:#1a2035;color:var(--text);}
           <h3 style="font-size:12px;"><i class="fas fa-folder" style="color:#0078d4;"></i> Folders</h3>
         </div>
         <div style="flex:1;overflow-y:auto;padding:8px 0;" id="outlook-folder-list">
-          <div class="outlook-folder-item active" data-folder="inbox" onclick="switchOutlookFolder('inbox',this)" title="Inbox">
-            <i class="fas fa-inbox"></i>
-            <span>Inbox</span>
-            <span class="folder-count" id="folder-count-inbox"></span>
-          </div>
-          <div class="outlook-folder-item" data-folder="drafts" onclick="switchOutlookFolder('drafts',this)" title="Drafts">
-            <i class="fas fa-edit"></i>
-            <span>Drafts</span>
-            <span class="folder-count" id="folder-count-drafts"></span>
-          </div>
-          <div class="outlook-folder-item" data-folder="sent" onclick="switchOutlookFolder('sent',this)" title="Sent Items">
-            <i class="fas fa-paper-plane"></i>
-            <span>Sent Items</span>
-            <span class="folder-count" id="folder-count-sent"></span>
-          </div>
-          <div class="outlook-folder-item" data-folder="deleted" onclick="switchOutlookFolder('deleted',this)" title="Deleted Items">
-            <i class="fas fa-trash"></i>
-            <span>Deleted Items</span>
-            <span class="folder-count" id="folder-count-deleted"></span>
-          </div>
-          <div class="outlook-folder-item" data-folder="junk" onclick="switchOutlookFolder('junkemail',this)" title="Junk Email">
-            <i class="fas fa-ban"></i>
-            <span>Junk Email</span>
-            <span class="folder-count" id="folder-count-junk"></span>
-          </div>
-          <div class="outlook-folder-item" data-folder="notes" onclick="switchOutlookFolder('notes',this)" title="Notes">
-            <i class="fas fa-sticky-note"></i>
-            <span>Notes</span>
-            <span class="folder-count" id="folder-count-notes"></span>
-          </div>
-          <div class="outlook-folder-item" data-folder="archive" onclick="switchOutlookFolder('archive',this)" title="Archive">
-            <i class="fas fa-archive"></i>
-            <span>Archive</span>
-            <span class="folder-count" id="folder-count-archive"></span>
-          </div>
+          <!-- Dynamic folders loaded here -->
+          <div style="text-align:center;padding:20px;"><div class="spin-loader" style="margin:0 auto;width:16px;height:16px;border-width:2px;"></div></div>
         </div>
       </div>
 
       <!-- CENTER: EMAIL LIST -->
       <div class="card" style="display:flex;flex-direction:column;max-height:calc(100vh - 140px);">
         <div class="card-header">
-          <h3><i class="fas fa-inbox" style="color:#0078d4;"></i> <span id="current-folder-name">Inbox</span>
+          <h3 style="min-width:0;"><i class="fas fa-inbox" style="color:#0078d4;"></i> <span id="current-folder-name" style="display:inline-block;max-width:260px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;vertical-align:bottom;">Inbox</span>
             <span id="inbox-unread-badge" class="badge b-blue" style="margin-left:6px;display:none;"></span>
+            <span id="email-loaded-count" class="badge b-gray" style="margin-left:6px;font-size:10px;"></span>
           </h3>
-          <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;">
-            <span id="outlook-status-dot" class="badge b-gray" style="font-size:10px;">⌛ Checking…</span>
-            <button class="btn btn-blue btn-xs" onclick="loadInbox(true)"><i class="fas fa-sync-alt"></i> Sync</button>
-            <button class="btn btn-gold btn-xs" onclick="openAIAssistant()" title="AI Email Intelligence Assistant"><i class="fas fa-brain"></i> AI Assistant</button>
-            <button class="btn btn-ghost btn-xs" id="sync-stats-btn" onclick="syncOutlookStats()" title="Scan all mail and update contact counts"><i class="fas fa-database"></i> Sync Mail Stats</button>
-            <span id="sync-stats-status" style="font-size:10px;color:var(--muted);"></span>
-          </div>
+          <span id="sync-stats-status" style="font-size:10px;color:var(--muted);white-space:nowrap;margin-left:auto;"></span>
         </div>
         <div style="padding:8px 14px;border-bottom:1px solid var(--border);display:flex;gap:8px;align-items:center;">
           <div class="search-box" style="flex:1;"><i class="fas fa-search"></i><input id="inbox-search" placeholder="Search inbox…" oninput="searchInbox(this.value)" /></div>
@@ -1906,6 +1868,7 @@ select.inp option{background:#1a2035;color:var(--text);}
           <button class="btn btn-ghost btn-xs mail-category-filter" id="filter-btn-lead" data-category="LEAD" onclick="filterEmailsByCategory('LEAD',this)">Leads <span class="count-pill" id="count-lead"></span></button>
           <button class="btn btn-ghost btn-xs mail-category-filter" id="filter-btn-needs-reply" data-category="NEEDS_REPLY" onclick="filterEmailsByCategory('NEEDS_REPLY',this)">Needs Reply <span class="count-pill" id="count-needs-reply"></span></button>
           <button class="btn btn-ghost btn-xs mail-category-filter" id="filter-btn-important" data-category="IMPORTANT" onclick="filterEmailsByCategory('IMPORTANT',this)">Important <span class="count-pill" id="count-important"></span></button>
+          <span id="email-filter-count-summary" style="margin-left:auto;font-size:10.5px;color:var(--muted);white-space:nowrap;"></span>
         </div>
         <div style="flex:1;overflow-y:auto;" id="email-list">
           <div style="text-align:center;padding:40px 20px;color:var(--muted);"><div class="spin-loader" style="margin:0 auto 12px;"></div><div style="font-size:12.5px;">Loading inbox…</div></div>
@@ -2978,7 +2941,7 @@ function nav(id, el) {
   if (id === 'whatsapp') checkWAStatus();
   if (id === 'calls')    { initWASocket(); loadCallLogs(); }
   if (id === 'marketing') { initWASocket(); loadMarketingData(); loadBroadcasts(); }
-  if (id === 'email')    { checkOutlookStatus(); loadInbox(); }
+  if (id === 'email')    { checkOutlookStatus(); loadOutlookFolders(); loadInbox(); }
   if (id === 'ai') initAIChat();
 }
 
@@ -3940,15 +3903,22 @@ function renderPbxContactsList(rows) {
   }
   el.innerHTML = rows.map(r => {
     const phone = r.phone || '';
-    const lc = r.last_call ? new Date(r.last_call).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' }) : '—';
+    const name = r.name || '';
+    const company = r.company || '';
+    const dateObj = r.last_call ? new Date(r.last_call) : null;
+    const lc = (dateObj && !isNaN(dateObj.getTime())) ? dateObj.toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' }) : '—';
     const n = r.call_count != null ? r.call_count : 0;
+    
+    const displayTitle = name || phone;
+    const subtitle = name ? `${phone}${company ? ' · ' + company : ''}` : `${n} calls · last ${lc}`;
+
     return `
     <div class="contact-card" onclick='showPbxDirectoryDetail(${JSON.stringify(phone)}, this)'>
       <div style="display:flex;align-items:center;gap:11px;">
         <div class="contact-avatar" style="background:rgba(16,185,129,0.12);color:var(--green2);"><i class="fas fa-phone-alt" style="font-size:14px;"></i></div>
         <div style="flex:1;min-width:0;">
-          <div style="font-weight:700;font-size:13.5px;color:var(--text);">${escHtml(phone)}</div>
-          <div style="font-size:11.5px;color:var(--muted);margin-top:1px;">${escHtml(String(n))} calls · last ${escHtml(lc)}</div>
+          <div style="font-weight:700;font-size:13.5px;color:var(--text);">${escHtml(displayTitle)}</div>
+          <div style="font-size:11.5px;color:var(--muted);margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escHtml(subtitle)}</div>
         </div>
         <span class="badge b-green" style="font-size:9px;">PBX</span>
       </div>
@@ -3956,31 +3926,93 @@ function renderPbxContactsList(rows) {
   }).join('');
 }
 
-function showPbxDirectoryDetail(phone, cardEl) {
+async function showPbxDirectoryDetail(phone, cardEl) {
   if (cardEl) {
     document.querySelectorAll('#contact-list .contact-card').forEach(e => e.classList.remove('selected'));
     cardEl.classList.add('selected');
   }
-  const row = pbxContactsCache.find(r => r.phone === phone);
-  const n = row && row.call_count != null ? row.call_count : 0;
-  const lc = row && row.last_call ? new Date(row.last_call).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' }) : '—';
-  const telHref = phone ? sanitizeTelForHref(phone) : '';
-  document.getElementById('contact-detail-panel').innerHTML = `
-    <div class="card" style="animation:fadeUp 0.2s ease;">
-      <div style="padding:18px 20px;border-bottom:1px solid var(--border);">
-        <div class="section-label"><i class="fas fa-phone-alt" style="color:var(--green2);"></i> PBX call directory</div>
-        <div style="font-size:17px;font-weight:800;color:var(--text);margin-top:8px;">${escHtml(phone || '—')}</div>
-      </div>
-      <div style="padding:14px 20px;border-bottom:1px solid var(--border);">
-        <div class="stat-row"><div class="stat-label">Calls (this number)</div><div class="stat-val" style="font-size:12px;font-weight:600;">${n}</div></div>
-        <div class="stat-row"><div class="stat-label">Last seen in logs</div><div class="stat-val" style="font-size:12px;">${escHtml(lc)}</div></div>
-      </div>
-      <div style="padding:14px 20px;display:flex;gap:8px;flex-wrap:wrap;">
-        ${telHref ? `<a class="btn btn-green btn-sm" href="tel:${telHref}" style="text-decoration:none;"><i class="fas fa-phone-alt"></i> Call</a>` : ''}
-        <button type="button" class="btn btn-ghost btn-sm" onclick="nav('calls', null)"><i class="fas fa-list"></i> Full call logs</button>
-      </div>
-      <div style="font-size:10px;color:var(--muted);padding:0 20px 16px;line-height:1.45;">Numbers are taken from Matrix PBX <code style="font-size:9.5px;">caller</code> and <code style="font-size:9.5px;">destination</code> fields in call logs (deduplicated).</div>
-    </div>`;
+  
+  const detailPanel = document.getElementById('contact-detail-panel');
+  detailPanel.innerHTML = `<div style="padding:60px 20px;text-align:center;"><div class="spin-loader" style="margin:0 auto;"></div></div>`;
+
+  try {
+    const row = pbxContactsCache.find(r => r.phone === phone);
+    const n = row && row.call_count != null ? row.call_count : 0;
+    const dateObjLast = row && row.last_call ? new Date(row.last_call) : null;
+    const lc = (dateObjLast && !isNaN(dateObjLast.getTime())) ? dateObjLast.toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' }) : '—';
+    const name = row && row.name ? row.name : '';
+    const company = row && row.company ? row.company : '';
+    const telHref = phone ? sanitizeTelForHref(phone) : '';
+
+    // Fetch call history
+    const res = await fetch(`${API_BASE}/calls/contact/${encodeURIComponent(phone)}`, { headers: getAuthHeaders() });
+    const data = res.ok ? await res.json() : { calls: [] };
+
+    detailPanel.innerHTML = `
+      <div class="card" style="animation:fadeUp 0.2s ease;">
+        <div style="padding:18px 20px;border-bottom:1px solid var(--border);">
+          <div class="section-label"><i class="fas fa-phone-alt" style="color:var(--green2);"></i> PBX call directory</div>
+          <div style="font-size:17px;font-weight:800;color:var(--text);margin-top:8px;">${escHtml(name || phone)}</div>
+          ${name ? `<div style="color:var(--gold);font-family:'JetBrains Mono';font-size:14px;margin-top:2px;">${escHtml(phone)}</div>` : ''}
+          ${company ? `<div style="color:var(--muted2);font-size:12.5px;margin-top:4px;"><i class="far fa-building"></i> ${escHtml(company)}</div>` : ''}
+        </div>
+        
+        <div style="padding:14px 20px;border-bottom:1px solid var(--border);background:rgba(16,185,129,0.04);">
+          <div class="stat-row"><div class="stat-label">Calls (this number)</div><div class="stat-val" style="font-size:12px;font-weight:600;">${n}</div></div>
+          <div class="stat-row"><div class="stat-label">Last seen in logs</div><div class="stat-val" style="font-size:12px;">${escHtml(lc)}</div></div>
+        </div>
+
+        <div style="padding:14px 20px;display:flex;gap:8px;flex-wrap:wrap;border-bottom:1px solid var(--border);">
+          ${telHref ? `<button class="btn btn-green btn-sm" onclick="pbxDial('${phone}')"><i class="fas fa-phone-alt"></i> Call</button>` : ''}
+          <button type="button" class="btn btn-ghost btn-sm" onclick="nav('calls', null)"><i class="fas fa-list"></i> Full logs</button>
+          ${name ? `<button class="btn btn-red btn-sm" onclick="deletePbxContact('${phone}')"><i class="fas fa-trash"></i> Delete</button>` : ''}
+          ${!name ? `<button class="btn btn-gold btn-sm" onclick="pbxSaveContactModal('${phone}')"><i class="fas fa-user-plus"></i> Save</button>` : ''}
+        </div>
+
+        <div style="padding:16px 20px;">
+          <h4 style="font-size:11px;text-transform:uppercase;color:var(--muted);margin-bottom:12px;letter-spacing:1px;font-weight:700;">Recent Call History</h4>
+          <div style="max-height:300px;overflow-y:auto;">
+            ${data.calls.length ? data.calls.map(h => {
+              const parseDate = (item) => {
+                try {
+                  if (item.call_date && item.call_time) {
+                    const d = typeof item.call_date === 'string' ? item.call_date.split('T')[0] : item.call_date;
+                    const obj = new Date(`${d}T${item.call_time}`);
+                    if (!isNaN(obj.getTime())) return obj;
+                  }
+                  if (item.created_at) {
+                    const obj = new Date(item.created_at);
+                    if (!isNaN(obj.getTime())) return obj;
+                  }
+                } catch(e) {}
+                return null;
+              };
+              const dateObj = parseDate(h);
+              const date = dateObj ? dateObj.toLocaleString('en-IN', { dateStyle: 'short', timeStyle: 'short' }) : '—';
+              const typeClass = h.call_type === 'Missed' ? 'b-red' : (h.call_type === 'In' ? 'b-blue' : 'b-gold');
+              return `
+                <div style="display:flex;justify-content:space-between;padding:10px 0;border-bottom:1px solid rgba(255,255,255,0.03);">
+                  <div>
+                    <div style="font-size:12px;color:var(--text);font-weight:600;">${date}</div>
+                    <div style="font-size:11px;color:var(--muted2);margin-top:2px;">
+                      <span class="badge ${typeClass}" style="font-size:9px;padding:1px 4px;">${h.call_type}</span> 
+                      · ${h.duration}
+                    </div>
+                  </div>
+                  <div style="font-size:11px;color:var(--muted);">${escHtml(h.trunk || '')}</div>
+                </div>
+              `;
+            }).join('') : '<div style="color:var(--muted);font-size:12px;padding:10px 0;">No history found.</div>'}
+          </div>
+        </div>
+
+        <div style="font-size:10px;color:var(--muted);padding:0 20px 16px;line-height:1.45;opacity:0.8;">
+          Numbers are from Matrix PBX caller/destination fields in logs.
+        </div>
+      </div>`;
+  } catch (err) {
+    document.getElementById('contact-detail-panel').innerHTML = `<div style="padding:40px;color:var(--red2);">${escHtml(err.message)}</div>`;
+  }
 }
 
 function filterContacts() {
@@ -5830,27 +5862,8 @@ function updateKPIs(stats) {
 // ── LEGACY PBX CALLS (REMOVED: COLLIDES WITH MATRIX INTEGRATION) ──
 
 
-function pbxOnConnected(data) {
-  var dot = document.getElementById('pbx-dot');
-  var txt = document.getElementById('pbx-status-text');
-  var badge = document.getElementById('pbx-live-badge');
-  if (dot) { dot.style.background = 'var(--green)'; }
-  if (txt) { txt.textContent = 'Matrix PBX Connected · SMDR Live'; txt.style.color = 'var(--green2)'; }
-  if (badge) badge.style.display = 'inline-flex';
-  console.log('[PBX] ✅ CONNECTED — Matrix PBX SMDR socket established', data || '');
-  console.log('[PBX]    Status bar updated → green dot, SMDR Live badge shown');
-}
+// Redundant PBX handlers removed - using unified implementation in PBX section.
 
-function pbxOnDisconnected(data) {
-  var dot = document.getElementById('pbx-dot');
-  var txt = document.getElementById('pbx-status-text');
-  var badge = document.getElementById('pbx-live-badge');
-  if (dot) dot.style.background = 'var(--red2)';
-  if (txt) { txt.textContent = 'Matrix PBX · Disconnected — Reconnecting...'; txt.style.color = 'var(--red2)'; }
-  if (badge) badge.style.display = 'none';
-  console.warn('[PBX] ❌ DISCONNECTED — Matrix PBX dropped the SMDR connection', data || '');
-  console.warn('[PBX]    Check: PBX at 192.168.0.81 → SMDR Settings → TCP Server enabled?');
-}
 
 function renderCallLogs() { loadCallLogs(); }
 
@@ -6032,9 +6045,37 @@ async function initSystemStatus() {
     const res = await fetch(`${API_BASE}/system/status`, { headers: getAuthHeaders() });
     if (!res.ok) return;
     const data = await res.json();
+    
+    // Update generic topbar indicators
     ['whatsapp', 'pbx', 'outlook', 'postgres'].forEach(svc => {
-      if (data[svc]) updateServiceIndicator(svc, data[svc].status === 'online');
+      if (data[svc]) {
+        const isOnline = data[svc].status === 'online' || data[svc].status === 'connected' || data[svc].status === 'ready';
+        updateServiceIndicator(svc, isOnline);
+      }
     });
+
+    // Update specific UI components if they exist
+    if (data.pbx) {
+      if (data.pbx.status === 'connected' && data.pbx.clientHost) {
+        if (typeof pbxOnConnected === 'function') pbxOnConnected({ host: data.pbx.clientHost });
+      } else if (data.pbx.status === 'online') {
+        if (typeof pbxOnReady === 'function') pbxOnReady({ port: data.pbx.port, mode: data.pbx.mode });
+      } else if (data.pbx.status === 'offline') {
+        if (typeof pbxOnDisconnected === 'function') pbxOnDisconnected({ fatal: true, reason: 'Server offline' });
+      }
+    }
+
+    if (data.whatsapp && data.whatsapp.status === 'online' && data.whatsapp.phone) {
+      // If we're already online, ensure the status bar reflects it
+      const sb = document.getElementById('wa-status-bar');
+      const cb = document.getElementById('wa-connect-banner');
+      if (sb) {
+        sb.style.display = 'block';
+        const st = document.getElementById('wa-status-text');
+        if (st) st.textContent = 'WhatsApp Connected: ' + data.whatsapp.phone;
+      }
+      if (cb) cb.style.display = 'none';
+    }
   } catch (err) {
     console.warn('[System] initSystemStatus failed:', err.message);
   }
@@ -7220,6 +7261,13 @@ function showOutlookAccountInfo() {
       ? '<span class="badge b-green" style="font-size:10px;">● Connected</span>'
       : '<span class="badge b-red" style="font-size:10px;">● Disconnected</span>';
   }
+
+  // Initialize Settings UI state
+  const junkToggle = document.getElementById('oa-toggle-junk');
+  if (junkToggle) {
+    junkToggle.checked = localStorage.getItem('oa_show_junk') === 'true';
+  }
+
   // Reset to account section
   oaShowSection('account');
   oaShowSub('email-account');
@@ -8148,6 +8196,7 @@ async function oaSaveCategory(id, displayName, color) {
     const data = await res.json().catch(() => ({}));
     if (!res.ok) throw new Error(data.error || 'Could not save category');
     notify('Categories', id ? 'Category updated.' : 'Category created.', 'var(--green2)', 'fas fa-check-circle');
+    smartMailCategoriesCache = null;
     oaLoadCategories();
   } catch(e) {
     notify('Categories', e.message, 'var(--red2)', 'fas fa-exclamation-circle');
@@ -8164,6 +8213,7 @@ async function oaDeleteCategory(id, name) {
     const data = await res.json().catch(() => ({}));
     if (!res.ok) throw new Error(data.error || 'Could not delete category');
     notify('Categories', 'Category deleted.', 'var(--green2)', 'fas fa-check-circle');
+    smartMailCategoriesCache = null;
     oaLoadCategories();
   } catch(e) {
     notify('Categories', e.message, 'var(--red2)', 'fas fa-exclamation-circle');
@@ -8594,7 +8644,10 @@ async function loadInbox(forceRefresh) {
       }
     };
     
-    const endpoints = folderEndpoints[inboxFolder] || folderEndpoints['inbox'];
+    const endpoints = folderEndpoints[inboxFolder] || {
+      api: `${API_BASE}/outlook/folder/${encodeURIComponent(inboxFolder)}?top=${inboxPageSize}&skip=${skip}`,
+      fallback: `${API_BASE}/outlook/folder/${encodeURIComponent(inboxFolder)}/fallback?top=${inboxPageSize}&skip=${skip}`
+    };
     
     // Try API first if connected AND not in force offline mode
     if (connected && !window.forceOffline) {
@@ -8682,6 +8735,13 @@ async function loadInbox(forceRefresh) {
       return true;
     });
     console.log('[Inbox] After folder filtering:', msgs.length, 'messages');
+
+    if (inboxFolder === 'inbox') {
+      const blockedSenders = new Set(getBlockedMailSenders());
+      if (blockedSenders.size) {
+        msgs = msgs.filter(m => !blockedSenders.has(String(m.from?.emailAddress?.address || '').toLowerCase()));
+      }
+    }
     
     // MANDATORY SORTING - Newest first
     msgs.sort((a, b) => {
@@ -8706,6 +8766,7 @@ async function loadInbox(forceRefresh) {
       }
       window.currentFolderMessages = [];
       updateCategoryFilterCounts();
+      updateEmailLoadedCount(0, 0, window.currentEmailCategoryFilter || 'ALL');
       updateFolderCounts();
       oaRefreshStorageIfOpen();
       return;
@@ -8724,20 +8785,24 @@ async function loadInbox(forceRefresh) {
           m.categoryPriority = catData.priority || 'LOW';
           m.categoryReason = catData.reason;
         } else {
-          m.category = m.category || 'GENERAL';
-          m.categoryPriority = 'LOW';
+          const cls = classifyOutlookMessage(m);
+          m.category = m.category || cls.category;
+          m.categoryPriority = cls.priority;
+          m.categoryReason = cls.reason;
         }
       });
     } else {
-      // For other folders, assign default category
       msgs.forEach(m => {
-        m.category = m.category || 'GENERAL';
-        m.categoryPriority = 'LOW';
+        const cls = classifyOutlookMessage(m);
+        m.category = m.category && m.category !== 'GENERAL' ? m.category : cls.category;
+        m.categoryPriority = cls.priority;
+        m.categoryReason = cls.reason;
       });
     }
     
     loadMailTasks().catch(() => {});
     loadMailTaskTriageCache(msgs).catch(() => {});
+    window.currentInboxDataSource = dataSource;
     document.getElementById('inbox-page-info').textContent = `Page ${inboxCurrentPage + 1}${dataSource === 'database' ? ' (Offline)' : ''}`;
     document.getElementById('inbox-prev').disabled = inboxCurrentPage === 0;
     document.getElementById('inbox-next').disabled = msgs.length < inboxPageSize;
@@ -8765,7 +8830,7 @@ async function loadInbox(forceRefresh) {
       }
     });
     
-    const grouped = Array.from(convMap.values());
+    const grouped = sortMessagesWithPins(Array.from(convMap.values()));
     
     // Ensure all grouped messages have category
     grouped.forEach(m => {
@@ -8808,6 +8873,64 @@ async function loadInbox(forceRefresh) {
 window.currentEmailCategoryFilter = 'ALL';
 window.currentEmailFolder = 'inbox';
 window.forceOffline = false;
+window.outlookFolderDisplayNames = window.outlookFolderDisplayNames || {};
+
+function emailFilterLabel(category) {
+  return {
+    ALL: 'All',
+    UNREAD: 'Unread',
+    LEAD: 'Leads',
+    NEEDS_REPLY: 'Needs Reply',
+    IMPORTANT: 'Important'
+  }[category] || category;
+}
+
+function updateEmailLoadedCount(shown, loaded, filter) {
+  const countEl = document.getElementById('email-loaded-count');
+  const pageEl = document.getElementById('inbox-page-info');
+  const filterSummaryEl = document.getElementById('email-filter-count-summary');
+  const label = emailFilterLabel(filter || window.currentEmailCategoryFilter || 'ALL');
+  const text = `${shown} shown / ${loaded} loaded`;
+
+  if (countEl) {
+    countEl.textContent = filter === 'ALL' ? `${loaded} loaded` : `${label}: ${shown}`;
+    countEl.title = text;
+    countEl.style.display = loaded > 0 ? 'inline-flex' : 'none';
+  }
+
+  if (pageEl) {
+    const suffix = window.currentInboxDataSource === 'database' ? ' (Offline)' : '';
+    pageEl.textContent = `Page ${inboxCurrentPage + 1}${suffix} · ${text}`;
+  }
+
+  if (filterSummaryEl) {
+    filterSummaryEl.textContent = filter === 'ALL'
+      ? `${loaded} messages loaded`
+      : `${label}: ${shown} of ${loaded}`;
+  }
+}
+
+function classifyOutlookMessage(m) {
+  const subject = String(m.subject || '').toLowerCase();
+  const body = String(m.bodyPreview || '').toLowerCase();
+  const from = String(m.from?.emailAddress?.address || '').toLowerCase();
+  const combined = `${subject} ${body} ${from}`;
+
+  const leadWords = ['indiamart', 'enquiry', 'inquiry', 'quotation', 'quote request', 'rfq', 'buyer', 'purchase order', 'requirement'];
+  const importantWords = ['urgent', 'asap', 'critical', 'immediate', 'important', 'payment overdue', 'escalation'];
+  const replyWords = ['please reply', 'please respond', 'kindly confirm', 'confirm', 'can you', 'could you', 'price', 'pricing', 'quote', 'need', 'required'];
+
+  if (leadWords.some(w => combined.includes(w))) {
+    return { category: 'LEAD', priority: 'HIGH', reason: 'Sales inquiry or buyer keyword detected' };
+  }
+  if (m.importance === 'high' || importantWords.some(w => combined.includes(w))) {
+    return { category: 'IMPORTANT', priority: 'HIGH', reason: 'High importance or urgent business keyword detected' };
+  }
+  if (replyWords.some(w => combined.includes(w))) {
+    return { category: 'NEEDS_REPLY', priority: 'MEDIUM', reason: 'Looks like it needs a response' };
+  }
+  return { category: 'GENERAL', priority: 'LOW', reason: 'No confident filter match' };
+}
 
 function toggleForceOffline() {
   window.forceOffline = !window.forceOffline;
@@ -8982,42 +9105,6 @@ async function updateFolderCounts() {
   }
 }
 
-/**
- * Universal folder switcher for Outlook sidebar
- */
-async function switchOutlookFolder(folder, el) {
-  if (!folder) return;
-  console.log(`[Outlook] Switching to folder: ${folder}`);
-  
-  // 1. Update UI Active State
-  document.querySelectorAll('.outlook-folder-item').forEach(i => i.classList.remove('active'));
-  if (el) el.classList.add('active');
-  else {
-    const target = document.querySelector(`.outlook-folder-item[data-folder="${folder}"]`);
-    if (target) target.classList.add('active');
-  }
-  
-  // 2. Update Global State
-  window.currentEmailFolder = folder;
-  inboxFolder = folder; // Sync with loadInbox's internal state
-  inboxCurrentPage = 0; // Reset pagination
-  
-  // 3. Update Header Info
-  const folderNames = {
-    'inbox': 'Inbox',
-    'sent': 'Sent Items',
-    'drafts': 'Drafts',
-    'deleted': 'Deleted Items',
-    'junkemail': 'Junk Email',
-    'notes': 'Notes',
-    'archive': 'Archive'
-  };
-  const titleEl = document.getElementById('current-folder-name');
-  if (titleEl) titleEl.textContent = folderNames[folder] || folder;
-  
-  // 4. Trigger Load
-  loadInbox();
-}
 
 /**
  * Render filtered emails based on current category filter
@@ -9033,6 +9120,7 @@ function renderFilteredEmails() {
   console.log(`[renderFilteredEmails] Total messages: ${allMessages.length}`);
   
   if (!allMessages.length) {
+    updateEmailLoadedCount(0, 0, window.currentEmailCategoryFilter || 'ALL');
     listEl.innerHTML = `<div style="text-align:center;padding:40px;color:var(--muted);font-size:12.5px;">No messages found.</div>`;
     return;
   }
@@ -9043,7 +9131,9 @@ function renderFilteredEmails() {
   
   console.log(`[renderFilteredEmails] Current filter: ${currentFilter}`);
   
-  if (currentFilter !== 'ALL') {
+  if (currentFilter === 'UNREAD') {
+    filtered = allMessages.filter(m => !m.isRead);
+  } else if (currentFilter !== 'ALL') {
     filtered = allMessages.filter(m => {
       const cat = m.category || 'GENERAL';
       const match = cat === currentFilter;
@@ -9053,8 +9143,10 @@ function renderFilteredEmails() {
       return match;
     });
   }
+  filtered = sortMessagesWithPins(filtered);
   
   console.log(`[renderFilteredEmails] Rendering category: ${currentFilter}, filtered count: ${filtered.length} of ${allMessages.length}`);
+  updateEmailLoadedCount(filtered.length, allMessages.length, currentFilter);
   
   if (!filtered.length) {
     listEl.innerHTML = `<div style="text-align:center;padding:40px;color:var(--muted);font-size:12.5px;">No ${currentFilter.toLowerCase()} messages in this folder.</div>`;
@@ -9062,6 +9154,7 @@ function renderFilteredEmails() {
   }
   
   // Render filtered emails
+  const pinnedIds = new Set(getPinnedEmailIds());
   listEl.innerHTML = filtered.map(m => {
     const fromEmail = m.from?.emailAddress?.address || '';
     const fromName  = m.from?.emailAddress?.name || '';
@@ -9070,23 +9163,24 @@ function renderFilteredEmails() {
       ? renderRecipientCell(m.toRecipients, m.ccRecipients)
       : renderSenderCell(fromEmail, fromName);
     const time    = m.receivedDateTime || m.sentDateTime
-      ? new Date(m.receivedDateTime || m.sentDateTime).toLocaleString('en-IN', { day:'2-digit', month:'short', hour:'2-digit', minute:'2-digit' })
+      ? new Date(m.receivedDateTime || m.sentDateTime).toLocaleString('en-IN', { day:'2-digit', month:'short', year:'2-digit', hour:'2-digit', minute:'2-digit' })
       : '';
     const unreadDot = !m.isRead ? `<span style="width:7px;height:7px;border-radius:50%;background:var(--blue);flex-shrink:0;margin-top:4px;"></span>` : `<span style="width:7px;height:7px;flex-shrink:0;"></span>`;
     const importanceIcon = m.importance === 'high' ? `<i class="fas fa-exclamation" style="color:var(--red2);font-size:10px;margin-left:4px;"></i>` : '';
     const attachIcon = m.hasAttachments ? `<i class="fas fa-paperclip" style="color:var(--muted);font-size:10px;margin-left:4px;"></i>` : '';
     const countBadge = m._count > 1 ? `<span style="font-size:10px;color:var(--muted);background:rgba(255,255,255,0.08);border-radius:10px;padding:1px 6px;margin-left:4px;">${m._count}</span>` : '';
-    const categoryBadge = m.category ? `<span class="mail-category ${m.category}" title="${m.categoryReason || ''}">${m.category}</span>` : '';
+    const pinBadge = pinnedIds.has(m.id) ? `<i class="fas fa-thumbtack" title="Pinned" style="color:var(--gold);font-size:10px;margin-left:4px;"></i>` : '';
+    const categoryBadge = m.category ? `<span class="mail-category ${normalizeMailCategory(m.category)}" title="${m.categoryReason || ''}">${displayMailCategory(m.category)}</span>` : '';
     const rowClass = isImportantMail(m) ? 'email-row-important' : '';
     const triageBadge = triageBadgeHtml(mailTaskTriageCache[m.id] || mailTaskTriageCache[m.conversationId] || 'none');
     return `
-      <div class="${rowClass}" onclick="openEmail('${m.id}')" style="padding:11px 14px;border-bottom:1px solid var(--border);cursor:pointer;transition:background 0.1s;display:flex;gap:10px;align-items:flex-start;"
+      <div class="${rowClass}" onclick="openEmail('${m.id}')" oncontextmenu="openSmartEmailContextMenu(event, ${jsArg(m.id)})" style="padding:11px 14px;border-bottom:1px solid var(--border);cursor:pointer;transition:background 0.1s;display:flex;gap:10px;align-items:flex-start;"
            onmouseover="this.style.background='rgba(255,255,255,0.03)'" onmouseout="this.style.background=''" id="email-row-${m.id}">
         ${unreadDot}
         <div style="flex:1;min-width:0;">
           <div style="display:flex;justify-content:space-between;align-items:center;gap:6px;">
-            <span style="font-size:12.5px;font-weight:${m.isRead?'500':'700'};color:${m.isRead?'var(--muted2)':'var(--text)'};display:flex;align-items:center;flex-wrap:wrap;gap:2px;min-width:0;">${senderCell}${countBadge}${categoryBadge}</span>
-            <span style="font-size:10.5px;color:var(--muted);flex-shrink:0;">${time}</span>
+            <span style="font-size:12.5px;font-weight:${m.isRead?'500':'700'};color:${m.isRead?'var(--muted2)':'var(--text)'};display:flex;align-items:center;flex-wrap:wrap;gap:2px;min-width:0;">${senderCell}${countBadge}${pinBadge}${categoryBadge}</span>
+            <span style="font-size:10.5px;color:var(--muted);flex-shrink:0;min-width:86px;text-align:right;">${time}</span>
           </div>
           <div style="font-size:12px;color:var(--text);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${triageBadge}${m.subject || '(no subject)'}${importanceIcon}${attachIcon}</div>
           <div style="font-size:11px;color:var(--muted);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${m.bodyPreview || ''}</div>
@@ -9782,6 +9876,662 @@ async function forwardFromThread(meta) {
   composeApplyDefaultSignature('reply');
 }
 
+function smartEmailMetaFromMessage(msg) {
+  if (!msg) return null;
+  return {
+    id: msg.id,
+    subject: msg.subject || '(no subject)',
+    fromAddr: msg.from?.emailAddress?.address || '',
+    fromName: msg.from?.emailAddress?.name || '',
+    toRecipients: (msg.toRecipients || []).map(r => r.emailAddress?.address).filter(Boolean),
+    ccRecipients: (msg.ccRecipients || []).map(r => r.emailAddress?.address).filter(Boolean),
+    receivedDateTime: msg.receivedDateTime || msg.sentDateTime || msg.createdDateTime || '',
+    bodyPreview: msg.bodyPreview || '',
+    importance: msg.importance || 'normal',
+    conversationId: msg.conversationId || '',
+    webLink: msg.webLink || '',
+    category: msg.category || normalizeMailCategory((msg.categories || [])[0] || '')
+  };
+}
+
+async function getSmartEmailMeta(id) {
+  if (activeMailMessage && activeMailMessage.id === id) return smartEmailMetaFromMessage(activeMailMessage);
+  const cached = (window.currentFolderMessages || []).find(m => m.id === id);
+  if (cached) return smartEmailMetaFromMessage(cached);
+  const res = await fetch(`${API_BASE}/outlook/message/${encodeURIComponent(id)}`, { headers: getAuthHeaders() });
+  const msg = await res.json();
+  if (!res.ok) throw new Error(msg.error || 'Could not load email');
+  return smartEmailMetaFromMessage(msg);
+}
+
+function closeSmartEmailMenu() {
+  document.querySelectorAll('.smart-mail-menu,.msg-more-menu').forEach(m => m.remove());
+}
+
+async function openSmartEmailContextMenu(event, idOrMeta) {
+  event.preventDefault();
+  event.stopPropagation();
+  closeSmartEmailMenu();
+
+  const meta = typeof idOrMeta === 'object' ? idOrMeta : await getSmartEmailMeta(idOrMeta);
+  if (!meta || !meta.id) return;
+  activeMessageId = meta.id;
+
+  const menu = document.createElement('div');
+  menu.className = 'smart-mail-menu';
+  const items = [
+    { icon:'fa-reply', label:'Reply', action:() => openReply(false) },
+    { icon:'fa-share', label:'Forward', action:() => forwardFromThread(meta) },
+    { type:'divider' },
+    { icon:'fa-copy', label:'Copy to Folder', action:() => smartCopyOrMoveToFolder(meta, 'copy') },
+    { icon:'fa-folder-open', label:'Move to Folder', action:() => smartCopyOrMoveToFolder(meta, 'move') },
+    { icon:'fa-envelope', label:'Mark as Unread', action:() => smartMarkUnread(meta) },
+    { icon:'fa-tag', label:'Categorize', action:() => smartCategorize(meta) },
+    { icon:'fa-thumbtack', label:isEmailPinned(meta.id) ? 'Unpin from UniCRM Top' : 'Pin to UniCRM Top (app only)', action:() => smartTogglePinEmail(meta) },
+    { icon:'fa-up-right-from-square', label:'Open in Outlook to Pin', action:() => smartOpenInOutlook(meta) },
+    { icon:'fa-ban', label:'Block Sender', action:() => smartBlockSender(meta), danger:true },
+    { type:'divider' },
+    { icon:'fa-download', label:'Download as EML', action:() => downloadMessageFromMenu(meta, 'eml') },
+    { icon:'fa-download', label:'Download as MSG', action:() => downloadMessageFromMenu(meta, 'msg') },
+    { type:'divider' },
+    { icon:'fa-archive', label:'Archive', action:() => smartArchive(meta) },
+    { icon:'fa-trash', label:'Delete', action:() => smartDelete(meta), danger:true },
+    { icon:'fa-clipboard-check', label:'Advanced Options -> Create Task', action:() => smartCreateTask(meta) },
+    { icon:'fa-filter', label:'Create Rule', action:() => smartCreateRule(meta) }
+  ];
+
+  items.forEach(item => {
+    if (item.type === 'divider') {
+      const div = document.createElement('div');
+      div.className = 'smart-mail-menu-divider';
+      menu.appendChild(div);
+      return;
+    }
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'smart-mail-menu-item' + (item.danger ? ' danger' : '');
+    btn.innerHTML = `<i class="fas ${item.icon}"></i><span>${escHtml(item.label)}</span>`;
+    btn.onclick = () => {
+      closeSmartEmailMenu();
+      Promise.resolve(item.action()).catch(err => {
+        console.error('[Smart Mail Menu] Action failed:', err);
+        notify('Action failed', err.message || String(err), 'var(--red)', 'fas fa-exclamation-circle');
+      });
+    };
+    menu.appendChild(btn);
+  });
+
+  document.body.appendChild(menu);
+  menu.style.left = Math.max(8, Math.min(event.clientX, window.innerWidth - menu.offsetWidth - 10)) + 'px';
+  menu.style.top = Math.max(8, Math.min(event.clientY, window.innerHeight - menu.offsetHeight - 10)) + 'px';
+  setTimeout(() => document.addEventListener('click', closeSmartEmailMenu, { once:true }), 0);
+}
+
+function applyComposeDraft(title, to, subject, html) {
+  document.getElementById('compose-title').textContent = title;
+  resetComposeForm();
+  openModal('compose-email-modal');
+  loadComposeTemplates();
+  composeLoadGroupsDropdown();
+  const toEl = document.getElementById('compose-to');
+  const subjEl = document.getElementById('compose-subject');
+  const bodyEl = document.getElementById('compose-body');
+  if (toEl) toEl.value = to || '';
+  if (subjEl) subjEl.value = subject || '';
+  if (bodyEl) bodyEl.innerHTML = html || '';
+  composeApplyDefaultSignature(title.toLowerCase().includes('reply') ? 'reply' : 'new');
+  setTimeout(() => bodyEl?.focus(), 150);
+}
+
+async function getFullEmailText(meta) {
+  const res = await fetch(`${API_BASE}/outlook/message/${encodeURIComponent(meta.id)}`, { headers: getAuthHeaders() });
+  const msg = await res.json();
+  if (!res.ok) throw new Error(msg.error || 'Could not load email');
+  activeMailMessage = msg;
+  return String(msg.body?.content || msg.uniqueBody?.content || msg.bodyPreview || meta.bodyPreview || '').replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+}
+
+async function smartReplyAI(meta) {
+  notify('AI reply', 'Drafting...', 'var(--gold)', 'fas fa-brain');
+  const body = await getFullEmailText(meta);
+  const draft = await callClaude(`Draft a short professional reply from Unicircuit Engineering Services LLP. Keep it editable, concise, and practical.\n\nSubject: ${meta.subject}\nFrom: ${meta.fromName || meta.fromAddr}\nEmail: ${body}`);
+  applyComposeDraft('Reply (AI-assisted)', meta.fromAddr, /^re:/i.test(meta.subject) ? meta.subject : 'Re: ' + meta.subject, escHtml(draft).replace(/\n/g, '<br>'));
+}
+
+async function smartForwardWithSummary(meta) {
+  notify('Forward summary', 'Preparing...', 'var(--blue2)', 'fas fa-share');
+  const body = await getFullEmailText(meta);
+  const summary = await callClaude(`Summarize this email in 2-3 lines for forwarding. Include only useful business context.\n\nSubject: ${meta.subject}\n${body}`);
+  applyComposeDraft('Forward with Summary', '', /^fwd?:/i.test(meta.subject) ? meta.subject : 'Fwd: ' + meta.subject, `<p><b>Summary:</b><br>${escHtml(summary).replace(/\n/g, '<br>')}</p><hr><p><b>Original email attached below:</b></p><blockquote>${escHtml(body).slice(0, 4000)}</blockquote>`);
+}
+
+async function smartSummarizeEmail(meta) {
+  notify('Summarizing', 'Reading email...', 'var(--blue2)', 'fas fa-wand-magic-sparkles');
+  const body = await getFullEmailText(meta);
+  const summary = await callClaude(`Extract key points, tasks, and deadlines from this email. Use headings: Key Points, Tasks, Deadlines. Be concise.\n\nSubject: ${meta.subject}\n${body}`);
+  alert(summary);
+}
+
+async function smartReplyOptions(meta) {
+  notify('Smart replies', 'Generating options...', 'var(--gold)', 'fas fa-bolt');
+  const body = await getFullEmailText(meta);
+  const optionsText = await callClaude(`Generate exactly 3 short professional reply options for this email. Number them 1, 2, 3. Each under 45 words.\n\nSubject: ${meta.subject}\n${body}`);
+  const options = optionsText.split(/\n(?=\s*(?:Option\s*)?\d[\).:-])/i).map(s => s.trim()).filter(Boolean).slice(0, 3);
+  const choice = prompt(`Choose smart reply option 1-${options.length}:\n\n${options.join('\n\n')}`);
+  const idx = parseInt(choice, 10) - 1;
+  if (idx >= 0 && options[idx]) applyComposeDraft('Smart Reply', meta.fromAddr, /^re:/i.test(meta.subject) ? meta.subject : 'Re: ' + meta.subject, escHtml(options[idx]).replace(/\n/g, '<br>'));
+}
+
+function smartDefaultDueAt() {
+  const d = new Date();
+  d.setHours(18, 0, 0, 0);
+  if (d < new Date()) d.setDate(d.getDate() + 1);
+  return d;
+}
+
+function smartDueFromText(text) {
+  const d = smartDefaultDueAt();
+  if (/\btomorrow\b/i.test(String(text || ''))) d.setDate(new Date().getDate() + 1);
+  return d;
+}
+
+async function smartCreateTask(meta, opts = {}) {
+  const due = opts.dueAt || smartDueFromText(`${meta.subject} ${meta.bodyPreview}`);
+  const payload = {
+    message_id: meta.id,
+    conversation_id: meta.conversationId || null,
+    subject: meta.subject || '(no subject)',
+    sender_name: meta.fromName || '',
+    sender_email: meta.fromAddr || '',
+    preview: meta.bodyPreview || '',
+    importance: meta.importance || 'normal',
+    priority: opts.priority || (meta.importance === 'high' ? 'high' : 'normal'),
+    assigned_to_name: 'Self',
+    due_at: due.toISOString(),
+    notify_before_minutes: opts.notifyBeforeMinutes || 60,
+    notes: opts.notes || 'Created from smart email menu.'
+  };
+  const res = await fetch(`${API_BASE}/mail-tasks/`, { method:'POST', headers:getAuthHeaders(), body:JSON.stringify(payload) });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || 'Task creation failed');
+  notify('Task created', new Date(due).toLocaleString('en-IN'), 'var(--gold)', 'fas fa-clipboard-check');
+  await loadMailTasks();
+  return data;
+}
+
+async function smartScheduleFollowUp(meta) {
+  const choice = prompt('Schedule follow-up:\n1. 10 minutes\n2. 1 hour\n3. Tomorrow\n\nEnter 1, 2, or 3:');
+  const due = new Date();
+  if (choice === '1') due.setMinutes(due.getMinutes() + 10);
+  else if (choice === '2') due.setHours(due.getHours() + 1);
+  else if (choice === '3') { due.setDate(due.getDate() + 1); due.setHours(10, 0, 0, 0); }
+  else return;
+  await smartCreateTask(meta, { dueAt: due, priority:'normal', notifyBeforeMinutes: choice === '1' ? 5 : 30, notes:'Scheduled follow-up reminder.' });
+}
+
+function smartDetectCategory(meta) {
+  const text = `${meta.subject || ''} ${meta.bodyPreview || ''} ${meta.fromAddr || ''}`.toLowerCase();
+  if (/urgent|asap|immediate|critical|escalat/.test(text) || meta.importance === 'high') return 'Urgent';
+  if (/invoice|payment|receipt|bank|gst|tax|petty cash|quotation|quote|price|pricing/.test(text)) return 'Finance';
+  if (/client|customer|purchase order|po\b|requirement|enquiry|inquiry|indiamart|buyer/.test(text)) return 'Client';
+  return 'Work';
+}
+
+const SMART_MAIL_CATEGORIES = [
+  { label:'LEAD', value:'LEAD', color:'#b146c2' },
+  { label:'BROADCAST', value:'BROADCAST', color:'#ff8c00' },
+  { label:'CLIENT', value:'CLIENT', color:'#16c60c' },
+  { label:'PRAPOSAL SEND', value:'PRAPOSAL_SEND', outlook:'PRAPOSAL SEND', color:'#e3008c' },
+  { label:'VENDOR', value:'VENDOR', color:'#8764b8' },
+  { label:'Red category', value:'RED_CATEGORY', outlook:'Red category', color:'#e74856' },
+  { label:'IMPORTANT', value:'IMPORTANT', color:'#ef4444' },
+  { label:'NEEDS REPLY', value:'NEEDS_REPLY', outlook:'NEEDS REPLY', color:'#f5a623' },
+  { label:'GENERAL', value:'GENERAL', color:'#94a3b8' }
+];
+
+let smartMailCategoriesCache = null;
+
+function normalizeMailCategory(category) {
+  const raw = String(category || '').trim();
+  if (!raw) return 'GENERAL';
+  return raw.toUpperCase().replace(/\s+/g, '_').replace(/[^A-Z0-9_]/g, '');
+}
+
+function displayMailCategory(category) {
+  return String(category || 'GENERAL').replace(/_/g, ' ');
+}
+
+function outlookCategoryToSmartCategory(cat) {
+  const name = String(cat?.displayName || cat?.label || '').trim();
+  if (!name) return null;
+  const colorMap = oaCategoryColorMap();
+  return {
+    label: name,
+    value: normalizeMailCategory(name),
+    outlook: name,
+    color: colorMap[cat.color] || cat.color || colorMap.none
+  };
+}
+
+async function loadSmartMailCategories(force = false) {
+  if (!force && Array.isArray(smartMailCategoriesCache) && smartMailCategoriesCache.length) return smartMailCategoriesCache;
+  try {
+    const res = await fetch(`${API_BASE}/outlook/settings/categories`, { headers: getAuthHeaders() });
+    const data = await res.json();
+    if (!res.ok || !Array.isArray(data)) throw new Error(data.error || 'Could not load Outlook categories');
+    const fromOutlook = data.map(outlookCategoryToSmartCategory).filter(Boolean);
+    const seen = new Set();
+    smartMailCategoriesCache = [...fromOutlook, ...SMART_MAIL_CATEGORIES]
+      .filter(cat => {
+        const key = normalizeMailCategory(cat.value || cat.label);
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      });
+  } catch (_) {
+    smartMailCategoriesCache = SMART_MAIL_CATEGORIES;
+  }
+  return smartMailCategoriesCache;
+}
+
+async function smartCategorize(meta) {
+  const categories = await loadSmartMailCategories();
+  const choice = await openSmartCategoryPicker(meta, categories);
+  if (!choice) return;
+  if (choice.clear) return smartClearCategory(meta);
+  return smartApplyCategory(meta, choice);
+}
+
+async function smartFlagTask(meta) {
+  await fetch(`${API_BASE}/outlook/message/${encodeURIComponent(meta.id)}`, { method:'PATCH', headers:getAuthHeaders(), body:JSON.stringify({ flag:{ flagStatus:'flagged' } }) });
+  await smartCreateTask(meta, { priority:'high', notes:'Flagged as priority from smart email menu.' });
+}
+
+function getPinnedEmailIds() {
+  try { return JSON.parse(localStorage.getItem('pinned_mail_ids') || '[]'); }
+  catch (_) { return []; }
+}
+
+function setPinnedEmailIds(ids) {
+  localStorage.setItem('pinned_mail_ids', JSON.stringify(Array.from(new Set(ids)).slice(-200)));
+}
+
+function isEmailPinned(id) {
+  return !!id && getPinnedEmailIds().includes(id);
+}
+
+function sortMessagesWithPins(messages) {
+  const pinnedIds = new Set(getPinnedEmailIds());
+  return [...(messages || [])].sort((a, b) => {
+    const ap = pinnedIds.has(a.id) ? 1 : 0;
+    const bp = pinnedIds.has(b.id) ? 1 : 0;
+    if (ap !== bp) return bp - ap;
+    const dateA = new Date(a.receivedDateTime || a.sentDateTime || a.createdDateTime || 0).getTime();
+    const dateB = new Date(b.receivedDateTime || b.sentDateTime || b.createdDateTime || 0).getTime();
+    return dateB - dateA;
+  });
+}
+
+function getBlockedMailSenders() {
+  try { return JSON.parse(localStorage.getItem('blocked_mail_senders') || '[]').map(s => String(s).toLowerCase()); }
+  catch (_) { return []; }
+}
+
+function setBlockedMailSenders(senders) {
+  localStorage.setItem('blocked_mail_senders', JSON.stringify(Array.from(new Set(senders.map(s => String(s).toLowerCase()))).slice(-300)));
+}
+
+async function ensureSmartFolderList() {
+  if (Array.isArray(window.outlookFolders) && window.outlookFolders.length) return window.outlookFolders;
+  const res = await fetch(`${API_BASE}/outlook/folders`, { headers: getAuthHeaders() });
+  const folders = await res.json();
+  if (!res.ok || !Array.isArray(folders)) throw new Error(folders.error || 'Could not load folders');
+  window.outlookFolders = folders.map(folder => ({ ...folder, key: normalizeOutlookFolderKey(folder) }));
+  return window.outlookFolders;
+}
+
+async function chooseSmartFolder(actionLabel) {
+  const folders = (await ensureSmartFolderList())
+    .filter(f => f.id || f.key)
+    .sort((a, b) => String(a.displayName || '').localeCompare(String(b.displayName || '')));
+  return openSmartFolderPicker(actionLabel, folders);
+}
+
+function openSmartFolderPicker(actionLabel, folders) {
+  return new Promise(resolve => {
+    document.getElementById('smart-folder-picker-modal')?.remove();
+
+    const overlay = document.createElement('div');
+    overlay.id = 'smart-folder-picker-modal';
+    overlay.className = 'modal-overlay smart-folder-picker open';
+    overlay.style.display = 'flex';
+
+    const icon = /copy/i.test(actionLabel) ? 'fa-copy' : 'fa-folder-open';
+    overlay.innerHTML = `
+      <div class="modal" role="dialog" aria-modal="true" aria-label="${escAttr(actionLabel)}">
+        <div class="smart-folder-picker-head">
+          <div class="smart-folder-picker-title"><i class="fas ${icon}" style="color:var(--gold);"></i><span>${escHtml(actionLabel)}</span></div>
+          <span class="modal-close" data-action="cancel"><i class="fas fa-times"></i></span>
+        </div>
+        <div class="smart-folder-picker-body">
+          <div class="smart-folder-search"><i class="fas fa-search" style="color:var(--muted);"></i><input id="smart-folder-search-input" placeholder="Search folders..." autocomplete="off"></div>
+          <div id="smart-folder-picker-list" class="smart-folder-list"></div>
+        </div>
+        <div class="smart-folder-picker-foot">
+          <button class="btn btn-ghost btn-sm" data-action="cancel">Cancel</button>
+        </div>
+      </div>`;
+
+    const close = folder => {
+      overlay.remove();
+      resolve(folder || null);
+    };
+
+    const list = overlay.querySelector('#smart-folder-picker-list');
+    const input = overlay.querySelector('#smart-folder-search-input');
+
+    const render = query => {
+      const q = String(query || '').trim().toLowerCase();
+      const visible = folders.filter(folder => String(folder.displayName || folder.key || '').toLowerCase().includes(q));
+      if (!visible.length) {
+        list.innerHTML = '<div class="smart-folder-empty">No matching folders found.</div>';
+        return;
+      }
+      list.innerHTML = '';
+      visible.forEach(folder => {
+        const name = folder.displayName || folder.key || 'Folder';
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'smart-folder-row';
+        btn.innerHTML = `<i class="fas ${outlookFolderIcon(name)}"></i><span>${escHtml(name)}</span>`;
+        btn.onclick = () => close(folder);
+        list.appendChild(btn);
+      });
+    };
+
+    overlay.addEventListener('click', e => {
+      if (e.target === overlay || e.target.closest('[data-action="cancel"]')) close(null);
+    });
+    overlay.addEventListener('keydown', e => {
+      if (e.key === 'Escape') close(null);
+    });
+    input.addEventListener('input', () => render(input.value));
+
+    document.body.appendChild(overlay);
+    render('');
+    setTimeout(() => input.focus(), 50);
+  });
+}
+
+function openSmartConfirm({ title, message, confirmText = 'Confirm', danger = false, icon = 'fa-circle-question' }) {
+  return new Promise(resolve => {
+    document.getElementById('smart-confirm-modal')?.remove();
+
+    const overlay = document.createElement('div');
+    overlay.id = 'smart-confirm-modal';
+    overlay.className = 'modal-overlay smart-folder-picker open';
+    overlay.style.display = 'flex';
+    overlay.innerHTML = `
+      <div class="modal" role="dialog" aria-modal="true" aria-label="${escAttr(title || 'Confirm')}">
+        <div class="smart-folder-picker-head">
+          <div class="smart-folder-picker-title"><i class="fas ${icon}" style="color:${danger ? 'var(--red2)' : 'var(--gold)'};"></i><span>${escHtml(title || 'Confirm')}</span></div>
+          <span class="modal-close" data-action="cancel"><i class="fas fa-times"></i></span>
+        </div>
+        <div class="smart-folder-picker-body">
+          <div style="font-size:13px;line-height:1.55;color:var(--muted2);white-space:pre-wrap;">${escHtml(message || '')}</div>
+        </div>
+        <div class="smart-folder-picker-foot">
+          <button class="btn btn-ghost btn-sm" data-action="cancel">Cancel</button>
+          <button class="btn ${danger ? 'btn-red' : 'btn-gold'} btn-sm" data-action="confirm">${escHtml(confirmText)}</button>
+        </div>
+      </div>`;
+
+    const close = value => {
+      overlay.remove();
+      resolve(!!value);
+    };
+
+    overlay.addEventListener('click', e => {
+      if (e.target === overlay || e.target.closest('[data-action="cancel"]')) close(false);
+      if (e.target.closest('[data-action="confirm"]')) close(true);
+    });
+    overlay.addEventListener('keydown', e => {
+      if (e.key === 'Escape') close(false);
+      if (e.key === 'Enter') close(true);
+    });
+
+    document.body.appendChild(overlay);
+    setTimeout(() => overlay.querySelector('[data-action="confirm"]')?.focus(), 50);
+  });
+}
+
+function openSmartCategoryPicker(meta, categories = SMART_MAIL_CATEGORIES) {
+  return new Promise(resolve => {
+    document.getElementById('smart-category-picker-modal')?.remove();
+
+    const overlay = document.createElement('div');
+    overlay.id = 'smart-category-picker-modal';
+    overlay.className = 'modal-overlay smart-folder-picker open';
+    overlay.style.display = 'flex';
+    overlay.innerHTML = `
+      <div class="modal" role="dialog" aria-modal="true" aria-label="Categorize email">
+        <div class="smart-folder-picker-head">
+          <div class="smart-folder-picker-title"><i class="fas fa-tag" style="color:var(--gold);"></i><span>Categorize Email</span></div>
+          <span class="modal-close" data-action="cancel"><i class="fas fa-times"></i></span>
+        </div>
+        <div class="smart-folder-picker-body">
+          <div class="smart-folder-search"><i class="fas fa-search" style="color:var(--muted);"></i><input id="smart-category-search-input" placeholder="Search categories..." autocomplete="off"></div>
+          <div id="smart-category-picker-list" class="smart-folder-list"></div>
+        </div>
+        <div class="smart-folder-picker-foot">
+          <button class="btn btn-ghost btn-sm" data-action="clear"><i class="fas fa-eraser"></i> Clear Categories</button>
+          <button class="btn btn-ghost btn-sm" data-action="cancel">Cancel</button>
+        </div>
+      </div>`;
+
+    const close = category => {
+      overlay.remove();
+      resolve(category || null);
+    };
+
+    const list = overlay.querySelector('#smart-category-picker-list');
+    const input = overlay.querySelector('#smart-category-search-input');
+
+    const render = query => {
+      const q = String(query || '').trim().toLowerCase();
+      const visible = categories.filter(cat => cat.label.toLowerCase().includes(q));
+      if (!visible.length) {
+        list.innerHTML = '<div class="smart-folder-empty">No matching categories found.</div>';
+        return;
+      }
+      list.innerHTML = '';
+      visible.forEach(cat => {
+        const current = normalizeMailCategory(meta.category) === cat.value;
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'smart-folder-row';
+        btn.innerHTML = `<span class="smart-category-dot" style="background:${cat.color};"></span><span style="flex:1;">${escHtml(cat.label)}</span>${current ? '<i class="fas fa-check" style="color:var(--green2);"></i>' : ''}`;
+        btn.onclick = () => close(cat);
+        list.appendChild(btn);
+      });
+    };
+
+    overlay.addEventListener('click', e => {
+      if (e.target === overlay || e.target.closest('[data-action="cancel"]')) close(null);
+      if (e.target.closest('[data-action="clear"]')) close({ clear:true });
+    });
+    overlay.addEventListener('keydown', e => {
+      if (e.key === 'Escape') close(null);
+    });
+    input.addEventListener('input', () => render(input.value));
+
+    document.body.appendChild(overlay);
+    render('');
+    setTimeout(() => input.focus(), 50);
+  });
+}
+
+function updateMessageCategoryInMemory(messageId, category) {
+  const normalized = category ? normalizeMailCategory(category) : 'GENERAL';
+  (window.currentFolderMessages || []).forEach(m => {
+    if (m.id === messageId) {
+      m.category = normalized;
+      m.categoryReason = category ? 'Manually categorized' : 'Categories cleared';
+    }
+  });
+  updateCategoryFilterCounts();
+  renderFilteredEmails();
+}
+
+async function smartApplyCategory(meta, category) {
+  const dbCategory = normalizeMailCategory(category.value || category.label);
+  const outlookCategory = category.outlook || category.label || displayMailCategory(dbCategory);
+  const res = await fetch(`${API_BASE}/outlook/message/${encodeURIComponent(meta.id)}`, {
+    method:'PATCH',
+    headers:getAuthHeaders(),
+    body:JSON.stringify({ categories:[outlookCategory] })
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error || 'Category update failed');
+  await fetch(`${API_BASE}/outlook/update-category`, {
+    method:'POST',
+    headers:getAuthHeaders(),
+    body:JSON.stringify({ id: meta.id, category: dbCategory })
+  }).catch(() => {});
+  updateMessageCategoryInMemory(meta.id, dbCategory);
+  notify('Categorized', displayMailCategory(dbCategory), 'var(--blue2)', 'fas fa-tag');
+}
+
+async function smartClearCategory(meta) {
+  const res = await fetch(`${API_BASE}/outlook/message/${encodeURIComponent(meta.id)}`, {
+    method:'PATCH',
+    headers:getAuthHeaders(),
+    body:JSON.stringify({ categories:[] })
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error || 'Clear categories failed');
+  await fetch(`${API_BASE}/outlook/update-category`, {
+    method:'POST',
+    headers:getAuthHeaders(),
+    body:JSON.stringify({ id: meta.id, category:'GENERAL' })
+  }).catch(() => {});
+  updateMessageCategoryInMemory(meta.id, 'GENERAL');
+  notify('Categories cleared', meta.subject || '', 'var(--muted)', 'fas fa-eraser');
+}
+
+async function smartCopyOrMoveToFolder(meta, mode) {
+  const folder = await chooseSmartFolder(mode === 'copy' ? 'Copy email' : 'Move email');
+  if (!folder) return;
+  const endpoint = mode === 'copy' ? 'copy' : 'move';
+  const destinationId = folder.id || folder.key || folder.displayName;
+  const res = await fetch(`${API_BASE}/outlook/message/${encodeURIComponent(meta.id)}/${endpoint}`, {
+    method:'POST',
+    headers:getAuthHeaders(),
+    body:JSON.stringify({ destinationId })
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || `${mode === 'copy' ? 'Copy' : 'Move'} failed`);
+  notify(mode === 'copy' ? 'Copied to folder' : 'Moved to folder', folder.displayName || folder.key, 'var(--green)', mode === 'copy' ? 'fas fa-copy' : 'fas fa-folder-open');
+  if (mode === 'move') loadInbox(false);
+}
+
+async function smartMarkUnread(meta) {
+  const res = await fetch(`${API_BASE}/outlook/message/${encodeURIComponent(meta.id)}`, {
+    method:'PATCH',
+    headers:getAuthHeaders(),
+    body:JSON.stringify({ isRead:false })
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || 'Mark as unread failed');
+  notify('Marked as unread', meta.subject || '', 'var(--blue2)', 'fas fa-envelope');
+  loadInbox(false);
+}
+
+async function smartTogglePinEmail(meta) {
+  const ids = getPinnedEmailIds();
+  const pinned = ids.includes(meta.id);
+  setPinnedEmailIds(pinned ? ids.filter(id => id !== meta.id) : [meta.id, ...ids]);
+  notify(
+    pinned ? 'Unpinned in UniCRM' : 'Pinned in UniCRM only',
+    pinned ? (meta.subject || '') : 'Outlook pin is separate. Use Open in Outlook to pin there.',
+    'var(--gold)',
+    'fas fa-thumbtack'
+  );
+  renderFilteredEmails();
+}
+
+async function smartOpenInOutlook(meta) {
+  let link = meta.webLink || '';
+  if (!link && meta.id) {
+    const res = await fetch(`${API_BASE}/outlook/message/${encodeURIComponent(meta.id)}`, { headers: getAuthHeaders() });
+    const msg = await res.json();
+    if (!res.ok) throw new Error(msg.error || 'Could not open Outlook link');
+    link = msg.webLink || '';
+  }
+  if (!link) throw new Error('Outlook web link is not available for this email');
+  window.open(link, '_blank', 'noopener,noreferrer');
+}
+
+async function smartBlockSender(meta) {
+  const sender = String(meta.fromAddr || '').trim().toLowerCase();
+  if (!sender) return notify('Block failed', 'Sender address not found', 'var(--red)', 'fas fa-ban');
+  const ok = await openSmartConfirm({
+    title: 'Block Sender',
+    message: `Block future email from ${sender} and move this email to Junk?`,
+    confirmText: 'Block',
+    danger: true,
+    icon: 'fa-ban'
+  });
+  if (!ok) return;
+  setBlockedMailSenders([sender, ...getBlockedMailSenders()]);
+  await fetch(`${API_BASE}/outlook/message/${encodeURIComponent(meta.id)}/move`, {
+    method:'POST',
+    headers:getAuthHeaders(),
+    body:JSON.stringify({ destinationId:'junkemail' })
+  }).catch(() => {});
+  notify('Sender blocked', sender, 'var(--red2)', 'fas fa-ban');
+  loadInbox(false);
+}
+
+async function smartArchive(meta) {
+  const res = await fetch(`${API_BASE}/outlook/message/${encodeURIComponent(meta.id)}/move`, { method:'POST', headers:getAuthHeaders(), body:JSON.stringify({ destinationId:'archive' }) });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || 'Archive failed');
+  notify('Archived', meta.subject || '', 'var(--green)', 'fas fa-archive');
+  loadInbox(false);
+}
+
+async function smartDelete(meta) {
+  const ok = await openSmartConfirm({
+    title: 'Delete Email',
+    message: `Delete this email?\n\n${meta.subject || '(no subject)'}`,
+    confirmText: 'Delete',
+    danger: true,
+    icon: 'fa-trash'
+  });
+  if (!ok) return;
+  const res = await fetch(`${API_BASE}/outlook/message/${encodeURIComponent(meta.id)}`, { method:'DELETE', headers:getAuthHeaders() });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || 'Delete failed');
+  notify('Deleted', meta.subject || '', 'var(--red2)', 'fas fa-trash');
+  loadInbox(false);
+}
+
+async function smartCreateRule(meta) {
+  const ok = await openSmartConfirm({
+    title: 'Create Rule',
+    message: `Always apply smart actions for similar emails from ${meta.fromAddr || 'this sender'}?`,
+    confirmText: 'Create Rule',
+    icon: 'fa-filter'
+  });
+  if (!ok) return;
+  const rules = JSON.parse(localStorage.getItem('smart_mail_rules') || '[]');
+  const category = smartDetectCategory(meta);
+  rules.push({ sender: meta.fromAddr, action: 'categorize', category, createdAt: new Date().toISOString() });
+  localStorage.setItem('smart_mail_rules', JSON.stringify(rules.slice(-100)));
+  notify('Rule saved', `${meta.fromAddr} -> ${category}`, 'var(--blue2)', 'fas fa-filter');
+}
+
 /**
  * toggleMoreMenu — Opens/closes the 3-dot more options menu for a message.
  * @param {Event} event - Click event
@@ -9789,6 +10539,8 @@ async function forwardFromThread(meta) {
  * @param {object} meta - Message metadata
  */
 function toggleMoreMenu(event, btn, meta) {
+  openSmartEmailContextMenu(event, meta);
+  return;
   event.stopPropagation();
   
   // Close any existing menu
@@ -9909,6 +10661,8 @@ function toggleMoreMenuSingle(event, btn) {
     receivedDateTime: activeMailMessage.receivedDateTime,
     bodyPreview: activeMailMessage.bodyPreview
   };
+  openSmartEmailContextMenu(event, meta);
+  return;
   
   // Close any existing menu
   const existingMenu = document.querySelector('.msg-more-menu');
@@ -11081,50 +11835,136 @@ function inboxPage(dir) {
   loadInbox();
 }
 
-function switchFolder(folder, btn) {
-  inboxFolder = folder;
-  inboxCurrentPage = 0;
-  document.querySelectorAll('#tab-inbox,#tab-sent').forEach(b => {
-    b.className = b.id === `tab-${folder}` ? 'btn btn-blue btn-xs' : 'btn btn-ghost btn-xs';
-  });
-  loadInbox();
+function normalizeOutlookFolderKey(folder) {
+  const name = String(folder?.displayName || '').trim().toLowerCase();
+  if (/^inbox$/.test(name)) return 'inbox';
+  if (/^sent items?$/.test(name)) return 'sent';
+  if (/^drafts?$/.test(name)) return 'drafts';
+  if (/^deleted items?$/.test(name)) return 'deleted';
+  if (/^junk email$|^junk$/.test(name)) return 'junkemail';
+  if (/^notes?$/.test(name)) return 'notes';
+  if (/^archive$/.test(name)) return 'archive';
+  return folder?.id || folder?.displayName || '';
+}
+
+function getOutlookFolderDisplayName(folderKey) {
+  const standard = {
+    inbox: 'Inbox',
+    sent: 'Sent Items',
+    drafts: 'Drafts',
+    deleted: 'Deleted Items',
+    junkemail: 'Junk Email',
+    notes: 'Notes',
+    archive: 'Archive'
+  };
+  return standard[folderKey] || window.outlookFolderDisplayNames?.[folderKey] || folderKey;
+}
+
+function outlookFolderIcon(name) {
+  const n = String(name || '').toLowerCase();
+  if (/inbox/.test(n)) return 'fa-inbox';
+  if (/sent/.test(n)) return 'fa-paper-plane';
+  if (/draft/.test(n)) return 'fa-edit';
+  if (/deleted|trash/.test(n)) return 'fa-trash-alt';
+  if (/junk|spam/.test(n)) return 'fa-ban';
+  if (/archive/.test(n)) return 'fa-archive';
+  if (/search/.test(n)) return 'fa-search';
+  return 'fa-folder';
+}
+
+async function loadOutlookFolders() {
+  const el = document.getElementById('outlook-folder-list');
+  if (!el) return;
+
+  el.innerHTML = '<div style="text-align:center;padding:20px;"><div class="spin-loader" style="margin:0 auto;width:16px;height:16px;border-width:2px;"></div></div>';
+
+  try {
+    const res = await fetch(`${API_BASE}/outlook/folders`, { headers: getAuthHeaders() });
+    if (!res.ok) throw new Error('Failed to load folders');
+    const folders = await res.json();
+    if (!Array.isArray(folders) || !folders.length) {
+      el.innerHTML = '<div style="padding:18px;color:var(--muted);font-size:12px;">No Outlook folders found.</div>';
+      return;
+    }
+
+    const priority = ['inbox', 'sent', 'drafts', 'deleted', 'junkemail', 'archive', 'notes'];
+    const sorted = folders
+      .map(folder => ({ ...folder, key: normalizeOutlookFolderKey(folder) }))
+      .sort((a, b) => {
+        const ai = priority.indexOf(a.key);
+        const bi = priority.indexOf(b.key);
+        if (ai !== -1 || bi !== -1) return (ai === -1 ? 99 : ai) - (bi === -1 ? 99 : bi);
+        return String(a.displayName || '').localeCompare(String(b.displayName || ''));
+      });
+
+    window.outlookFolders = sorted;
+    window.outlookFolderDisplayNames = {};
+    sorted.forEach(folder => {
+      if (folder.key) window.outlookFolderDisplayNames[folder.key] = folder.displayName || folder.key;
+    });
+
+    el.innerHTML = sorted.map(folder => {
+      const key = folder.key;
+      const name = folder.displayName || key;
+      const unread = Number(folder.unreadItemCount || 0);
+      const total = Number(folder.totalItemCount || 0);
+      const active = key === inboxFolder ? ' active' : '';
+      return `
+        <div class="outlook-folder-item${active}" data-folder="${escAttr(key)}" title="${escAttr(name)} - ${total} items (${unread} unread)" onclick="switchOutlookFolder(${jsArg(key)}, this)">
+          <i class="fas ${outlookFolderIcon(name)}"></i>
+          <span>${escHtml(name)}</span>
+          <span class="folder-count" id="folder-count-${escAttr(key)}" style="${unread > 0 ? '' : 'display:none;'}">${unread > 0 ? unread : ''}</span>
+        </div>`;
+    }).join('');
+  } catch (err) {
+    console.error('[Outlook Folders] Load error:', err.message);
+    el.innerHTML = '<div style="padding:18px;color:var(--red2);font-size:12px;">Could not load Outlook folders.</div>';
+  }
 }
 
 /**
- * Switch Outlook folder (new sidebar navigation)
+ * Universal folder switcher for Outlook sidebar
  */
 function switchOutlookFolder(folder, element) {
-  // Update active state
+  if (!folder) return;
+  console.log(`[Outlook] Switching to folder: ${folder}`);
+
+  // 1. Update UI Active State
   document.querySelectorAll('.outlook-folder-item').forEach(item => {
     item.classList.remove('active');
   });
-  if (element) element.classList.add('active');
+  if (element) {
+    element.classList.add('active');
+  } else {
+    // Programmatic selection support
+    const target = document.querySelector(`.outlook-folder-item[data-folder="${folder}"]`);
+    if (target) target.classList.add('active');
+  }
   
-  // Update folder name in header
-  const folderNames = {
-    'inbox': 'Inbox',
-    'sent': 'Sent Items',
-    'drafts': 'Drafts',
-    'deleted': 'Deleted Items',
-    'junkemail': 'Junk Email',
-    'notes': 'Notes',
-    'archive': 'Archive'
-  };
+  // 2. Update Header Info
   const nameEl = document.getElementById('current-folder-name');
-  if (nameEl) nameEl.textContent = folderNames[folder] || 'Inbox';
+  const folderDisplayName = element?.querySelector('span:nth-child(2)')?.textContent?.trim() || getOutlookFolderDisplayName(folder);
+  if (nameEl) nameEl.textContent = folderDisplayName;
+  const searchInput = document.getElementById('inbox-search');
+  if (searchInput) searchInput.placeholder = `Search ${folderDisplayName}...`;
   
-  // Update global folder state
+  // 3. Update Global State
+  window.currentEmailFolder = folder;
   inboxFolder = folder;
   inboxCurrentPage = 0;
   
-  // Reset category filter to "All"
+  // 4. Reset category filter to "All"
   window.currentEmailCategoryFilter = 'ALL';
   document.querySelectorAll('.mail-category-filter').forEach(btn => {
     btn.classList.toggle('active', btn.dataset.category === 'ALL');
   });
   
-  // Load folder data
+  // 5. Load folder data
   loadInbox();
+}
+
+function switchFolder(folder, element) {
+  switchOutlookFolder(folder, element);
 }
 
 /**
@@ -11205,9 +12045,13 @@ let waAllChats   = [];
 var waLidMap = {};
 
 function initWASocket() {
-  if (waSocket) return;
+  console.log('[DASHBOARD] 🚀 Initializing Unified Socket.IO Connection...');
   waSocket = io(window.location.origin);
   socket = waSocket;
+
+  waSocket.on('connect', () => {
+    console.log('[SOCKET] ✅ Connected to Backend System (Transport: ' + (waSocket.io.engine.transport.name || 'unknown') + ')');
+  });
   waSocket.on('wa:qr', ({ qr }) => {
     const img = document.getElementById('wa-qr-img');
     const wrap = document.getElementById('wa-qr-wrap');
@@ -11280,39 +12124,49 @@ function initWASocket() {
   });
 
   // PBX real-time events
+  waSocket.on('pbx:ready', (data) => {
+    console.log('[PBX] 🟢 SOCKET EVENT: "pbx:ready" (Server listening)', data);
+    pbxOnReady(data);
+  });
   waSocket.on('pbx:connected', (data) => {
-    console.log('[PBX] Connected:', data);
+    console.log('[PBX] 🟢 SOCKET EVENT: "pbx:connected"', data);
     pbxOnConnected(data);
   });
   waSocket.on('pbx:disconnected', (data) => {
-    console.warn('[PBX] Disconnected:', data);
-    pbxOnDisconnected();
+    console.warn('[PBX] 🔴 SOCKET EVENT: "pbx:disconnected"', data);
+    pbxOnDisconnected(data);
   });
   waSocket.on('pbx:call', (call) => {
-    console.log('[PBX] 📞 New call record received via Socket.IO:', call);
+    console.log('[PBX] 📞 SOCKET EVENT: "pbx:call" (New Live Call)', call);
     
     // Update live status bar
     const dot = document.getElementById('pbx-dot');
     const statusText = document.getElementById('pbx-status-text');
     const liveBadge = document.getElementById('pbx-live-badge');
     
+    console.log('[PBX] Updating UI Status Bar for new call...');
     if (dot) dot.style.background = 'var(--green2)';
-    if (statusText) statusText.textContent = `Matrix PBX · Connected · Last call: ${call.caller_ext} → ${call.destination}`;
+    if (statusText) statusText.textContent = `Matrix PBX · Connected · Last call: ${call.caller || call.caller_ext} → ${call.destination}`;
     if (liveBadge) {
       liveBadge.style.display = 'inline-flex';
-      setTimeout(() => liveBadge.style.display = 'none', 10000);
+      setTimeout(() => {
+        console.log('[PBX] Hiding live badge (timeout)');
+        liveBadge.style.display = 'none';
+      }, 10000);
     }
     
     // If we are on the logs tab, refresh automatically
     if (document.getElementById('sec-calls').style.display !== 'none' && 
         document.getElementById('pbx-panel-logs').style.display !== 'none') {
+      console.log('[PBX] Log section visible, refreshing table data...');
       loadCallLogs(1);
     }
     
     // Desktop notification
+    console.log('[PBX] Triggering notification check...');
     if (Notification.permission === 'granted') {
       new Notification(`UniComm PBX: ${call.call_type} Call`, {
-        body: `${call.caller_ext} is calling ${call.destination}\nDuration: ${call.duration}`,
+        body: `${call.caller || call.caller_ext} is calling ${call.destination}\nDuration: ${call.duration}`,
         icon: '/favicon.ico'
       });
     }
@@ -11321,7 +12175,7 @@ function initWASocket() {
   });
 
   waSocket.on('pbx:binding_error', (data) => {
-    console.error('[PBX] Backend binding error:', data);
+    console.error('[PBX] ❌ SOCKET EVENT: "pbx:binding_error"', data);
     notify('PBX Connection Error', `${data.mode === 'server' ? 'Listener' : 'Client'} failure: ${data.error}`, 'var(--red2)', 'fas fa-exclamation-triangle');
   });
 
@@ -14257,7 +15111,6 @@ function pbxShowTab(tab, btn) {
 
   // Load data
   if (tab === 'logs') loadCallLogs();
-  if (tab === 'contacts') loadPbxContacts();
   if (tab === 'recordings') pbxLoadRecordings();
   if (tab === 'backup') pbxListBackups();
 }
@@ -14274,14 +15127,29 @@ async function loadCallLogs(page = 1) {
       headers: getAuthHeaders()
     });
     const data = await res.json();
+    console.log(`[PBX-UI] API Response (/calls page ${page}):`, data);
     if (!res.ok) throw new Error(data.error || 'Failed to load logs');
 
     if (!data.calls.length) {
       tbody.innerHTML = `<tr><td colspan="7" style="text-align:center;padding:40px;color:var(--muted);">No call records found.</td></tr>`;
     } else {
       tbody.innerHTML = data.calls.map(log => {
-        const dateObj = (log.call_date && log.call_time) ? new Date(`${log.call_date}T${log.call_time}`) : new Date(log.created_at);
-        const date = isNaN(dateObj.getTime()) ? '—' : dateObj.toLocaleString('en-IN', { dateStyle: 'short', timeStyle: 'short' });
+        const parseDate = (item) => {
+          try {
+            if (item.call_date && item.call_time) {
+              const d = typeof item.call_date === 'string' ? item.call_date.split('T')[0] : item.call_date;
+              const obj = new Date(`${d}T${item.call_time}`);
+              if (!isNaN(obj.getTime())) return obj;
+            }
+            if (item.created_at) {
+              const obj = new Date(item.created_at);
+              if (!isNaN(obj.getTime())) return obj;
+            }
+          } catch(e) {}
+          return null;
+        };
+        const dateObj = parseDate(log);
+        const date = dateObj ? dateObj.toLocaleString('en-IN', { dateStyle: 'short', timeStyle: 'short' }) : '—';
         const typeClass = log.call_type === 'Missed' ? 'b-red' : (log.call_type === 'In' ? 'b-blue' : 'b-gold');
         const contactName = log.saved_name || log.contact_name;
         const callerDisplay = contactName ? `<div><b>${escHtml(contactName)}</b></div><div style="font-size:11px;color:var(--muted);">${escHtml(log.caller)}</div>` : escHtml(log.caller);
@@ -14321,27 +15189,89 @@ function callsPage(delta) {
   loadCallLogs(callsCurrentPage + delta);
 }
 
-function pbxOnConnected(data) {
+function pbxOnReady(data) {
+  console.log('[PBX-UI] 🟢 Transitioning to READY state (Passive Standby)...', data);
   const dot = document.getElementById('pbx-dot');
   const txt = document.getElementById('pbx-status-text');
+  const info = document.getElementById('pbx-listener-info');
   if (dot) dot.style.background = 'var(--green)';
-  if (txt) txt.textContent = `Matrix PBX · Connected (${data.mode || 'active'})`;
+  if (txt) {
+    txt.textContent = `Matrix PBX · Online · Ready for Calls`;
+    txt.style.color = 'var(--text)';
+  }
+  if (info) info.textContent = `Listening on Port ${data.port || 5001} (${data.mode || 'server'})`;
   updateServiceIndicator('pbx', true);
 }
 
-function pbxOnDisconnected() {
+function pbxOnConnected(data) {
+  console.log('[PBX-UI] 🟢 Transitioning to CONNECTED state...', data);
   const dot = document.getElementById('pbx-dot');
   const txt = document.getElementById('pbx-status-text');
-  if (dot) dot.style.background = 'var(--muted)';
-  if (txt) txt.textContent = 'Matrix PBX · Waiting for connection...';
-  updateServiceIndicator('pbx', false);
+  const info = document.getElementById('pbx-listener-info');
+  const badge = document.getElementById('pbx-live-badge');
+  if (dot) dot.style.background = 'var(--green)';
+  if (txt) {
+    txt.textContent = `Matrix PBX · Connected · (Client: ${data.host})`;
+    txt.style.color = 'var(--green2)';
+  }
+  if (info) info.textContent = `Active SMDR session from ${data.host}`;
+  if (badge) badge.style.display = 'inline-flex';
+  updateServiceIndicator('pbx', true);
+}
+
+function pbxOnDisconnected(data) {
+  const isFatal = data && data.fatal === true;
+  console.warn(`[PBX-UI] 🔴 Disconnected (Fatal: ${isFatal})`, data);
+  
+  const dot = document.getElementById('pbx-dot');
+  const txt = document.getElementById('pbx-status-text');
+  const badge = document.getElementById('pbx-live-badge');
+  
+  if (badge) badge.style.display = 'none';
+
+  if (isFatal) {
+    if (dot) dot.style.background = 'var(--red2)';
+    if (txt) {
+      txt.textContent = `Matrix PBX · Offline · ${data.reason || 'Server error'}`;
+      txt.style.color = 'var(--red2)';
+    }
+    updateServiceIndicator('pbx', false);
+  } else {
+    // Just a peer disconnect, keep server "Online" but in waiting mode
+    if (dot) dot.style.background = 'var(--green)';
+    if (txt) {
+      txt.textContent = 'Matrix PBX · Online · Ready for Calls';
+      txt.style.color = 'var(--text)';
+    }
+    updateServiceIndicator('pbx', true);
+  }
+}
+
+async function reconcilePbxCounts() {
+  if (!confirm('This will recount all calls in the database and update CRM contact statistics. Continue?')) return;
+  notify('Maintenance', 'Recalculating all call counts...', 'var(--gold)', 'fas fa-calculator');
+  try {
+    const res = await fetch(`${API_BASE}/system/maintenance/reconcile-calls`, { method: 'POST', headers: getAuthHeaders() });
+    const data = await res.json();
+    if (res.ok) {
+      notify('Success', data.message, 'var(--green)', 'fas fa-check-circle');
+      await loadDashboardData();
+      filterContacts();
+    } else {
+      throw new Error(data.error || 'Failed');
+    }
+  } catch (err) {
+    notify('Error', err.message, 'var(--red)', 'fas fa-exclamation-circle');
+  }
 }
 
 async function pbxSyncNow() {
+  console.log('[PBX-UI] 🔄 Manual Sync Triggered...');
   notify('PBX Sync', 'Fetching latest logs from Matrix...', 'var(--gold)', 'fas fa-sync-alt');
   try {
     const res = await fetch(`${API_BASE}/calls/sync`, { method: 'POST', headers: getAuthHeaders() });
     const data = await res.json();
+    console.log('[PBX-UI] Sync Response:', data);
     if (res.ok) {
       notify('PBX Sync Complete', `Synced ${data.count} new records`, 'var(--green2)', 'fas fa-check-circle');
       loadCallLogs();
@@ -14349,112 +15279,30 @@ async function pbxSyncNow() {
       throw new Error(data.error);
     }
   } catch (err) {
+    console.error('[PBX-UI] ❌ Sync Failed:', err);
     notify('Sync Failed', err.message, 'var(--red2)', 'fas fa-exclamation-circle');
   }
 }
 
 function pbxReconnect() {
-  if (!confirm('Force reset PBX TCP connection? This will restart the SMDR listener.')) return;
+  console.log('[PBX-UI] 🔌 Reconnect Button Clicked...');
+  if (!confirm('Force reset PBX TCP connection? This will restart the SMDR listener.')) {
+    console.log('[PBX-UI] Reconnect cancelled by user');
+    return;
+  }
   
   if (socket && socket.connected) {
+    console.log('[PBX-UI] 📡 Emitting "pbx:reconnect" via Socket...');
     notify('PBX Reconnect', 'Requesting TCP reset...', 'var(--gold)', 'fas fa-plug');
     socket.emit('pbx:reconnect');
   } else {
+    console.error('[PBX-UI] ❌ Cannot reconnect: Socket is offline');
     notify('Socket Offline', 'Dashboard is not connected to the backend. Please check your internet or server status.', 'var(--red2)', 'fas fa-wifi-slash');
-    console.error('[PBX] pbxReconnect failed: socket.connected is false');
   }
 }
 
-async function loadPbxContacts() {
-  const list = document.getElementById('pbx-contacts-list');
-  try {
-    const res = await fetch(`${API_BASE}/calls/contacts`, { headers: getAuthHeaders() });
-    pbxContactsCache = await res.json();
-    document.getElementById('pbx-contacts-count').textContent = pbxContactsCache.length;
-    renderPbxContactsList(pbxContactsCache);
-  } catch (err) {
-    list.innerHTML = `<div style="padding:20px;color:var(--red2);">${escHtml(err.message)}</div>`;
-  }
-}
-
-function renderPbxContactsList(contacts) {
-  const list = document.getElementById('pbx-contacts-list');
-  if (!contacts.length) {
-    list.innerHTML = `<div style="padding:40px 20px;text-align:center;color:var(--muted);font-size:12.5px;">No contacts saved yet.</div>`;
-    return;
-  }
-  list.innerHTML = contacts.map(c => `
-    <div class="contact-item" onclick="selectPbxContact(this, '${c.phone}')" style="padding:10px 14px;cursor:pointer;border-bottom:1px solid rgba(255,255,255,0.03);transition:background 0.2s;display:flex;justify-content:space-between;align-items:center;">
-      <div>
-        <div style="font-weight:700;font-size:13px;color:var(--text);">${escHtml(c.name)}</div>
-        <div style="font-size:11.5px;color:var(--gold);font-family:'JetBrains Mono';">${escHtml(c.phone)}</div>
-        ${c.company ? `<div style="font-size:10.5px;color:var(--muted);margin-top:2px;">${escHtml(c.company)}</div>` : ''}
-      </div>
-      <button class="btn btn-ghost btn-xs" onclick="event.stopPropagation();pbxDial('${c.phone}')" title="Dial"><i class="fas fa-phone-alt" style="color:var(--green2);"></i></button>
-    </div>
-  `).join('');
-}
-
-function filterPbxContacts() {
-  const q = document.getElementById('pbx-contact-search').value.toLowerCase();
-  const filtered = pbxContactsCache.filter(c => 
-    c.name.toLowerCase().includes(q) || 
-    c.phone.includes(q) || 
-    (c.company && c.company.toLowerCase().includes(q))
-  );
-  renderPbxContactsList(filtered);
-}
-
-async function selectPbxContact(el, phone) {
-  document.querySelectorAll('#pbx-contacts-list .contact-item').forEach(i => i.style.background = '');
-  el.style.background = 'rgba(245,166,35,0.08)';
-  
-  const detail = document.getElementById('pbx-contact-detail');
-  detail.innerHTML = `<div style="padding:60px 20px;text-align:center;"><div class="spin-loader" style="margin:0 auto;"></div></div>`;
-  
-  try {
-    const res = await fetch(`${API_BASE}/calls/contact/${encodeURIComponent(phone)}`, { headers: getAuthHeaders() });
-    const data = await res.json();
-    
-    const contactName = data.calls[0]?.saved_name || phone;
-    const contactCompany = data.calls[0]?.saved_company || '';
-
-    detail.innerHTML = `
-      <div style="padding:16px 20px;border-bottom:1px solid var(--border);">
-        <div style="display:flex;justify-content:space-between;align-items:start;">
-          <div>
-            <h2 style="font-size:18px;margin-bottom:4px;">${escHtml(contactName)}</h2>
-            <div style="color:var(--gold);font-family:'JetBrains Mono';font-size:14px;">${escHtml(phone)}</div>
-            ${contactCompany ? `<div style="color:var(--muted2);font-size:12.5px;margin-top:4px;"><i class="far fa-building"></i> ${escHtml(contactCompany)}</div>` : ''}
-          </div>
-          <div style="display:flex;gap:6px;">
-            <button class="btn btn-gold btn-xs" onclick="pbxDial('${phone}')"><i class="fas fa-phone-alt"></i> Call</button>
-            <button class="btn btn-red btn-xs" onclick="deletePbxContact('${phone}')"><i class="fas fa-trash"></i> Delete</button>
-          </div>
-        </div>
-      </div>
-      <div style="padding:16px 20px;">
-        <h4 style="font-size:12px;text-transform:uppercase;color:var(--muted);margin-bottom:12px;letter-spacing:1px;">Call History</h4>
-        <div style="max-height:400px;overflow-y:auto;">
-          ${data.calls.map(h => {
-            const date = new Date(h.call_time || h.created_at).toLocaleString('en-IN', { dateStyle: 'short', timeStyle: 'short' });
-            return `
-              <div style="display:flex;justify-content:space-between;padding:10px 0;border-bottom:1px solid rgba(255,255,255,0.03);">
-                <div>
-                  <div style="font-size:12.5px;color:var(--text);">${date}</div>
-                  <div style="font-size:11px;color:var(--muted2);">${h.call_type} · ${h.duration}</div>
-                </div>
-                <div style="font-size:11px;color:var(--muted);">${escHtml(h.trunk || '')}</div>
-              </div>
-            `;
-          }).join('')}
-        </div>
-      </div>
-    `;
-  } catch (err) {
-    detail.innerHTML = `<div style="padding:40px;color:var(--red2);">${escHtml(err.message)}</div>`;
-  }
-}
+// PBX Contacts functionality migrated to CRM Contacts module
+// pbxShowTab('contacts') and associated functions removed from here.
 
 function pbxSaveContactModal(phone) {
   document.getElementById('pbx-save-phone').value = phone;
@@ -14483,7 +15331,7 @@ async function pbxSaveContactSubmit() {
       notify('Contact Saved', name, 'var(--green2)', 'fas fa-user-check');
       closeModal('pbx-save-contact-modal');
       loadCallLogs(callsCurrentPage);
-      if (document.getElementById('pbx-panel-contacts').style.display !== 'none') loadPbxContacts();
+      if (contactsSource === 'pbx') loadPbxContactsDirectory();
     } else {
       const d = await res.json();
       throw new Error(d.error);
@@ -14557,7 +15405,7 @@ async function pbxListBackups() {
       <div style="display:flex;justify-content:space-between;align-items:center;padding:10px;background:rgba(255,255,255,0.02);border-radius:6px;margin-bottom:8px;border:1px solid var(--border);">
         <div>
           <div style="font-size:12.5px;font-weight:700;">${escHtml(b.filename)}</div>
-          <div style="font-size:11px;color:var(--muted2);">${(b.size / 1024).toFixed(1)} KB · ${new Date(b.mtime).toLocaleString()}</div>
+          <div style="font-size:11px;color:var(--muted2);">${(b.size / 1024).toFixed(1)} KB · ${new Date(b.mtime || b.created_at).toLocaleString()}</div>
         </div>
         <button class="btn btn-ghost btn-xs" onclick="pbxRestoreBackup('${b.filename}')" title="Restore"><i class="fas fa-undo"></i> Restore</button>
       </div>
@@ -14578,8 +15426,9 @@ async function pbxRestoreBackup(filename) {
     });
     const data = await res.json();
     if (res.ok) {
-      notify('Restore Complete', `Restored ${data.count} records`, 'var(--green2)', 'fas fa-check-circle');
+      notify('Restore Complete', `Calls: ${data.inserted || 0}/${data.total || 0} new · Contacts: ${data.contacts_upserted || 0}`, 'var(--green2)', 'fas fa-check-circle');
       loadCallLogs();
+      if (contactsSource === 'pbx') loadPbxContactsDirectory();
     } else {
       throw new Error(data.error);
     }
@@ -14594,11 +15443,11 @@ async function deletePbxContact(phone) {
     const res = await fetch(`${API_BASE}/calls/contacts/${phone}`, { method: 'DELETE', headers: getAuthHeaders() });
     if (res.ok) {
       notify('Contact Deleted', '', 'var(--muted)', 'fas fa-trash');
-      loadPbxContacts();
-      document.getElementById('pbx-contact-detail').innerHTML = `
-        <div style="padding:60px 20px;text-align:center;color:var(--muted);">
-          <i class="fas fa-user-circle" style="font-size:48px;margin-bottom:12px;opacity:0.3;display:block;"></i>
-          Select a contact to view their call history
+      if (contactsSource === 'pbx') loadPbxContactsDirectory();
+      document.getElementById('contact-detail-panel').innerHTML = `
+        <div class="card" style="text-align:center;padding:40px 20px;color:var(--muted);">
+          <i class="fas fa-address-card" style="font-size:36px;color:rgba(255,255,255,0.06);display:block;margin-bottom:12px;"></i>
+          <div style="font-size:13px;">Select an entry</div>
         </div>`;
       loadCallLogs(callsCurrentPage);
     }
@@ -16107,6 +16956,10 @@ Nagpur, Maharashtra, 440017, India<br>
             <div style="display:flex;justify-content:space-between;align-items:center;padding:12px 16px;background:var(--card2);border-radius:8px;border:1px solid var(--border);">
               <div><div style="font-size:13px;font-weight:600;color:var(--text);">Inbox page size</div><div style="font-size:11.5px;color:var(--muted);">Number of emails per page</div></div>
               <select class="inp" style="width:80px;font-size:12px;" onchange="inboxPageSize=parseInt(this.value);loadInbox()"><option value="10">10</option><option value="25" selected>25</option><option value="50">50</option></select>
+            </div>
+            <div style="display:flex;justify-content:space-between;align-items:center;padding:12px 16px;background:var(--card2);border-radius:8px;border:1px solid var(--border);">
+              <div><div style="font-size:13px;font-weight:600;color:var(--text);">Show Junk Email</div><div style="font-size:11.5px;color:var(--muted);">Toggle visibility of Junk Email folder in sidebar</div></div>
+              <input type="checkbox" id="oa-toggle-junk" style="width:18px;height:18px;cursor:pointer;" onchange="toggleOutlookJunkVisibility(this.checked)">
             </div>
             <div style="display:flex;justify-content:space-between;align-items:center;padding:12px 16px;background:var(--card2);border-radius:8px;border:1px solid var(--border);">
               <div><div style="font-size:13px;font-weight:600;color:var(--text);">Sync mail stats</div><div style="font-size:11.5px;color:var(--muted);">Scan all mail and update contact counts</div></div>

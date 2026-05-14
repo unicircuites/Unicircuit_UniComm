@@ -15,9 +15,9 @@ const router = express.Router();
  * Exported so server.js can import and mutate it directly.
  */
 const serviceState = {
-  whatsapp: { status: 'offline', lastConnected: null, lastDisconnected: null },
-  pbx:      { status: 'offline', lastConnected: null, lastDisconnected: null },
-  outlook:  { status: 'offline', lastConnected: null, lastDisconnected: null },
+  whatsapp: { status: 'offline', lastConnected: null, lastDisconnected: null, phone: null },
+  pbx:      { status: 'offline', lastConnected: null, lastDisconnected: null, port: 5001, mode: 'server', clientHost: null },
+  outlook:  { status: 'offline', lastConnected: null, lastDisconnected: null, email: null },
   postgres: { status: 'offline', lastConnected: null, lastDisconnected: null },
 };
 
@@ -215,5 +215,17 @@ router.get('/ai/sessions', authenticate, async (req, res) => {
   }
 });
 
+const maintenance = require('../services/maintenance');
+
+// ── POST /api/system/maintenance/reconcile-calls ─────────────────────────
+router.post('/maintenance/reconcile-calls', authenticate, async (req, res) => {
+  try {
+    const updated = await maintenance.reconcileCallCounts(pool);
+    return res.json({ success: true, message: `Reconciled counts for ${updated} contacts.` });
+  } catch (err) {
+    return res.status(500).json({ error: err.message });
+  }
+});
+
+router.serviceState = serviceState;
 module.exports = router;
-module.exports.serviceState = serviceState;

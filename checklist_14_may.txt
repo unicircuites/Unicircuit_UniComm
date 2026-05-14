@@ -1,0 +1,234 @@
+UniComm Pro — Work Updated on May 14, 2026
+
+Scope: local changes that are not yet committed to GitHub.
+
+STATUS:
+[✓] Completed in code
+[~] Partially completed / needs runtime verification
+[O] Next action before commit
+
+====================
+PBX / CALL LOGS
+====================
+
+1. [✓] PBX call logs remain automatic
+   - Files: backend/services/matrixSmdr.js, backend/routes/calls.js
+   - Live Matrix SMDR records are stored in call_logs.
+   - /api/calls/sync returns current DB stats and PBX status.
+
+2. [✓] PBX contacts are now stored automatically
+   - File: backend/routes/calls.js
+   - Added syncPbxContactsFromCallLogs().
+   - Caller/destination phone numbers from call_logs are inserted into pbx_contacts.
+   - Existing saved names/company/notes are preserved with ON CONFLICT DO NOTHING.
+   - Triggered by:
+     * GET /api/calls/contacts
+     * GET /api/calls/sync
+     * POST /api/calls/sync
+
+3. [✓] PBX recording schema self-healing
+   - File: backend/server.js
+   - Ensures call_logs.recording_file exists on startup.
+
+4. [✓] PBX status model improved
+   - Files: backend/server.js, backend/routes/system.js, backend/services/matrixSmdr.js, dashboard.html
+   - Tracks ready/connected/disconnected states separately.
+   - Stores PBX mode, port, and connected client host in serviceState.
+   - Dashboard now distinguishes passive listening from active PBX session.
+
+5. [✓] PBX call count reconciliation
+   - Files: backend/services/maintenance.js, backend/routes/system.js, dashboard.html
+   - Added POST /api/system/maintenance/reconcile-calls.
+   - Dashboard has Recalculate Counts action for CRM contact call statistics.
+
+5A. [✓] PBX backup/restore includes contacts
+   - Files: backend/routes/calls.js, dashboard.html
+   - New backups include both call_logs and pbx_contacts.
+   - Restore supports old v1 call-only backups and new v2 backups with saved PBX contacts.
+   - Dashboard backup list now uses mtime/created_at correctly and restore notification shows call/contact counts.
+
+6. [~] PBX timeout / circuit breaker
+   - Improved disconnect/ready handling exists.
+   - Full circuit breaker pattern is still pending.
+
+====================
+OUTLOOK MAIL / FOLDERS
+====================
+
+7. [✓] Outlook folder sidebar fixed
+   - File: dashboard.html
+   - Added loadOutlookFolders().
+   - Folder list no longer stays on spinner.
+   - Supports up to 100 Outlook folders.
+
+8. [✓] Custom Outlook folders can be opened
+   - Files: dashboard.html, backend/routes/outlook.js
+   - Custom folders such as Director, Marketing, CRM_FFHERRP, IndiaMart, PETTY CASH can load by Outlook folder id.
+   - Unknown/custom folders no longer fall back to Inbox.
+
+9. [✓] Custom folder backend fallback added
+   - File: backend/routes/outlook.js
+   - Added GET /api/outlook/folder/:folderName/fallback.
+   - Uses outlook_emails_cache for folder-aware offline reads.
+
+10. [✓] Outlook category filters fixed
+    - File: dashboard.html
+    - Unread filter now uses real isRead=false.
+    - Lead/Important/Needs Reply filters apply to confident matches only.
+    - General or uncertain mails stay unfiltered as GENERAL.
+
+11. [✓] Outlook folder metadata expanded
+    - File: backend/routes/outlook.js
+    - /api/outlook/folders now requests top=100 and childFolderCount.
+
+11A. [✓] Outlook practical email action menu added
+    - Files: dashboard.html, backend/routes/outlook.js
+    - Removed unnecessary AI-only context menu entries now covered by the AI assistant.
+    - Added Copy to Folder and Move to Folder with folder picker.
+    - Added Mark as Unread, Pin to UniCRM Top, Block Sender.
+    - Added Download as EML and Download as MSG.
+    - Added Advanced Options -> Create Task.
+    - Added POST /api/outlook/message/:id/copy.
+    - Added PATCH /api/outlook/message/:id/unread.
+    - Pin/block behavior is stored locally for the CRM inbox view.
+    - Pin is app-level only and no longer changes Outlook follow-up flag, because Graph exposes flag but not a normal pinned message field.
+    - Copy/Move folder picker and email action confirmations now use custom UniCRM modals instead of browser prompt/confirm popups.
+    - Categorize action now loads Account Info / Outlook master categories first, including their colors, with fallback defaults.
+
+====================
+AI / PICOCLAW / QUEUE
+====================
+
+12. [~] PicoClaw assistant route improved
+    - File: backend/routes/outlook.js
+    - Outlook AI assistant uses configurable max token limit.
+    - 429 rate limit responses now return a user-friendly message.
+    - Dedicated /api/ai/analyze style endpoint is still not complete.
+
+13. [~] AI task queue resilience improved
+    - File: backend/services/aiTaskQueue.js
+    - ensureTable now retries.
+    - Orphaned pending/processing tasks are marked failed on startup.
+    - Full AI pipeline still pending.
+
+14. [✓] AI prompt output tightened
+    - File: backend/services/ollamaService.js
+    - PicoClaw validation ran against 5 real cached Outlook emails.
+    - Output was structured with Summary, Insights, Smart Actions, 3 numbered actions, and 119 words.
+    - AI assistant route now reads from outlook_emails_cache and uses the same concise prompt contract.
+
+====================
+WHATSAPP
+====================
+
+15. [✓] WhatsApp connection and group participant improvements are still present
+    - File: backend/services/whatsapp.js
+    - Session persistence, reconnect handling, reply detection, group participant/LID phone sync, and optimized group name resolution remain in current local code.
+
+====================
+DATABASE / PERFORMANCE
+====================
+
+16. [~] PostgreSQL pool tuned
+    - File: backend/db/pool.js
+    - max connections increased from 10 to 20.
+    - idle timeout increased to 60s.
+    - connection timeout increased to 10s.
+    - Needs runtime observation under normal dashboard use.
+
+====================
+DOCUMENTATION / SCRATCH
+====================
+
+17. [✓] PBX networking documentation added
+    - File: backend/PBX_NETWORKING_GUIDE.md
+    - Documents Matrix PBX networking and firewall guidance.
+
+18. [O] Review scratch/untracked artifacts before commit
+    - backend/scratch/add_recording_column.js
+    - scratch_check_schema.js
+    - call_backups/
+    - Decide whether to commit, move, or ignore these before pushing.
+
+====================
+VERIFICATION RUN
+====================
+
+[✓] node --check backend/routes/outlook.js
+[✓] node --check backend/routes/calls.js
+
+Runtime checks still recommended before commit:
+[O] Open Email tab and verify folder list loads.
+[O] Click Inbox, Director, Marketing, CRM_FFHERRP, IndiaMart, and Archive if available.
+[O] Verify Unread, Leads, Needs Reply, and Important filters.
+[O] Right-click an email and verify Copy to Folder, Move to Folder, Mark as Unread, Pin to UniCRM Top, Block, EML/MSG download, and Advanced Options -> Create Task.
+[O] Verify Copy/Move folder picker, Delete, Block, and Create Rule use custom UniCRM popups, not browser tab prompts.
+[O] Verify pinned email moves to top immediately and stays at top after refresh within the loaded inbox view.
+[O] Trigger PBX Sync Latest and verify pbx_contacts receives new numbers.
+[O] Run Recalculate Counts and verify CRM contact call counts.
+
+====================
+PARTIAL TASKS - EASY TO COMPLETE NEXT
+====================
+
+1. [✓] AI prompt output tightened
+   - Completed: PicoClaw tested with 5 real cached emails and pass/fail notes recorded above.
+
+2. [~] PostgreSQL pool tuned
+   - Why easy: Config is already changed.
+   - Finish by observing normal dashboard use for connection errors/timeouts.
+
+3. [~] AI drafting UAT
+   - Why easy: Drafting feature already exists.
+   - Finish by testing email draft, WA draft, and one reply scenario.
+
+4. [~] Suggest-only trust phase
+   - Why easy: Current AI behavior is already suggestion-first.
+   - Finish by confirming no autonomous send/action path is enabled.
+
+5. [~] Email quality
+   - Why easy: Mail actions and drafts now exist.
+   - Finish by adding a small manual quality checklist for subject, tone, recipient, attachments/downloads.
+
+6. [~] API error tracking
+   - Why easy: Logs already exist.
+   - Finish by adding a small error summary/counter or documenting where to check failures.
+
+7. [~] Contact enrichment from Outlook
+   - Why easy: Outlook import exists.
+   - Finish by adding a one-click update for missing phone/company/name fields from Outlook contact data.
+
+====================
+GIT STATUS SNAPSHOT
+====================
+
+Modified:
+- backend/db/pool.js
+- backend/routes/calls.js
+- backend/routes/outlook.js
+- backend/routes/system.js
+- backend/server.js
+- backend/services/aiTaskQueue.js
+- backend/services/maintenance.js
+- backend/services/matrixSmdr.js
+- backend/services/msGraph.js
+- backend/services/ollamaService.js
+- backend/services/whatsapp.js
+- dashboard.html
+- checklist.txt
+
+Untracked:
+- backend/PBX_NETWORKING_GUIDE.md
+- backend/scratch/add_recording_column.js
+- call_backups/
+- scratch_check_schema.js
+- checklist_14_may.txt
+
+====================
+COMMIT READINESS
+====================
+
+[O] Run runtime UI smoke test.
+[O] Inspect untracked scratch/backup files.
+[O] Stage only intended files.
+[O] Commit May 14 PBX + Outlook folder/filter + practical mail actions + resilience updates.

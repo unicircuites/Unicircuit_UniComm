@@ -17,27 +17,38 @@ try {
 } catch (e) {
   console.warn('[Outlook] Could not log OAuth env:', e.message);
 }
-const express    = require('express');
-const cors       = require('cors');
-const path       = require('path');
-const fs         = require('fs');
-const http       = require('http');
-const https      = require('https');
+const express = require('express');
+const cors = require('cors');
+const path = require('path');
+const fs = require('fs');
+const http = require('http');
+const https = require('https');
 const { Server } = require('socket.io');
-const rateLimit  = require('express-rate-limit');
-const wa         = require('./services/whatsapp');
-const smdr       = require('./services/matrixSmdr');
-const mktCron      = require('./services/marketingCron');
+const rateLimit = require('express-rate-limit');
+const wa = require('./services/whatsapp');
+const smdr = require('./services/matrixSmdr');
+const mktCron = require('./services/marketingCron');
 const taskNotifier = require('./services/taskNotifier');
-const automatedAI  = require('./services/automatedAI');
-const aiTaskQueue  = require('./services/aiTaskQueue');
-const pool       = require('./db/pool');
-const activityLog  = require('./services/activityLog');
+const automatedAI = require('./services/automatedAI');
+const aiTaskQueue = require('./services/aiTaskQueue');
+const pool = require('./db/pool');
+const activityLog = require('./services/activityLog');
 const systemRoutes = require('./routes/system');
 const { serviceState } = systemRoutes;
-const msGraph      = require('./services/msGraph');
-const cron         = require('node-cron');
-const maintenance  = require('./services/maintenance');
+const msGraph = require('./services/msGraph');
+const cron = require('node-cron');
+const maintenance = require('./services/maintenance');
+
+// ── DATABASE SCHEMA MIGRATION (Self-Healing) ───────────────────────────────
+async function ensureSchema() {
+  try {
+    await pool.query(`ALTER TABLE call_logs ADD COLUMN IF NOT EXISTS recording_file TEXT`);
+    console.log('[DB] ✅ Schema check complete: recording_file column ensured.');
+  } catch (err) {
+    console.error('[DB] ❌ Schema check failed:', err.message);
+  }
+}
+ensureSchema();
 
 
 const app = express();
@@ -53,7 +64,7 @@ if (sslKey && sslCert) {
   const keyPath = path.isAbsolute(sslKey) ? sslKey : path.join(__dirname, sslKey);
   const certPath = path.isAbsolute(sslCert) ? sslCert : path.join(__dirname, sslCert);
   server = https.createServer({
-    key:  fs.readFileSync(keyPath),
+    key: fs.readFileSync(keyPath),
     cert: fs.readFileSync(certPath),
   }, app);
   urlScheme = 'https';
@@ -72,7 +83,7 @@ app.use((_req, res, next) => {
   next();
 });
 const io = new Server(server, {
-  cors: { origin: '*', methods: ['GET','POST'] },
+  cors: { origin: '*', methods: ['GET', 'POST'] },
   path: '/socket.io'
 });
 
@@ -91,8 +102,8 @@ function markOnline(service) {
   serviceState[service].status = 'online';
   serviceState[service].lastConnected = _now();
   const ev = activityLog.append({ type: 'online', service, message: `${service} connected`, timestamp: _now() });
-  try { _origEmit('system:service_online', { service, timestamp: ev.timestamp, seq: ev.seq }); } catch(_) {}
-  try { _origEmit('system:activity', ev); } catch(_) {}
+  try { _origEmit('system:service_online', { service, timestamp: ev.timestamp, seq: ev.seq }); } catch (_) { }
+  try { _origEmit('system:activity', ev); } catch (_) { }
 }
 
 function markOffline(service, reason) {
@@ -100,24 +111,40 @@ function markOffline(service, reason) {
   serviceState[service].lastDisconnected = _now();
   const msg = reason ? `${service} disconnected: ${reason}` : `${service} disconnected`;
   const ev = activityLog.append({ type: 'offline', service, message: msg, timestamp: _now() });
-  try { _origEmit('system:service_offline', { service, timestamp: ev.timestamp, reason: reason || 'Connection lost', seq: ev.seq }); } catch(_) {}
-  try { _origEmit('system:activity', ev); } catch(_) {}
+  try { _origEmit('system:service_offline', { service, timestamp: ev.timestamp, reason: reason || 'Connection lost', seq: ev.seq }); } catch (_) { }
+  try { _origEmit('system:activity', ev); } catch (_) { }
 }
 
 function systemBridge(event, data) {
   try {
     // ── Service connect/disconnect ──────────────────────────────────────
-    if      (event === 'wa:connected')      markOnline('whatsapp');
-    else if (event === 'wa:disconnected')   markOffline('whatsapp', data?.reason || (data?.code ? `code ${data.code}` : null));
-    else if (event === 'pbx:connected')     markOnline('pbx');
-    else if (event === 'pbx:disconnected')  markOffline('pbx', data?.reason);
+    if (event === 'wa:connected') { markOnline('whatsapp'); serviceState.whatsapp.phone = data?.jid || data?.phone || null; }
+    else if (event === 'wa:disconnected') markOffline('whatsapp', data?.reason || (data?.code ? `code ${data.code}` : null));
+    else if (event === 'pbx:connected') {
+      markOnline('pbx');
+      serviceState.pbx.clientHost = data?.host || null;
+      serviceState.pbx.status = 'connected'; // differentiate from 'online' (ready)
+    }
+    else if (event === 'pbx:ready') {
+      markOnline('pbx');
+      serviceState.pbx.port = data?.port || SMDR_PORT;
+      serviceState.pbx.mode = data?.mode || 'server';
+    }
+    else if (event === 'pbx:disconnected') {
+      serviceState.pbx.clientHost = null;
+      if (data?.fatal) {
+        markOffline('pbx', data.error || data.reason);
+      } else {
+        serviceState.pbx.status = 'online'; // back to ready mode
+      }
+    }
 
     // ── WhatsApp activity ───────────────────────────────────────────────
     else if (event === 'wa:message') {
-      const who  = data?.fromMe ? 'You' : (data?.senderName || data?.chatId || 'Unknown');
+      const who = data?.fromMe ? 'You' : (data?.senderName || data?.chatId || 'Unknown');
       const chat = data?.chatName || data?.chatId || '';
       const body = (data?.body || '').slice(0, 60);
-      const msg  = data?.fromMe
+      const msg = data?.fromMe
         ? `WA sent to ${chat}: ${body}`
         : `WA received from ${who} (${chat}): ${body}`;
       activityLog.append({ type: 'info', service: 'whatsapp', message: msg, timestamp: _now() });
@@ -134,8 +161,8 @@ function systemBridge(event, data) {
       const d = data || {};
       const type = d.call_type || 'Call';
       const caller = d.caller || '?';
-      const dest   = d.destination || d.extension || '?';
-      const dur    = d.duration || '';
+      const dest = d.destination || d.extension || '?';
+      const dur = d.duration || '';
       activityLog.append({
         type: 'info', service: 'pbx',
         message: `PBX ${type}: ${caller} → ${dest}${dur ? ' (' + dur + ')' : ''}`,
@@ -161,7 +188,7 @@ function systemBridge(event, data) {
     else if (event === 'system:user_login') {
       const user = data?.name || data?.email || 'Unknown user';
       activityLog.append({ type: 'user_login', service: 'system', message: `User logged in: ${user}`, timestamp: _now() });
-      try { _origEmit('system:activity', { type: 'user_login', service: 'system', message: `User logged in: ${user}`, timestamp: _now() }); } catch(_) {}
+      try { _origEmit('system:activity', { type: 'user_login', service: 'system', message: `User logged in: ${user}`, timestamp: _now() }); } catch (_) { }
     }
     else if (event === 'system:user_logout') {
       const user = data?.name || data?.email || 'Unknown user';
@@ -169,10 +196,10 @@ function systemBridge(event, data) {
     }
 
     // ── Emit generic activity event for all non-connect/disconnect events ─
-    if (!['wa:connected','wa:disconnected','pbx:connected','pbx:disconnected'].includes(event)) {
+    if (!['wa:connected', 'wa:disconnected', 'pbx:connected', 'pbx:disconnected'].includes(event)) {
       const last = activityLog.getRecent(1)[0];
       if (last) {
-        try { _origEmit('system:activity', last); } catch(_) {}
+        try { _origEmit('system:activity', last); } catch (_) { }
       }
     }
   } catch (err) {
@@ -182,7 +209,7 @@ function systemBridge(event, data) {
 
 // Wrap io.emit to intercept wa:* and pbx:* events for the system bridge
 const _origEmit = io.emit.bind(io);
-io.emit = function(event, ...args) {
+io.emit = function (event, ...args) {
   _origEmit(event, ...args);
   systemBridge(event, args[0]);
 };
@@ -206,7 +233,7 @@ pool.on('error', (err) => {
 
 // Periodic probes
 const outlookProbeMs = parseInt(process.env.OUTLOOK_PROBE_INTERVAL_MS, 10) || 60000;
-const dbProbeMs      = parseInt(process.env.DB_PROBE_INTERVAL_MS, 10)      || 30000;
+const dbProbeMs = parseInt(process.env.DB_PROBE_INTERVAL_MS, 10) || 30000;
 
 async function probeOutlook() {
   try {
@@ -304,7 +331,7 @@ app.get('/', (_req, res) => {
 
 // ── CORS ───────────────────────────────────────────────────────────────────
 app.use(cors({
-  origin: function(origin, callback) {
+  origin: function (origin, callback) {
     // Allow same-origin requests (served by this server) and local dev
     const allowed = [
       'http://localhost:4551',
@@ -375,25 +402,25 @@ const apiLimiter = rateLimit({
 });
 
 // ── ROUTES ─────────────────────────────────────────────────────────────────
-app.use('/api/auth',      authLimiter, require('./routes/auth'));
-app.use('/api/contacts',  apiLimiter,  require('./routes/contacts'));
-app.use('/api/pipeline',  apiLimiter,  require('./routes/pipeline'));
-app.use('/api/calls',     apiLimiter,  require('./routes/calls'));
-app.use('/api/campaigns', apiLimiter,  require('./routes/campaigns'));
-app.use('/api/dashboard', apiLimiter,  require('./routes/dashboard'));
-app.use('/api/outlook',   apiLimiter,  require('./routes/outlook'));
-app.use('/api/wa',        apiLimiter,  require('./routes/whatsapp'));
-app.use('/api/eb',        apiLimiter,  require('./routes/engagebay'));
-app.use('/api/marketing', apiLimiter,  require('./routes/marketing'));
-app.use('/api/broadcast', apiLimiter,  require('./routes/broadcast'));
-app.use('/api/templates', apiLimiter,  require('./routes/emailTemplates'));
-app.use('/api/marquee',  require('./routes/marquee'));
-app.use('/api/groups',   apiLimiter,  require('./routes/recipientGroups'));
+app.use('/api/auth', authLimiter, require('./routes/auth'));
+app.use('/api/contacts', apiLimiter, require('./routes/contacts'));
+app.use('/api/pipeline', apiLimiter, require('./routes/pipeline'));
+app.use('/api/calls', apiLimiter, require('./routes/calls'));
+app.use('/api/campaigns', apiLimiter, require('./routes/campaigns'));
+app.use('/api/dashboard', apiLimiter, require('./routes/dashboard'));
+app.use('/api/outlook', apiLimiter, require('./routes/outlook'));
+app.use('/api/wa', apiLimiter, require('./routes/whatsapp'));
+app.use('/api/eb', apiLimiter, require('./routes/engagebay'));
+app.use('/api/marketing', apiLimiter, require('./routes/marketing'));
+app.use('/api/broadcast', apiLimiter, require('./routes/broadcast'));
+app.use('/api/templates', apiLimiter, require('./routes/emailTemplates'));
+app.use('/api/marquee', require('./routes/marquee'));
+app.use('/api/groups', apiLimiter, require('./routes/recipientGroups'));
 app.use('/api/mail-tasks', apiLimiter, require('./routes/mailTasks'));
-app.use('/api/system',  apiLimiter,  require('./routes/system'));
+app.use('/api/system', apiLimiter, require('./routes/system'));
 
 // OAuth2 callback — must be at root level to match redirect URI
-app.use('/auth',          require('./routes/outlook'));
+app.use('/auth', require('./routes/outlook'));
 
 // ── HEALTH CHECK ───────────────────────────────────────────────────────────
 app.get('/api/health', (_req, res) => {
@@ -413,35 +440,43 @@ app.use((err, _req, res, _next) => {
 });
 
 // ── START ──────────────────────────────────────────────────────────────────
-server.listen(PORT, HOST, () => {
+server.listen(PORT, HOST, async () => {
   console.log(`\n🚀  UniComm Pro API  →  ${urlScheme}://localhost:${PORT}  (bind ${HOST})`);
   console.log(`🏥  Health check    →  ${urlScheme}://localhost:${PORT}/api/health`);
   console.log(`📱  WhatsApp        →  starting...\n`);
 
-  // Start WhatsApp — auto-reconnects, QR pushed via Socket.IO
-  wa.startWA().catch(err => console.error('[WA] Start error:', err.message));
+  // Sequential Service Initialization for stability
+  try {
+    console.log('[System] Initializing services...');
 
-  // Start Matrix SMDR listener
-  smdr.start().catch(err => console.error('[SMDR] Start error:', err.message));
+    // 1. Matrix SMDR listener (Critical for call logging)
+    await smdr.start().catch(err => console.error('[SMDR] Start error:', err.message));
 
-  // Start Marketing cron (6 PM daily reminder)
-  mktCron.start(io);
+    // 2. WhatsApp — auto-reconnects, QR pushed via Socket.IO
+    await wa.startWA().catch(err => console.error('[WA] Start error:', err.message));
 
-  // Start Task Notification scheduler (WA + email reminders before due time)
-  taskNotifier.start(pool);
+    // 3. AI System Initialization (Ensure tables)
+    aiTaskQueue.init(io);
+    await aiTaskQueue.ensureTable();
 
-  // ✅ 1. DISABLE AUTOMATED AI SCHEDULER (Only manual trigger allowed)
-  // automatedAI.start(io, 4);
+    // 4. Maintenance & Schedulers
+    mktCron.start(io);
+    taskNotifier.start(pool);
 
-  // AI System Initialization
-  aiTaskQueue.init(io);
-  aiTaskQueue.ensureTable();
+    console.log('[System] ✅ All background services initialized.');
+  } catch (err) {
+    console.error('[System] ❌ Critical initialization failure:', err.message);
+  }
 
   // ✅ 2. START DAILY PRUNING (7-day policy)
   cron.schedule('0 0 * * *', async () => {
     console.log('[Maintenance] Running daily AI task history pruning (7-day policy)...');
-    await aiTaskQueue.pruneHistory(7);
-    await maintenance.pruneAntigravityLogs();
+    try {
+      await aiTaskQueue.pruneHistory(7);
+      await maintenance.pruneAntigravityLogs();
+    } catch (err) {
+      console.error('[Maintenance] Cron error:', err.message);
+    }
   });
 
   // Run initial maintenance on startup (async)
@@ -457,6 +492,6 @@ process.on('SIGINT', async () => {
     if (wa.getStatus().connected) {
       await wa.logout();
     }
-  } catch(_) {}
+  } catch (_) { }
   process.exit(0);
 });

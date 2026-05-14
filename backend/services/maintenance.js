@@ -64,6 +64,59 @@ async function pruneAntigravityLogs() {
     }
 }
 
+/**
+ * Reconciles call counts in the contacts table with actual records in call_logs.
+ */
+async function reconcileCallCounts(pool) {
+  console.log('[Maintenance] Starting call count reconciliation...');
+  try {
+    const contactsRes = await pool.query('SELECT id, phone, wa, fname, lname FROM contacts');
+    const contacts = contactsRes.rows;
+    
+    let totalUpdated = 0;
+
+    for (const c of contacts) {
+      const nums = [c.phone, c.wa].filter(n => n && n.length > 5).map(n => n.replace(/\s+/g, ''));
+      if (nums.length === 0) continue;
+
+      // Build OR conditions for all phone variations
+      const conditions = [];
+      const params = [];
+      let p = 1;
+
+      nums.forEach(n => {
+        const last10 = n.slice(-10);
+        conditions.push(`caller LIKE $${p} OR destination LIKE $${p}`);
+        params.push(`%${last10}`);
+        p++;
+        conditions.push(`caller LIKE $${p} OR destination LIKE $${p}`);
+        params.push(`%${n}%`);
+        p++;
+      });
+
+      const countRes = await pool.query(
+        `SELECT COUNT(*)::int AS n FROM call_logs WHERE ${conditions.join(' OR ')}`,
+        params
+      );
+
+      const actualCount = countRes.rows[0].n;
+      
+      await pool.query(
+        'UPDATE contacts SET calls = $1 WHERE id = $2',
+        [actualCount, c.id]
+      );
+      totalUpdated++;
+    }
+
+    console.log(`[Maintenance] ✅ Reconciled call counts for ${totalUpdated} contacts.`);
+    return totalUpdated;
+  } catch (err) {
+    console.error('[Maintenance] ❌ Reconciliation error:', err.message);
+    throw err;
+  }
+}
+
 module.exports = {
-    pruneAntigravityLogs
+    pruneAntigravityLogs,
+    reconcileCallCounts
 };

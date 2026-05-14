@@ -70,65 +70,67 @@ async function queueTask(type, payload, batchId = null, caller = 'UNKNOWN') {
 /**
  * Ensure the ai_tasks table and required structures exist
  */
-async function ensureTable() {
-  try {
-    await pool.query(`
-      CREATE TABLE IF NOT EXISTS ai_tasks (
-        id SERIAL PRIMARY KEY,
-        status VARCHAR(20) NOT NULL DEFAULT 'pending',
-        type VARCHAR(50),
-        batch_id VARCHAR(100),
-        payload JSONB,
-        result JSONB,
-        error TEXT,
-        duration_ms INTEGER,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-      )
-    `);
+async function ensureTable(retries = 3) {
+  for (let i = 0; i < retries; i++) {
+    try {
+      await pool.query(`
+        CREATE TABLE IF NOT EXISTS ai_tasks (
+          id SERIAL PRIMARY KEY,
+          status VARCHAR(20) NOT NULL DEFAULT 'pending',
+          type VARCHAR(50),
+          batch_id VARCHAR(100),
+          payload JSONB,
+          result JSONB,
+          error TEXT,
+          duration_ms INTEGER,
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+          updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+      `);
 
-    // ✅ 5. FIX DB SCHEMA ISSUE (Column migration)
-    await pool.query(`
-      ALTER TABLE ai_tasks ADD COLUMN IF NOT EXISTS duration_ms INTEGER;
-    `);
-    await pool.query(`CREATE INDEX IF NOT EXISTS idx_ai_tasks_status ON ai_tasks(status)`);
-    await pool.query(`CREATE INDEX IF NOT EXISTS idx_ai_tasks_batch ON ai_tasks(batch_id)`);
+      await pool.query(`ALTER TABLE ai_tasks ADD COLUMN IF NOT EXISTS duration_ms INTEGER;`);
+      await pool.query(`CREATE INDEX IF NOT EXISTS idx_ai_tasks_status ON ai_tasks(status)`);
+      await pool.query(`CREATE INDEX IF NOT EXISTS idx_ai_tasks_batch ON ai_tasks(batch_id)`);
 
-    await pool.query(`
-      CREATE OR REPLACE FUNCTION update_ai_tasks_timestamp()
-      RETURNS TRIGGER AS $$
-      BEGIN
-        NEW.updated_at = CURRENT_TIMESTAMP;
-        RETURN NEW;
-      END;
-      $$ LANGUAGE plpgsql;
-    `);
+      await pool.query(`
+        CREATE OR REPLACE FUNCTION update_ai_tasks_timestamp()
+        RETURNS TRIGGER AS $$
+        BEGIN
+          NEW.updated_at = CURRENT_TIMESTAMP;
+          RETURN NEW;
+        END;
+        $$ LANGUAGE plpgsql;
+      `);
 
-    await pool.query(`
-      DO $$
-      BEGIN
-        IF NOT EXISTS (SELECT 1 FROM pg_trigger WHERE tgname = 'trg_ai_tasks_timestamp') THEN
-          CREATE TRIGGER trg_ai_tasks_timestamp
-          BEFORE UPDATE ON ai_tasks
-          FOR EACH ROW
-          EXECUTE FUNCTION update_ai_tasks_timestamp();
-        END IF;
-      END $$;
-    `);
-    console.log('✅ AI Task Queue database structure ensured.');
+      await pool.query(`
+        DO $$
+        BEGIN
+          IF NOT EXISTS (SELECT 1 FROM pg_trigger WHERE tgname = 'trg_ai_tasks_timestamp') THEN
+            CREATE TRIGGER trg_ai_tasks_timestamp
+            BEFORE UPDATE ON ai_tasks
+            FOR EACH ROW
+            EXECUTE FUNCTION update_ai_tasks_timestamp();
+          END IF;
+        END $$;
+      `);
+      console.log('✅ AI Task Queue database structure ensured.');
 
-    // ✅ STARTUP CLEANUP: Reset any orphaned tasks from a previous server run
-    const orphaned = await pool.query(`
-      UPDATE ai_tasks
-      SET status = 'failed', error = 'Server restarted — task was orphaned'
-      WHERE status IN ('pending', 'processing')
-      RETURNING id
-    `);
-    if (orphaned.rowCount > 0) {
-      console.warn(`[AI Queue] ⚠️  Reset ${orphaned.rowCount} orphaned task(s) to 'failed' on startup.`);
+      // STARTUP CLEANUP: Reset any orphaned tasks
+      const orphaned = await pool.query(`
+        UPDATE ai_tasks
+        SET status = 'failed', error = 'Server restarted — task was orphaned'
+        WHERE status IN ('pending', 'processing')
+        RETURNING id
+      `);
+      if (orphaned.rowCount > 0) {
+        console.warn(`[AI Queue] ⚠️  Reset ${orphaned.rowCount} orphaned task(s) to 'failed' on startup.`);
+      }
+      return; // Success
+    } catch (err) {
+      console.warn(`[AI Queue] Table ensure attempt ${i+1} failed: ${err.message}`);
+      if (i === retries - 1) throw err;
+      await new Promise(resolve => setTimeout(resolve, 2000));
     }
-  } catch (err) {
-    console.error('❌ Failed to ensure AI Task Queue table:', err.message);
   }
 }
 

@@ -56,6 +56,25 @@ async function ensurePbxContactsTable() {
 }
 ensurePbxContactsTable().catch(err => console.warn('[Calls] pbx_contacts table error:', err.message));
 
+async function syncPbxContactsFromCallLogs() {
+  const result = await pool.query(`
+    INSERT INTO pbx_contacts (phone)
+    SELECT DISTINCT phone
+    FROM (
+      SELECT NULLIF(TRIM(destination), '') AS phone
+      FROM call_logs
+      WHERE destination IS NOT NULL AND destination <> ''
+      UNION
+      SELECT NULLIF(TRIM(caller), '') AS phone
+      FROM call_logs
+      WHERE caller IS NOT NULL AND caller <> ''
+    ) phones
+    WHERE phone IS NOT NULL AND phone <> ''
+    ON CONFLICT (phone) DO NOTHING
+  `);
+  return result.rowCount || 0;
+}
+
 // ═══════════════════════════════════════════════════════════════════
 // GET /api/calls/pbx-status
 // ═══════════════════════════════════════════════════════════════════
@@ -68,25 +87,24 @@ router.get('/pbx-status', (req, res) => {
 // ═══════════════════════════════════════════════════════════════════
 router.get('/contacts', async (req, res) => {
   try {
+    await syncPbxContactsFromCallLogs();
     const result = await pool.query(`
       SELECT
         t.phone,
-        MAX(cl.created_at)   AS last_call,
-        COUNT(cl.id)::int    AS call_count,
+        MAX(t.created_at)    AS last_call,
+        COUNT(DISTINCT t.id)::int AS call_count,
         pc.name,
         pc.company,
         pc.notes,
         pc.id                AS pbx_contact_id
       FROM (
-        SELECT NULLIF(TRIM(destination), '') AS phone, id FROM call_logs WHERE destination IS NOT NULL
+        SELECT NULLIF(TRIM(destination), '') AS phone, created_at, id FROM call_logs WHERE destination IS NOT NULL AND destination <> ''
         UNION ALL
-        SELECT NULLIF(TRIM(caller), '') AS phone, id FROM call_logs WHERE caller IS NOT NULL
+        SELECT NULLIF(TRIM(caller), '') AS phone, created_at, id FROM call_logs WHERE caller IS NOT NULL AND caller <> ''
       ) t
-      LEFT JOIN call_logs cl ON (cl.destination = t.phone OR cl.caller = t.phone)
       LEFT JOIN pbx_contacts pc ON pc.phone = t.phone
-      WHERE t.phone IS NOT NULL AND t.phone <> ''
       GROUP BY t.phone, pc.name, pc.company, pc.notes, pc.id
-      ORDER BY MAX(cl.created_at) DESC NULLS LAST
+      ORDER BY last_call DESC NULLS LAST
       LIMIT 500
     `);
     return res.json(result.rows);
@@ -317,7 +335,7 @@ router.get('/backup/list', (req, res) => {
       .filter(f => f.endsWith('.json'))
       .map(f => {
         const stat = fs.statSync(path.join(BACKUP_DIR, f));
-        return { filename: f, size: stat.size, created_at: stat.birthtime };
+        return { filename: f, size: stat.size, created_at: stat.birthtime, mtime: stat.mtime };
       })
       .sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
     return res.json({ backups: files, dir: BACKUP_DIR });
@@ -329,19 +347,30 @@ router.get('/backup/list', (req, res) => {
 /** POST /api/calls/backup/create */
 router.post('/backup/create', async (req, res) => {
   try {
-    const result = await pool.query(`SELECT * FROM call_logs ORDER BY created_at DESC`);
+    await ensurePbxContactsTable();
+    const calls = await pool.query(`SELECT * FROM call_logs ORDER BY created_at DESC`);
+    const contacts = await pool.query(`SELECT * FROM pbx_contacts ORDER BY updated_at DESC NULLS LAST, created_at DESC`);
     const ts = new Date().toISOString().replace(/[:.]/g, '-');
     const filename = `call_backup_${ts}.json`;
     const filepath = path.join(BACKUP_DIR, filename);
     fs.writeFileSync(filepath, JSON.stringify({
+      version: 2,
       created_at: new Date().toISOString(),
-      total: result.rowCount,
-      records: result.rows,
+      totals: {
+        call_logs: calls.rowCount,
+        pbx_contacts: contacts.rowCount,
+      },
+      total: calls.rowCount,
+      records: calls.rows,
+      call_logs: calls.rows,
+      pbx_contacts: contacts.rows,
     }, null, 2));
     return res.json({
       message: `Backup created: ${filename}`,
       filename,
-      total: result.rowCount,
+      total: calls.rowCount,
+      calls: calls.rowCount,
+      contacts: contacts.rowCount,
     });
   } catch (err) {
     return res.status(500).json({ error: 'Backup failed: ' + err.message });
@@ -359,12 +388,13 @@ router.post('/backup/restore', async (req, res) => {
 
   try {
     const raw = JSON.parse(fs.readFileSync(filepath, 'utf8'));
-    const records = raw.records || [];
+    const records = raw.call_logs || raw.records || [];
+    const contacts = raw.pbx_contacts || raw.contacts || [];
     let inserted = 0;
     let skipped  = 0;
     for (const r of records) {
       try {
-        await pool.query(`
+        const result = await pool.query(`
           INSERT INTO call_logs
             (id, call_date, call_time, duration, call_type, caller, extension, destination, trunk, ai_summary, raw_line, created_at)
           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
@@ -374,10 +404,43 @@ router.post('/backup/restore', async (req, res) => {
           r.caller, r.extension, r.destination, r.trunk,
           r.ai_summary, r.raw_line, r.created_at
         ]);
-        inserted++;
+        inserted += result.rowCount || 0;
       } catch (_) { skipped++; }
     }
-    return res.json({ message: 'Restore complete.', inserted, skipped, total: records.length });
+
+    await ensurePbxContactsTable();
+    let contactsUpserted = 0;
+    let contactsSkipped = 0;
+    for (const c of contacts) {
+      const phone = String(c.phone || '').trim();
+      if (!phone) { contactsSkipped++; continue; }
+      try {
+        const result = await pool.query(`
+          INSERT INTO pbx_contacts (phone, name, company, notes, created_at, updated_at)
+          VALUES ($1,$2,$3,$4,COALESCE($5::timestamptz,NOW()),COALESCE($6::timestamptz,NOW()))
+          ON CONFLICT (phone) DO UPDATE
+            SET name = COALESCE(EXCLUDED.name, pbx_contacts.name),
+                company = COALESCE(EXCLUDED.company, pbx_contacts.company),
+                notes = COALESCE(EXCLUDED.notes, pbx_contacts.notes),
+                updated_at = COALESCE(EXCLUDED.updated_at, NOW())
+        `, [phone, c.name || null, c.company || null, c.notes || null, c.created_at || null, c.updated_at || null]);
+        contactsUpserted += result.rowCount || 0;
+      } catch (_) { contactsSkipped++; }
+    }
+
+    const syncedContacts = await syncPbxContactsFromCallLogs().catch(() => 0);
+
+    return res.json({
+      message: 'Restore complete.',
+      inserted,
+      skipped,
+      total: records.length,
+      contacts_upserted: contactsUpserted,
+      contacts_skipped: contactsSkipped,
+      contacts_total: contacts.length,
+      contacts_synced_from_logs: syncedContacts,
+      count: inserted,
+    });
   } catch (err) {
     return res.status(500).json({ error: 'Restore failed: ' + err.message });
   }
@@ -436,6 +499,7 @@ router.delete('/contacts/:phone', async (req, res) => {
 // ═══════════════════════════════════════════════════════════════════
 router.get('/sync', async (req, res) => {
   try {
+    const contactsSynced = await syncPbxContactsFromCallLogs();
     const result = await pool.query(
       `SELECT COUNT(*) AS total,
               COUNT(*) FILTER (WHERE created_at > NOW() - INTERVAL '24 hours') AS today
@@ -445,6 +509,7 @@ router.get('/sync', async (req, res) => {
       synced: true,
       total: parseInt(result.rows[0].total),
       today: parseInt(result.rows[0].today),
+      contacts_synced: contactsSynced,
       timestamp: new Date().toISOString(),
     });
   } catch (err) {
@@ -456,10 +521,12 @@ router.post('/sync', async (req, res) => {
   // Future: trigger re-read from PBX SMDR file or re-process buffer.
   // For now: return current stats.
   try {
+    const contactsSynced = await syncPbxContactsFromCallLogs();
     const result = await pool.query(`SELECT COUNT(*) FROM call_logs`);
     return res.json({
       message: 'Call log database is up to date. Live SMDR listener is active.',
       total: parseInt(result.rows[0].count),
+      contacts_synced: contactsSynced,
       pbx_status: smdr.getStatus(),
     });
   } catch (err) {

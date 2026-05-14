@@ -320,6 +320,25 @@ async function graphPatch(endpoint, body, email) {
   return res.json().catch(() => ({ success: true }));
 }
 
+async function graphDelete(endpoint, email) {
+  const token = await getAccessToken(email || process.env.MS_USER_EMAIL);
+  if (!token) throw new Error('NOT_AUTHENTICATED');
+
+  const resolvedEndpoint = resolveEndpoint(endpoint, email || process.env.MS_USER_EMAIL);
+  const res = await fetch(`${GRAPH}${resolvedEndpoint}`, {
+    method: 'DELETE',
+    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    const graphErr = new Error(err.error?.message || `Graph API error ${res.status}`);
+    graphErr.status = res.status;
+    graphErr.code = err.error?.code;
+    throw graphErr;
+  }
+  return { success: true };
+}
+
 // ── CHECK AUTH STATUS ──────────────────────────────────────────────────────
 // Actually verify mailbox access — not just token existence
 // IMPORTANT: Only checks delegated (user) token, NOT client credentials
@@ -376,6 +395,7 @@ module.exports = {
   graphGet,
   graphPost,
   graphPatch,
+  graphDelete,
   isAuthenticated,
   saveTokens,
   logOutlookOAuthConfigAtStartup,

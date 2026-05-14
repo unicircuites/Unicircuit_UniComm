@@ -32,6 +32,12 @@ const activityLog = require('../services/activityLog');
 const router = express.Router();
 const MS_EMAIL = process.env.MS_USER_EMAIL;
 
+function resolvePicoClawModel() {
+  const configured = String(process.env.AI_API_MODEL || '').trim();
+  if (!configured || /^gemma2-9b-it$/i.test(configured)) return 'llama-3.1-8b-instant';
+  return configured;
+}
+
 // Helper function to store messages in database
 async function storeMessagesInDB(messages, folder) {
   await mailStore.ensureTable();
@@ -1852,7 +1858,7 @@ router.get('/message/:id', async (req, res) => {
   try {
     const sel = [
       'id', 'subject', 'from', 'toRecipients', 'ccRecipients', 'receivedDateTime',
-      'body', 'uniqueBody', 'isRead', 'hasAttachments', 'importance', 'conversationId',
+      'body', 'uniqueBody', 'isRead', 'hasAttachments', 'importance', 'conversationId', 'webLink',
     ].join(',');
     // Do not use attachments($select=…): OData treats the collection as base
     // microsoft.graph.attachment, which has no contentId/contentBytes (those live on fileAttachment).
@@ -2178,8 +2184,9 @@ router.get('/folder/:folderName', async (req, res) => {
   console.log(`[Outlook] GET /folder/${folder} — top:`, top, 'skip:', skip);
   
   try {
+    const folderSegment = encodeURIComponent(folder);
     const data = await graph.graphGet(
-      `/me/mailFolders/${folder}/messages?$top=${top}&$skip=${skip}`
+      `/me/mailFolders/${folderSegment}/messages?$top=${top}&$skip=${skip}`
       + `&$select=id,conversationId,subject,from,toRecipients,ccRecipients,receivedDateTime,sentDateTime,isRead,bodyPreview,hasAttachments,importance`
       + `&$orderby=receivedDateTime desc`,
       MS_EMAIL
@@ -2201,6 +2208,63 @@ router.get('/folder/:folderName', async (req, res) => {
     console.error(`[Outlook] ❌ Folder ${folder} fetch error:`, err.message);
     if (err.message === 'NOT_AUTHENTICATED') return res.status(401).json({ error: 'NOT_AUTHENTICATED' });
     return res.status(500).json({ error: err.message });
+  }
+});
+
+// ── GET /api/outlook/folder/:folderName/fallback ─────────────────────────
+router.get('/folder/:folderName/fallback', async (req, res) => {
+  const folder = req.params.folderName;
+  const top = parseInt(req.query.top || '25');
+  const skip = parseInt(req.query.skip || '0');
+
+  try {
+    const result = await pool.query(`
+      SELECT
+        id,
+        conversation_id AS "conversationId",
+        subject,
+        from_address,
+        from_name,
+        to_recipients,
+        cc_recipients,
+        received_datetime,
+        sent_datetime,
+        is_read,
+        body_preview,
+        has_attachments,
+        importance,
+        category
+      FROM outlook_emails_cache
+      WHERE folder = $1
+      ORDER BY received_datetime DESC NULLS LAST, sent_datetime DESC NULLS LAST, synced_at DESC
+      LIMIT $2 OFFSET $3
+    `, [folder, top, skip]);
+
+    const messages = result.rows.map(row => ({
+      id: row.id,
+      conversationId: row.conversationId,
+      subject: row.subject,
+      from: {
+        emailAddress: {
+          address: row.from_address,
+          name: row.from_name
+        }
+      },
+      toRecipients: row.to_recipients || [],
+      ccRecipients: row.cc_recipients || [],
+      receivedDateTime: row.received_datetime,
+      sentDateTime: row.sent_datetime,
+      isRead: row.is_read,
+      bodyPreview: row.body_preview,
+      hasAttachments: row.has_attachments,
+      importance: row.importance,
+      category: row.category || 'GENERAL'
+    }));
+
+    return res.json({ messages, source: 'database' });
+  } catch (err) {
+    console.error(`[Outlook] ❌ Folder ${folder} fallback error:`, err.message);
+    return res.status(500).json({ error: err.message, messages: [] });
   }
 });
 
@@ -2227,7 +2291,7 @@ router.get('/folders', async (req, res) => {
   try {
     console.log('[Outlook] Fetching folder metadata (Stable Mode)...');
     const data = await graph.graphGet(
-      '/me/mailFolders?$select=id,displayName,unreadItemCount,totalItemCount',
+      '/me/mailFolders?$top=100&$select=id,displayName,unreadItemCount,totalItemCount,childFolderCount',
       MS_EMAIL
     );
     
@@ -2327,6 +2391,67 @@ router.patch('/message/:id', async (req, res) => {
 });
 
 // ── GET /api/outlook/directory-activity?email= ─────────────────────────────
+router.post('/message/:id/move', async (req, res) => {
+  const destinationId = String(req.body?.destinationId || '').trim();
+  if (!destinationId) return res.status(400).json({ error: 'destinationId is required' });
+  try {
+    const data = await graph.graphPost(
+      `/me/messages/${encodeURIComponent(req.params.id)}/move`,
+      { destinationId },
+      MS_EMAIL
+    );
+    clearStorageScanCache();
+    return res.json(data || { success: true });
+  } catch (err) {
+    if (err.message === 'NOT_AUTHENTICATED') return res.status(401).json({ error: 'NOT_AUTHENTICATED' });
+    return res.status(500).json({ error: err.message });
+  }
+});
+
+router.post('/message/:id/copy', async (req, res) => {
+  const destinationId = String(req.body?.destinationId || '').trim();
+  if (!destinationId) return res.status(400).json({ error: 'destinationId is required' });
+  try {
+    const data = await graph.graphPost(
+      `/me/messages/${encodeURIComponent(req.params.id)}/copy`,
+      { destinationId },
+      MS_EMAIL
+    );
+    clearStorageScanCache();
+    return res.json(data || { success: true });
+  } catch (err) {
+    if (err.message === 'NOT_AUTHENTICATED') return res.status(401).json({ error: 'NOT_AUTHENTICATED' });
+    return res.status(500).json({ error: err.message });
+  }
+});
+
+router.patch('/message/:id/unread', async (req, res) => {
+  try {
+    const data = await graph.graphPatch(`/me/messages/${encodeURIComponent(req.params.id)}`, { isRead: false }, MS_EMAIL);
+    clearStorageScanCache();
+    return res.json(data || { success: true });
+  } catch (err) {
+    if (err.message === 'NOT_AUTHENTICATED') return res.status(401).json({ error: 'NOT_AUTHENTICATED' });
+    return res.status(500).json({ error: err.message });
+  }
+});
+
+router.delete('/message/:id', async (req, res) => {
+  try {
+    try {
+      await graph.graphPost(`/me/messages/${encodeURIComponent(req.params.id)}/permanentDelete`, {}, MS_EMAIL);
+    } catch (_) {
+      await graph.graphDelete(`/me/messages/${encodeURIComponent(req.params.id)}`, MS_EMAIL);
+    }
+    await pool.query(`DELETE FROM outlook_emails_cache WHERE id = $1`, [req.params.id]).catch(() => {});
+    clearStorageScanCache();
+    return res.json({ success: true });
+  } catch (err) {
+    if (err.message === 'NOT_AUTHENTICATED') return res.status(401).json({ error: 'NOT_AUTHENTICATED' });
+    return res.status(500).json({ error: err.message });
+  }
+});
+
 router.get('/directory-activity', async (req, res) => {
   const email = String(req.query.email || '').trim();
   if (!email) return res.status(400).json({ error: 'email query parameter is required' });
@@ -3181,7 +3306,7 @@ router.delete('/settings/categories/:id', async (req, res) => {
 router.post('/ai-assistant/model-test', authenticate, async (req, res) => {
   const fetch = require('node-fetch');
   const aiHost  = process.env.AI_API_HOST  || 'https://api.groq.com/openai/v1';
-  const aiModel = process.env.AI_API_MODEL || 'llama-3.1-8b-instant';
+  const aiModel = resolvePicoClawModel();
   const aiToken = process.env.AI_API_KEY   || '';
   const AI_TIMEOUT_MS = 60000;
 
@@ -3274,11 +3399,11 @@ router.post('/ai-assistant/analyze', authenticate, async (req, res) => {
     // --- 1. Fetch latest email ---
     const emailRes = await pool.query(`
       SELECT subject, from_name, from_address, received_datetime, body_preview, is_read, importance
-      FROM ms_messages 
-      WHERE user_email = $1
-      ORDER BY received_datetime DESC
+      FROM outlook_emails_cache
+      WHERE COALESCE(subject, '') <> ''
+      ORDER BY received_datetime DESC NULLS LAST, synced_at DESC
       LIMIT 1
-    `, [MS_EMAIL]);
+    `);
 
     if (!emailRes.rows.length) {
       console.log('[AI] No emails found in cache.');
@@ -3291,15 +3416,19 @@ router.post('/ai-assistant/analyze', authenticate, async (req, res) => {
     // --- 2. Build a simple prompt ---
     const prompt = [
       'You are an AI email assistant for a B2B sales team in India.',
-      'Analyze the following email and reply in this exact format:',
+      'Analyze the following email and reply in this exact format only:',
       '',
-      'Summary: <one sentence about what this email is about>',
+      'Summary: <one short sentence about what this email is about>',
       'Insights:',
-      '- <insight 1>',
-      '- <insight 2>',
+      '- <short insight 1>',
+      '- <short insight 2>',
+      '- <short insight 3>',
       'Smart Actions:',
-      '1. <action 1>',
-      '2. <action 2>',
+      '1. <short action 1>',
+      '2. <short action 2>',
+      '3. <short action 3>',
+      '',
+      'Rules: keep the whole answer under 130 words; be specific; do not invent facts; no extra headings.',
       '',
       '--- EMAIL ---',
       `Subject: ${email.subject || '(no subject)'}`,
@@ -3312,7 +3441,8 @@ router.post('/ai-assistant/analyze', authenticate, async (req, res) => {
     // --- 3. Call Fast Cloud API (OpenAI-compatible) ---
     // Using generic variables so we can plug in Groq, OpenRouter, etc.
     const aiHost  = process.env.AI_API_HOST  || 'https://api.groq.com/openai';
-    const aiModel = process.env.AI_API_MODEL || 'llama-3.1-8b-instant';
+    const aiBase  = aiHost.replace(/\/v1\/?$/, '');
+    const aiModel = resolvePicoClawModel();
     const aiToken = process.env.AI_API_KEY || '';
     const AI_TIMEOUT_MS = parseInt(process.env.AI_TIMEOUT_MS || '60000', 10); // default 60s
 
@@ -3335,13 +3465,13 @@ router.post('/ai-assistant/analyze', authenticate, async (req, res) => {
         headers['Authorization'] = `Bearer ${aiToken}`;
       }
 
-      aiResponse = await fetch(`${aiHost}/v1/chat/completions`, {
+      aiResponse = await fetch(`${aiBase}/v1/chat/completions`, {
         method: 'POST',
         headers: headers,
         body: JSON.stringify({
           model: aiModel,
           messages: [{ role: 'user', content: prompt }],
-          max_tokens: 300,
+          max_tokens: parseInt(process.env.AI_MAX_TOKENS || '800', 10),
           temperature: 0.3
         }),
         signal: abortCtrl.signal
@@ -3360,8 +3490,21 @@ router.post('/ai-assistant/analyze', authenticate, async (req, res) => {
 
     if (!aiResponse.ok) {
       const errText = await aiResponse.text();
+      let parsedErr = {};
+      try { parsedErr = JSON.parse(errText); } catch(e) {}
+      
       console.error('[AI] PicoClaw API error:', aiResponse.status, errText);
-      return res.status(503).json({ error: `PicoClaw error: ${aiResponse.status}` });
+
+      // Handle Rate Limits (Groq Free Tier)
+      if (aiResponse.status === 429) {
+        return res.status(429).json({ 
+          error: 'AI Rate Limit Reached', 
+          message: 'The AI assistant is temporarily busy. Please wait 15-20 seconds or switch to Local AI (Ollama) for unlimited analysis.',
+          raw: parsedErr.error?.message || errText
+        });
+      }
+
+      return res.status(503).json({ error: `PicoClaw error: ${aiResponse.status}`, message: parsedErr.error?.message || 'The AI service is temporarily unavailable.' });
     }
 
     const aiData = await aiResponse.json();
