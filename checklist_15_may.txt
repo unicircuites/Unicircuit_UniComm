@@ -48,7 +48,13 @@ PBX / CALL LOGS
    - It no longer implies historical PBX rows are pulled on demand.
    - Dashboard notification no longer says "Synced undefined new records."
 
-6. [~] Runtime dashboard verification pending after restart
+6. [✓] PBX date filter hardened after live blank-screen check
+   - Files: backend/routes/calls.js, dashboard.html
+   - Single dashboard date picker now filters the exact selected date by sending both from and to.
+   - Backend now normalizes ISO, MM/DD/YYYY, and DD-MM-YYYY style date inputs before querying PostgreSQL.
+   - This prevents locale-formatted values such as 05/14/2026 from producing empty/error-prone date queries.
+
+7. [~] Runtime dashboard verification pending after restart
    - Open PBX Call Logs.
    - Filter date: 05/14/2026.
    - Expected result: 49 records should be available in call_logs for 2026-05-14.
@@ -76,6 +82,7 @@ VERIFICATION RUN
 [✓] node --check backend/services/matrixSmdr.js
 [✓] node --check backend/routes/calls.js
 [✓] Database query verified 49 rows under call_date = 2026-05-14
+[✓] Exact date query verified 49 rows for 2026-05-14
 
 Runtime checks still recommended:
 [O] Restart backend so the new parser is active.
@@ -89,8 +96,17 @@ DEPLOYMENT READINESS
 ====================
 
 [O] Stage intended files.
-[O] Commit May 15 PBX SMDR date parser fix and checklist.
-[O] Push to GitHub.
-[O] Pull latest code on tower server.
-[O] Restart backend service on tower server.
+[✓] Commit May 15 PBX SMDR date parser fix and checklist.
+   - Commit: df4459e Fix PBX SMDR date parsing
+[✓] Push to GitHub.
+   - Branch: master
+   - Remote: origin https://github.com/unicircuites/Unicircuit_UniComm.git
+[~] Pull latest code on tower server.
+   - Tower IP 192.168.0.205 is reachable by ping.
+   - Remote execution from dev machine is blocked:
+     * WinRM / SSH not responding from this shell.
+     * Admin share \\192.168.0.205\C$ returned access denied.
+     * Remote scheduled task query returned invalid security context.
+[~] Restart backend service on tower server.
+   - Pending tower console / valid remote credentials.
 [O] Run dashboard smoke test on tower server.

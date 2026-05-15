@@ -15120,10 +15120,20 @@ async function loadCallLogs(page = 1) {
   const tbody = document.getElementById('calls-tbody');
   const search = document.getElementById('call-search').value;
   const type = document.getElementById('call-filter-type').value;
-  const fromDate = document.getElementById('call-filter-from').value;
+  const fromDate = normaliseDateInputValue(document.getElementById('call-filter-from').value);
 
   try {
-    const res = await fetch(`${API_BASE}/calls?offset=${(page - 1) * callsLimit}&limit=${callsLimit}&search=${encodeURIComponent(search)}&type=${type}&from=${fromDate}`, {
+    const params = new URLSearchParams({
+      offset: String((page - 1) * callsLimit),
+      limit: String(callsLimit),
+      search,
+      type,
+    });
+    if (fromDate) {
+      params.set('from', fromDate);
+      params.set('to', fromDate);
+    }
+    const res = await fetch(`${API_BASE}/calls?${params.toString()}`, {
       headers: getAuthHeaders()
     });
     const data = await res.json();
@@ -15187,6 +15197,15 @@ async function loadCallLogs(page = 1) {
 
 function callsPage(delta) {
   loadCallLogs(callsCurrentPage + delta);
+}
+
+function normaliseDateInputValue(value) {
+  const raw = String(value || '').trim();
+  if (!raw) return '';
+  if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) return raw;
+  const slash = raw.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+  if (slash) return `${slash[3]}-${slash[1].padStart(2, '0')}-${slash[2].padStart(2, '0')}`;
+  return raw;
 }
 
 function pbxOnReady(data) {

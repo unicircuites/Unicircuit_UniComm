@@ -193,8 +193,8 @@ router.get('/', async (req, res) => {
   const offset  = parseInt(req.query.offset || '0');
   const type    = req.query.type   || '';
   const search  = req.query.search || '';
-  const dateFrom = req.query.from  || '';
-  const dateTo   = req.query.to    || '';
+  const dateFrom = normalizeDateParam(req.query.from || '');
+  const dateTo   = normalizeDateParam(req.query.to   || '');
 
   const where = ['1=1'];
   const params = [];
@@ -544,6 +544,28 @@ function formatBytes(bytes) {
   if (bytes < 1024)     return bytes + ' B';
   if (bytes < 1048576)  return (bytes / 1024).toFixed(1) + ' KB';
   return (bytes / 1048576).toFixed(2) + ' MB';
+}
+
+function normalizeDateParam(value) {
+  const raw = String(value || '').trim();
+  if (!raw) return '';
+  if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) return raw;
+
+  const slash = raw.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+  if (slash) {
+    const month = slash[1].padStart(2, '0');
+    const day = slash[2].padStart(2, '0');
+    return `${slash[3]}-${month}-${day}`;
+  }
+
+  const dash = raw.match(/^(\d{1,2})-(\d{1,2})-(\d{4})$/);
+  if (dash) {
+    const day = dash[1].padStart(2, '0');
+    const month = dash[2].padStart(2, '0');
+    return `${dash[3]}-${month}-${day}`;
+  }
+
+  return raw;
 }
 
 module.exports = router;
