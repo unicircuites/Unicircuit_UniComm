@@ -15,10 +15,10 @@ function Write-AutosaveLog {
 }
 
 function Invoke-Git {
-  param([string[]]$Args)
+  param([Parameter(ValueFromRemainingArguments = $true)][string[]]$GitArgs)
   Push-Location $RepoPath
   try {
-    $output = & git @Args 2>&1
+    $output = & git @GitArgs 2>&1
     $code = $LASTEXITCODE
     return @{ Code = $code; Output = ($output -join "`n") }
   } finally {
@@ -27,12 +27,12 @@ function Invoke-Git {
 }
 
 function Ensure-AutosaveBranch {
-  $current = (Invoke-Git @('branch', '--show-current')).Output.Trim()
+  $current = (Invoke-Git 'branch' '--show-current').Output.Trim()
   if ($current -eq $BranchName) { return $true }
 
-  $exists = Invoke-Git @('branch', '--list', $BranchName)
+  $exists = Invoke-Git 'branch' '--list' $BranchName
   if ([string]::IsNullOrWhiteSpace($exists.Output)) {
-    $created = Invoke-Git @('checkout', '-b', $BranchName)
+    $created = Invoke-Git 'checkout' '-b' $BranchName
     if ($created.Code -ne 0) {
       Write-AutosaveLog "Failed to create $BranchName branch: $($created.Output)"
       return $false
@@ -41,7 +41,7 @@ function Ensure-AutosaveBranch {
     return $true
   }
 
-  $switched = Invoke-Git @('checkout', $BranchName)
+  $switched = Invoke-Git 'checkout' $BranchName
   if ($switched.Code -ne 0) {
     Write-AutosaveLog "Failed to switch to $BranchName branch: $($switched.Output)"
     return $false
@@ -56,20 +56,20 @@ function Save-GitSnapshot {
   try {
     if (-not (Ensure-AutosaveBranch)) { return }
 
-    $status = Invoke-Git @('status', '--porcelain')
+    $status = Invoke-Git 'status' '--porcelain'
     if ([string]::IsNullOrWhiteSpace($status.Output)) { return }
 
-    $add = Invoke-Git @('add', '.')
+    $add = Invoke-Git 'add' '.'
     if ($add.Code -ne 0) {
       Write-AutosaveLog "git add failed: $($add.Output)"
       return
     }
 
-    $diff = Invoke-Git @('diff', '--cached', '--quiet')
+    $diff = Invoke-Git 'diff' '--cached' '--quiet'
     if ($diff.Code -eq 0) { return }
 
     $message = 'Auto-change: ' + (Get-Date -Format 'yyyy-MM-dd HH:mm')
-    $commit = Invoke-Git @('commit', '-m', $message)
+    $commit = Invoke-Git 'commit' '-m' $message
     if ($commit.Code -eq 0) {
       Write-AutosaveLog "Committed: $message"
     } else {
@@ -78,9 +78,9 @@ function Save-GitSnapshot {
   } catch {
     Write-AutosaveLog "Autosave exception: $($_.Exception.Message)"
     try {
-      Invoke-Git @('add', '.') | Out-Null
+      Invoke-Git 'add' '.' | Out-Null
       $message = 'Auto-change: ' + (Get-Date -Format 'yyyy-MM-dd HH:mm')
-      Invoke-Git @('commit', '-m', $message) | Out-Null
+      Invoke-Git 'commit' '-m' $message | Out-Null
       Write-AutosaveLog "Failsafe commit attempted: $message"
     } catch {
       Write-AutosaveLog "Failsafe commit failed: $($_.Exception.Message)"
