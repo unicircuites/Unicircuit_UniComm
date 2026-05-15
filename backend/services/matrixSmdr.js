@@ -159,8 +159,9 @@ function parseSMDR(line) {
     const callingNum   = get(6, 16);
     const trunk        = get(23, 5);
     const connectedNum = get(29, 8);
-    const rawDate      = get(38, 8); // DD-MM-YY
-    const rawTime      = get(47, 8); // HH:MM:SS
+    const dateTimeMatch = rawLine.match(/\b(\d{1,2}-\d{2}-\d{2,4})\s+(\d{2}:\d{2}:\d{2})\b/);
+    const rawDate      = dateTimeMatch ? dateTimeMatch[1] : get(38, 8); // DD-MM-YY
+    const rawTime      = dateTimeMatch ? dateTimeMatch[2] : get(47, 8); // HH:MM:SS
     const speechSec    = parseInt(get(64, 5)) || 0;
     
     // RECORDING FILENAME: Standard Matrix position is usually 80+ if enabled

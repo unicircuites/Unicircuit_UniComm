@@ -1,0 +1,96 @@
+UniComm Pro - Work Updated on May 15, 2026
+
+Scope: PBX call-log date investigation, parser fix, and deployment readiness.
+
+STATUS:
+[✓] Completed in code / data
+[~] Partially completed / needs runtime verification
+[O] Next action before deployment
+
+====================
+PBX / CALL LOGS
+====================
+
+1. [✓] Investigated missing May 14 call logs
+   - User checked Matrix/PBX call records for May 14, 2026.
+   - Dashboard filter for 05/14/2026 showed "No call records found."
+   - Database check confirmed call_logs had no rows stored under call_date = 2026-05-14 before repair.
+
+2. [✓] Root cause found: SMDR fixed-width date parsing was brittle
+   - File: backend/services/matrixSmdr.js
+   - Raw PBX lines contained correct dates such as:
+     * 14-05-26
+     * 13-05-26
+   - Parser was reading date/time by hardcoded column offsets.
+   - In some Matrix SMDR line formats this shaved or shifted date digits.
+   - Example issue:
+     * raw 14-05-26 was stored as 2026-05-04
+     * raw 13-05-26 was stored as 2026-05-03 or other wrong dates
+
+3. [✓] Future SMDR date parsing fixed
+   - File: backend/services/matrixSmdr.js
+   - Fixed-width parser now first extracts the real date/time using a pattern:
+     * DD-MM-YY HH:MM:SS
+     * D-MM-YY HH:MM:SS
+     * DD-MM-YYYY HH:MM:SS
+   - Hardcoded fixed-width offsets remain only as fallback.
+   - This prevents future live PBX rows from being stored under the wrong date.
+
+4. [✓] Existing wrong call_dates repaired from raw_line
+   - Table: call_logs
+   - Repaired rows by extracting date/time from raw_line.
+   - Updated 246 rows whose stored call_date/call_time did not match the raw SMDR date/time.
+   - After repair, 2026-05-14 has 49 call records.
+
+5. [✓] PBX Sync Latest wording corrected
+   - Files: backend/routes/calls.js, dashboard.html
+   - POST /api/calls/sync now reports live listener / DB state.
+   - It no longer implies historical PBX rows are pulled on demand.
+   - Dashboard notification no longer says "Synced undefined new records."
+
+6. [~] Runtime dashboard verification pending after restart
+   - Open PBX Call Logs.
+   - Filter date: 05/14/2026.
+   - Expected result: 49 records should be available in call_logs for 2026-05-14.
+   - Make a new live PBX test call and verify it appears under the correct current date.
+
+====================
+FILES CHANGED
+====================
+
+Modified:
+- backend/services/matrixSmdr.js
+- backend/routes/calls.js
+- dashboard.html
+
+Added:
+- checklist_15_may.txt
+
+Database repair performed:
+- call_logs date/time corrected from raw_line for 246 rows.
+
+====================
+VERIFICATION RUN
+====================
+
+[✓] node --check backend/services/matrixSmdr.js
+[✓] node --check backend/routes/calls.js
+[✓] Database query verified 49 rows under call_date = 2026-05-14
+
+Runtime checks still recommended:
+[O] Restart backend so the new parser is active.
+[O] Refresh dashboard.
+[O] Select PBX Call Logs -> date 05/14/2026.
+[O] Confirm rows appear.
+[O] Test a fresh incoming/outgoing PBX call and confirm today's date is stored correctly.
+
+====================
+DEPLOYMENT READINESS
+====================
+
+[O] Stage intended files.
+[O] Commit May 15 PBX SMDR date parser fix and checklist.
+[O] Push to GitHub.
+[O] Pull latest code on tower server.
+[O] Restart backend service on tower server.
+[O] Run dashboard smoke test on tower server.

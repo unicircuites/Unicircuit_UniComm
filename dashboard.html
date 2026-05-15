@@ -15273,7 +15273,7 @@ async function pbxSyncNow() {
     const data = await res.json();
     console.log('[PBX-UI] Sync Response:', data);
     if (res.ok) {
-      notify('PBX Sync Complete', `Synced ${data.count} new records`, 'var(--green2)', 'fas fa-check-circle');
+      notify('PBX Sync Complete', data.message || `Checked live listener (${data.total || 0} stored records)`, 'var(--green2)', 'fas fa-check-circle');
       loadCallLogs();
     } else {
       throw new Error(data.error);

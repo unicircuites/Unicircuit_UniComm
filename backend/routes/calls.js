@@ -518,14 +518,19 @@ router.get('/sync', async (req, res) => {
 });
 
 router.post('/sync', async (req, res) => {
-  // Future: trigger re-read from PBX SMDR file or re-process buffer.
-  // For now: return current stats.
+  // Matrix SMDR is a live push stream; this endpoint reports DB/listener state.
   try {
     const contactsSynced = await syncPbxContactsFromCallLogs();
-    const result = await pool.query(`SELECT COUNT(*) FROM call_logs`);
+    const result = await pool.query(`
+      SELECT COUNT(*) AS total,
+             COUNT(*) FILTER (WHERE call_date = CURRENT_DATE) AS today
+      FROM call_logs
+    `);
     return res.json({
-      message: 'Call log database is up to date. Live SMDR listener is active.',
-      total: parseInt(result.rows[0].count),
+      message: 'Live SMDR listener checked. Historical PBX rows are stored only when the PBX pushes them to this server.',
+      count: 0,
+      total: parseInt(result.rows[0].total),
+      today: parseInt(result.rows[0].today),
       contacts_synced: contactsSynced,
       pbx_status: smdr.getStatus(),
     });
