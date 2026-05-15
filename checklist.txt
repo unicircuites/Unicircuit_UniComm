@@ -8,6 +8,27 @@ STATUS:
 [O] Planned to work on (next priority)
 [X] Not done (not started)
 
+LATEST UPDATE - MAY 15, 2026:
+[done] PBX backup file operations expanded
+    - Backup / Restore panel now supports reading/previewing backup JSON, authenticated download, and deleting old backup files.
+    - Backend has safe JSON backup filename validation and an authenticated /api/calls/backup/read endpoint.
+    - Backup creation explicitly includes saved PBX contacts with id, phone, name, company, notes, created_at, and updated_at.
+    - Restore preserves PBX contact name, company, and notes.
+
+[done] PBX saved contacts improved
+    - Save Contact now passes the actual caller number instead of undefined caller_ext.
+    - Saved PBX contacts immediately update PBX Contacts and PBX Call Logs from phone number to saved name.
+    - PBX contacts now match by normalized digits, so +91/spaced/plain number formats map to the same saved contact.
+    - New calls from an already saved number are grouped into the existing PBX contact instead of creating a separate contact row.
+    - Saved contact notes are stored in pbx_contacts.notes and shown as tooltip/note indicators in PBX Contacts, contact detail, and call logs.
+    - PBX Call Log search now supports saved contact name, company, and notes, in addition to caller/destination/extension.
+
+[done] PBX duration parsing corrected
+    - Matrix SMDR parser now reads duration from the final numeric SMDR duration field instead of the wrong fixed-width slice.
+    - Example: raw line ending "46 T" now stores 00:00:46 instead of 00:00:04.
+    - Sync Latest now repairs existing saved durations from raw_line.
+    - Added POST /api/calls/maintenance/repair-durations for manual repair.
+
 LATEST UPDATE - MAY 14, 2026:
 [✓] Outlook practical email action menu added
     - Removed unnecessary AI-only context menu entries now covered by the AI assistant.

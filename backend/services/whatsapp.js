@@ -1,5 +1,5 @@
 /**
- * WhatsApp Service â€” Baileys
+ * WhatsApp Service — Baileys
  * Proper WhatsApp Web-like implementation:
  * - Contacts store (name resolution)
  * - Individual chats + Groups (separate handling)
@@ -21,7 +21,7 @@ const os     = require('os');
 const fs     = require('fs');
 const pool   = require('../db/pool');
 
-// â”€â”€ STATE â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── STATE ───────────────────────────────────────────────────────────────────────────
 let sock        = null;
 let qrString    = null;
 let isConnected = false;
@@ -30,8 +30,14 @@ let userJid     = null; // This will store the active JID (Phone or LID)
 let io          = null;
 let currentState = 'INIT'; // INIT | QR_READY | CONNECTED | DISCONNECTED | RECONNECTING
 let reconnectAttempts = 0;
+let reconnectTimer = null;
+let startInProgress = false;
+let socketGeneration = 0;
+let groupParticipantSyncing = false;
+let lastGroupParticipantSyncAt = 0;
 const MAX_RECONNECT_ATTEMPTS = 10;
 const RECONNECT_DELAYS = [2000, 5000, 10000, 15000, 30000]; // Progressive delays
+const GROUP_PARTICIPANT_SYNC_INTERVAL_MS = 30 * 60 * 1000;
 
 // In-memory contacts store (name lookup)
 const contactsStore = {};
@@ -48,8 +54,30 @@ function emit(event, data) {
   if (io) io.emit(event, data);
 }
 
+// Helper: Normalize JID to prevent double domains and device suffixes
+function formatJid(jid) {
+  if (!jid) return jid;
+  let clean = jid.trim().toLowerCase();
+  
+  // Aggressively collapse any redundant domain suffixes
+  const parts = clean.split('@');
+  const idPart = parts[0].split(':')[0]; // Also strip device suffixes like :48
+  let domain = 's.whatsapp.net';
+  
+  if (clean.includes('@g.us')) domain = 'g.us';
+  else if (clean.includes('@lid')) domain = 'lid';
+  else if (clean.includes('@newsletter')) domain = 'newsletter';
+  else if (clean.includes('@broadcast')) domain = 'broadcast';
+  
+  return `${idPart}@${domain}`;
+}
+
 // Helper: Schedule reconnect with exponential backoff
 function scheduleReconnect(reason) {
+  if (reconnectTimer) {
+    console.log('[WA] Reconnect already scheduled; keeping existing timer.');
+    return;
+  }
   if (reconnectAttempts >= MAX_RECONNECT_ATTEMPTS) {
     console.log(`[WA] Max reconnect attempts (${MAX_RECONNECT_ATTEMPTS}) reached. Stopping auto-reconnect.`);
     currentState = 'DISCONNECTED';
@@ -65,13 +93,17 @@ function scheduleReconnect(reason) {
   console.log(`[WA] Reconnect attempt ${reconnectAttempts}/${MAX_RECONNECT_ATTEMPTS} in ${delay}ms (reason: ${reason})`);
   emit('wa:reconnecting', { attempt: reconnectAttempts, delay, reason });
   
-  setTimeout(() => {
+  reconnectTimer = setTimeout(() => {
+    reconnectTimer = null;
     console.log(`[WA] Executing reconnect attempt ${reconnectAttempts}`);
-    startWA();
+    startWA().catch(err => {
+      console.error('[WA] Reconnect start failed:', err.message);
+      scheduleReconnect('reconnect start failed');
+    });
   }, delay);
 }
 
-// â”€â”€ SAFE TIMESTAMP â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── SAFE TIMESTAMP ────────────────────────────────────────────────────────────────
 function toDate(ts) {
   if (!ts) return new Date();
   try {
@@ -88,7 +120,7 @@ function toDate(ts) {
   } catch (_) { return new Date(); }
 }
 
-// â”€â”€ CONTACT NAME RESOLUTION â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── CONTACT NAME RESOLUTION ───────────────────────────────────────────────────────
 // Priority: saved contact name > pushName > formatted phone number
 function getContactName(jid, pushName) {
   if (!jid) return '';
@@ -100,14 +132,14 @@ function getContactName(jid, pushName) {
   if (stored?.name)   return stored.name;
   if (stored?.notify) return stored.notify;
   if (pushName)       return pushName;
-  // Format Indian number: 91XXXXXXXXXX â†’ +91 XXXXX XXXXX
+  // Format Indian number: 91XXXXXXXXXX → +91 XXXXX XXXXX
   if (phone.startsWith('91') && phone.length === 12) {
     return '+91 ' + phone.slice(2, 7) + ' ' + phone.slice(7);
   }
   return '+' + phone;
 }
 
-// â”€â”€ IS REAL MESSAGE (not system/protocol) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── IS REAL MESSAGE (not system/protocol) ────────────────────────────────────────
 function isRealMessage(msg) {
   if (!msg?.message) return false;
   const type = getContentType(msg.message);
@@ -121,7 +153,7 @@ function isRealMessage(msg) {
   return !skip.includes(type);
 }
 
-// â”€â”€ GET MESSAGE BODY + METADATA â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── GET MESSAGE BODY + METADATA ─────────────────────────────────────────────────
 function getBody(msg) {
   const type = getContentType(msg.message);
   switch (type) {
@@ -130,7 +162,7 @@ function getBody(msg) {
     case 'imageMessage':             return msg.message.imageMessage?.caption || '';
     case 'videoMessage':             return msg.message.videoMessage?.caption || '';
     case 'audioMessage':             return '';
-    case 'documentMessage':          return msg.message.documentMessage?.fileName || 'Document';
+    case 'documentMessage':          return msg.message.documentMessage?.caption || msg.message.documentMessage?.fileName || 'Document';
     case 'stickerMessage':           return '';
     case 'locationMessage':          return `${msg.message.locationMessage?.degreesLatitude},${msg.message.locationMessage?.degreesLongitude}`;
     case 'contactMessage':           return msg.message.contactMessage?.displayName || 'Contact';
@@ -143,9 +175,9 @@ function getBody(msg) {
 
 function getMsgIcon(type) {
   const icons = {
-    imageMessage: 'ðŸ“·', videoMessage: 'ðŸŽ¥', audioMessage: 'ðŸŽµ',
-    documentMessage: 'ðŸ“„', stickerMessage: 'ðŸŽ­', locationMessage: 'ðŸ“',
-    contactMessage: 'ðŸ‘¤', contactsArrayMessage: 'ðŸ‘¥',
+    imageMessage: '📷', videoMessage: '🎥', audioMessage: '🎵',
+    documentMessage: '📄', stickerMessage: '🎭', locationMessage: '📍',
+    contactMessage: '👤', contactsArrayMessage: '👥',
   };
   return icons[type] || '';
 }
@@ -222,12 +254,16 @@ async function ensureTables(retries = 3) {
           is_read      BOOLEAN DEFAULT FALSE,
           status       VARCHAR(20) DEFAULT 'sent',
           created_at   TIMESTAMPTZ DEFAULT NOW(),
+          is_reply     BOOLEAN DEFAULT FALSE,
+          reply_to_msg_id VARCHAR(200),
+          media_path   TEXT,
           PRIMARY KEY (id, chat_id)
         )
       `);
       await pool.query(`ALTER TABLE wa_messages ADD COLUMN IF NOT EXISTS quoted_body TEXT`).catch(() => {});
       await pool.query(`ALTER TABLE wa_messages ADD COLUMN IF NOT EXISTS is_reply BOOLEAN DEFAULT FALSE`).catch(() => {});
       await pool.query(`ALTER TABLE wa_messages ADD COLUMN IF NOT EXISTS reply_to_msg_id VARCHAR(200)`).catch(() => {});
+      await pool.query(`ALTER TABLE wa_messages ADD COLUMN IF NOT EXISTS media_path TEXT`).catch(() => {});
       await pool.query(`ALTER TABLE wa_chats ADD COLUMN IF NOT EXISTS imported_last_ts TIMESTAMPTZ`).catch(() => {});
 
       // Load imported checkpoints into memory
@@ -310,8 +346,7 @@ async function saveContact(contact) {
   } catch (_) {}
 }
 
-
-// â”€â”€ SAVE MESSAGE â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── SAVE MESSAGE ──────────────────────────────────────────────────────────────────────
 async function saveMessage(msg) {
   try {
     if (!isRealMessage(msg)) return null;
@@ -368,20 +403,22 @@ async function saveMessage(msg) {
     const quotedBody  = getQuotedBody(msg);
     const replyInfo   = getReplyInfo(msg);
 
-    await pool.query(`
-      INSERT INTO wa_messages (id, chat_id, from_me, sender, sender_name, body, msg_type, timestamp, is_read, quoted_body, is_reply, reply_to_msg_id)
-      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
-      ON CONFLICT (id, chat_id) DO NOTHING
-    `, [id, jid, fromMe, senderJid, senderName, body, type, ts, fromMe, quotedBody, replyInfo.isReply, replyInfo.replyToMsgId]);
+    const mediaPath   = msg.mediaPath || null;
 
-    return { id, jid, fromMe, sender: senderJid, senderName, body, type, ts, quotedBody, isReply: replyInfo.isReply, replyToMsgId: replyInfo.replyToMsgId };
+    await pool.query(`
+      INSERT INTO wa_messages (id, chat_id, from_me, sender, sender_name, body, msg_type, timestamp, is_read, quoted_body, is_reply, reply_to_msg_id, media_path)
+      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)
+      ON CONFLICT (id, chat_id) DO NOTHING
+    `, [id, jid, fromMe, senderJid, senderName, body, type, ts, fromMe, quotedBody, replyInfo.isReply, replyInfo.replyToMsgId, mediaPath]);
+
+    return { id, jid, fromMe, sender: senderJid, senderName, body, type, ts, quotedBody, isReply: replyInfo.isReply, replyToMsgId: replyInfo.replyToMsgId, mediaPath };
   } catch (err) {
     console.error('[WA-DB] saveMessage error:', err.message);
     return null;
   }
 }
 
-// â”€â”€ LOAD CONTACTS FROM DB INTO MEMORY â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── LOAD CONTACTS FROM DB INTO MEMORY ──────────────────────────────────────────────────
 async function loadContactsFromDB() {
   try {
     const res = await pool.query(`SELECT jid, name, notify FROM wa_contacts`);
@@ -397,8 +434,19 @@ async function loadContactsFromDB() {
   } catch (_) {}
 }
 
-// â”€â”€ START WHATSAPP â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── START WHATSAPP ────────────────────────────────────────────────────────────────────
 async function startWA() {
+  if (startInProgress) {
+    console.log('[WA] startWA ignored: start already in progress');
+    return;
+  }
+  if (sock && isConnected) {
+    console.log('[WA] startWA ignored: already connected');
+    return;
+  }
+
+  startInProgress = true;
+  const generation = ++socketGeneration;
   await ensureTables();
   await loadContactsFromDB();
   // Update chat names from contacts on every startup
@@ -406,7 +454,7 @@ async function startWA() {
 
   const { state, saveCreds } = await useMultiFileAuthState(AUTH_DIR);
   
-  let version = [2, 3000, 1015901307];
+  let version = [2, 3000, 1017539718]; // Updated fallback to a more recent version
   try {
     const res = await fetchLatestBaileysVersion();
     version = res.version;
@@ -416,13 +464,18 @@ async function startWA() {
   
   console.log('[WA] Starting Baileys v' + version.join('.'));
 
+  if (sock) {
+    try { sock.ev.removeAllListeners(); } catch (_) {}
+    try { sock.end?.(); } catch (_) {}
+  }
+
   sock = makeWASocket({
     version,
     auth:              state,
     printQRInTerminal: false,
     browser:           ['UniComm Pro', 'Chrome', '120.0'],
     syncFullHistory:   false,  // false = only recent messages (faster, prevents sync stuck)
-    logger: require('pino')({ level: 'silent' }), // suppress verbose Baileys logs
+    logger: require('pino')({ level: 'info' }), // Enabled info level to see Baileys internal logs
     getMessage: async (key) => {
       const res = await pool.query(
         `SELECT body FROM wa_messages WHERE id=$1 AND chat_id=$2`,
@@ -430,18 +483,23 @@ async function startWA() {
       );
       return res.rows[0] ? { conversation: res.rows[0].body } : { conversation: '' };
     },
-    connectTimeoutMs: 20000,
-    keepAliveIntervalMs: 10000
+    connectTimeoutMs: 45000,
+    keepAliveIntervalMs: 25000,
+    markOnlineOnConnect: true,
+    retryRequestDelayMs: 2000,
+    maxMsgRetryCount: 5
   });
+  startInProgress = false;
 
-  // â”€â”€ CONNECTION â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ── CONNECTION ────────────────────────────────────────────────────────────────────────
   sock.ev.on('connection.update', async (update) => {
+    if (generation !== socketGeneration) return;
     const { connection, lastDisconnect, qr } = update;
 
     if (qr) {
       qrString    = qr;
       isConnected = false;
-      console.log('[WA] QR ready â€” waiting for scan');
+      console.log('[WA] QR ready — waiting for scan');
       try {
         const qrDataUrl = await qrcode.toDataURL(qr);
         emit('wa:qr', { qr: qrDataUrl });
@@ -450,6 +508,12 @@ async function startWA() {
 
     if (connection === 'open') {
       isConnected = true;
+      currentState = 'CONNECTED';
+      reconnectAttempts = 0;
+      if (reconnectTimer) {
+        clearTimeout(reconnectTimer);
+        reconnectTimer = null;
+      }
       qrString    = null;
       const rawId = sock.user?.id || '';
       console.log('[WA] sock.user:', JSON.stringify(sock.user));
@@ -461,15 +525,23 @@ async function startWA() {
       emit('wa:connected', { phone: phoneNumber, name: sock.user?.name });
       
       // After connect: scan ALL groups and populate LID→phone in wa_contacts
-      // Delay 8s to let WhatsApp settle before making group metadata requests
-      setTimeout(() => syncAllGroupParticipants(), 8000);
+      // Delay 60s to let WhatsApp settle before making group metadata requests
+      setTimeout(() => {
+        if (generation === socketGeneration) syncAllGroupParticipants();
+      }, 60000);
     }
 
     if (connection === 'close') {
       isConnected = false;
-      const code  = lastDisconnect?.error?.output?.statusCode;
-      console.log('[WA] Disconnected. Code:', code);
-      emit('wa:disconnected', { code });
+      currentState = 'DISCONNECTED';
+      emit('wa:disconnected');
+
+      const code = (lastDisconnect?.error)?.output?.statusCode || (lastDisconnect?.error)?.code;
+      const reason = lastDisconnect?.error?.message || 'unknown';
+      console.warn(`[WA] Connection closed. Code: ${code}, Reason: ${reason}`);
+      if (lastDisconnect?.error) {
+        console.error('[WA] Full Disconnect Error:', JSON.stringify(lastDisconnect.error, null, 2));
+      }
       
       if (code === DisconnectReason.loggedOut) {
         // User logged out - clear session and restart
@@ -503,9 +575,9 @@ async function startWA() {
     }
   });
 
-    sock.ev.on('creds.update', saveCreds);
+  sock.ev.on('creds.update', saveCreds);
 
-  // â”€â”€ CONTACTS SYNC â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ── CONTACTS SYNC ──────────────────────────────────────────────────────────────────────
   sock.ev.on('contacts.upsert', async (contacts) => {
     console.log(`[WA] contacts.upsert count=${contacts.length}`);
     for (const c of contacts) {
@@ -521,9 +593,9 @@ async function startWA() {
     }
   });
 
-  // â”€â”€ HISTORY SYNC â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ── HISTORY SYNC ───────────────────────────────────────────────────────────────────────
   sock.ev.on('messaging-history.set', async ({ chats, contacts, messages, isLatest }) => {
-    console.log(`[WA] History chunk â€” chats=${chats.length} contacts=${contacts?.length||0} messages=${messages.length} isLatest=${isLatest}`);
+    console.log(`[WA] History chunk — chats=${chats.length} contacts=${contacts?.length||0} messages=${messages.length} isLatest=${isLatest}`);
 
     // 1. Save contacts FIRST (needed for name resolution)
     if (contacts?.length) {
@@ -558,18 +630,18 @@ async function startWA() {
         await saveChat(jid, name, result.body, result.ts, 0, isGroup);
       }
     }
-    console.log(`[WA] Chunk saved â€” ${saved} messages`);
+    console.log(`[WA] Chunk saved — ${saved} messages`);
 
     // 4. Only refresh frontend on FINAL chunk (isLatest=true)
     if (isLatest) {
-      console.log('[WA] âœ… Full history sync complete â€” refreshing UI');
+      console.log('[WA] ✅ Full history sync complete — refreshing UI');
       // Update all chat names now that all contacts are loaded
       await updateChatNames();
       emit('wa:sync_complete', {});
     }
   });
 
-  // â”€â”€ CHAT LIST UPDATES â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ── CHAT LIST UPDATES ──────────────────────────────────────────────────────────────────
   sock.ev.on('chats.upsert', async (chats) => {
     for (const chat of chats) {
       const isGroup = chat.id.endsWith('@g.us');
@@ -581,7 +653,7 @@ async function startWA() {
     emit('wa:chats_updated', {});
   });
 
-  // â”€â”€ REAL-TIME MESSAGES â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ── REAL-TIME MESSAGES ───────────────────────────────────────────────────────────────
   sock.ev.on('messages.upsert', async ({ messages, type }) => {
     for (const msg of messages) {
       // Cache for media download
@@ -593,16 +665,15 @@ async function startWA() {
         const mtype = getContentType(msg.message);
         if (['imageMessage','videoMessage','audioMessage','documentMessage'].includes(mtype)) {
           try {
-            const { downloadMediaMessage } = require('@whiskeysockets/baileys');
             const buf = await downloadMediaMessage(msg, 'buffer', {});
-            const fs = require('fs');
-            const path = require('path');
             const mediaDir = path.join(__dirname, '../wa_media');
             if (!fs.existsSync(mediaDir)) fs.mkdirSync(mediaDir, { recursive: true });
             const ext = mtype === 'imageMessage' ? 'jpg' : mtype === 'videoMessage' ? 'mp4' : mtype === 'audioMessage' ? 'ogg' : 'bin';
             const docMsg = msg.message.documentMessage;
             const fname = docMsg?.fileName || `${msg.key.id}.${ext}`;
-            fs.writeFileSync(path.join(mediaDir, msg.key.id + '_' + fname), buf);
+            const savedName = msg.key.id + '_' + fname;
+            fs.writeFileSync(path.join(mediaDir, savedName), buf);
+            msg.mediaPath = savedName;
           } catch (e) {
             console.warn('[WA] Auto-save media failed:', e.message);
           }
@@ -625,19 +696,20 @@ async function startWA() {
 
       await saveChat(jid, chatName, saved.body, saved.ts, msg.key.fromMe ? 0 : 1, isGroup);
 
-      if (type === 'notify') {
+      if (type === 'notify' && isRealMessage(msg)) {
         console.log(`[WA] Emitting message to UI: ${saved.id}`);
         emit('wa:message', {
           id: saved.id, chatId: jid, fromMe: saved.fromMe,
           sender: saved.sender, senderName: saved.senderName, body: saved.body,
           type: saved.type, ts: saved.ts,
+          mediaPath: saved.mediaPath,
           chatName,
         });
       }
     }
   });
 
-  // â”€â”€ MESSAGE STATUS â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ── MESSAGE STATUS ──────────────────────────────────────────────────────────────────
   sock.ev.on('messages.update', async (updates) => {
     for (const { key, update } of updates) {
       if (update.status) {
@@ -652,7 +724,7 @@ async function startWA() {
     }
   });
 
-  // â”€â”€ GROUP METADATA â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ── GROUP METADATA ──────────────────────────────────────────────────────────────────
   sock.ev.on('groups.upsert', async (groups) => {
     for (const g of groups) {
       await pool.query(
@@ -675,7 +747,7 @@ async function startWA() {
   return sock;
 }
 
-// â”€â”€ UPDATE CHAT NAMES AFTER CONTACTS SYNC â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── UPDATE CHAT NAMES AFTER CONTACTS SYNC ───────────────────────────────────────────
 async function updateChatNames() {
   try {
     // Step 1: Update names from contactsStore (in-memory)
@@ -727,10 +799,18 @@ async function updateChatNames() {
 }
 
 // ── SYNC ALL GROUP PARTICIPANTS → populate LID→phone in wa_contacts ────────
-// Runs once after connect. Scans every group, saves all @lid participant
-// phone numbers to wa_contacts so waLidMap covers 100% of members.
 async function syncAllGroupParticipants() {
   if (!sock || !isConnected) return;
+  const now = Date.now();
+  if (groupParticipantSyncing) {
+    console.log('[WA] Group participant sync skipped: already running');
+    return;
+  }
+  if (lastGroupParticipantSyncAt && (now - lastGroupParticipantSyncAt) < GROUP_PARTICIPANT_SYNC_INTERVAL_MS) {
+    console.log('[WA] Group participant sync skipped: recently completed');
+    return;
+  }
+  groupParticipantSyncing = true;
   try {
     const groups = await pool.query(`SELECT id FROM wa_chats WHERE is_group = true`);
     if (groups.rows.length === 0) return;
@@ -739,13 +819,10 @@ async function syncAllGroupParticipants() {
     for (const group of groups.rows) {
       if (!isConnected) break; // Stop sync if disconnected
       try {
-        // Throttling: Add 1s delay between group metadata requests
-        // This prevents WhatsApp from flagging the connection as a bot and disconnecting (Code 401/500)
         await new Promise(resolve => setTimeout(resolve, 1000));
         const meta = await sock.groupMetadata(group.id);
         for (const p of meta.participants) {
           if (!p.id || !p.id.endsWith('@lid')) continue;
-          // Baileys provides p.phoneNumber for @lid participants
           if (!p.phoneNumber) continue;
           const pNum = typeof p.phoneNumber === 'string' ? p.phoneNumber : (p.phoneNumber?.jid || '');
           const rawPhone = pNum.replace(/\D/g, '');
@@ -760,18 +837,19 @@ async function syncAllGroupParticipants() {
           `, [p.id, null, rawPhone]);
           total++;
         }
-      } catch (_) {
-        // Skip groups we can't access (left, banned, etc.)
-      }
+      } catch (_) {}
     }
     console.log(`[WA] ✅ Group participant sync done — ${total} LID→phone entries saved`);
+    lastGroupParticipantSyncAt = Date.now();
     emit('wa:participants_synced', { total });
   } catch (err) {
     console.error('[WA] syncAllGroupParticipants error:', err.message);
+  } finally {
+    groupParticipantSyncing = false;
   }
 }
 
-// â”€â”€ CLEAR SESSION â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── CLEAR SESSION ────────────────────────────────────────────────────────────────────
 function clearSession() {
   try {
     if (fs.existsSync(AUTH_DIR)) {
@@ -781,15 +859,13 @@ function clearSession() {
   } catch (e) { console.warn('[WA] clearSession error:', e.message); }
 }
 
-// â”€â”€ SEND MESSAGE â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-// ── SEND MESSAGE WITH OPTIONAL REPLY ──────────────────────────────────────
+// ── SEND MESSAGE ─────────────────────────────────────────────────────────────────────
 async function sendMessage(jid, text, quotedMsgId) {
   if (!sock || !isConnected) throw new Error('WhatsApp not connected');
-  const formattedJid = jid.includes('@') ? jid : jid + '@s.whatsapp.net';
+  const formattedJid = formatJid(jid);
 
   let sendOptions = { text };
 
-  // Build quoted message for reply
   if (quotedMsgId) {
     try {
       const res = await pool.query(
@@ -797,7 +873,6 @@ async function sendMessage(jid, text, quotedMsgId) {
         [quotedMsgId, formattedJid]
       );
       if (res.rows[0]) {
-        // Baileys quoted message format
         sendOptions.quoted = {
           key: {
             id:        quotedMsgId,
@@ -807,7 +882,6 @@ async function sendMessage(jid, text, quotedMsgId) {
           },
           message: { conversation: res.rows[0].body || '' },
         };
-        console.log('[WA] Sending reply to:', quotedMsgId);
       }
     } catch (e) {
       console.warn('[WA] Could not build quoted message:', e.message);
@@ -816,144 +890,240 @@ async function sendMessage(jid, text, quotedMsgId) {
 
   const result = await sock.sendMessage(formattedJid, sendOptions);
   const ts = new Date();
+  const savedMsg = {
+    id: result.key.id,
+    chatId: formattedJid,
+    fromMe: true,
+    senderName: 'You',
+    body: text,
+    msgType: 'text',
+    timestamp: ts,
+    status: 'sent',
+    quotedBody: quotedMsgId ? `↩ Reply` : null
+  };
+
   await pool.query(
     `INSERT INTO wa_messages (id, chat_id, from_me, sender_name, body, msg_type, timestamp, is_read, status, quoted_body)
      VALUES ($1,$2,true,'You',$3,'text',$4,true,'sent',$5)
      ON CONFLICT (id, chat_id) DO NOTHING`,
-    [result.key.id, formattedJid, text, ts, quotedMsgId ? `↩ Reply` : null]
+    [savedMsg.id, formattedJid, text, ts, savedMsg.quotedBody]
   );
   await saveChat(formattedJid, null, text, ts, 0, formattedJid.endsWith('@g.us'));
+  
+  emit('wa:message', savedMsg);
   return result;
 }
 
-// ── GROUP METADATA ─────────────────────────────────────────────────────────
-async function getGroupMetadata(jid) {
-  if (!sock || !isConnected) throw new Error('WhatsApp not connected');
+function safeMediaFilename(filename, fallback) {
+  const clean = String(filename || fallback || 'file.bin')
+    .replace(/[<>:"/\\|?*\x00-\x1F]/g, '_')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, 160);
+  return clean || fallback || 'file.bin';
+}
 
-  // Check cache first (15 min TTL)
-  const CACHE_TTL = 15 * 60 * 1000;
-  const cached = groupMetadataCache.get(jid);
-  if (cached && (Date.now() - cached.ts < CACHE_TTL)) {
-    // console.log(`[WA] Using cached metadata for group ${jid}`);
-    return cached.data;
+function mediaKindToMessageType(mediaType, mime) {
+  const kind = String(mediaType || '').toLowerCase();
+  const m = String(mime || '').toLowerCase();
+  if (kind === 'image' || m.startsWith('image/')) return 'imageMessage';
+  if (kind === 'video' || m.startsWith('video/')) return 'videoMessage';
+  return 'documentMessage';
+}
+
+async function sendPreparedMedia(formattedJid, msgType, buffer, mimetype, filename, caption, quoted) {
+  let content;
+  if (msgType === 'imageMessage') {
+    content = { image: buffer, mimetype, caption };
+  } else if (msgType === 'videoMessage') {
+    content = { video: buffer, mimetype, caption };
+  } else {
+    content = { document: buffer, mimetype, fileName: filename, caption };
+  }
+  if (quoted) {
+    content.quoted = quoted;
+    console.log('[WA] Quoted message included in payload:', JSON.stringify(quoted, null, 2));
+  }
+  
+  console.log(`[WA] Sending ${msgType} payload structure keys:`, Object.keys(content));
+  return sock.sendMessage(formattedJid, content);
+}
+
+async function sendMediaMessage(jid, media, quotedMsgId) {
+  if (!sock || !isConnected) throw new Error('WhatsApp not connected');
+  const formattedJid = formatJid(jid);
+  const buffer = Buffer.isBuffer(media?.buffer) ? media.buffer : Buffer.from(media?.buffer || '');
+  if (!buffer.length) throw new Error('Media file is empty');
+
+  const mimetype = media.mimetype || 'application/octet-stream';
+  const msgType = mediaKindToMessageType(media.mediaType, mimetype);
+  const filename = safeMediaFilename(media.filename, msgType === 'imageMessage' ? 'photo.jpg' : msgType === 'videoMessage' ? 'video.mp4' : 'document');
+  const caption = String(media.caption || '').trim();
+
+  let quoted = null;
+  if (quotedMsgId) {
+    try {
+      const res = await pool.query(
+        `SELECT body, from_me, sender FROM wa_messages WHERE id=$1 AND chat_id=$2`,
+        [quotedMsgId, formattedJid]
+      );
+      if (res.rows[0]) {
+        quoted = {
+          key: {
+            id: quotedMsgId,
+            remoteJid: formattedJid,
+            fromMe: !!res.rows[0].from_me,
+            participant: res.rows[0].from_me ? undefined : (res.rows[0].sender ? formatJid(res.rows[0].sender) : undefined),
+          },
+          message: { conversation: res.rows[0].body || '' },
+        };
+      }
+    } catch (e) {
+      console.warn('[WA] Could not build quoted media message:', e.message);
+    }
   }
 
-  const meta = await sock.groupMetadata(jid);
+  let finalType = msgType;
+  let result;
+  try {
+    // Attempt combined send (Document + Caption in one bubble)
+    console.log(`[WA] Attempting combined send of ${finalType} to ${formattedJid} with caption: "${caption || ''}"`);
+    result = await sendPreparedMedia(formattedJid, finalType, buffer, mimetype, filename, caption, quoted);
+    console.log(`[WA] Send successful, ID: ${result?.key?.id}`);
+  } catch (err) {
+    console.error(`[WA] Combined send failed for ${finalType}:`, err.message);
+    
+    // Fallback: If combined fails, try file only to at least deliver the content
+    console.warn(`[WA] Falling back to file-only transmission...`);
+    try {
+      result = await sendPreparedMedia(formattedJid, finalType, buffer, mimetype, filename, null, quoted);
+      console.log(`[WA] File-only fallback successful, ID: ${result?.key?.id}`);
+      
+      // If file-only worked, send caption as separate follow-up
+      if (caption) {
+        console.log(`[WA] Sending caption as follow-up...`);
+        await sendMessage(formattedJid, caption, result?.key?.id);
+      }
+    } catch (fallbackErr) {
+      console.error(`[WA] All transmission attempts failed:`, fallbackErr.message);
+      throw fallbackErr;
+    }
+  }
 
+  const id = result.key.id;
+  const ts = new Date();
+  const mediaDir = path.join(__dirname, '../wa_media');
+  if (!fs.existsSync(mediaDir)) fs.mkdirSync(mediaDir, { recursive: true });
+  const savedName = id + '_' + filename;
+  fs.writeFileSync(path.join(mediaDir, savedName), buffer);
+
+  const body = caption || filename || 'Media Message';
+  const savedMsg = {
+    id,
+    chatId: formattedJid,
+    fromMe: true,
+    senderName: 'You',
+    body,
+    msgType: finalType,
+    timestamp: ts,
+    status: 'sent',
+    quotedBody: quotedMsgId ? 'Reply' : null,
+    mediaPath: savedName,
+    filename: filename
+  };
+
+  await pool.query(
+    `INSERT INTO wa_messages (id, chat_id, from_me, sender_name, body, msg_type, timestamp, is_read, status, quoted_body, media_path)
+     VALUES ($1,$2,true,'You',$3,$4,$5,true,'sent',$6,$7)
+     ON CONFLICT (id, chat_id) DO NOTHING`,
+    [id, formattedJid, body, finalType, ts, savedMsg.quotedBody, savedName]
+  );
+  await saveChat(formattedJid, null, body, ts, 0, formattedJid.endsWith('@g.us'));
+  
+  emit('wa:message', savedMsg);
+  return savedMsg;
+}
+
+// ── GROUP METADATA ───────────────────────────────────────────────────────────
+async function getGroupMetadata(jid) {
+  if (!sock || !isConnected) throw new Error('WhatsApp not connected');
+  const CACHE_TTL = 15 * 60 * 1000;
+  const cached = groupMetadataCache.get(jid);
+  if (cached && (Date.now() - cached.ts < CACHE_TTL)) return cached.data;
+
+  const meta = await sock.groupMetadata(jid);
   const processedParticipants = meta.participants.map(p => {
     const pJid = p.id;
-
-    // Baileys provides p.phoneNumber for @lid participants — use it directly
     const phoneJid = p.phoneNumber || (pJid.endsWith('@lid') ? null : pJid);
     const rawPhone = phoneJid ? phoneJid.split('@')[0].split(':')[0] : '';
-
-    // Format phone display
     let phoneDisplay = '';
     if (rawPhone && /^\d{7,15}$/.test(rawPhone)) {
       phoneDisplay = rawPhone.startsWith('91') && rawPhone.length === 12
         ? '+91 ' + rawPhone.slice(2,7) + ' ' + rawPhone.slice(7)
         : '+' + rawPhone;
     }
-
-    // Name: Use in-memory contactsStore directly (much faster than DB query for 1000+ members)
     const realJid = phoneJid || pJid;
     const stored  = contactsStore[realJid] || contactsStore[pJid];
     const displayName = stored?.name || stored?.notify || phoneDisplay || null;
-
-    return {
-      jid:   pJid,
-      phone: phoneDisplay,
-      name:  displayName,
-      admin: p.admin === 'admin' || p.admin === 'superadmin',
-    };
+    return { jid: pJid, phone: phoneDisplay, name: displayName, admin: p.admin === 'admin' || p.admin === 'superadmin' };
   });
 
-  const result = {
-    id: meta.id,
-    name: meta.subject,
-    description: meta.desc || '',
-    participants: processedParticipants
-  };
-
-  // Update cache
+  const result = { id: meta.id, name: meta.subject, description: meta.desc || '', participants: processedParticipants };
   groupMetadataCache.set(jid, { ts: Date.now(), data: result });
-
   return result;
 }
 
-// ── MEDIA CACHE + DOWNLOAD ─────────────────────────────────────────────────
+// ── MEDIA DOWNLOAD ────────────────────────────────────────────────────────────
 const msgCache = new Map();
 const MAX_CACHE = 500;
 
 async function downloadMedia(msgId) {
-  const fs = require('fs');
-  const path = require('path');
   const mediaDir = path.join(__dirname, '../wa_media');
-
-  // Check disk first — auto-saved on receive
   if (fs.existsSync(mediaDir)) {
     const files = fs.readdirSync(mediaDir).filter(f => f.startsWith(msgId + '_'));
     if (files.length > 0) {
       const fpath = path.join(mediaDir, files[0]);
       const buffer = fs.readFileSync(fpath);
       const ext = path.extname(files[0]).toLowerCase();
-      const mimeMap = { '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.png': 'image/png', '.mp4': 'video/mp4', '.ogg': 'audio/ogg', '.bin': 'application/octet-stream' };
+      const mimeMap = {
+        '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.png': 'image/png', '.gif': 'image/gif',
+        '.mp4': 'video/mp4', '.pdf': 'application/pdf', '.bin': 'application/octet-stream',
+        '.ogg': 'audio/ogg'
+      };
       const mime = mimeMap[ext] || 'application/octet-stream';
       const filename = files[0].replace(msgId + '_', '');
       return { buffer, mime, filename };
     }
   }
-
-  // Fallback: try live download from cache
   const cached = msgCache.get(msgId);
-  if (!cached) throw new Error('Message not in cache. Only recent messages can be downloaded.');
-  const { downloadMediaMessage } = require('@whiskeysockets/baileys');
+  if (!cached) throw new Error('Message not in cache.');
   const buffer = await downloadMediaMessage(cached, 'buffer', {});
   const type = getContentType(cached.message);
   const docMsg = cached.message.documentMessage;
-  const imgMsg = cached.message.imageMessage;
-  const vidMsg = cached.message.videoMessage;
-  const audMsg = cached.message.audioMessage;
-  const filename = docMsg?.fileName || (type === 'imageMessage' ? 'image.jpg' : type === 'videoMessage' ? 'video.mp4' : type === 'audioMessage' ? 'voice.ogg' : 'file.bin');
-  const mime = docMsg?.mimetype || imgMsg?.mimetype || vidMsg?.mimetype || audMsg?.mimetype || 'application/octet-stream';
+  const filename = docMsg?.fileName || (type === 'imageMessage' ? 'image.jpg' : type === 'videoMessage' ? 'video.mp4' : 'file.bin');
+  const mime = docMsg?.mimetype || 'application/octet-stream';
   return { buffer, mime, filename };
 }
 
-// ── LOGOUT ────────────────────────────────────────────────────────────────
+// ── LOGOUT ────────────────────────────────────────────────────────────────────
 async function logout() {
   console.log('[WA] Logging out...');
   currentState = 'DISCONNECTED';
-  
   if (sock) {
-    try {
-      console.log('[WA] Sending logout command to WhatsApp servers...');
-      await sock.logout(); // This removes device from phone's linked devices
-      console.log('[WA] Logout command sent successfully');
-    } catch (e) {
-      console.warn('[WA] Logout error:', e.message);
-    }
+    try { await sock.logout(); } catch (e) { console.warn('[WA] Logout error:', e.message); }
     sock = null;
     isConnected = false;
     qrString = null;
     phoneNumber = null;
     reconnectAttempts = 0;
   }
-  
-  // Clear session files completely
   clearSession();
-  
-  // Wait 2 seconds before restarting to ensure logout is processed
-  console.log('[WA] Waiting 2s for logout to complete...');
-  setTimeout(() => {
-    console.log('[WA] Restarting WhatsApp service...');
-    startWA();
-  }, 2000);
+  setTimeout(() => startWA(), 2000);
 }
 
-// ── STATUS / QR ───────────────────────────────────────────────────────────
+// ── STATUS ─────────────────────────────────────────────────────────────────────
 function getStatus() {
-  const phone = getConnectedPhone() || phoneNumber;
-  return { connected: isConnected, phone: phone, name: sock?.user?.name || null, hasQR: !!qrString };
+  return { connected: isConnected, phone: phoneNumber, name: sock?.user?.name || null, hasQR: !!qrString };
 }
 
 async function getQR() {
@@ -961,228 +1131,94 @@ async function getQR() {
   return qrcode.toDataURL(qrString);
 }
 
-// ── WHATSAPP EXPORT CHAT IMPORT ───────────────────────────────────────────
-// Parses WhatsApp exported chat (Android / iOS .txt format) and saves to DB.
-// Supports:
-//   - Android: DD/MM/YYYY, HH:MM - Name: text
-//   - iOS:     [DD/MM/YYYY, HH:MM:SS] Name: text
-//   - Media files (base64) from zip export — saved to wa_media folder
-//   - Smart duplicate prevention — merges into existing chat by phone
-//
+function getConnectedPhone() {
+  if (!isConnected) return null;
+  return phoneNumber;
+}
+
+// ── IMPORT ────────────────────────────────────────────────────────────────────
 async function importExportedChat(chatText, chatJid, mediaFiles, clearOld) {
-  // mediaFiles = [{ filename, base64, mime }] — from zip extraction on frontend
-
-  if (!chatJid) throw new Error("A valid chat must be selected to import messages.");
-
-  // Ensure tables exist
+  if (!chatJid) throw new Error("A valid chat must be selected.");
   await ensureTables();
-  await pool.query(`ALTER TABLE wa_messages ADD COLUMN IF NOT EXISTS media_path TEXT`);
-
-  // ── STEP 1: Verify chat exists in DB ─────────────────────────────────────
   const existing = await pool.query(`SELECT id, name FROM wa_chats WHERE id=$1`, [chatJid]);
-  if (existing.rows.length === 0) {
-    throw new Error("The selected chat does not exist in the database. Only synced chats can receive imports.");
-  }
+  if (existing.rows.length === 0) throw new Error("Chat not found.");
   const displayChatName = existing.rows[0].name;
 
-  // ── STEP 1.5: Clean old imports if requested ───────────────────────────
-  if (clearOld) {
-    // User explicitly requested: "db khali karo uss group ki aur zip ki chats + media db mai daalo"
-    await pool.query(`DELETE FROM wa_messages WHERE chat_id=$1`, [chatJid]);
-    console.log(`[WA-Import] Wiped entire chat history for ${chatJid} to replace with ZIP`);
-  }
+  if (clearOld) await pool.query(`DELETE FROM wa_messages WHERE chat_id=$1`, [chatJid]);
 
-  // ── STEP 2: Save media files to wa_media folder ────────────────────────
   const mediaDir = path.join(__dirname, '../wa_media');
   if (!fs.existsSync(mediaDir)) fs.mkdirSync(mediaDir, { recursive: true });
 
-  // Build filename → saved msgId map for linking
-  const mediaSavedMap = {}; // originalFilename → { msgId, mime, ext }
-  if (Array.isArray(mediaFiles) && mediaFiles.length > 0) {
+  const mediaSavedMap = {};
+  if (Array.isArray(mediaFiles)) {
     for (const mf of mediaFiles) {
-      try {
-        if (!mf.filename || !mf.base64) continue;
-        const buf = Buffer.from(mf.base64, 'base64');
-        const ext  = path.extname(mf.filename) || '.bin';
-        // Create a stable import msgId from filename
-        const fakeMsgId = 'import_' + Buffer.from(mf.filename).toString('base64').replace(/[^a-zA-Z0-9]/g,'').substring(0,24);
-        const savedName = fakeMsgId + '_' + mf.filename;
-        fs.writeFileSync(path.join(mediaDir, savedName), buf);
-        mediaSavedMap[mf.filename.toLowerCase()] = { msgId: fakeMsgId, mime: mf.mime || 'application/octet-stream', ext };
-        console.log(`[WA-Import] Saved media: ${savedName}`);
-      } catch (e) {
-        console.warn(`[WA-Import] Failed to save media ${mf.filename}:`, e.message);
-      }
+      if (!mf.filename || !mf.base64) continue;
+      const buf = Buffer.from(mf.base64, 'base64');
+      const fakeMsgId = 'import_' + Buffer.from(mf.filename).toString('base64').substring(0,24);
+      fs.writeFileSync(path.join(mediaDir, fakeMsgId + '_' + mf.filename), buf);
+      mediaSavedMap[mf.filename.toLowerCase()] = { msgId: fakeMsgId };
     }
   }
 
-  // ── STEP 4: Parse chat text ────────────────────────────────────────────
   const lines = chatText.split('\n');
-  console.log(`[WA-Import] Parsed chatText. lines.length = ${lines.length}`);
-  console.log(`[WA-Import] First line preview: ${lines[0]}`);
+  const androidRe = /^(\d{1,2})\/(\d{1,2})\/(\d{2,4}),?[\s\u202F\u00A0]+(\d{1,2}):(\d{2})(?::(\d{2}))?[\s\u202F\u00A0]*(am|pm|AM|PM)?[\s\u202F\u00A0]*[-–][\s\u202F\u00A0]*(.+?):\s([\s\S]*)$/;
+  const iosRe     = /^\[(\d{1,2})\/(\d{1,2})\/(\d{2,4}),?[\s\u202F\u00A0]+(\d{1,2}):(\d{2})(?::(\d{2}))?[\s\u202F\u00A0]*(am|pm|AM|PM)?\][\s\u202F\u00A0]*(.+?):\s([\s\S]*)$/;
+  const mediaAttachedRe = /^(.+?\.(jpg|jpeg|png|gif|mp4|mp3|opus|ogg|pdf|docx?|xlsx?|pptx?|zip|aac|m4a|webp|sticker))(?:\s*\(file attached\))?(?:\s+([\s\S]*))?$/i;
 
   let imported = 0;
-  let skipped  = 0;
-  let mediaLinked = 0;
-  let lastTs   = new Date();
+  let lastTs = new Date();
   let pendingMsg = null;
-
-  // Regex patterns
-  // Android: 02/05/2025, 14:35 - Name: text OR 5/4/26, 1:50 PM - Name: text
-  // Using [\s\u202F\u00A0] to handle various Unicode spaces found in exports
-  const androidRe = /^(\d{1,2})\/(\d{1,2})\/(\d{2,4}),?[\s\u202F\u00A0]+(\d{1,2}):(\d{2})(?::(\d{2}))?[\s\u202F\u00A0]*(am|pm|AM|PM)?[\s\u202F\u00A0]*[-–][\s\u202F\u00A0]*(.+?):\s([\s\S]*)$/;
-  // iOS:     [02/05/2025, 14:35:22] Name: text OR [02/05/2025, 1:35:22 PM] Name: text
-  const iosRe     = /^\[(\d{1,2})\/(\d{1,2})\/(\d{2,4}),?[\s\u202F\u00A0]+(\d{1,2}):(\d{2})(?::(\d{2}))?[\s\u202F\u00A0]*(am|pm|AM|PM)?\][\s\u202F\u00A0]*(.+?):\s([\s\S]*)$/;
-
-  // Media filename pattern — WhatsApp exports write: "IMG-20240501-WA0012.jpg (file attached)"
-  // or just the filename on its own line after the sender prefix. Caption may follow on same line.
-  const mediaAttachedRe = /^(.+?\.(jpg|jpeg|png|gif|mp4|mp3|opus|ogg|pdf|docx?|xlsx?|pptx?|zip|aac|m4a|webp|sticker))(?:\s*\(file attached\))?(?:\s+([\s\S]*))?$/i;
 
   const flush = async () => {
     if (!pendingMsg) return;
-    const { ts, senderName, body, msgType, linkedMsgId, linkedMediaPath } = pendingMsg;
-
-    // Skip empty, system, and "without media" placeholders
-    if (!body || body.trim() === '') { pendingMsg = null; skipped++; return; }
+    const { ts, senderName, body, msgType, linkedMediaPath } = pendingMsg;
     const cleanBody = body.replace(/^\u200e|\u200f/g, '').trim();
-    if (
-      cleanBody === '<Media omitted>' ||
-      cleanBody.match(/^(Image|Video|Audio|GIF|Sticker|Contact card|Document) omitted$/) ||
-      cleanBody === 'This message was deleted' ||
-      cleanBody === 'You deleted this message' ||
-      cleanBody === 'null'
-    ) {
-      if (cleanBody.includes('omitted')) {
-        console.log(`[WA-Import] Info: WhatsApp omitted a media file from this export: ${cleanBody}`);
-      }
-      pendingMsg = null; skipped++; return;
-    }
+    if (!cleanBody || cleanBody.includes('omitted')) { pendingMsg = null; return; }
 
-    // Deterministic import message ID (prevents re-import duplicates)
-    const msgId = linkedMsgId || (
-      'import_' + Buffer.from(ts.toISOString() + senderName + cleanBody.substring(0, 20))
-        .toString('base64').replace(/[^a-zA-Z0-9]/g, '').substring(0, 32)
-    );
+    const msgId = 'import_' + Buffer.from(ts.toISOString() + senderName + cleanBody.substring(0, 20)).toString('base64').substring(0, 32);
+    const isFromMe = (senderName === 'You');
 
-    const isFromMe = (senderName === 'You' || senderName === (sock?.user?.name || ''));
-    const finalType = msgType || 'text';
-
-    // Resolve body: for media messages, extract caption if any, otherwise empty
-    let finalBody = cleanBody;
-    if (finalType !== 'text' && finalType !== 'conversation') {
-      const match = cleanBody.match(mediaAttachedRe);
-      if (match && match[3] && match[3].trim()) {
-        finalBody = match[3].trim();
-      } else {
-        finalBody = ''; // Don't show the raw filename text
-      }
-    }
-
-    try {
-      await pool.query(`
-        INSERT INTO wa_messages (id, chat_id, from_me, sender_name, body, msg_type, timestamp, is_read, status, media_path)
-        VALUES ($1,$2,$3,$4,$5,$6,$7,true,'read',$8)
-        ON CONFLICT (id, chat_id) DO NOTHING
-      `, [msgId, chatJid, isFromMe, isFromMe ? 'You' : senderName, finalBody, finalType, ts, linkedMediaPath]);
-      imported++;
-      lastTs = ts;
-    } catch (e) {
-      console.warn('[WA-Import] DB insert error:', e.message);
-      skipped++;
-    }
+    await pool.query(`
+      INSERT INTO wa_messages (id, chat_id, from_me, sender_name, body, msg_type, timestamp, is_read, status, media_path)
+      VALUES ($1,$2,$3,$4,$5,$6,$7,true,'read',$8)
+      ON CONFLICT (id, chat_id) DO NOTHING
+    `, [msgId, chatJid, isFromMe, isFromMe ? 'You' : senderName, cleanBody, msgType, ts, linkedMediaPath]);
+    imported++;
+    lastTs = ts;
     pendingMsg = null;
   };
 
-  for (const rawLine of lines) {
-    const line = rawLine.replace(/\r/g, '').trimEnd();
-    if (!line) {
-      if (pendingMsg) pendingMsg.body += '\n';
-      continue;
-    }
-
-    const cleanLine = line.replace(/^\u200e|\u200f/g, '');
-    let match = cleanLine.match(androidRe) || cleanLine.match(iosRe);
-
+  for (const line of lines) {
+    const cleanLine = line.replace(/^\u200e|\u200f/g, '').trim();
+    const match = cleanLine.match(androidRe) || cleanLine.match(iosRe);
     if (match) {
       await flush();
-
       let [, day, month, year, hh, mm, ss, ampm, senderName, body] = match;
       let hour = parseInt(hh, 10);
-      if (ampm) {
-        ampm = ampm.toLowerCase();
-        if (ampm === 'pm' && hour < 12) hour += 12;
-        if (ampm === 'am' && hour === 12) hour = 0;
-      }
-      hh = hour.toString().padStart(2, '0');
-
+      if (ampm?.toLowerCase() === 'pm' && hour < 12) hour += 12;
+      if (ampm?.toLowerCase() === 'am' && hour === 12) hour = 0;
       const yr = year.length === 2 ? '20' + year : year;
-      const ts = new Date(`${yr}-${month.padStart(2,'0')}-${day.padStart(2,'0')}T${hh}:${mm.padStart(2,'0')}:${(ss||'00').padStart(2,'0')}+05:30`);
+      const ts = new Date(`${yr}-${month.padStart(2,'0')}-${day.padStart(2,'0')}T${hour.toString().padStart(2,'0')}:${mm.padStart(2,'0')}:00+05:30`);
       
-      const cleanSender = senderName.replace(/^\u200e|\u200f/g, '').trim();
-      const cleanBody   = (body || '').replace(/^\u200e|\u200f/g, '').trim();
-
-      // Detect if this line IS a media attachment reference
       let msgType = 'text';
-      let linkedMsgId = null;
       let linkedMediaPath = null;
-
-      const mediaMatch = cleanBody.match(mediaAttachedRe);
+      const mediaMatch = body.match(mediaAttachedRe);
       if (mediaMatch) {
-        const fname = mediaMatch[1].trim();
-        const ext   = mediaMatch[2].toLowerCase();
-        msgType = ext.match(/^(jpg|jpeg|png|gif|webp)$/) ? 'imageMessage'
-                : ext.match(/^(mp4|mov|avi)$/)           ? 'videoMessage'
-                : ext.match(/^(mp3|opus|ogg|aac|m4a)$/)  ? 'audioMessage'
-                : 'documentMessage';
-
-        // If we have the actual file saved, link its msgId and media path
-        const lookup = fname.toLowerCase();
+        const lookup = mediaMatch[1].trim().toLowerCase();
         if (mediaSavedMap[lookup]) {
-          linkedMsgId = mediaSavedMap[lookup].msgId;
-          linkedMediaPath = mediaSavedMap[lookup].msgId + '_' + fname;
-          mediaLinked++;
+          linkedMediaPath = mediaSavedMap[lookup].msgId + '_' + mediaMatch[1].trim();
+          msgType = 'documentMessage'; // simplified
         }
       }
-
-      pendingMsg = { ts, senderName: cleanSender, body: cleanBody, msgType, linkedMsgId, linkedMediaPath, chatJidLocal: chatJid };
+      pendingMsg = { ts, senderName, body, msgType, linkedMediaPath };
     } else if (pendingMsg) {
-      // Continuation of previous multi-line message
       pendingMsg.body += '\n' + line;
-    } else {
-      // System / date header line — skip
-      skipped++;
     }
   }
-  await flush(); // flush last message
-
-  // ── STEP 5: Update chat metadata & protect it ──────────────────────────
-  await pool.query(`
-    UPDATE wa_chats SET last_time=$1, updated_at=NOW(), imported_last_ts=GREATEST(imported_last_ts, $1)
-    WHERE id=$2
-  `, [lastTs, chatJid]);
-  
+  await flush();
+  await pool.query(`UPDATE wa_chats SET last_time=$1, imported_last_ts=GREATEST(imported_last_ts, $1) WHERE id=$2`, [lastTs, chatJid]);
   importedLastTsMap[chatJid] = new Date(lastTs).getTime();
-
-  console.log(`[WA-Import] Done — imported=${imported} skipped=${skipped} mediaLinked=${mediaLinked} chat=${chatJid} isNew=false`);
-  return { imported, skipped, mediaLinked, chatJid, chatName: displayChatName, merged: true };
+  return { imported, chatJid, chatName: displayChatName };
 }
 
-function getConnectedPhone() {
-  if (!isConnected) return null;
-  // phoneNumber already cleaned (no @ or :) from connection handler
-  if (phoneNumber && !String(phoneNumber).includes('@')) return phoneNumber;
-  // Fallback: search contactsStore for own mapped phone
-  console.log('[WA] getConnectedPhone fallback — phoneNumber:', phoneNumber);
-  const mapped = Object.values(contactsStore).find(c => c.phoneJid);
-  console.log('[WA] mapped:', mapped ? mapped.phoneJid : 'NOT FOUND');
-  return mapped ? mapped.phoneJid.split('@')[0] : (phoneNumber || null);
-}
-
-
-// ── SESSION PERSISTENCE ON SERVER RESTART ─────────────────────────────────────────
-// DO NOT clear session on server restart - this allows persistent login
-// Session is only cleared on explicit logout or when connection is replaced (code 515)
-// This enables WhatsApp to auto-reconnect after server restart without QR scan
-
-module.exports = { startWA, sendMessage, logout, getStatus, getQR, setIO, getGroupMetadata, downloadMedia, msgCache, importExportedChat, getConnectedPhone };
-
+module.exports = { startWA, sendMessage, sendMediaMessage, logout, getStatus, getQR, setIO, getGroupMetadata, downloadMedia, msgCache, importExportedChat, getConnectedPhone };

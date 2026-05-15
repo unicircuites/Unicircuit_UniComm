@@ -128,11 +128,18 @@ function validateInput(req, res, next) {
   try {
     // Skip validation for certain routes that handle rich content
     const skipRoutes = [
+      '/mail-tasks',
       '/api/mail-tasks',
+      '/templates',
       '/api/templates',
+      '/broadcast',
       '/api/broadcast',
+      '/outlook/send',
       '/api/outlook/send',
+      '/wa/send',
       '/api/wa/send',
+      '/wa/send-media',
+      '/api/wa/send-media',
     ];
     
     if (skipRoutes.some(route => req.path.startsWith(route))) {

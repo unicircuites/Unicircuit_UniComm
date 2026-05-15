@@ -9,6 +9,98 @@ const activityLog = require('../services/activityLog');
 const pool       = require('../db/pool');
 
 const router = express.Router();
+const DEFAULT_FAST_MODEL = 'llama-3.1-8b-instant';
+const DEFAULT_CURRENT_MODEL = 'groq/compound-mini';
+
+function resolveAIModel() {
+  const configuredModel = String(process.env.AI_API_MODEL || '').trim();
+  if (!configuredModel || /^gemma2-9b-it$/i.test(configuredModel)) return DEFAULT_FAST_MODEL;
+  return configuredModel;
+}
+
+function safeModel(value, fallback) {
+  const model = String(value || '').trim();
+  if (!model || /^gemma2-9b-it$/i.test(model)) return fallback;
+  return model;
+}
+
+function shortText(value, max = 180) {
+  return String(value || '').replace(/\s+/g, ' ').trim().slice(0, max);
+}
+
+function detectNeedsCurrentInfo(text) {
+  return /\b(latest|current|news|recent|up[- ]?to[- ]?date|web|search|price|weather|law|rule|regulation|market|stock)\b/i
+    .test(String(text || ''));
+}
+
+function detectPrivateBusinessContext(text) {
+  return /\b(crm|outlook|email|mail|whatsapp|call|pbx|contact|lead|deal|pipeline|payment|invoice|quotation|quote|tender|po|pending action|follow[- ]?up|client|customer)\b/i
+    .test(String(text || ''));
+}
+
+function compactMessages(messages, options = {}) {
+  const safeMessages = Array.isArray(messages) ? messages : [];
+  const historyLimit = options.historyLimit || 6;
+  const charLimit = options.charLimit || 700;
+  return safeMessages
+    .filter(msg => msg && msg.role && typeof msg.content === 'string')
+    .filter(msg => msg.role !== 'system')
+    .slice(-historyLimit)
+    .map(msg => ({
+      role: msg.role === 'assistant' ? 'assistant' : 'user',
+      content: shortText(msg.content, charLimit)
+    }));
+}
+
+function planAIRequest(req) {
+  const operation = String(req.body.operation || 'chat').trim().toLowerCase();
+  const preferredModel = String(req.body.preferredModel || req.body.modelMode || 'auto').trim().toLowerCase();
+  const rawMessages = Array.isArray(req.body.messages) ? req.body.messages : [];
+  const lastUser = [...rawMessages].reverse().find(msg => msg && msg.role !== 'assistant');
+  const lastText = lastUser?.content || '';
+  const isMailAI = operation === 'mail_ai';
+  const isPrivateBusinessContext = isMailAI || detectPrivateBusinessContext(lastText);
+  const needsCurrentInfo = preferredModel === 'current' || operation === 'current_info' || (detectNeedsCurrentInfo(lastText) && !isPrivateBusinessContext);
+  const asksDraft = /\b(draft|write|compose|reply|email|message)\b/i.test(lastText);
+  const asksForList = /\b(list|formats?|types?|all|complete|full)\b/i.test(lastText);
+
+  const fastModel = safeModel(process.env.AI_FAST_MODEL || process.env.AI_API_MODEL, DEFAULT_FAST_MODEL);
+  const currentModel = safeModel(process.env.AI_CURRENT_MODEL, DEFAULT_CURRENT_MODEL);
+  const deepModel = safeModel(process.env.AI_DEEP_MODEL || process.env.AI_API_MODEL, fastModel);
+  const model = preferredModel === 'current'
+    ? currentModel
+    : preferredModel === 'deep'
+      ? deepModel
+      : preferredModel === 'fast'
+        ? fastModel
+        : (needsCurrentInfo && !isMailAI ? currentModel : fastModel);
+  const requestedMax = parseInt(process.env.AI_MAX_TOKENS || '1200', 10) || 1200;
+  const targetMaxTokens = preferredModel === 'deep'
+    ? 1800
+    : asksDraft
+      ? 1200
+      : (asksForList ? 1500 : 850);
+
+  return {
+    operation,
+    preferredModel,
+    model,
+    needsCurrentInfo: needsCurrentInfo && !isMailAI,
+    includeCrmContext: !isMailAI,
+    historyLimit: isMailAI ? 3 : 6,
+    charLimit: isMailAI ? 1800 : 700,
+    maxTokens: Math.min(Math.max(requestedMax, targetMaxTokens), preferredModel === 'deep' ? 2400 : 1800)
+  };
+}
+
+function getRetryAfterSeconds(response, bodyText) {
+  const headerValue = response.headers.get('retry-after');
+  const headerSeconds = Number.parseFloat(headerValue);
+  if (Number.isFinite(headerSeconds)) return Math.ceil(headerSeconds);
+
+  const match = String(bodyText || '').match(/try again in\s+([\d.]+)s/i);
+  return match ? Math.ceil(Number.parseFloat(match[1])) : 30;
+}
 
 /**
  * Shared service state — updated by server.js bridge and probes.
@@ -82,88 +174,150 @@ router.get('/ai-tasks', authenticate, async (req, res) => {
 // ── POST /api/system/ai/chat ──────────────────────────────────────────────
 router.post('/ai/chat', async (req, res) => {
   const fetch = require('node-fetch');
-  const aiHost  = process.env.AI_API_HOST  || 'https://api.groq.com/openai/v1';
-  const aiModel = process.env.AI_API_MODEL || 'llama-3.1-8b-instant';
-  const aiToken = process.env.AI_API_KEY   || '';
+  const aiHost  = process.env.PICOCLAW_API_HOST || process.env.AI_API_HOST || 'https://api.groq.com/openai/v1';
+  const aiPlan = planAIRequest(req);
+  const aiModel = aiPlan.model || resolveAIModel();
+  const aiToken = process.env.PICOCLAW_API_KEY || process.env.AI_API_KEY || '';
+  const maxTokens = aiPlan.maxTokens;
 
   try {
     const headers = { 'Content-Type': 'application/json' };
     if (aiToken) headers['Authorization'] = `Bearer ${aiToken}`;
 
-    // Add a system prompt if not present
-    let msgs = req.body.messages || [];
+    const userMessages = compactMessages(req.body.messages, aiPlan);
     
     // Inject real-time CRM context
-    const msGraph = require('../services/msGraph');
     let emailContext = "";
-    try {
-      const [emailData, inboxInfo, sentInfo, draftsInfo, deletedInfo] = await Promise.all([
-        msGraph.graphGet('/me/messages?$top=5&$select=subject,sender,bodyPreview'),
-        msGraph.graphGet('/me/mailFolders/inbox').catch(() => ({ totalItemCount: 0, unreadItemCount: 0 })),
-        msGraph.graphGet('/me/mailFolders/sentitems').catch(() => ({ totalItemCount: 0 })),
-        msGraph.graphGet('/me/mailFolders/drafts').catch(() => ({ totalItemCount: 0 })),
-        msGraph.graphGet('/me/mailFolders/deleteditems').catch(() => ({ totalItemCount: 0 }))
+    let contextData = "";
+
+    if (aiPlan.includeCrmContext) {
+      const msGraph = require('../services/msGraph');
+      try {
+        const [emailData, inboxInfo, sentInfo, draftsInfo, deletedInfo] = await Promise.all([
+          msGraph.graphGet('/me/messages?$top=2&$select=subject,sender,bodyPreview'),
+          msGraph.graphGet('/me/mailFolders/inbox').catch(() => ({ totalItemCount: 0, unreadItemCount: 0 })),
+          msGraph.graphGet('/me/mailFolders/sentitems').catch(() => ({ totalItemCount: 0 })),
+          msGraph.graphGet('/me/mailFolders/drafts').catch(() => ({ totalItemCount: 0 })),
+          msGraph.graphGet('/me/mailFolders/deleteditems').catch(() => ({ totalItemCount: 0 }))
+        ]);
+
+        emailContext = `\nOUTLOOK MAILBOX STATISTICS:\n`;
+        emailContext += `- Inbox: ${inboxInfo.totalItemCount} total, ${inboxInfo.unreadItemCount} unread\n`;
+        emailContext += `- Sent Items: ${sentInfo.totalItemCount} total\n`;
+        emailContext += `- Drafts: ${draftsInfo.totalItemCount} total\n`;
+        emailContext += `- Deleted Items: ${deletedInfo.totalItemCount} total\n`;
+
+        if (emailData && emailData.value) {
+          emailContext += "\nRecent Outlook Emails:\n";
+          emailData.value.forEach(em => {
+            const sender = shortText(em.sender?.emailAddress?.name || 'Unknown', 40);
+            emailContext += `- ${sender}: ${shortText(em.subject, 80)} | ${shortText(em.bodyPreview, 140)}\n`;
+          });
+        }
+      } catch (e) {
+        emailContext = "\n(Outlook Emails temporarily unavailable)\n";
+      }
+
+      const [deals, calls, contacts] = await Promise.all([
+        pool.query("SELECT name, company, value, stage, due_date FROM pipeline_deals WHERE stage != 'Won' ORDER BY due_date NULLS LAST LIMIT 5"),
+        pool.query("SELECT caller, ai_summary FROM call_logs WHERE ai_summary IS NOT NULL ORDER BY created_at DESC LIMIT 3"),
+        pool.query("SELECT fname, lname, company, segment, notes FROM contacts WHERE notes IS NOT NULL ORDER BY created_at DESC LIMIT 3")
       ]);
 
-      emailContext = `\nOUTLOOK MAILBOX STATISTICS:\n`;
-      emailContext += `- Inbox: ${inboxInfo.totalItemCount} total, ${inboxInfo.unreadItemCount} unread\n`;
-      emailContext += `- Sent Items: ${sentInfo.totalItemCount} total\n`;
-      emailContext += `- Drafts: ${draftsInfo.totalItemCount} total\n`;
-      emailContext += `- Deleted Items: ${deletedInfo.totalItemCount} total\n`;
+      contextData = "CURRENT CRM CONTEXT:\n\nPending Pipeline Deals:\n";
+      deals.rows.forEach(d => contextData += `- ${shortText(d.name, 60)} (${shortText(d.company, 50)}): ${d.value}, ${d.stage}, Due: ${d.due_date}\n`);
+      contextData += "\nRecent Call Summaries (Action Items):\n";
+      calls.rows.forEach(c => contextData += `- ${shortText(c.caller, 40)}: ${shortText(c.ai_summary, 160)}\n`);
+      contextData += "\nKey Client Notes (WhatsApp/Contact Context):\n";
+      contacts.rows.forEach(c => contextData += `- ${shortText(`${c.fname} ${c.lname}`, 50)} (${shortText(c.company, 50)}): ${shortText(c.notes, 160)}\n`);
+      contextData += emailContext;
+    }
 
-      if (emailData && emailData.value) {
-        emailContext += "\nRecent Outlook Emails:\n";
-        emailData.value.forEach(em => {
-          const sender = em.sender?.emailAddress?.name || 'Unknown';
-          emailContext += `- From ${sender}: [${em.subject}] ${em.bodyPreview}\n`;
-        });
+    const callerSystem = typeof req.body.system === 'string' ? req.body.system.trim() : '';
+    const systemPrompt = `${callerSystem || 'You are UniComm AI for Unicircuit Engineering Services LLP.'}
+Token optimization and model utilization is active.
+Answer clearly and completely. Keep normal answers concise, but when the user asks for a list, comparison, steps, or formats, provide the full requested list without cutting it short.
+Use only the provided private CRM/email context unless the request explicitly needs current public info.
+Do not show reasoning. If unsure, say what to verify.
+
+${contextData || 'No extra CRM context injected for this optimized operation.'}`;
+
+    const msgs = [
+      { role: 'system', content: systemPrompt },
+      ...userMessages
+    ];
+
+    const aiBody = {
+      model: aiModel,
+      messages: msgs,
+      max_tokens: maxTokens,
+      temperature: 0.2
+    };
+    if (aiPlan.needsCurrentInfo && /^groq\/compound/i.test(aiModel)) {
+      aiBody.search_settings = { country: 'india' };
+    }
+
+    const parts = [];
+    let finishReason = null;
+    let completionMessages = msgs.slice();
+    let usage = { prompt_tokens: 0, completion_tokens: 0, total_tokens: 0 };
+    const maxContinuationRounds = 3;
+
+    for (let round = 0; round <= maxContinuationRounds; round += 1) {
+      const response = await fetch(`${aiHost}/chat/completions`, {
+        method: 'POST',
+        headers: headers,
+        body: JSON.stringify({ ...aiBody, messages: completionMessages })
+      });
+
+      if (!response.ok) {
+        const txt = await response.text();
+        console.error('[AI-CHAT] Error from API:', txt);
+        if (response.status === 429) {
+          return res.status(429).json({
+            error: 'AI rate limit reached. Please retry shortly.',
+            retryAfter: getRetryAfterSeconds(response, txt)
+          });
+        }
+        return res.status(503).json({ error: `API Error: ${response.status}` });
       }
-    } catch (e) {
-      emailContext = "\n(Outlook Emails temporarily unavailable)\n";
+
+      const data = await response.json();
+      const choice = data.choices?.[0] || {};
+      const chunk = choice.message?.content || '';
+      finishReason = choice.finish_reason || null;
+      if (chunk) parts.push(chunk);
+      if (data.usage) {
+        usage.prompt_tokens += data.usage.prompt_tokens || 0;
+        usage.completion_tokens += data.usage.completion_tokens || 0;
+        usage.total_tokens += data.usage.total_tokens || 0;
+      }
+
+      if (finishReason !== 'length') break;
+
+      completionMessages = [
+        ...msgs,
+        { role: 'assistant', content: parts.join('\n\n') },
+        { role: 'user', content: 'Continue from exactly where you stopped. Do not repeat earlier text. Finish the answer completely.' }
+      ];
     }
 
-    const [deals, calls, contacts] = await Promise.all([
-      pool.query("SELECT name, company, value, stage, due_date FROM pipeline_deals WHERE stage != 'Won'"),
-      pool.query("SELECT caller, ai_summary FROM call_logs WHERE ai_summary IS NOT NULL LIMIT 5"),
-      pool.query("SELECT fname, lname, company, segment, notes FROM contacts WHERE notes IS NOT NULL LIMIT 5")
-    ]);
-
-    let contextData = "CURRENT CRM CONTEXT:\n\nPending Pipeline Deals:\n";
-    deals.rows.forEach(d => contextData += `- ${d.name} (${d.company}): ${d.value}, Stage: ${d.stage}, Due: ${d.due_date}\n`);
-    contextData += "\nRecent Call Summaries (Action Items):\n";
-    calls.rows.forEach(c => contextData += `- ${c.caller}: ${c.ai_summary}\n`);
-    contextData += "\nKey Client Notes (WhatsApp/Contact Context):\n";
-    contacts.rows.forEach(c => contextData += `- ${c.fname} ${c.lname} (${c.company}): ${c.notes}\n`);
-    contextData += emailContext;
-
-    const systemPrompt = `You are the UniComm AI assistant for Unicircuit Engineering Services LLP. You have access to real-time CRM data, Outlook emails, and WhatsApp logs. When asked to summarize actions or give updates, strictly use the provided context below. Keep answers extremely concise, professional, and use tabular format (Markdown tables) when summarizing data or statistics if requested.\n\n${contextData}`;
-
-    if (msgs.length === 0 || msgs[0].role !== 'system') {
-      msgs.unshift({ role: 'system', content: systemPrompt });
-    } else {
-      msgs[0].content = systemPrompt; // Ensure context is always fresh
-    }
-
-    const response = await fetch(`${aiHost}/chat/completions`, {
-      method: 'POST',
-      headers: headers,
-      body: JSON.stringify({
+    const reply = parts.join('\n\n').trim() || 'Sorry, I could not generate a response.';
+    return res.json({
+      reply,
+      utilization: {
+        provider: 'PicoClaw',
+        operation: aiPlan.operation,
+        preferredModel: aiPlan.preferredModel,
         model: aiModel,
-        messages: msgs,
-        max_tokens: 1000,
-        temperature: 0.7
-      })
+        maxTokens,
+        finishReason,
+        continued: parts.length > 1,
+        rounds: parts.length,
+        usage,
+        currentInfo: aiPlan.needsCurrentInfo
+      }
     });
-
-    if (!response.ok) {
-      const txt = await response.text();
-      console.error('[AI-CHAT] Error from API:', txt);
-      return res.status(503).json({ error: `API Error: ${response.status}` });
-    }
-
-    const data = await response.json();
-    const reply = data.choices?.[0]?.message?.content || 'Sorry, I could not generate a response.';
-    return res.json({ reply });
   } catch (err) {
     console.error('[AI-CHAT] Exception:', err.message);
     return res.status(500).json({ error: err.message });

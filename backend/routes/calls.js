@@ -38,6 +38,90 @@ const BACKUP_DIR = process.env.CALL_BACKUP_DIR
 // Ensure directories exist
 [REC_DIR, BACKUP_DIR].forEach(d => { try { fs.mkdirSync(d, { recursive: true }); } catch (_) {} });
 
+function getSafeBackupPath(filename) {
+  const name = String(filename || '').trim();
+  if (!name) return null;
+  if (name !== path.basename(name) || path.extname(name).toLowerCase() !== '.json') {
+    return null;
+  }
+  return path.join(BACKUP_DIR, name);
+}
+
+function formatDurationFromSeconds(seconds) {
+  const sec = Math.max(0, parseInt(seconds, 10) || 0);
+  const h = Math.floor(sec / 3600);
+  const m = Math.floor((sec % 3600) / 60);
+  const s = sec % 60;
+  return [h, m, s].map(v => v.toString().padStart(2, '0')).join(':');
+}
+
+function isMatrixDate(value) {
+  return /^\d{1,2}-\d{2}-\d{2,4}$/.test(String(value || '').trim());
+}
+
+function isMatrixTime(value) {
+  return /^\d{2}:\d{2}:\d{2}$/.test(String(value || '').trim());
+}
+
+function parseMatrixFixedLayout(rawLine) {
+  const line = String(rawLine || '');
+  const get = (start, len) => line.substring(start - 1, (start - 1) + len).trim();
+  const durationAfterTime = (rawTime) => {
+    const afterTime = line.slice(line.indexOf(rawTime) + rawTime.length).trim();
+    const numericFields = afterTime.match(/\b\d+(?:\.\d+)?\b/g) || [];
+    if (!numericFields.length) return 0;
+    return Math.round(parseFloat(numericFields[numericFields.length - 1]) || 0);
+  };
+  const incomingDate = get(36, 8);
+  const incomingTime = get(47, 8);
+  const outgoingDate = get(41, 8);
+  const outgoingTime = get(50, 8);
+
+  if (isMatrixDate(incomingDate) && isMatrixTime(incomingTime)) {
+    return {
+      durationSeconds: parseInt(get(64, 5), 10) || durationAfterTime(incomingTime),
+    };
+  }
+
+  if (isMatrixDate(outgoingDate) && isMatrixTime(outgoingTime)) {
+    return {
+      durationSeconds: parseInt(get(59, 5), 10) || 0,
+    };
+  }
+
+  const dateTimeMatch = line.match(/\b(\d{1,2}-\d{2}-\d{2,4})\s+(\d{2}:\d{2}:\d{2})\b/);
+  if (dateTimeMatch) {
+    return {
+      durationSeconds: durationAfterTime(dateTimeMatch[2]),
+    };
+  }
+
+  return null;
+}
+
+function extractMatrixDurationFromRawLine(rawLine) {
+  const parsedLayout = parseMatrixFixedLayout(rawLine);
+  if (!parsedLayout) return null;
+  return formatDurationFromSeconds(parsedLayout.durationSeconds);
+}
+
+async function repairPbxDurationsFromRawLines() {
+  const result = await pool.query(`
+    SELECT id, duration, raw_line
+    FROM call_logs
+    WHERE raw_line IS NOT NULL
+      AND raw_line ~ '\\d{2}:\\d{2}:\\d{2}'
+  `);
+  let repaired = 0;
+  for (const row of result.rows) {
+    const parsedDuration = extractMatrixDurationFromRawLine(row.raw_line);
+    if (!parsedDuration || parsedDuration === row.duration) continue;
+    await pool.query(`UPDATE call_logs SET duration = $1 WHERE id = $2`, [parsedDuration, row.id]);
+    repaired++;
+  }
+  return repaired;
+}
+
 // ═══════════════════════════════════════════════════════════════════
 // ENSURE TABLES
 // ═══════════════════════════════════════════════════════════════════
@@ -70,6 +154,11 @@ async function syncPbxContactsFromCallLogs() {
       WHERE caller IS NOT NULL AND caller <> ''
     ) phones
     WHERE phone IS NOT NULL AND phone <> ''
+      AND NOT EXISTS (
+        SELECT 1
+        FROM pbx_contacts pc
+        WHERE regexp_replace(pc.phone, '[^0-9]', '', 'g') = regexp_replace(phones.phone, '[^0-9]', '', 'g')
+      )
     ON CONFLICT (phone) DO NOTHING
   `);
   return result.rowCount || 0;
@@ -78,8 +167,15 @@ async function syncPbxContactsFromCallLogs() {
 // ═══════════════════════════════════════════════════════════════════
 // GET /api/calls/pbx-status
 // ═══════════════════════════════════════════════════════════════════
-router.get('/pbx-status', (req, res) => {
-  res.json(smdr.getStatus());
+router.get('/pbx-status', async (req, res) => {
+  try {
+    const dates = await pool.query(`SELECT call_date, COUNT(*) as count FROM call_logs GROUP BY call_date ORDER BY call_date DESC NULLS LAST`);
+    const status = smdr.getStatus();
+    status.db_dates = dates.rows;
+    res.json(status);
+  } catch (err) {
+    res.json(smdr.getStatus());
+  }
 });
 
 // ═══════════════════════════════════════════════════════════════════
@@ -89,22 +185,47 @@ router.get('/contacts', async (req, res) => {
   try {
     await syncPbxContactsFromCallLogs();
     const result = await pool.query(`
+      WITH seen_numbers AS (
+        SELECT NULLIF(TRIM(destination), '') AS phone, created_at, id FROM call_logs WHERE destination IS NOT NULL AND destination <> ''
+        UNION ALL
+        SELECT NULLIF(TRIM(caller), '') AS phone, created_at, id FROM call_logs WHERE caller IS NOT NULL AND caller <> ''
+      ),
+      grouped_numbers AS (
+        SELECT
+          regexp_replace(phone, '[^0-9]', '', 'g') AS phone_digits,
+          COALESCE(
+            (ARRAY_AGG(phone ORDER BY created_at DESC NULLS LAST))[1],
+            MIN(phone)
+          ) AS phone,
+          MAX(created_at) AS last_call,
+          COUNT(DISTINCT id)::int AS call_count
+        FROM seen_numbers
+        WHERE phone IS NOT NULL AND phone <> ''
+        GROUP BY regexp_replace(phone, '[^0-9]', '', 'g')
+      ),
+      saved_contacts AS (
+        SELECT DISTINCT ON (regexp_replace(phone, '[^0-9]', '', 'g'))
+          regexp_replace(phone, '[^0-9]', '', 'g') AS phone_digits,
+          id,
+          phone,
+          name,
+          company,
+          notes
+        FROM pbx_contacts
+        ORDER BY regexp_replace(phone, '[^0-9]', '', 'g'), (name IS NULL), updated_at DESC NULLS LAST, id DESC
+      )
       SELECT
-        t.phone,
-        MAX(t.created_at)    AS last_call,
-        COUNT(DISTINCT t.id)::int AS call_count,
+        COALESCE(sc.phone, gn.phone) AS phone,
+        gn.last_call,
+        gn.call_count,
         pc.name,
         pc.company,
         pc.notes,
         pc.id                AS pbx_contact_id
-      FROM (
-        SELECT NULLIF(TRIM(destination), '') AS phone, created_at, id FROM call_logs WHERE destination IS NOT NULL AND destination <> ''
-        UNION ALL
-        SELECT NULLIF(TRIM(caller), '') AS phone, created_at, id FROM call_logs WHERE caller IS NOT NULL AND caller <> ''
-      ) t
-      LEFT JOIN pbx_contacts pc ON pc.phone = t.phone
-      GROUP BY t.phone, pc.name, pc.company, pc.notes, pc.id
-      ORDER BY last_call DESC NULLS LAST
+      FROM grouped_numbers gn
+      LEFT JOIN saved_contacts sc ON sc.phone_digits = gn.phone_digits
+      LEFT JOIN pbx_contacts pc ON pc.id = sc.id
+      ORDER BY gn.last_call DESC NULLS LAST
       LIMIT 500
     `);
     return res.json(result.rows);
@@ -122,7 +243,12 @@ router.get('/contacts/list', async (req, res) => {
     const result = await pool.query(`
       SELECT pc.*, COUNT(cl.id)::int AS call_count, MAX(cl.created_at) AS last_call
       FROM pbx_contacts pc
-      LEFT JOIN call_logs cl ON (cl.caller = pc.phone OR cl.destination = pc.phone)
+      LEFT JOIN call_logs cl ON (
+        cl.caller = pc.phone
+        OR cl.destination = pc.phone
+        OR regexp_replace(cl.caller, '[^0-9]', '', 'g') = regexp_replace(pc.phone, '[^0-9]', '', 'g')
+        OR regexp_replace(cl.destination, '[^0-9]', '', 'g') = regexp_replace(pc.phone, '[^0-9]', '', 'g')
+      )
       GROUP BY pc.id
       ORDER BY pc.name ASC
     `);
@@ -139,16 +265,35 @@ router.post('/contacts/save', async (req, res) => {
   const { phone, name, company, notes } = req.body;
   if (!phone) return res.status(400).json({ error: 'phone is required.' });
   try {
-    const result = await pool.query(`
-      INSERT INTO pbx_contacts (phone, name, company, notes, updated_at)
-      VALUES ($1, $2, $3, $4, NOW())
-      ON CONFLICT (phone) DO UPDATE
-        SET name = EXCLUDED.name,
-            company = EXCLUDED.company,
-            notes = EXCLUDED.notes,
-            updated_at = NOW()
-      RETURNING *
-    `, [phone.trim(), name || null, company || null, notes || null]);
+    const cleanPhone = phone.trim();
+    const existing = await pool.query(`
+      SELECT id
+      FROM pbx_contacts
+      WHERE regexp_replace(phone, '[^0-9]', '', 'g') = regexp_replace($1, '[^0-9]', '', 'g')
+      ORDER BY (name IS NULL), updated_at DESC NULLS LAST, id DESC
+      LIMIT 1
+    `, [cleanPhone]);
+
+    const result = existing.rowCount
+      ? await pool.query(`
+          UPDATE pbx_contacts
+          SET name = $1,
+              company = $2,
+              notes = $3,
+              updated_at = NOW()
+          WHERE id = $4
+          RETURNING *
+        `, [name || null, company || null, notes || null, existing.rows[0].id])
+      : await pool.query(`
+          INSERT INTO pbx_contacts (phone, name, company, notes, updated_at)
+          VALUES ($1, $2, $3, $4, NOW())
+          ON CONFLICT (phone) DO UPDATE
+            SET name = EXCLUDED.name,
+                company = EXCLUDED.company,
+                notes = EXCLUDED.notes,
+                updated_at = NOW()
+          RETURNING *
+        `, [cleanPhone, name || null, company || null, notes || null]);
     return res.json(result.rows[0]);
   } catch (err) {
     console.error('[Calls] save contact error:', err.message);
@@ -163,17 +308,71 @@ router.get('/contact/:phone', async (req, res) => {
   const phone = decodeURIComponent(req.params.phone);
   const limit  = parseInt(req.query.limit  || '100');
   const offset = parseInt(req.query.offset || '0');
+  const dedupedCallsSql = `
+    SELECT DISTINCT ON (
+      CASE
+        WHEN raw_line IS NOT NULL AND trim(raw_line) <> ''
+          THEN regexp_replace(trim(raw_line), '^\\d+\\s+', '')
+        ELSE 'id:' || id::text
+      END
+    ) *
+    FROM call_logs
+    ORDER BY
+      CASE
+        WHEN raw_line IS NOT NULL AND trim(raw_line) <> ''
+          THEN regexp_replace(trim(raw_line), '^\\d+\\s+', '')
+        ELSE 'id:' || id::text
+      END,
+      created_at DESC,
+      id DESC
+  `;
   try {
     const result = await pool.query(`
-      SELECT cl.*, pc.name AS saved_name, pc.company AS saved_company
-      FROM call_logs cl
-      LEFT JOIN pbx_contacts pc ON (pc.phone = cl.caller OR pc.phone = cl.destination)
-      WHERE cl.caller = $1 OR cl.destination = $1
-      ORDER BY cl.created_at DESC
+      SELECT cl.*, TO_CHAR(cl.call_date, 'YYYY-MM-DD') AS call_date_str, 
+             COALESCE(pc1.name, pc2.name) AS saved_name, 
+             COALESCE(pc1.company, pc2.company) AS saved_company,
+             COALESCE(pc1.notes, pc2.notes) AS saved_notes
+      FROM (${dedupedCallsSql}) cl
+      LEFT JOIN (
+        SELECT DISTINCT ON (regexp_replace(phone, '[^0-9]', '', 'g'))
+          regexp_replace(phone, '[^0-9]', '', 'g') AS phone_digits, phone, name, company, notes
+        FROM pbx_contacts
+        ORDER BY regexp_replace(phone, '[^0-9]', '', 'g'), (name IS NULL), updated_at DESC NULLS LAST, id DESC
+      ) pc1 ON (
+        pc1.phone = cl.caller
+        OR pc1.phone_digits = regexp_replace(cl.caller, '[^0-9]', '', 'g')
+      )
+      LEFT JOIN (
+        SELECT DISTINCT ON (regexp_replace(phone, '[^0-9]', '', 'g'))
+          regexp_replace(phone, '[^0-9]', '', 'g') AS phone_digits, phone, name, company, notes
+        FROM pbx_contacts
+        ORDER BY regexp_replace(phone, '[^0-9]', '', 'g'), (name IS NULL), updated_at DESC NULLS LAST, id DESC
+      ) pc2 ON (
+        pc2.phone = cl.destination
+        OR pc2.phone_digits = regexp_replace(cl.destination, '[^0-9]', '', 'g')
+      )
+      WHERE cl.caller = $1
+         OR cl.destination = $1
+         OR regexp_replace(cl.caller, '[^0-9]', '', 'g') = regexp_replace($1, '[^0-9]', '', 'g')
+         OR regexp_replace(cl.destination, '[^0-9]', '', 'g') = regexp_replace($1, '[^0-9]', '', 'g')
+      ORDER BY COALESCE(cl.call_date::timestamp + COALESCE(cl.call_time, TIME '00:00:00'), cl.created_at) DESC,
+               cl.created_at DESC,
+               cl.id DESC
       LIMIT $2 OFFSET $3
     `, [phone, limit, offset]);
+    
+    result.rows.forEach(r => {
+      if (r.call_date_str) {
+        r.call_date = r.call_date_str;
+        delete r.call_date_str;
+      }
+    });
     const total = await pool.query(`
-      SELECT COUNT(*) FROM call_logs WHERE caller = $1 OR destination = $1
+      SELECT COUNT(*) FROM (${dedupedCallsSql}) cl
+      WHERE caller = $1
+         OR destination = $1
+         OR regexp_replace(caller, '[^0-9]', '', 'g') = regexp_replace($1, '[^0-9]', '', 'g')
+         OR regexp_replace(destination, '[^0-9]', '', 'g') = regexp_replace($1, '[^0-9]', '', 'g')
     `, [phone]);
     return res.json({
       calls: result.rows,
@@ -196,31 +395,101 @@ router.get('/', async (req, res) => {
   const dateFrom = normalizeDateParam(req.query.from || '');
   const dateTo   = normalizeDateParam(req.query.to   || '');
 
+  console.log('[Calls API] Filter request:', { rawFrom: req.query.from, rawTo: req.query.to, dateFrom, dateTo });
+
   const where = ['1=1'];
   const params = [];
   let p = 1;
 
   if (type) { where.push(`call_type = $${p++}`); params.push(type); }
   if (search) {
-    where.push(`(caller ILIKE $${p} OR destination ILIKE $${p} OR extension ILIKE $${p})`);
+    where.push(`(
+      caller ILIKE $${p}
+      OR destination ILIKE $${p}
+      OR extension ILIKE $${p}
+      OR EXISTS (
+        SELECT 1
+        FROM pbx_contacts pc
+        WHERE (
+          pc.name ILIKE $${p}
+          OR pc.company ILIKE $${p}
+          OR pc.notes ILIKE $${p}
+        )
+        AND (
+          pc.phone = caller
+          OR pc.phone = destination
+          OR regexp_replace(pc.phone, '[^0-9]', '', 'g') = regexp_replace(caller, '[^0-9]', '', 'g')
+          OR regexp_replace(pc.phone, '[^0-9]', '', 'g') = regexp_replace(destination, '[^0-9]', '', 'g')
+        )
+      )
+    )`);
     params.push('%' + search + '%'); p++;
   }
   if (dateFrom) { where.push(`call_date >= $${p++}`); params.push(dateFrom); }
   if (dateTo)   { where.push(`call_date <= $${p++}`); params.push(dateTo); }
 
   const whereStr = where.join(' AND ');
+  const dedupedCallsSql = `
+    SELECT DISTINCT ON (
+      CASE
+        WHEN raw_line IS NOT NULL AND trim(raw_line) <> ''
+          THEN regexp_replace(trim(raw_line), '^\\d+\\s+', '')
+        ELSE 'id:' || id::text
+      END
+    ) *
+    FROM call_logs
+    ORDER BY
+      CASE
+        WHEN raw_line IS NOT NULL AND trim(raw_line) <> ''
+          THEN regexp_replace(trim(raw_line), '^\\d+\\s+', '')
+        ELSE 'id:' || id::text
+      END,
+      created_at DESC,
+      id DESC
+  `;
   try {
     const result = await pool.query(
-      `SELECT cl.*, pc.name AS saved_name, pc.company AS saved_company
-       FROM call_logs cl
-       LEFT JOIN pbx_contacts pc ON (pc.phone = cl.caller OR pc.phone = cl.destination)
+      `SELECT cl.*, TO_CHAR(cl.call_date, 'YYYY-MM-DD') AS call_date_str, 
+              COALESCE(pc1.name, pc2.name) AS saved_name, 
+              COALESCE(pc1.company, pc2.company) AS saved_company,
+              COALESCE(pc1.notes, pc2.notes) AS saved_notes
+       FROM (${dedupedCallsSql}) cl
+       LEFT JOIN (
+         SELECT DISTINCT ON (regexp_replace(phone, '[^0-9]', '', 'g'))
+           regexp_replace(phone, '[^0-9]', '', 'g') AS phone_digits, phone, name, company, notes
+         FROM pbx_contacts
+         ORDER BY regexp_replace(phone, '[^0-9]', '', 'g'), (name IS NULL), updated_at DESC NULLS LAST, id DESC
+       ) pc1 ON (
+         pc1.phone = cl.caller
+         OR pc1.phone_digits = regexp_replace(cl.caller, '[^0-9]', '', 'g')
+       )
+       LEFT JOIN (
+         SELECT DISTINCT ON (regexp_replace(phone, '[^0-9]', '', 'g'))
+           regexp_replace(phone, '[^0-9]', '', 'g') AS phone_digits, phone, name, company, notes
+         FROM pbx_contacts
+         ORDER BY regexp_replace(phone, '[^0-9]', '', 'g'), (name IS NULL), updated_at DESC NULLS LAST, id DESC
+       ) pc2 ON (
+         pc2.phone = cl.destination
+         OR pc2.phone_digits = regexp_replace(cl.destination, '[^0-9]', '', 'g')
+       )
        WHERE ${whereStr}
-       ORDER BY cl.created_at DESC
+       ORDER BY COALESCE(cl.call_date::timestamp + COALESCE(cl.call_time, TIME '00:00:00'), cl.created_at) DESC,
+                cl.created_at DESC,
+                cl.id DESC
        LIMIT $${p++} OFFSET $${p++}`,
       [...params, limit, offset]
     );
+    
+    // Fix pg driver timezone shift by using the string representation of the date
+    result.rows.forEach(r => {
+      if (r.call_date_str) {
+        r.call_date = r.call_date_str;
+        delete r.call_date_str;
+      }
+    });
+    
     const total = await pool.query(
-      `SELECT COUNT(*) FROM call_logs WHERE ${whereStr}`,
+      `SELECT COUNT(*) FROM (${dedupedCallsSql}) cl WHERE ${whereStr}`,
       params
     );
     return res.json({ calls: result.rows, total: parseInt(total.rows[0].count) });
@@ -277,7 +546,12 @@ router.post('/:id/summarize', async (req, res) => {
     const { rows } = await pool.query(`
       SELECT cl.*, pc.name AS saved_name, pc.company AS saved_company, pc.notes AS contact_notes
       FROM call_logs cl
-      LEFT JOIN pbx_contacts pc ON (pc.phone = cl.caller OR pc.phone = cl.destination)
+      LEFT JOIN pbx_contacts pc ON (
+        pc.phone = cl.caller
+        OR pc.phone = cl.destination
+        OR regexp_replace(pc.phone, '[^0-9]', '', 'g') = regexp_replace(cl.caller, '[^0-9]', '', 'g')
+        OR regexp_replace(pc.phone, '[^0-9]', '', 'g') = regexp_replace(cl.destination, '[^0-9]', '', 'g')
+      )
       WHERE cl.id = $1
     `, [req.params.id]);
 
@@ -348,8 +622,18 @@ router.get('/backup/list', (req, res) => {
 router.post('/backup/create', async (req, res) => {
   try {
     await ensurePbxContactsTable();
-    const calls = await pool.query(`SELECT * FROM call_logs ORDER BY created_at DESC`);
-    const contacts = await pool.query(`SELECT * FROM pbx_contacts ORDER BY updated_at DESC NULLS LAST, created_at DESC`);
+    const calls = await pool.query(`
+      SELECT *
+      FROM call_logs
+      ORDER BY COALESCE(call_date::timestamp + COALESCE(call_time, TIME '00:00:00'), created_at) DESC,
+               created_at DESC,
+               id DESC
+    `);
+    const contacts = await pool.query(`
+      SELECT id, phone, name, company, notes, created_at, updated_at
+      FROM pbx_contacts
+      ORDER BY updated_at DESC NULLS LAST, created_at DESC
+    `);
     const ts = new Date().toISOString().replace(/[:.]/g, '-');
     const filename = `call_backup_${ts}.json`;
     const filepath = path.join(BACKUP_DIR, filename);
@@ -381,9 +665,8 @@ router.post('/backup/create', async (req, res) => {
 router.post('/backup/restore', async (req, res) => {
   const { filename } = req.body;
   if (!filename) return res.status(400).json({ error: 'filename required.' });
-  // Safety: prevent path traversal
-  const safe = path.basename(filename);
-  const filepath = path.join(BACKUP_DIR, safe);
+  const filepath = getSafeBackupPath(filename);
+  if (!filepath) return res.status(400).json({ error: 'Invalid backup filename.' });
   if (!fs.existsSync(filepath)) return res.status(404).json({ error: 'Backup file not found.' });
 
   try {
@@ -446,6 +729,54 @@ router.post('/backup/restore', async (req, res) => {
   }
 });
 
+/** GET /api/calls/backup/read */
+router.get('/backup/read', (req, res) => {
+  const { filename } = req.query;
+  if (!filename) return res.status(400).json({ error: 'filename required.' });
+  const filepath = getSafeBackupPath(filename);
+  if (!filepath) return res.status(400).json({ error: 'Invalid backup filename.' });
+  if (!fs.existsSync(filepath)) return res.status(404).json({ error: 'Backup file not found.' });
+
+  try {
+    const stat = fs.statSync(filepath);
+    const raw = fs.readFileSync(filepath, 'utf8');
+    return res.json({
+      filename: path.basename(filepath),
+      size: stat.size,
+      created_at: stat.birthtime,
+      mtime: stat.mtime,
+      content: JSON.parse(raw),
+    });
+  } catch (err) {
+    return res.status(500).json({ error: 'Could not read backup: ' + err.message });
+  }
+});
+
+/** GET /api/calls/backup/download */
+router.get('/backup/download', (req, res) => {
+  const { filename } = req.query;
+  if (!filename) return res.status(400).json({ error: 'filename required.' });
+  const filepath = getSafeBackupPath(filename);
+  if (!filepath) return res.status(400).json({ error: 'Invalid backup filename.' });
+  if (!fs.existsSync(filepath)) return res.status(404).json({ error: 'Backup file not found.' });
+  res.download(filepath, path.basename(filepath));
+});
+
+/** POST /api/calls/backup/delete  body: { filename } */
+router.post('/backup/delete', (req, res) => {
+  const { filename } = req.body;
+  if (!filename) return res.status(400).json({ error: 'filename required.' });
+  const filepath = getSafeBackupPath(filename);
+  if (!filepath) return res.status(400).json({ error: 'Invalid backup filename.' });
+  if (!fs.existsSync(filepath)) return res.status(404).json({ error: 'Backup file not found.' });
+  try {
+    fs.unlinkSync(filepath);
+    return res.json({ success: true, message: 'Backup deleted.' });
+  } catch (err) {
+    return res.status(500).json({ error: 'Could not delete backup: ' + err.message });
+  }
+});
+
 // ═══════════════════════════════════════════════════════════════════
 // RECORDINGS — scan filesystem for .wav / .mp3 files
 // ═══════════════════════════════════════════════════════════════════
@@ -500,6 +831,7 @@ router.delete('/contacts/:phone', async (req, res) => {
 router.get('/sync', async (req, res) => {
   try {
     const contactsSynced = await syncPbxContactsFromCallLogs();
+    const durationsRepaired = await repairPbxDurationsFromRawLines();
     const result = await pool.query(
       `SELECT COUNT(*) AS total,
               COUNT(*) FILTER (WHERE created_at > NOW() - INTERVAL '24 hours') AS today
@@ -510,6 +842,7 @@ router.get('/sync', async (req, res) => {
       total: parseInt(result.rows[0].total),
       today: parseInt(result.rows[0].today),
       contacts_synced: contactsSynced,
+      durations_repaired: durationsRepaired,
       timestamp: new Date().toISOString(),
     });
   } catch (err) {
@@ -521,6 +854,7 @@ router.post('/sync', async (req, res) => {
   // Matrix SMDR is a live push stream; this endpoint reports DB/listener state.
   try {
     const contactsSynced = await syncPbxContactsFromCallLogs();
+    const durationsRepaired = await repairPbxDurationsFromRawLines();
     const result = await pool.query(`
       SELECT COUNT(*) AS total,
              COUNT(*) FILTER (WHERE call_date = CURRENT_DATE) AS today
@@ -532,6 +866,7 @@ router.post('/sync', async (req, res) => {
       total: parseInt(result.rows[0].total),
       today: parseInt(result.rows[0].today),
       contacts_synced: contactsSynced,
+      durations_repaired: durationsRepaired,
       pbx_status: smdr.getStatus(),
     });
   } catch (err) {
@@ -540,6 +875,51 @@ router.post('/sync', async (req, res) => {
 });
 
 // ─── Helpers ──────────────────────────────────────────────────────
+router.post('/maintenance/repair-dates', async (req, res) => {
+  try {
+    const result = await pool.query(`
+      WITH matched AS (
+        SELECT id,
+               regexp_match(raw_line, '(\\d{1,2})-(\\d{2})-(\\d{2,4})\\s+(\\d{2}:\\d{2}:\\d{2})') AS m
+        FROM call_logs
+        WHERE raw_line ~ '(\\d{1,2})-(\\d{2})-(\\d{2,4})\\s+(\\d{2}:\\d{2}:\\d{2})'
+      ), parsed AS (
+        SELECT id,
+               ((CASE WHEN length(m[3]) = 2 THEN '20' || m[3] ELSE m[3] END) || '-' || m[2] || '-' || lpad(m[1], 2, '0'))::date AS parsed_date,
+               m[4]::time AS parsed_time
+        FROM matched
+      )
+      UPDATE call_logs cl
+         SET call_date = p.parsed_date,
+             call_time = p.parsed_time
+        FROM parsed p
+       WHERE cl.id = p.id
+         AND (cl.call_date IS DISTINCT FROM p.parsed_date OR cl.call_time IS DISTINCT FROM p.parsed_time)
+      RETURNING cl.id
+    `);
+
+    const may14 = await pool.query(`SELECT COUNT(*)::int AS total FROM call_logs WHERE call_date = DATE '2026-05-14'`);
+    return res.json({
+      success: true,
+      repaired: result.rowCount || 0,
+      may14_total: may14.rows[0].total,
+    });
+  } catch (err) {
+    console.error('[Calls] repair dates error:', err.message);
+    return res.status(500).json({ error: 'Failed to repair PBX call dates: ' + err.message });
+  }
+});
+
+router.post('/maintenance/repair-durations', async (req, res) => {
+  try {
+    const repaired = await repairPbxDurationsFromRawLines();
+    return res.json({ success: true, repaired });
+  } catch (err) {
+    console.error('[Calls] repair durations error:', err.message);
+    return res.status(500).json({ error: 'Failed to repair PBX call durations: ' + err.message });
+  }
+});
+
 function formatBytes(bytes) {
   if (bytes < 1024)     return bytes + ' B';
   if (bytes < 1048576)  return (bytes / 1024).toFixed(1) + ' KB';

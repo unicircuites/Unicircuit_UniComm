@@ -13,19 +13,31 @@
 
 const { fork } = require('child_process');
 const path = require('path');
+const DEFAULT_FAST_MODEL = 'llama-3.1-8b-instant';
+
+function safeGroqModel(value, fallback = DEFAULT_FAST_MODEL) {
+  const model = String(value || '').trim();
+  if (!model || /^gemma2-9b-it$/i.test(model)) return fallback;
+  return model;
+}
 
 async function callOllamaService(prompt, preprocessedEmails, onWorker = null) {
   // ── GROQ CLOUD API (Priority) ──────────────────────────────────────────
   if (process.env.AI_API_KEY) {
     try {
-      console.log('[AI] Using Groq Cloud API for analysis...');
+      console.log('[AI] Using PicoClaw/Groq API for analysis...');
       return await callGroqService(prompt, preprocessedEmails);
     } catch (err) {
-      console.warn('[AI] Groq failed, falling back to local Ollama:', err.message);
+      console.warn('[AI] PicoClaw/Groq API failed:', err.message);
+      if (process.env.AI_ALLOW_OLLAMA_FALLBACK !== 'true') throw err;
     }
   }
 
   // ── LOCAL OLLAMA (Fallback) ─────────────────────────────────────────────
+  if (process.env.AI_ALLOW_OLLAMA_FALLBACK !== 'true') {
+    throw new Error('AI API unavailable and Ollama fallback is disabled');
+  }
+
   const ollamaHost = process.env.OLLAMA_HOST || 'http://localhost:11434';
   const ollamaModel = process.env.OLLAMA_MODEL || 'phi3:mini';
   
@@ -266,10 +278,24 @@ async function callAnthropic(prompt, emails) {
 async function callGroqService(prompt, emails, retryCount = 0) {
   const apiKey = process.env.AI_API_KEY;
   const host   = process.env.AI_API_HOST || 'https://api.groq.com/openai/v1';
-  const model  = process.env.AI_API_MODEL || 'llama-3.1-8b-instant';
+  const model = safeGroqModel(process.env.AI_FAST_MODEL || process.env.AI_API_MODEL);
+  const maxTokens = Math.min(parseInt(process.env.AI_MAX_TOKENS || '160', 10) || 160, 220);
 
   const systemContent = (emails && emails.length > 0) ? prepareSystemInstructions() : 'You are a professional CRM assistant.';
   const userContent   = (emails && emails.length > 0) ? buildUserPrompt(emails) : prompt;
+
+  const aiBody = {
+    model: model,
+    messages: [
+      { role: 'system', content: systemContent },
+      { role: 'user', content: userContent }
+    ],
+    temperature: 0.2,
+    max_tokens: maxTokens
+  };
+  if (/^groq\/compound/i.test(model)) {
+    aiBody.search_settings = { country: 'india' };
+  }
 
   const response = await fetch(`${host}/chat/completions`, {
     method: 'POST',
@@ -277,15 +303,7 @@ async function callGroqService(prompt, emails, retryCount = 0) {
       'Authorization': `Bearer ${apiKey}`,
       'Content-Type': 'application/json'
     },
-    body: JSON.stringify({
-      model: model,
-      messages: [
-        { role: 'system', content: systemContent },
-        { role: 'user', content: userContent }
-      ],
-      temperature: 0.5,
-      max_tokens: parseInt(process.env.AI_MAX_TOKENS || '800', 10)
-    })
+    body: JSON.stringify(aiBody)
   });
 
   if (!response.ok) {

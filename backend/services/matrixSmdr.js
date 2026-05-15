@@ -50,6 +50,90 @@ function emit(event, data) {
   }
 }
 
+function formatDurationFromSeconds(seconds) {
+  const sec = Math.max(0, parseInt(seconds, 10) || 0);
+  const h = Math.floor(sec / 3600);
+  const m = Math.floor((sec % 3600) / 60);
+  const s = sec % 60;
+  return [h, m, s].map(v => v.toString().padStart(2, '0')).join(':');
+}
+
+function isMatrixDate(value) {
+  return /^\d{1,2}-\d{2}-\d{2,4}$/.test(String(value || '').trim());
+}
+
+function isMatrixTime(value) {
+  return /^\d{2}:\d{2}:\d{2}$/.test(String(value || '').trim());
+}
+
+function parseMatrixDate(rawDate) {
+  const dp = String(rawDate || '').trim().split('-');
+  if (dp.length !== 3) return null;
+  const yr = dp[2].length === 2 ? '20' + dp[2] : dp[2];
+  return `${yr}-${dp[1].padStart(2, '0')}-${dp[0].padStart(2, '0')}`;
+}
+
+function normaliseSmdrLineForDedupe(rawLine) {
+  return String(rawLine || '').trim().replace(/^\d+\s+/, '');
+}
+
+function parseMatrixFixedLayout(rawLine) {
+  const get = (start, len) => rawLine.substring(start - 1, (start - 1) + len).trim();
+  const durationAfterTime = (rawTime) => {
+    const afterTime = rawLine.slice(rawLine.indexOf(rawTime) + rawTime.length).trim();
+    const numericFields = afterTime.match(/\b\d+(?:\.\d+)?\b/g) || [];
+    if (!numericFields.length) return 0;
+    return Math.round(parseFloat(numericFields[numericFields.length - 1]) || 0);
+  };
+  const incomingDate = get(36, 8);
+  const incomingTime = get(47, 8);
+  const outgoingDate = get(41, 8);
+  const outgoingTime = get(50, 8);
+
+  if (isMatrixDate(incomingDate) && isMatrixTime(incomingTime)) {
+    return {
+      layout: 'incoming',
+      callingNum: get(6, 16),
+      trunk: get(23, 5),
+      connectedNum: get(29, 6),
+      rawDate: incomingDate,
+      rawTime: incomingTime,
+      durationSeconds: parseInt(get(64, 5), 10) || durationAfterTime(incomingTime),
+      remarks: get(70, 2),
+    };
+  }
+
+  if (isMatrixDate(outgoingDate) && isMatrixTime(outgoingTime)) {
+    return {
+      layout: 'outgoing',
+      callingNum: get(6, 6),
+      trunk: get(17, 5),
+      connectedNum: get(22, 18),
+      rawDate: outgoingDate,
+      rawTime: outgoingTime,
+      durationSeconds: parseInt(get(59, 5), 10) || 0,
+      remarks: get(78, 2),
+    };
+  }
+
+  const dateTimeMatch = rawLine.match(/\b(\d{1,2}-\d{2}-\d{2,4})\s+(\d{2}:\d{2}:\d{2})\b/);
+  const parts = rawLine.trim().split(/\s+/);
+  if (dateTimeMatch && parts.length >= 6) {
+    return {
+      layout: 'space-delimited',
+      callingNum: parts[1] || '',
+      trunk: parts[2] || '',
+      connectedNum: parts[3] || '',
+      rawDate: dateTimeMatch[1],
+      rawTime: dateTimeMatch[2],
+      durationSeconds: durationAfterTime(dateTimeMatch[2]),
+      remarks: parts[parts.length - 1] || '',
+    };
+  }
+
+  return null;
+}
+
 // ── ENSURE TABLE ──────────────────────────────────────────────────────────
 async function ensureTable(retries = 3) {
   for (let i = 0; i < retries; i++) {
@@ -153,38 +237,28 @@ function parseSMDR(line) {
   // Note: We use the raw line (not trimmed) because Matrix depends on exact column positions.
   const rawLine = line; 
   if (rawLine.length >= 70) {
-    // Helper to extract by position (1-indexed as per Matrix manuals)
-    const get = (start, len) => rawLine.substring(start - 1, (start - 1) + len).trim();
+    const getFixed = (start, len) => rawLine.substring(start - 1, (start - 1) + len).trim();
+    const parsedLayout = parseMatrixFixedLayout(rawLine);
+    if (!parsedLayout) return null;
 
-    const callingNum   = get(6, 16);
-    const trunk        = get(23, 5);
-    const connectedNum = get(29, 8);
-    const dateTimeMatch = rawLine.match(/\b(\d{1,2}-\d{2}-\d{2,4})\s+(\d{2}:\d{2}:\d{2})\b/);
-    const rawDate      = dateTimeMatch ? dateTimeMatch[1] : get(38, 8); // DD-MM-YY
-    const rawTime      = dateTimeMatch ? dateTimeMatch[2] : get(47, 8); // HH:MM:SS
-    const speechSec    = parseInt(get(64, 5)) || 0;
+    const callingNum   = parsedLayout.callingNum;
+    const trunk        = parsedLayout.trunk;
+    const connectedNum = parsedLayout.connectedNum;
+    const rawDate      = parsedLayout.rawDate;
+    const rawTime      = parsedLayout.rawTime;
+    const speechSec    = parsedLayout.durationSeconds;
     
     // RECORDING FILENAME: Standard Matrix position is usually 80+ if enabled
-    const recordingId  = rawLine.length > 80 ? get(80, 30) : null;
+    const recordingId  = rawLine.length > 80 ? getFixed(80, 30) : null;
 
     // VALIDATION: If the date or time fields contain dashes or non-digits, it's a summary line
     if (!rawDate || rawDate.includes('-') && rawDate.length < 5 || rawTime.includes('-')) {
       return null; 
     }
 
-    let callDate = null;
-    try {
-      const dp = rawDate.split('-');
-      if (dp.length === 3) {
-        const yr = dp[2].length === 2 ? '20' + dp[2] : dp[2];
-        callDate = `${yr}-${dp[1].padStart(2, '0')}-${dp[0].padStart(2, '0')}`;
-      }
-    } catch (_) {}
+    const callDate = parseMatrixDate(rawDate);
 
-    const h = Math.floor(speechSec / 3600);
-    const m = Math.floor((speechSec % 3600) / 60);
-    const s = speechSec % 60;
-    const duration = [h, m, s].map(v => v.toString().padStart(2, '0')).join(':');
+    const duration = formatDurationFromSeconds(speechSec);
 
     let type = 'Out';
     if (callingNum.length > 5) type = 'In';
@@ -221,6 +295,24 @@ function parseSMDR(line) {
 // ── SAVE TO DB ────────────────────────────────────────────────────────────
 async function saveCallLog(record) {
   try {
+    const dedupeKey = normaliseSmdrLineForDedupe(record.raw_line);
+    if (dedupeKey) {
+      const existing = await pool.query(`
+        SELECT id
+        FROM call_logs
+        WHERE raw_line IS NOT NULL
+          AND regexp_replace(trim(raw_line), '^\\d+\\s+', '') = $1
+        LIMIT 1
+      `, [dedupeKey]);
+      if (existing.rowCount) {
+        console.log(`[SMDR] Duplicate raw event ignored (existing ID: ${existing.rows[0].id})`);
+        return existing.rows[0];
+      }
+    }
+
+    // Strip null bytes and non-printable characters to prevent DB UTF-8 encoding errors
+    const cleanRawLine = String(record.raw_line || '').replace(/\x00/g, '').replace(/[\x01-\x1F\x7F-\x9F]/g, ' ').trim();
+
     const result = await pool.query(`
       INSERT INTO call_logs (call_date, call_time, duration, call_type, caller, extension, destination, trunk, raw_line, recording_file)
       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
@@ -228,14 +320,13 @@ async function saveCallLog(record) {
     `, [
       record.call_date, record.call_time, record.duration,
       record.call_type, record.caller, record.extension,
-      record.destination, record.trunk, record.raw_line,
+      record.destination, record.trunk, cleanRawLine,
       record.recording_file
     ]);
     const row = result.rows[0];
     console.log(`[SMDR] Saved to call_logs: ${record.call_type} | ${record.caller} → ${record.destination}`);
     
     // ── SYNC WITH CRM CONTACTS ──────────────────────────────────────────
-    // Find external number to match against CRM contacts
     const externalNum = (record.call_type === 'In') ? record.caller : record.destination;
     
     if (externalNum && externalNum.length > 5) {

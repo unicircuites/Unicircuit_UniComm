@@ -54,11 +54,119 @@ PBX / CALL LOGS
    - Backend now normalizes ISO, MM/DD/YYYY, and DD-MM-YYYY style date inputs before querying PostgreSQL.
    - This prevents locale-formatted values such as 05/14/2026 from producing empty/error-prone date queries.
 
-7. [~] Runtime dashboard verification pending after restart
+7. [✓] Tower API checked after blank dashboard report
+   - Tower API login works over HTTPS from dev machine.
+   - GET /api/calls?from=2026-05-14 returned total 0 on tower before repair.
+   - GET /api/calls without date returned live tower rows.
+   - Tower rows include raw_line dates such as 14-05-26, confirming tower DB still needs date repair.
+
+8. [✓] PBX date repair endpoint added
+   - File: backend/routes/calls.js
+   - Added POST /api/calls/maintenance/repair-dates.
+   - Endpoint repairs call_logs.call_date and call_time from raw_line using the same SMDR date/time pattern.
+   - Returns repaired row count and May 14 total.
+
+9. [~] Runtime dashboard verification pending after tower pull/restart and repair endpoint run
    - Open PBX Call Logs.
    - Filter date: 05/14/2026.
    - Expected result: 49 records should be available in call_logs for 2026-05-14.
    - Make a new live PBX test call and verify it appears under the correct current date.
+
+10. [✓] PBX backup read/download/delete operations added
+   - Files: backend/routes/calls.js, dashboard.html
+   - Backup / Restore panel now has Read, Download, Restore, and Delete actions for each backup file.
+   - Read opens an authenticated JSON preview modal.
+   - Download uses authenticated fetch/blob download.
+   - Delete confirms before removing a backup file.
+   - Backend validates backup filenames and blocks path traversal.
+
+11. [✓] PBX backups now explicitly include saved contacts
+   - File: backend/routes/calls.js
+   - Backup create now explicitly selects saved PBX contact fields:
+     * id
+     * phone
+     * name
+     * company
+     * notes
+     * created_at
+     * updated_at
+   - Backup JSON stores these under pbx_contacts.
+   - Restore already writes phone, name, company, notes, created_at, and updated_at back into pbx_contacts.
+
+12. [✓] PBX saved contact matching and UI display fixed
+   - Files: backend/routes/calls.js, dashboard.html
+   - Save Contact button now passes the actual caller number instead of undefined caller_ext.
+   - PBX Contacts and PBX Call Logs refresh after save so saved names replace raw numbers.
+   - PBX contact matching now compares normalized digits, so +91, spaced, and plain number formats are treated as the same contact.
+   - New call logs from an existing saved number appear under the existing saved PBX contact instead of creating a separate contact row.
+
+13. [✓] PBX contact notes surfaced
+   - Files: backend/routes/calls.js, dashboard.html
+   - Notes entered in Save PBX Contact are saved in pbx_contacts.notes.
+   - Notes show via tooltip/note icon in:
+     * PBX Contacts list
+     * PBX contact detail panel
+     * PBX Call Logs caller/name cell
+   - PBX contact search includes phone, name, company, and notes.
+
+14. [✓] PBX Call Log search by saved contact details fixed
+   - File: backend/routes/calls.js
+   - /api/calls search now checks saved PBX contact name, company, and notes.
+   - Dashboard search placeholder updated to "Search name/caller/dest..."
+   - Number search still works.
+
+15. [✓] PBX call duration parsing corrected
+   - Files: backend/services/matrixSmdr.js, backend/routes/calls.js
+   - Matrix SMDR parser now reads duration from the final numeric duration field in raw_line.
+   - Example fixed:
+     * raw line ending "46 T" now stores 00:00:46 instead of 00:00:04.
+   - Sync Latest now repairs existing wrong durations from raw_line.
+   - Added POST /api/calls/maintenance/repair-durations for manual duration repair.
+
+====================
+EMAIL / OUTLOOK COMPOSE + AI ASSISTANT
+====================
+
+16. [✓] Selected-email AI Assistant restored
+   - File: dashboard.html
+   - When an email is selected and AI Assistant is clicked, the assistant now opens with the selected email context.
+   - Added quick actions:
+     * Summary
+     * Draft Reply
+     * Extract Tasks
+     * Reply Options
+   - Added an ask box for follow-up questions about the selected email.
+   - Draft Reply / Reply Options output can be inserted into a reply compose window using "Use in reply".
+
+17. [✓] Compose To/CC recipient autocomplete added
+   - File: dashboard.html
+   - To and CC fields now show Outlook-style suggestions while typing.
+   - Suggestions are built from:
+     * Recent loaded mail senders/recipients
+     * Outlook contacts endpoint
+   - Selecting a suggestion inserts a formatted recipient and keeps focus in the field.
+
+18. [✓] Compose editor focus and toolbar behavior improved
+   - File: dashboard.html
+   - Compose body now auto-focuses after opening Compose / Draft Email.
+   - HTML and Media insert buttons preserve the editor cursor and return focus to the editor after insert.
+   - Bold, Italic, Underline, and Strike toolbar buttons now behave like independent toggles with active state instead of radio-style behavior.
+
+19. [✓] AI Assistant right-side drawer, model choice, and continuation fixed
+   - Files: dashboard.html, backend/routes/system.js
+   - Email AI Assistant now opens as a right-side drawer instead of a centered popup.
+   - Added model routing choices: Auto model, Fast replies, Current-info model, and Deep/complete.
+   - Selected-email quick actions now use the backend AI route with the selected model mode.
+   - Backend token utilization increased for drafts, lists, and deep answers.
+   - If the model stops because of token length, backend automatically continues up to 3 rounds and returns the combined complete answer.
+
+20. [✓] AI provider locked to PicoClaw only with decision-tree selector
+   - Files: dashboard.html, backend/routes/system.js, backend/routes/outlook.js
+   - Removed browser-side Claude fallback and all Claude/Ollama user-facing labels from the dashboard AI path.
+   - Existing AI helper calls now route through callPicoClaw and POST /api/system/ai/chat only.
+   - Added a PicoClaw Decision Model tree inside the email assistant drawer.
+   - Backend now prioritizes PICOCLAW_API_HOST / PICOCLAW_API_KEY, then existing AI_API_HOST / AI_API_KEY.
+   - PicoClaw backend connection failures now show a clear restart/config message instead of raw "Failed to fetch".
 
 ====================
 FILES CHANGED
@@ -67,6 +175,8 @@ FILES CHANGED
 Modified:
 - backend/services/matrixSmdr.js
 - backend/routes/calls.js
+- backend/routes/system.js
+- backend/routes/outlook.js
 - dashboard.html
 
 Added:
@@ -79,8 +189,13 @@ Database repair performed:
 VERIFICATION RUN
 ====================
 
+[✓] dashboard.html inline scripts parse OK
+
 [✓] node --check backend/services/matrixSmdr.js
 [✓] node --check backend/routes/calls.js
+[✓] node --check backend/routes/system.js
+[✓] node --check backend/routes/outlook.js
+[✓] dashboard.html contains no Claude/Ollama labels in the active AI route
 [✓] Database query verified 49 rows under call_date = 2026-05-14
 [✓] Exact date query verified 49 rows for 2026-05-14
 
@@ -90,6 +205,10 @@ Runtime checks still recommended:
 [O] Select PBX Call Logs -> date 05/14/2026.
 [O] Confirm rows appear.
 [O] Test a fresh incoming/outgoing PBX call and confirm today's date is stored correctly.
+[O] In Email / Outlook, select an email and open AI Assistant to confirm selected-email actions.
+[O] Confirm AI Assistant opens as right-side drawer and Deep/complete continues long answers.
+[O] Open Compose and type in To/CC to confirm recipient suggestions.
+[O] Open Compose and test HTML/Media insert plus Bold/Italic/Underline/Strike independent toggles.
 
 ====================
 DEPLOYMENT READINESS

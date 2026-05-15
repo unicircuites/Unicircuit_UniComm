@@ -6,7 +6,7 @@
  * Dev:    nodemon server.js
  * Init DB: node db/init.js
  */
-require('dotenv').config();
+require('dotenv').config({ path: require('path').join(__dirname, '.env') });
 
 // Run security checks on startup
 const { runStartupSecurityChecks } = require('./utils/securityCheck');

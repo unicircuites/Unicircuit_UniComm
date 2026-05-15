@@ -3499,7 +3499,7 @@ router.post('/ai-assistant/analyze', authenticate, async (req, res) => {
       if (aiResponse.status === 429) {
         return res.status(429).json({ 
           error: 'AI Rate Limit Reached', 
-          message: 'The AI assistant is temporarily busy. Please wait 15-20 seconds or switch to Local AI (Ollama) for unlimited analysis.',
+          message: 'The PicoClaw assistant is temporarily busy. Please wait 15-20 seconds and retry.',
           raw: parsedErr.error?.message || errText
         });
       }

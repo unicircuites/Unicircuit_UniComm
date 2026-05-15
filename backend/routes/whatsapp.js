@@ -199,6 +199,36 @@ router.post('/send', authenticate, async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
+router.post('/send-media', authenticate, async (req, res) => {
+  const { jid, fileName, mimeType, mediaType, data, caption, quotedMsgId } = req.body;
+  if (!jid || !fileName || !mimeType || !data) {
+    return res.status(400).json({ error: 'jid, fileName, mimeType, and data are required' });
+  }
+
+  const allowed = ['image', 'video', 'document'];
+  if (mediaType && !allowed.includes(String(mediaType).toLowerCase())) {
+    return res.status(400).json({ error: 'mediaType must be image, video, or document' });
+  }
+
+  try {
+    const base64 = String(data).includes(',') ? String(data).split(',').pop() : String(data);
+    const buffer = Buffer.from(base64, 'base64');
+    if (!buffer.length) return res.status(400).json({ error: 'Invalid media data' });
+
+    const result = await wa.sendMediaMessage(jid, {
+      buffer,
+      filename: fileName,
+      mimetype: mimeType,
+      mediaType,
+      caption,
+    }, quotedMsgId || null);
+
+    res.json({ success: true, message: result });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 router.get('/media/:msgId', async (req, res) => {
   // Support token via query param for <img src> / <audio src> direct links
   if (req.query.token && !req.headers.authorization) {
