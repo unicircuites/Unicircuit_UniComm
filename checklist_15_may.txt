@@ -168,6 +168,14 @@ EMAIL / OUTLOOK COMPOSE + AI ASSISTANT
    - Backend now prioritizes PICOCLAW_API_HOST / PICOCLAW_API_KEY, then existing AI_API_HOST / AI_API_KEY.
    - PicoClaw backend connection failures now show a clear restart/config message instead of raw "Failed to fetch".
 
+21. [✓] Local auto Git tracking system implemented
+   - Files: tools/autogit-watch.ps1, tools/start-autogit-watch.ps1, tools/stop-autogit-watch.ps1
+   - Created autosave branch and committed the current workspace snapshot before adding watcher scripts.
+   - Watcher enforces autosave branch, checks for dirty state every 2 seconds, runs git add ., and commits non-empty staged changes.
+   - Commit format: Auto-change: yyyy-MM-dd HH:mm.
+   - Logs and PID are stored under .git so watcher metadata does not pollute the worktree.
+   - No git push is performed.
+
 ====================
 FILES CHANGED
 ====================
@@ -178,6 +186,9 @@ Modified:
 - backend/routes/system.js
 - backend/routes/outlook.js
 - dashboard.html
+- tools/autogit-watch.ps1
+- tools/start-autogit-watch.ps1
+- tools/stop-autogit-watch.ps1
 
 Added:
 - checklist_15_may.txt
