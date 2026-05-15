@@ -10,8 +10,12 @@ $LockPath = Join-Path $RepoPath '.git\autosave-watcher.lock'
 
 function Write-AutosaveLog {
   param([string]$Message)
-  $stamp = Get-Date -Format 'yyyy-MM-dd HH:mm:ss'
-  Add-Content -LiteralPath $LogPath -Value "[$stamp] $Message"
+  try {
+    $stamp = Get-Date -Format 'yyyy-MM-dd HH:mm:ss'
+    Add-Content -LiteralPath $LogPath -Value "[$stamp] $Message" -ErrorAction Stop
+  } catch {
+    # Logging must never stop autosave commits.
+  }
 }
 
 function Invoke-Git {
@@ -51,7 +55,11 @@ function Ensure-AutosaveBranch {
 }
 
 function Save-GitSnapshot {
-  if (Test-Path -LiteralPath $LockPath) { return }
+  if (Test-Path -LiteralPath $LockPath) {
+    $lock = Get-Item -LiteralPath $LockPath -ErrorAction SilentlyContinue
+    if ($lock -and $lock.LastWriteTime -gt (Get-Date).AddSeconds(-10)) { return }
+    Remove-Item -LiteralPath $LockPath -Force -ErrorAction SilentlyContinue
+  }
   New-Item -ItemType File -Path $LockPath -Force | Out-Null
   try {
     if (-not (Ensure-AutosaveBranch)) { return }
