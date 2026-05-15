@@ -207,7 +207,7 @@ VERIFICATION RUN
 [✓] node --check backend/routes/system.js
 [✓] node --check backend/routes/outlook.js
 [✓] dashboard.html contains no Claude/Ollama labels in the active AI route
-[✓] Autosave watcher restarted after argument-passing fix and verified with live auto-commit test
+[✓] Autosave watcher restarted after hardening and verified with live auto-commit test
 [✓] Database query verified 49 rows under call_date = 2026-05-14
 [✓] Exact date query verified 49 rows for 2026-05-14
 
