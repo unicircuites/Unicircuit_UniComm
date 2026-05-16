@@ -1,0 +1,34 @@
+# May 16, 2026 - Daily Progress Checklist
+
+## 1. Dashboard UI & Encoding Fixes
+- [x] Identified and removed widespread 'mojibake' encoding artifacts (`â Œ`, `â ±`, `â— `, `ðŸ˜€`, etc.) across `dashboard.html`.
+- [x] Corrected corrupted emoji arrays within the UI using a custom Node.js replacement script.
+- [x] Cleaned up sidebar navigation icons, connection badges, PBX modal headers, and AI tool logs to display proper UTF-8 unicode (✅, ❌, ⏱, etc.).
+
+## 2. PBX Contacts Functionality
+- [x] Fixed PBX Contacts search functionality.
+- [x] The search bar in the "PBX calls" directory tab now successfully filters against contact names, company names, and saved notes, not just raw phone numbers.
+
+## 3. PBX Call Logs Export
+- [x] Made the "Export CSV" button fully functional in the PBX Call Logs module.
+- [x] Implemented a frontend CSV generation utility that correctly respects the active search, call type filters, and date range filters.
+- [x] Added proper CSV escaping and timezone-aware formatting for `call_date` and `call_time`.
+- [x] Generates an on-the-fly downloadable CSV (`PBX_Calls_Export_YYYY-MM-DD.csv`) containing Date, Time, Caller, Contact Name, Destination, Duration, Type, Trunk, and Notes.
+
+## Next Steps / Pending Issues
+- [ ] Observe system stability after UI cleanup.
+- [ ] Continue with planned Phase 1 testing and multi-channel synchronization improvements.
+
+## 4. WhatsApp Bug Fixes & Media Support
+- [x] Implemented full Media Support (Images, Videos, Documents).
+- [x] Fixed Document rendering in UniComm: Captions now show below document files instead of being hidden.
+- [x] Fixed Document filenames: Extracted from media path to prevent captions from overwriting filenames in the UI.
+- [x] Improved Stability: Reduced aggressive session clearing on unauthorized errors and increased connection timeouts.
+- [x] Enhanced Replies: Quoted documents now correctly show the file icon and filename in the reply context.
+- [x] Added media size (64MB) and length (5 mins) validation with user alerts.
+
+## 5. PBX Recordings Network Integration
+- [x] Documented the Matrix VMS network drive connectivity and Windows SMB sharing setup.
+- [x] Configured backend to scan for call recordings recursively across subdirectories.
+- [x] Added pagination (page/limit) to the PBX recordings API endpoint (`/api/calls/recordings`).
+- [x] Updated the dashboard UI to support paginated viewing and playback of audio recordings.

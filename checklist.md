@@ -1,0 +1,306 @@
+✅ Unified Communication + Pico Claw AI Platform — Implementation Checklist
+
+Use this checklist with coding agents to track what is implemented vs pending.
+
+STATUS:
+[✓] Completed (fully working)
+[~] Partially worked (started but incomplete)
+[O] Planned to work on (next priority)
+[X] Not done (not started)
+
+LATEST UPDATE - MAY 16, 2026:
+[done] Dashboard UI and Encoding cleaned
+    - Removed mojibake and encoding artifacts globally from dashboard.html
+    - Restored fully functional emojis and UTF-8 icons across sidebars, badges, and AI logs
+
+[done] PBX Search and Export
+    - PBX Contacts search now actively filters by name, company, and notes (not just phone number)
+    - Export CSV button activated in PBX Call logs, respecting active filters and formatting correctly
+
+[done] PBX Recordings Network Integration
+    - Configured Windows SMB share mapping for Matrix VMS recordings.
+    - Updated backend /api/calls/recordings to recursively scan subdirectories for audio files.
+    - Added pagination logic to the recordings API and updated dashboard.html for paginated playback.
+
+LATEST UPDATE - MAY 15, 2026:
+[done] PBX backup file operations expanded
+    - Backup / Restore panel now supports reading/previewing backup JSON, authenticated download, and deleting old backup files.
+    - Backend has safe JSON backup filename validation and an authenticated /api/calls/backup/read endpoint.
+    - Backup creation explicitly includes saved PBX contacts with id, phone, name, company, notes, created_at, and updated_at.
+    - Restore preserves PBX contact name, company, and notes.
+
+[done] PBX saved contacts improved
+    - Save Contact now passes the actual caller number instead of undefined caller_ext.
+    - Saved PBX contacts immediately update PBX Contacts and PBX Call Logs from phone number to saved name.
+    - PBX contacts now match by normalized digits, so +91/spaced/plain number formats map to the same saved contact.
+    - New calls from an already saved number are grouped into the existing PBX contact instead of creating a separate contact row.
+    - Saved contact notes are stored in pbx_contacts.notes and shown as tooltip/note indicators in PBX Contacts, contact detail, and call logs.
+    - PBX Call Log search now supports saved contact name, company, and notes, in addition to caller/destination/extension.
+
+[done] PBX duration parsing corrected
+    - Matrix SMDR parser now reads duration from the final numeric SMDR duration field instead of the wrong fixed-width slice.
+    - Example: raw line ending "46 T" now stores 00:00:46 instead of 00:00:04.
+    - Sync Latest now repairs existing saved durations from raw_line.
+    - Added POST /api/calls/maintenance/repair-durations for manual repair.
+
+LATEST UPDATE - MAY 14, 2026:
+[✓] Outlook practical email action menu added
+    - Removed unnecessary AI-only context menu entries now covered by the AI assistant.
+    - Added Copy to Folder, Move to Folder, Mark as Unread, Pin to UniCRM Top, Block Sender.
+    - Added Download as EML, Download as MSG, and Advanced Options -> Create Task.
+    - Added backend copy endpoint and unread endpoint support.
+    - Pin/block behavior is stored locally for the CRM inbox view.
+    - Note: Outlook Graph exposes flag but not a normal pinned message field, so UniCRM pin no longer changes Outlook follow-up flag.
+    - Copy/Move folder picker and email action confirmations now use custom UniCRM modals instead of browser prompt/confirm popups.
+    - Categorize action now loads Account Info / Outlook master categories first, including their colors, with fallback defaults.
+
+PARTIAL TASKS THAT LOOK EASY TO COMPLETE NEXT:
+[✓] AI prompt output tightened — PicoClaw validated against 5 real cached Outlook emails; output had Summary/Insights/Smart Actions, 3 actions, and 119 words.
+[✓] PBX backup/restore hardened — New backups include call_logs and pbx_contacts; restore supports old call-only backups and v2 backups with saved contacts.
+[~] PostgreSQL pool tuned — Needs normal dashboard runtime observation; no major code expected.
+[~] AI drafting UAT — Existing feature needs a short smoke test and sign-off notes.
+[~] Suggest-only trust phase — Mostly already true; needs UI wording/checklist confirmation.
+[~] Email quality — Add simple quality checks/metrics for drafts, replies, and downloads.
+[~] API error tracking — Logs already exist; add a small centralized error summary or dashboard counter.
+[~] Contact enrichment from Outlook — Import exists; easy next step is adding a one-click "update missing fields from Outlook" action.
+
+====================
+L1 — UNIT & API VALIDATION
+====================
+
+API Coverage
+[✓] Outlook Sync API (POST /sync/emails) — Multiple sync endpoints exist: /sync-messages, /sync-stats, /contacts/sync
+[✓] PBX Call History API (GET /calls/history) — /api/calls implemented with Matrix SMDR; live logs, recordings schema, sync stats, PBX contact materialization from call_logs
+[✓] WhatsApp Webhook API (POST /webhook/message) — Baileys implementation (correct architecture), /api/wa/* exists
+[O] Contact Merge API (PUT /contacts/merge) — Planned for Phase 1
+[~] Pico Claw Trigger API (POST /ai/analyze) — Outlook AI assistant route exists with PicoClaw/OpenAI-format call, timeout and 429 handling; dedicated /ai/analyze API still not finalized
+
+Edge Cases
+[O] 50k+ email incremental sync (delta tokens) — Planned for Phase 1
+[~] PBX timeout → circuit breaker — Passive listener ready/connected/disconnected states improved; reconnect exists, full circuit breaker still pending
+[O] WhatsApp rate limit → exponential backoff — Planned for Phase 2
+[X] Contact with 15+ numbers → primary heuristic
+[~] AI null context graceful fallback — AI task queue orphan cleanup/retries and AI service error handling improved; full null-context policy still pending
+
+====================
+L2 — MULTI-CHANNEL INTEGRATION
+====================
+
+Data Flow
+[~] Unified Contact Graph implemented — Contacts exist, no unified graph linking
+[✓] Outlook integration — Graph API, inbox/sent/drafts/deleted/custom folders, folder sidebar, category filters, contacts, send, practical email actions menu
+[✓] PBX integration — Matrix Eternity SMDR live, passive server status, call logs, recordings, PBX contact backfill
+[✓] WhatsApp integration — Baileys, chat, messages, media, session persistence, auto-reconnect, group chat phone numbers in ALL bubbles, 15-min metadata cache for large groups, optimized name resolution.
+[✓] Contacts integration — CRM contacts, Outlook import
+[~] AI pipeline into dashboard — AI drafts/assistant/task queue exist, queue schema retries and orphan cleanup improved; full pipeline still pending
+[X] Action recommendation engine — Pico Claw not implemented
+
+Sync Scenarios
+[O] Email ↔ Call linking — Planned for Phase 2
+[✓] WhatsApp reply detection — Detects replies using contextInfo, stores is_reply + reply_to_msg_id, shows reply indicator in UI
+[✓] WhatsApp group chat phone numbers — PERMANENT FIX: auto-syncs ALL group participants on connect, expanded /wa/lid-map UNION query. Optimized for 1000+ member groups with backend caching and minimized DB load.
+[~] Contact enrichment from Outlook — Import exists, no auto-enrichment
+[O] Duplicate resolution (fuzzy) — Planned for Phase 1
+[X] Channel preference learning — Pico Claw not implemented
+
+Conflict Resolution
+[O] Name mismatch handling — Planned for Phase 1
+[~] Email prioritization logic — Outlook category filters classify confident leads/important/reply-needed mail; full prioritization engine pending
+[X] Phone ownership resolution
+[X] Timezone normalization
+[X] Deleted contact recovery
+
+====================
+L3 — AI ENGINE (PICO CLAW)
+====================
+
+Core Engine
+[X] ReAct loop implemented — Pico Claw not implemented
+[X] Structured outputs (ForLLM / ForUser) — Pico Claw not implemented
+[X] Subagent delegation — Pico Claw not implemented
+[X] Context cancellation support — Pico Claw not implemented
+
+AI Capabilities
+[~] Lead scoring — Score field exists, no AI auto-scoring
+[X] Channel optimization — Pico Claw not implemented
+[X] Sentiment detection
+[X] Gene creation & solidification — Pico Claw not implemented
+[X] Subagent spawning — Pico Claw not implemented
+[X] Cross-channel anomaly detection — Pico Claw not implemented
+[~] Talking point generation — AI drafts exist, no talking points
+[~] Follow-up drafting — AI email/WA drafts exist
+[X] Deal risk prediction
+[X] Next-best-action engine — Pico Claw not implemented
+
+Gene Pool
+[X] Gene creation logic — Pico Claw not implemented
+[X] Verification rules (min 2 instances) — Pico Claw not implemented
+[X] Confidence scoring lifecycle — Pico Claw not implemented
+[X] Gene retirement logic — Pico Claw not implemented
+[X] Anti-spam protection — Pico Claw not implemented
+[X] Max genes per domain enforcement — Pico Claw not implemented
+[X] Auto purge (<30% confidence) — Pico Claw not implemented
+
+AI Safety
+[X] Hallucination detection
+[X] Uncertain data flagging
+[X] Human verification queues
+[X] Bias detection alerts
+[X] Insufficient data handling
+
+====================
+L4 — SECURITY & COMPLIANCE
+====================
+
+Security Fixes
+[X] Symlink bypass patched
+[✓] Config file secured (chmod 600) — Security check on startup validates .env permissions
+[O] Secrets encryption — Planned for Phase 1
+[X] SSRF protection added
+[✓] Command injection prevention — Comprehensive input validation middleware implemented
+[O] Token encryption — Planned for Phase 1
+
+Data Security
+[O] Email encryption at rest — Planned for Phase 2
+[~] PBX RBAC access control — JWT auth exists, no RBAC
+[✓] WhatsApp E2E integrity — Baileys handles E2E
+[X] PII masking
+[X] AI data isolation — Pico Claw not implemented
+[✓] Session timeout — JWT expiry + idle timeout (30 min inactivity) implemented
+[✓] API rate limiting — Express rate limiter implemented
+[✓] SQL injection protection — Parameterized queries used
+
+Compliance
+[O] Consent tracking — Planned for Phase 2
+[O] Right to erasure — Planned for Phase 2
+[O] Data portability export — Planned for Phase 2
+[X] Breach notification workflow
+[X] AI explainability logs — Pico Claw not implemented
+
+====================
+L5 — PERFORMANCE & LOAD
+====================
+
+Scalability
+[X] 500 concurrent users — Not tested
+[X] 200k contacts — Not tested
+[X] 500k daily API calls — Not tested
+[X] Gene pool scaling — Pico Claw not implemented
+[~] Dashboard performance — Works, no optimization
+[X] Search latency — Not tested
+[X] Email batch sync
+[X] WhatsApp throughput — Not tested
+
+Resources
+[X] RAM validation — Not tested
+[X] CPU validation — Not tested
+[X] Concurrent AI load — Not tested
+[X] Subagent memory control — Pico Claw not implemented
+[X] Memory leak testing — Not tested
+[X] ARM compatibility — Not required
+
+Degradation
+[✓] Outlook fallback — Offline DB fallback exists for inbox/sent/drafts/deleted/custom folders with folder-aware cache reads
+[~] PBX delay handling — Passive/ready status and disconnect handling improved; formal timeout/circuit breaker still pending
+[✓] WhatsApp fallback — Reconnect exists, optimized QR code visibility (5s grace period) to prevent flickering on brief drops.
+[~] AI timeout handling — Outlook AI assistant has hard timeout and 429 handling; full AI engine timeout policy pending
+[~] DB fallback — Outlook mail cache fallback exists for inbox/sent/drafts/deleted/custom folders; system-wide fallback pending
+
+====================
+L6 — UAT
+====================
+
+Cognitive Load
+[X] Call prep — Not tested
+[X] Deal research — Not tested
+[~] AI drafting — Feature exists, no UAT
+[X] Lead prioritization — Not tested
+[X] Unified dashboard usage — Not tested
+
+Trust Phases
+[~] Suggest-only — AI drafts are suggestions
+[X] Assisted — Pico Claw not implemented
+[X] Trusted — Pico Claw not implemented
+[X] Autonomous — Pico Claw not implemented
+
+Scenarios
+[X] Ghost prospect — Not tested
+[X] Channel hopper — Not tested
+[X] Committee sale — Not tested
+[X] Competitor response — Not tested
+
+====================
+L7 — REGRESSION & CHAOS
+====================
+
+Regression
+[O] Daily API tests — Planned for Phase 1
+[O] Smoke tests — Planned for Phase 1
+[O] Weekly integration — Planned for Phase 1
+[X] Monthly security
+[X] Chaos testing
+
+Chaos
+[X] AI engine kill recovery — Pico Claw not implemented
+[X] DB corruption recovery
+[X] WhatsApp delay — Not tested
+[X] CPU autoscale
+[X] Gene restore — Pico Claw not implemented
+
+====================
+ANALYTICS
+====================
+
+[X] Pipeline velocity
+[X] AI adoption tracking — Pico Claw not implemented
+[~] Channel performance — Basic stats exist, no analytics
+[X] Lead score validation
+[X] Revenue attribution
+
+====================
+GO / NO-GO
+====================
+
+Hard Gates
+[O] P0 tests pass — Planned for Phase 1
+[X] <1% sync errors — Not measured
+[X] Zero vulnerabilities — Not scanned
+[X] AI accuracy >85% — Pico Claw not implemented
+[X] Latency <3s — Not measured
+[O] GDPR compliant — Planned for Phase 2
+[X] >80% adoption — Not measured
+
+Soft Gates
+[~] Email quality — Works, no quality metrics
+[X] Time reduction — Not measured
+[X] Cross-sell lift — Not measured
+[X] Mobile usability — Desktop only
+[~] Manager visibility — Dashboard exists, no reports
+[X] Onboarding speed — Not measured
+[X] Support load — Not measured
+[X] Uptime — Not measured
+[X] AI explainability — Pico Claw not implemented
+
+====================
+POST LAUNCH
+====================
+
+[X] AI health monitoring — Pico Claw not implemented
+[X] Sync lag alerts
+[~] API error tracking — Logs exist, no tracking
+[X] Adoption tracking
+[X] Security monitoring
+[X] Model drift detection — Pico Claw not implemented
+
+====================
+ARTIFACTS
+====================
+
+[O] Test plan — Planned for Phase 1
+[O] API scripts — Planned for Phase 1
+[X] Integration matrix
+[X] AI validation report — Pico Claw not implemented
+[X] Security report
+[X] Performance report
+[X] UAT sign-off
+[X] Go/No-Go record

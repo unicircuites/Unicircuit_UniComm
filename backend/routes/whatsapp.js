@@ -8,17 +8,17 @@ const { authenticate } = require('../middleware/auth');
 
 const router = express.Router();
 
-// ── PUBLIC (no auth) ──────────────────────────────────────────────────────
+// -- PUBLIC (no auth) -------------------------------------------------------
 router.get('/qr',     async (req, res) => { res.json({ qr: await wa.getQR() || null }); });
 router.get('/status', (req, res)       => { res.json(wa.getStatus()); });
 
-// ── PROTECTED ─────────────────────────────────────────────────────────────
+// -- PROTECTED --------------------------------------------------------------
 router.post('/logout', authenticate, async (req, res) => {
   try { await wa.logout(); res.json({ success: true }); }
   catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-// GET /api/wa/lid-map — returns LID number -> {name, phone} map for @mention replacement
+// GET /api/wa/lid-map - returns LID number -> {name, phone} map for @mention replacement
 router.get('/lid-map', authenticate, async (req, res) => {
   try {
     // Merge wa_chats + wa_contacts to cover ALL LID contacts:
@@ -68,7 +68,7 @@ router.get('/chats', authenticate, async (req, res) => {
       SELECT * FROM wa_chats
       WHERE
         -- Groups: real WhatsApp groups only
-        (is_group = true AND id LIKE '%@g.us')
+        (is_group = true AND id LIKE '%@g.us' AND name !~ '^[0-9+]{15,}$')
         OR
         -- Individual: only Indian +91 numbers on real WhatsApp
         (
@@ -77,7 +77,7 @@ router.get('/chats', authenticate, async (req, res) => {
           AND length(split_part(id,'@',1)) = 12
         )
         OR
-        -- LID (Linked Identity) chats — only show if they have a real name (not own device)
+        -- LID (Linked Identity) chats - only show if they have a real name (not own device)
         (
           id LIKE '%@lid'
           AND name IS NOT NULL
@@ -243,7 +243,7 @@ router.get('/media/:msgId', async (req, res) => {
   } catch (err) { res.status(404).json({ error: err.message }); }
 });
 
-// ── WhatsApp Export Chat Import ────────────────────────────────────────────
+// -- WhatsApp Export Chat Import -------------------------------------------
 router.post('/import-chat', authenticate, async (req, res) => {
   try {
     const { chatText, chatJid, mediaFiles, clearOld } = req.body;

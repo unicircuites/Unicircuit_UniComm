@@ -17,12 +17,12 @@
  * POST   /api/calls/sync              — trigger a manual re-pull from PBX table
  */
 
-const express  = require('express');
-const pool     = require('../db/pool');
-const path     = require('path');
-const fs       = require('fs');
+const express = require('express');
+const pool = require('../db/pool');
+const path = require('path');
+const fs = require('fs');
 const { authenticate } = require('../middleware/auth');
-const smdr     = require('../services/matrixSmdr');
+const smdr = require('../services/matrixSmdr');
 
 const router = express.Router();
 router.use(authenticate);
@@ -36,7 +36,7 @@ const BACKUP_DIR = process.env.CALL_BACKUP_DIR
   || path.join(__dirname, '../../call_backups');
 
 // Ensure directories exist
-[REC_DIR, BACKUP_DIR].forEach(d => { try { fs.mkdirSync(d, { recursive: true }); } catch (_) {} });
+[REC_DIR, BACKUP_DIR].forEach(d => { try { fs.mkdirSync(d, { recursive: true }); } catch (_) { } });
 
 function getSafeBackupPath(filename) {
   const name = String(filename || '').trim();
@@ -306,7 +306,7 @@ router.post('/contacts/save', async (req, res) => {
 // ═══════════════════════════════════════════════════════════════════
 router.get('/contact/:phone', async (req, res) => {
   const phone = decodeURIComponent(req.params.phone);
-  const limit  = parseInt(req.query.limit  || '100');
+  const limit = parseInt(req.query.limit || '100');
   const offset = parseInt(req.query.offset || '0');
   const dedupedCallsSql = `
     SELECT DISTINCT ON (
@@ -360,7 +360,7 @@ router.get('/contact/:phone', async (req, res) => {
                cl.id DESC
       LIMIT $2 OFFSET $3
     `, [phone, limit, offset]);
-    
+
     result.rows.forEach(r => {
       if (r.call_date_str) {
         r.call_date = r.call_date_str;
@@ -388,12 +388,12 @@ router.get('/contact/:phone', async (req, res) => {
 // GET /api/calls  — paginated call log with type/date/search filters
 // ═══════════════════════════════════════════════════════════════════
 router.get('/', async (req, res) => {
-  const limit   = parseInt(req.query.limit  || '50');
-  const offset  = parseInt(req.query.offset || '0');
-  const type    = req.query.type   || '';
-  const search  = req.query.search || '';
+  const limit = parseInt(req.query.limit || '50');
+  const offset = parseInt(req.query.offset || '0');
+  const type = req.query.type || '';
+  const search = req.query.search || '';
   const dateFrom = normalizeDateParam(req.query.from || '');
-  const dateTo   = normalizeDateParam(req.query.to   || '');
+  const dateTo = normalizeDateParam(req.query.to || '');
 
   console.log('[Calls API] Filter request:', { rawFrom: req.query.from, rawTo: req.query.to, dateFrom, dateTo });
 
@@ -426,7 +426,7 @@ router.get('/', async (req, res) => {
     params.push('%' + search + '%'); p++;
   }
   if (dateFrom) { where.push(`call_date >= $${p++}`); params.push(dateFrom); }
-  if (dateTo)   { where.push(`call_date <= $${p++}`); params.push(dateTo); }
+  if (dateTo) { where.push(`call_date <= $${p++}`); params.push(dateTo); }
 
   const whereStr = where.join(' AND ');
   const dedupedCallsSql = `
@@ -479,7 +479,7 @@ router.get('/', async (req, res) => {
        LIMIT $${p++} OFFSET $${p++}`,
       [...params, limit, offset]
     );
-    
+
     // Fix pg driver timezone shift by using the string representation of the date
     result.rows.forEach(r => {
       if (r.call_date_str) {
@@ -487,7 +487,7 @@ router.get('/', async (req, res) => {
         delete r.call_date_str;
       }
     });
-    
+
     const total = await pool.query(
       `SELECT COUNT(*) FROM (${dedupedCallsSql}) cl WHERE ${whereStr}`,
       params
@@ -509,9 +509,9 @@ router.post('/', async (req, res) => {
       INSERT INTO call_logs (caller,extension,destination,duration,call_type,ai_summary,call_date,call_time,trunk,raw_line)
       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) RETURNING *
     `, [
-      caller||null, extension||null, destination||null,
-      duration||null, call_type||'Out', ai_summary||null,
-      call_date||null, call_time||null, trunk||null, raw_line||null
+      caller || null, extension || null, destination || null,
+      duration || null, call_type || 'Out', ai_summary || null,
+      call_date || null, call_time || null, trunk || null, raw_line || null
     ]);
     return res.status(201).json(result.rows[0]);
   } catch (err) {
@@ -575,7 +575,7 @@ Output only the summary text. No intro or outro.`;
 
     // Use a lightweight worker call
     const summary = await ollama.callOllamaService(prompt, []);
-    
+
     // Save to DB
     await pool.query(`UPDATE call_logs SET ai_summary = $1 WHERE id = $2`, [summary, req.params.id]);
 
@@ -674,7 +674,7 @@ router.post('/backup/restore', async (req, res) => {
     const records = raw.call_logs || raw.records || [];
     const contacts = raw.pbx_contacts || raw.contacts || [];
     let inserted = 0;
-    let skipped  = 0;
+    let skipped = 0;
     for (const r of records) {
       try {
         const result = await pool.query(`
@@ -777,40 +777,95 @@ router.post('/backup/delete', (req, res) => {
   }
 });
 
+function getAllRecordingFiles(dir) {
+  let results = [];
+
+  if (!fs.existsSync(dir)) return results;
+
+  const items = fs.readdirSync(dir, { withFileTypes: true });
+
+  for (const item of items) {
+    const fullPath = path.join(dir, item.name);
+
+    if (item.isDirectory()) {
+      results = results.concat(getAllRecordingFiles(fullPath));
+    } else {
+      const ext = path.extname(item.name).toLowerCase();
+
+      if (['.wav', '.mp3', '.ogg', '.m4a'].includes(ext)) {
+        results.push(fullPath);
+      }
+    }
+  }
+
+  return results;
+}
+
 // ═══════════════════════════════════════════════════════════════════
 // RECORDINGS — scan filesystem for .wav / .mp3 files
 // ═══════════════════════════════════════════════════════════════════
 router.get('/recordings', (req, res) => {
   try {
+    const page = parseInt(req.query.page || '1');
+    const limit = parseInt(req.query.limit || '50');
+
+    const start = (page - 1) * limit;
+    const end = start + limit;
     if (!fs.existsSync(REC_DIR)) {
       return res.json({ recordings: [], dir: REC_DIR, message: 'Recordings directory not found. Set PBX_RECORDINGS_DIR in .env.' });
     }
     const exts = ['.wav', '.mp3', '.ogg', '.m4a'];
-    const files = fs.readdirSync(REC_DIR)
-      .filter(f => exts.includes(path.extname(f).toLowerCase()))
-      .map(f => {
-        const stat = fs.statSync(path.join(REC_DIR, f));
+    const files = getAllRecordingFiles(REC_DIR)
+      .map((fullPath) => {
+        const stat = fs.statSync(fullPath);
+
         return {
-          filename: f,
+          filename: path.basename(fullPath),
+          full_path: fullPath,
           size_bytes: stat.size,
           size_label: formatBytes(stat.size),
           created_at: stat.birthtime,
-          url: `/recordings/${f}`,
+          relative_path: path.relative(REC_DIR, fullPath),
+          url: `/recordings/${encodeURIComponent(path.relative(REC_DIR, fullPath))}`
         };
       })
       .sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
-    return res.json({ recordings: files, dir: REC_DIR, total: files.length });
+    const paginatedFiles = files.slice(start, end);
+    return res.json({
+      recordings: paginatedFiles,
+      total: files.length,
+      page,
+      limit,
+      total_pages: Math.ceil(files.length / limit)
+    });
   } catch (err) {
     return res.status(500).json({ error: 'Could not list recordings: ' + err.message });
   }
 });
 
 /** GET /api/calls/recordings/:filename — Stream the actual audio file */
-router.get('/recordings/:filename', (req, res) => {
-  const safe = path.basename(req.params.filename);
-  const filepath = path.join(REC_DIR, safe);
-  if (!fs.existsSync(filepath)) return res.status(404).send('Recording not found');
+router.get('/recordings/*', (req, res) => {
+  const relativePath = decodeURIComponent(req.params[0]);
+  const filepath = path.join(REC_DIR, relativePath);
+
+  if (!fs.existsSync(filepath)) {
+    return res.status(404).send('Recording not found');
+  }
+
   res.sendFile(filepath);
+  const safe = path.basename(req.params.filename);
+
+  const allFiles = getAllRecordingFiles(REC_DIR);
+
+  const matchedFile = allFiles.find(f =>
+    path.basename(f) === safe
+  );
+
+  if (!matchedFile) {
+    return res.status(404).send('Recording not found');
+  }
+
+  res.sendFile(matchedFile);
 });
 
 // ═══════════════════════════════════════════════════════════════════
@@ -921,8 +976,8 @@ router.post('/maintenance/repair-durations', async (req, res) => {
 });
 
 function formatBytes(bytes) {
-  if (bytes < 1024)     return bytes + ' B';
-  if (bytes < 1048576)  return (bytes / 1024).toFixed(1) + ' KB';
+  if (bytes < 1024) return bytes + ' B';
+  if (bytes < 1048576) return (bytes / 1024).toFixed(1) + ' KB';
   return (bytes / 1048576).toFixed(2) + ' MB';
 }
 
