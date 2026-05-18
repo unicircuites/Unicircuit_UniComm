@@ -132,18 +132,109 @@ Set-Content -Path "C:\UniComm\Unicircuit_UniComm-main\backend\certs\server.key" 
 Dev machine pe changes karo → GitHub pe push karo → Tower pe run karo:
 
 ```powershell
-cd C:\UniComm\Unicircuit_UniComm-main
-git stash
-git pull origin master
-cd backend
+powershell -ExecutionPolicy Bypass -File C:\update-unicomm.ps1
+```
+
+> **IMPORTANT:** Tower server ke local files delete/stash mat karo:
+> - `backend\.env`
+> - `backend\certs\server.crt`
+> - `backend\certs\server.key`
+>
+> Agar cert files missing ho gayi to PM2 process start hote hi crash karega:
+> `ENOENT: no such file or directory, open '...\backend\certs\server.crt'`
+
+### Update script banane ka command (ek baar)
+```powershell
+@"
+Write-Host "Downloading latest code..." -ForegroundColor Cyan
+Invoke-WebRequest -Uri 'https://github.com/unicircuites/Unicircuit_UniComm/archive/refs/heads/main.zip' -Headers @{Authorization='token GITHUB_TOKEN_HERE'} -OutFile 'C:\UniComm_update.zip'
+
+Write-Host "Extracting..." -ForegroundColor Cyan
+Expand-Archive -Path 'C:\UniComm_update.zip' -DestinationPath 'C:\UniComm_update' -Force
+
+Write-Host "Backing up server-local files (.env + certs)..." -ForegroundColor Cyan
+New-Item -ItemType Directory -Path 'C:\UniComm_server_backup' -Force | Out-Null
+if (Test-Path 'C:\UniComm\Unicircuit_UniComm-main\backend\.env') {
+  Copy-Item 'C:\UniComm\Unicircuit_UniComm-main\backend\.env' 'C:\UniComm_server_backup\.env' -Force
+}
+if (Test-Path 'C:\UniComm\Unicircuit_UniComm-main\backend\certs') {
+  Copy-Item 'C:\UniComm\Unicircuit_UniComm-main\backend\certs' 'C:\UniComm_server_backup\certs' -Recurse -Force
+}
+
+Write-Host "Copying files..." -ForegroundColor Cyan
+Copy-Item -Path 'C:\UniComm_update\Unicircuit_UniComm-main\*' -Destination 'C:\UniComm\Unicircuit_UniComm-main\' -Recurse -Force
+
+Write-Host "Restoring server-local files (.env + certs)..." -ForegroundColor Cyan
+if (Test-Path 'C:\UniComm_server_backup\.env') {
+  Copy-Item 'C:\UniComm_server_backup\.env' 'C:\UniComm\Unicircuit_UniComm-main\backend\.env' -Force
+}
+if (Test-Path 'C:\UniComm_server_backup\certs') {
+  Copy-Item 'C:\UniComm_server_backup\certs' 'C:\UniComm\Unicircuit_UniComm-main\backend\certs' -Recurse -Force
+}
+
+Write-Host "Installing dependencies..." -ForegroundColor Cyan
+Set-Location 'C:\UniComm\Unicircuit_UniComm-main\backend'
 npm install
-pm2 restart unicomm
+
+Write-Host "Restarting server..." -ForegroundColor Cyan
+if (pm2 describe unicomm | Select-String "status") {
+  pm2 restart unicomm --update-env
+} else {
+  pm2 start server.js --name unicomm --update-env
+  pm2 save
+}
+
+Write-Host "Cleaning up..." -ForegroundColor Cyan
+Remove-Item 'C:\UniComm_update.zip' -Force
+Remove-Item 'C:\UniComm_update' -Recurse -Force
+
+Write-Host "Done! Server updated and restarted." -ForegroundColor Green
 pm2 status
 ```
 
 > **Note:** `git stash` saves any local changes on Tower server before pulling.
 > If you want to see what was stashed: `git stash list`
 > To restore stashed changes: `git stash pop`
+
+### Manual Git update (agar script use nahi kar rahe)
+
+```powershell
+cd C:\UniComm\Unicircuit_UniComm-main
+
+# Sirf tracked local changes stash karo. -u mat lagao, warna certs jaise untracked server files stash ho sakte hain.
+git stash push -m "tower tracked changes before deploy"
+
+git checkout main
+git fetch origin
+git reset --hard origin/main
+
+cd backend
+npm install
+
+if (Test-Path .\certs\server.crt) {
+  pm2 restart unicomm --update-env
+  pm2 status
+} else {
+  Write-Host "ERROR: backend\certs\server.crt missing. Restore certs before restarting PM2." -ForegroundColor Red
+}
+```
+
+### Restore certs if they were accidentally stashed
+
+```powershell
+cd C:\UniComm\Unicircuit_UniComm-main
+git stash list
+git stash show --name-only "stash@{0}"
+git checkout "stash@{0}" -- backend/certs
+
+# Agar certs untracked the aur git stash push -u se stash hue the, yeh use karo:
+git ls-tree -r --name-only "stash@{0}^3"
+git checkout "stash@{0}^3" -- backend/certs
+
+cd backend
+pm2 restart unicomm --update-env
+pm2 status
+```
 
 ---
 
