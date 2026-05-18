@@ -365,7 +365,19 @@ app.use(express.urlencoded({ limit: '500mb', extended: true }));
 // ── INPUT VALIDATION (Security) ────────────────────────────────────────────
 const { validateInput } = require('./middleware/inputValidation');
 // Apply to all API routes (skip static files and auth callback)
-app.use('/api', validateInput);
+app.use((req, res, next) => {
+
+  // Skip validation for Outlook backup APIs
+  if (
+    req.path.includes('/outlook-backups/create') ||
+    req.path.includes('/outlook-backups/restore')
+  ) {
+    return next();
+  }
+
+  validateInput(req, res, next);
+
+});
 
 // ── DEBUG ROUTE (PRIORITY) ──
 app.get('/debug-messages', async (req, res) => {
@@ -418,6 +430,7 @@ app.use('/api/marquee', require('./routes/marquee'));
 app.use('/api/groups', apiLimiter, require('./routes/recipientGroups'));
 app.use('/api/mail-tasks', apiLimiter, require('./routes/mailTasks'));
 app.use('/api/system', apiLimiter, require('./routes/system'));
+app.use('/api/outlook-backups', apiLimiter, require('./routes/outlookBackups'));
 
 // OAuth2 callback — must be at root level to match redirect URI
 app.use('/auth', require('./routes/outlook'));

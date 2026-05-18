@@ -815,8 +815,28 @@ router.get('/recordings', (req, res) => {
       return res.json({ recordings: [], dir: REC_DIR, message: 'Recordings directory not found. Set PBX_RECORDINGS_DIR in .env.' });
     }
     const exts = ['.wav', '.mp3', '.ogg', '.m4a'];
-    const files = getAllRecordingFiles(REC_DIR)
-      .map((fullPath) => {
+    const allFiles = getAllRecordingFiles(REC_DIR);
+
+    const uniqueMap = new Map();
+
+    for (const fullPath of allFiles) {
+      const filename = path.basename(fullPath);
+      const stat = fs.statSync(fullPath);
+
+      // Keep latest duplicate only
+      if (
+        !uniqueMap.has(filename) ||
+        stat.mtime > uniqueMap.get(filename).mtime
+      ) {
+        uniqueMap.set(filename, {
+          fullPath,
+          mtime: stat.mtime
+        });
+      }
+    }
+
+    const files = [...uniqueMap.values()]
+      .map(({ fullPath }) => {
         const stat = fs.statSync(fullPath);
 
         return {

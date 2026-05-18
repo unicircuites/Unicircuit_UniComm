@@ -12,16 +12,16 @@
  *   System → SMDR Settings  → Enable SMDR: YES, Output: TCP Server, Port: SMDR_PORT
  *   System → CTI  Settings  → Enable CTI:  YES, Port: CTI_PORT, create CTI user
  */
-const net  = require('net');
+const net = require('net');
 const pool = require('../db/pool');
 
 // ── CONFIG (from .env) ────────────────────────────────────────────────────
-const PBX_HOST  = process.env.PBX_HOST  || '192.168.0.81';
+const PBX_HOST = process.env.PBX_HOST || '192.168.0.81';
 if (PBX_HOST === '192.168.0.205') {
   console.warn('[SMDR] ⚠️ WARNING: PBX_HOST is set to local server IP (192.168.0.205). Ensure this is the PBX IP (192.168.0.81).');
 }
 const SMDR_PORT = parseInt(process.env.SMDR_PORT || '5000');
-const CTI_PORT  = parseInt(process.env.CTI_PORT  || '5001');
+const CTI_PORT = parseInt(process.env.CTI_PORT || '5001');
 
 // ── STARTUP CONFIG DUMP ───────────────────────────────────────────────────
 console.log('[SMDR] ══════════════════════════════════════════════════════');
@@ -32,12 +32,12 @@ console.log(`[SMDR]   CTI_PORT  : ${CTI_PORT}  (click-to-dial / call control)`);
 console.log('[SMDR]   Source    : process.env (SMDR_PORT=' +
   (process.env.SMDR_PORT ? process.env.SMDR_PORT + ' ✅ set in .env' : 'NOT SET — using default 5000 ⚠️') + ')');
 console.log('[SMDR]   Source    : process.env (CTI_PORT=' +
-  (process.env.CTI_PORT  ? process.env.CTI_PORT  + ' ✅ set in .env' : 'NOT SET — using default 5001 ⚠️') + ')');
+  (process.env.CTI_PORT ? process.env.CTI_PORT + ' ✅ set in .env' : 'NOT SET — using default 5001 ⚠️') + ')');
 console.log('[SMDR] ══════════════════════════════════════════════════════');
 
-let io          = null;
+let io = null;
 let isConnected = false;
-let buffer      = '';
+let buffer = '';
 
 function setIO(socketIO) { io = socketIO; }
 
@@ -158,11 +158,11 @@ async function ensureTable(retries = 3) {
       const cols = ['call_date DATE', 'call_time TIME', 'trunk VARCHAR(50)', 'raw_line TEXT'];
       for (const col of cols) {
         const name = col.split(' ')[0];
-        await pool.query(`ALTER TABLE call_logs ADD COLUMN IF NOT EXISTS ${name} ${col.split(' ').slice(1).join(' ')}`).catch(() => {});
+        await pool.query(`ALTER TABLE call_logs ADD COLUMN IF NOT EXISTS ${name} ${col.split(' ').slice(1).join(' ')}`).catch(() => { });
       }
       return; // Success
     } catch (err) {
-      console.warn(`[SMDR] Table ensure attempt ${i+1} failed: ${err.message}`);
+      console.warn(`[SMDR] Table ensure attempt ${i + 1} failed: ${err.message}`);
       if (i === retries - 1) throw err;
       await new Promise(resolve => setTimeout(resolve, 2000));
     }
@@ -179,7 +179,7 @@ function parseSMDR(line) {
   // Let's try space-delimited first if it looks like the user's reported format:
   // [ID] [Date] [Time] [Duration] [Type] [Number] [Ext]
   const parts = trimmedLine.split(/\s+/);
-  
+
   let record = null;
 
   if (parts.length >= 6) {
@@ -190,13 +190,13 @@ function parseSMDR(line) {
     if (isDate && isTime) {
       // Space-delimited format detected
       console.log(`[SMDR] ℹ️  Space-delimited format detected (${parts.length} parts)`);
-      
+
       let rawDate = parts[1];
       let rawTime = parts[2];
-      let rawDur  = parts[3]; // Might be HH:MM:SS or seconds
-      let type    = parts[4] || 'Out';
-      let num     = parts[5] || '';
-      let ext     = parts[6] || '';
+      let rawDur = parts[3]; // Might be HH:MM:SS or seconds
+      let type = parts[4] || 'Out';
+      let num = parts[5] || '';
+      let ext = parts[6] || '';
 
       // Normalize Date
       let callDate = rawDate;
@@ -220,40 +220,40 @@ function parseSMDR(line) {
       }
 
       record = {
-        call_date:   callDate,
-        call_time:   rawTime,
-        duration:    duration,
-        call_type:   type,
-        caller:      (type === 'In') ? num : ext,
-        extension:   ext || (type === 'Out' ? ext : num),
+        call_date: callDate,
+        call_time: rawTime,
+        duration: duration,
+        call_type: type,
+        caller: (type === 'In') ? num : ext,
+        extension: ext || (type === 'Out' ? ext : num),
         destination: (type === 'In') ? ext : num,
-        trunk:       null,
-        raw_line:    trimmedLine,
+        trunk: null,
+        raw_line: trimmedLine,
       };
     }
   }
 
   // ── ATTEMPT 2: Fixed-Width Parsing (For Matrix SARVAM / ETERNITY) ──────
   // Note: We use the raw line (not trimmed) because Matrix depends on exact column positions.
-  const rawLine = line; 
+  const rawLine = line;
   if (rawLine.length >= 70) {
     const getFixed = (start, len) => rawLine.substring(start - 1, (start - 1) + len).trim();
     const parsedLayout = parseMatrixFixedLayout(rawLine);
     if (!parsedLayout) return null;
 
-    const callingNum   = parsedLayout.callingNum;
-    const trunk        = parsedLayout.trunk;
+    const callingNum = parsedLayout.callingNum;
+    const trunk = parsedLayout.trunk;
     const connectedNum = parsedLayout.connectedNum;
-    const rawDate      = parsedLayout.rawDate;
-    const rawTime      = parsedLayout.rawTime;
-    const speechSec    = parsedLayout.durationSeconds;
-    
+    const rawDate = parsedLayout.rawDate;
+    const rawTime = parsedLayout.rawTime;
+    const speechSec = parsedLayout.durationSeconds;
+
     // RECORDING FILENAME: Standard Matrix position is usually 80+ if enabled
-    const recordingId  = rawLine.length > 80 ? getFixed(80, 30) : null;
+    const recordingId = rawLine.length > 80 ? getFixed(80, 30) : null;
 
     // VALIDATION: If the date or time fields contain dashes or non-digits, it's a summary line
     if (!rawDate || rawDate.includes('-') && rawDate.length < 5 || rawTime.includes('-')) {
-      return null; 
+      return null;
     }
 
     const callDate = parseMatrixDate(rawDate);
@@ -265,15 +265,15 @@ function parseSMDR(line) {
     else if (connectedNum.length <= 5 && connectedNum.length > 0) type = 'Internal';
 
     record = {
-      call_date:   callDate,
-      call_time:   rawTime || null,
-      duration:    duration,
-      call_type:   type,
-      caller:      callingNum || null,
-      extension:   (type === 'Out' || type === 'Internal') ? callingNum : connectedNum,
+      call_date: callDate,
+      call_time: rawTime || null,
+      duration: duration,
+      call_type: type,
+      caller: callingNum || null,
+      extension: (type === 'Out' || type === 'Internal') ? callingNum : connectedNum,
       destination: connectedNum,
-      trunk:       trunk || null,
-      raw_line:    rawLine.trim(),
+      trunk: trunk || null,
+      raw_line: rawLine.trim(),
       recording_file: recordingId
     };
 
@@ -295,6 +295,20 @@ function parseSMDR(line) {
 // ── SAVE TO DB ────────────────────────────────────────────────────────────
 async function saveCallLog(record) {
   try {
+    // ── RECORDING FILE DEDUPE ─────────────────────────────
+    if (record.recording_file && record.recording_file.trim()) {
+      const existingRecording = await pool.query(`
+        SELECT id
+        FROM call_logs
+        WHERE recording_file = $1
+        LIMIT 1
+      `, [record.recording_file.trim()]);
+
+      if (existingRecording.rowCount) {
+        console.log(`[SMDR] Duplicate recording ignored: ${record.recording_file}`);
+        return existingRecording.rows[0];
+      }
+    }
     const dedupeKey = normaliseSmdrLineForDedupe(record.raw_line);
     if (dedupeKey) {
       const existing = await pool.query(`
@@ -325,15 +339,15 @@ async function saveCallLog(record) {
     ]);
     const row = result.rows[0];
     console.log(`[SMDR] Saved to call_logs: ${record.call_type} | ${record.caller} → ${record.destination}`);
-    
+
     // ── SYNC WITH CRM CONTACTS ──────────────────────────────────────────
     const externalNum = (record.call_type === 'In') ? record.caller : record.destination;
-    
+
     if (externalNum && externalNum.length > 5) {
       // Normalize number for search (remove spaces, match last 10 digits or +91)
       const cleanNum = externalNum.replace(/\s+/g, '');
-      const last10   = cleanNum.slice(-10);
-      
+      const last10 = cleanNum.slice(-10);
+
       const updateResult = await pool.query(`
         UPDATE contacts 
         SET calls = COALESCE(calls, 0) + 1,
@@ -373,7 +387,7 @@ function processBuffer() {
   buffer = lines.pop(); // keep incomplete last line
   for (const line of lines) {
     if (!line || line.trim().length < 10) continue;
-    
+
     // Ignore explicit header/summary lines
     if (line.includes('---') || line.includes('Total Calls') || line.includes('Trunk    :') || line.includes('Page :')) {
       continue;
@@ -384,7 +398,7 @@ function processBuffer() {
     if (record) {
       console.log('[SMDR] ✅ Parsed:', JSON.stringify(record));
       saveCallLog(record);
-    } 
+    }
   }
 }
 
@@ -394,7 +408,7 @@ let clientRetryTimer = null;
 
 function startClient() {
   if (smdrClient) {
-    try { smdrClient.destroy(); } catch (_) {}
+    try { smdrClient.destroy(); } catch (_) { }
     smdrClient = null;
   }
 
@@ -411,7 +425,7 @@ function startClient() {
     console.log('[SMDR] ── OUTBOUND CONNECTION SUCCESS ─────────────────────');
     console.log(`[SMDR]   Connected to PBX at ${PBX_HOST}:${SMDR_PORT}`);
     emit('pbx:connected', { host: PBX_HOST, port: SMDR_PORT, mode: 'client' });
-    
+
     if (clientRetryTimer) {
       clearInterval(clientRetryTimer);
       clientRetryTimer = null;
@@ -446,10 +460,10 @@ function startClient() {
     } else if (err.code !== 'ECONNREFUSED') {
       console.error(`[SMDR] ⚠️  Outbound client error: ${err.message} (code=${err.code})`);
     }
-    emit('pbx:binding_error', { 
-      service: 'matrixSmdr', 
-      mode: 'client', 
-      error: err.message, 
+    emit('pbx:binding_error', {
+      service: 'matrixSmdr',
+      mode: 'client',
+      error: err.message,
       code: err.code,
       host: PBX_HOST,
       port: SMDR_PORT
@@ -459,23 +473,23 @@ function startClient() {
 
   smdrClient.on('timeout', () => {
     console.warn('[SMDR] ⏱️  Outbound client timeout — no data from PBX');
-    emit('pbx:binding_error', { 
-      service: 'matrixSmdr', 
-      mode: 'client', 
-      error: 'Connection timeout', 
-      host: PBX_HOST, 
-      port: SMDR_PORT 
+    emit('pbx:binding_error', {
+      service: 'matrixSmdr',
+      mode: 'client',
+      error: 'Connection timeout',
+      host: PBX_HOST,
+      port: SMDR_PORT
     });
     smdrClient.destroy();
   });
 }
 
 // ── TCP SERVER — PBX connects TO us ──────────────────────────────────────
-let tcpServer     = null;
+let tcpServer = null;
 let connectedPeers = 0;  // track simultaneous connections
 
 function startServer() {
-  if (tcpServer) { try { tcpServer.close(); } catch (_) {} }
+  if (tcpServer) { try { tcpServer.close(); } catch (_) { } }
 
   console.log('[SMDR] ── startServer() ──────────────────────────────────');
   console.log(`[SMDR]   Binding TCP server on 0.0.0.0:${SMDR_PORT}`);
@@ -492,8 +506,8 @@ function startServer() {
     connectedPeers++;
     isConnected = true;
     const remote = `${socket.remoteAddress}:${socket.remotePort}`;
-    const isPBX  = socket.remoteAddress === PBX_HOST ||
-                   socket.remoteAddress === `::ffff:${PBX_HOST}`;
+    const isPBX = socket.remoteAddress === PBX_HOST ||
+      socket.remoteAddress === `::ffff:${PBX_HOST}`;
 
     console.log('[SMDR] ── INBOUND CONNECTION ─────────────────────────────');
     console.log(`[SMDR]   Remote  : ${remote}`);
@@ -514,7 +528,7 @@ function startServer() {
 
     socket.on('close', (hadError) => {
       connectedPeers = Math.max(0, connectedPeers - 1);
-      isConnected    = connectedPeers > 0 || (smdrClient && !smdrClient.destroyed);
+      isConnected = connectedPeers > 0 || (smdrClient && !smdrClient.destroyed);
       console.log('[SMDR] ── INBOUND DISCONNECTED ───────────────────────────');
       console.log(`[SMDR]   Remote  : ${remote}`);
       console.log(`[SMDR]   hadError: ${hadError}`);
@@ -525,10 +539,10 @@ function startServer() {
 
     socket.on('error', (err) => {
       console.error(`[SMDR] ❌ Socket error from ${remote}: ${err.message} (code=${err.code})`);
-      emit('pbx:binding_error', { 
-        service: 'matrixSmdr', 
-        mode: 'server_socket', 
-        error: err.message, 
+      emit('pbx:binding_error', {
+        service: 'matrixSmdr',
+        mode: 'server_socket',
+        error: err.message,
         code: err.code,
         remote: remote
       });
@@ -554,11 +568,11 @@ function startServer() {
 
   tcpServer.on('error', (err) => {
     console.error('[SMDR] ❌ Server error:', err.message, `(code=${err.code})`);
-    emit('pbx:disconnected', { 
-      service: 'matrixSmdr', 
-      mode: 'server', 
+    emit('pbx:disconnected', {
+      service: 'matrixSmdr',
+      mode: 'server',
       fatal: true,
-      error: err.message, 
+      error: err.message,
       code: err.code,
       port: SMDR_PORT
     });
@@ -591,9 +605,9 @@ async function start() {
 async function dial(sourceExt, destination) {
   return new Promise((resolve, reject) => {
     if (!sourceExt || !destination) return reject(new Error('Source extension and destination required'));
-    
+
     console.log(`[CTI] Attempting Click-to-Dial: ${sourceExt} → ${destination}`);
-    
+
     const client = new net.Socket();
     client.setTimeout(5000);
 
@@ -628,30 +642,30 @@ async function dial(sourceExt, destination) {
 
 async function reconnect() {
   console.log('[SMDR] 🔄 Manual reconnect requested...');
-  
+
   // Close outbound client
   if (smdrClient) {
-    try { smdrClient.destroy(); } catch (_) {}
+    try { smdrClient.destroy(); } catch (_) { }
     smdrClient = null;
   }
   if (clientRetryTimer) {
     clearInterval(clientRetryTimer);
     clientRetryTimer = null;
   }
-  
+
   // Close inbound server
   if (tcpServer) {
     try {
       tcpServer.close();
       console.log('[SMDR] Inbound server closed for restart');
-    } catch (_) {}
+    } catch (_) { }
     tcpServer = null;
   }
-  
+
   isConnected = false;
   connectedPeers = 0;
   emit('pbx:disconnected', { reason: 'manual_reconnect' });
-  
+
   // Small delay then restart
   setTimeout(() => {
     start();
