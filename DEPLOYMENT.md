@@ -131,6 +131,15 @@ Set-Content -Path "C:\UniComm\Unicircuit_UniComm-main\backend\certs\server.key" 
 
 Dev machine pe changes karo → GitHub pe push karo → Tower pe run karo:
 
+> **BRANCH SAFETY - READ FIRST**
+> - Production feature line is `main`, currently based on the autosave/PBX call-log work.
+> - Do **not** force-push `main` from an old branch/history.
+> - Before pushing `main`, verify these commits/features exist in history:
+>   - `feat(pbx): add network drive integration and paginated recursive recording sync`
+>   - PBX call logs UI/API changes in `dashboard.html`, `backend/routes/calls.js`, `backend/services/matrixSmdr.js`
+>   - backup files under `backups/call_logs/`
+> - If `main` accidentally loses these features, restore from `origin/autosave` or the latest known good autosave commit before deploying Tower.
+
 ```powershell
 powershell -ExecutionPolicy Bypass -File C:\update-unicomm.ps1
 ```
