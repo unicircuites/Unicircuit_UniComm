@@ -7051,9 +7051,7 @@ Always write in a professional yet warm Indian B2B communication style. Use form
     }
 
     async function restoreOutlookBackup(name) {
-      if (!confirm(
-        `WARNING!\n\nRestoring this backup will replace current Outlook contacts.\n\nContinue restoring "${name}"?`
-      )) return;
+      if (!confirm(`Restore backup "${name}" ?`)) return;
 
       try {
         const res = await fetch('/api/outlook-backups/restore', {
@@ -19432,9 +19430,27 @@ ${plainText}`;
               <div style="font-size:12.5px;font-weight:700;color:var(--text);">${escHtml(r.filename)}</div>
               <div style="font-size:11px;color:var(--muted);">${r.size_label}</div>
             </div>
-            <div style="font-size:11px;color:var(--muted2);margin-bottom:10px;">Modified: ${new Date(r.created_at).toLocaleString()}</div>
-            <audio controls style="width:100%;height:32px;">
-              <source src="${API_BASE}/calls/recordings/${encodeURIComponent(r.filename)}" type="audio/mpeg">
+            <div style="font-size:11px;color:var(--muted2);margin-bottom:6px;">
+              Modified: ${new Date(r.created_at).toLocaleString()}
+            </div>
+
+            <div style="
+              font-size:11px;
+              color:#7dd3fc;
+              margin-bottom:10px;
+              word-break:break-word;
+              background:rgba(255,255,255,0.03);
+              padding:6px 8px;
+              border-radius:6px;
+            ">
+              📁 ${escHtml(r.relative_path || '')}
+            </div>
+
+            <audio controls preload="metadata" style="width:100%;height:32px;">
+              <source
+                src="${API_BASE}/calls/recordings/${encodeURIComponent(r.relative_path)}"
+                type="audio/wav">
+              Your browser does not support audio playback.
             </audio>
           </div>
         `).join('')}

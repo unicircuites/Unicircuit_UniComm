@@ -25,11 +25,20 @@ const { authenticate } = require('../middleware/auth');
 const smdr = require('../services/matrixSmdr');
 
 const router = express.Router();
-router.use(authenticate);
+router.use((req, res, next) => {
+
+  // Allow recordings without authentication
+  if (req.path.startsWith('/recordings')) {
+    return next();
+  }
+
+  return authenticate(req, res, next);
+});
 
 // ── Recordings directory (PBX may store files here via network share/FTP) ──
 const REC_DIR = process.env.PBX_RECORDINGS_DIR
   || path.join(__dirname, '../../recordings');
+console.log('[REC_DIR]', REC_DIR);
 
 // ── Backup directory ──────────────────────────────────────────────────────
 const BACKUP_DIR = process.env.CALL_BACKUP_DIR
@@ -839,14 +848,19 @@ router.get('/recordings', (req, res) => {
       .map(({ fullPath }) => {
         const stat = fs.statSync(fullPath);
 
+        const relativePath = path.relative(REC_DIR, fullPath);
+        const parts = relativePath.split(path.sep);
+
         return {
           filename: path.basename(fullPath),
+          folder_date: parts[0] || '',
+          folder_team: parts[1] || '',
           full_path: fullPath,
           size_bytes: stat.size,
           size_label: formatBytes(stat.size),
           created_at: stat.birthtime,
-          relative_path: path.relative(REC_DIR, fullPath),
-          url: `/recordings/${encodeURIComponent(path.relative(REC_DIR, fullPath))}`
+          relative_path: relativePath,
+          url: `/recordings/${encodeURIComponent(relativePath)}`
         };
       })
       .sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
@@ -862,30 +876,61 @@ router.get('/recordings', (req, res) => {
     return res.status(500).json({ error: 'Could not list recordings: ' + err.message });
   }
 });
+/** Find actual recording file on disk (smart guessing) */
+function findRecordingFile(baseDir, filename) {
+  const cleanName = path.basename(filename);
 
-/** GET /api/calls/recordings/:filename — Stream the actual audio file */
+  function search(dir) {
+    const items = fs.readdirSync(dir, { withFileTypes: true });
+
+    for (const item of items) {
+      const fullPath = path.join(dir, item.name);
+
+      if (item.isFile()) {
+        if (item.name === cleanName) {
+          return fullPath;
+        }
+      }
+
+      if (item.isDirectory()) {
+        try {
+          const found = search(fullPath);
+          if (found) return found;
+        } catch (_) { }
+      }
+    }
+
+    return null;
+  }
+
+  return search(baseDir);
+}
+/** GET /api/calls/recordings/:filename — Stream audio file */
 router.get('/recordings/*', (req, res) => {
-  const relativePath = decodeURIComponent(req.params[0]);
-  const filepath = path.join(REC_DIR, relativePath);
+  try {
+    const relativePath = decodeURIComponent(req.params[0]);
+    const filepath = findRecordingFile(REC_DIR, relativePath);
 
-  if (!fs.existsSync(filepath)) {
-    return res.status(404).send('Recording not found');
+    console.log('[RECORDING REQUEST]', filepath);
+
+    if (!filepath || !fs.existsSync(filepath)) {
+      console.log('[RECORDING NOT FOUND]', filepath);
+      return res.status(404).send('Recording not found');
+    }
+
+    // Proper WAV headers
+    if (filepath.toLowerCase().endsWith('.wav')) {
+      res.setHeader('Content-Type', 'audio/wav');
+    }
+
+    res.setHeader('Accept-Ranges', 'bytes');
+
+    return res.sendFile(filepath);
+
+  } catch (err) {
+    console.error('Recording stream error:', err);
+    return res.status(500).send('Failed to stream recording');
   }
-
-  res.sendFile(filepath);
-  const safe = path.basename(req.params.filename);
-
-  const allFiles = getAllRecordingFiles(REC_DIR);
-
-  const matchedFile = allFiles.find(f =>
-    path.basename(f) === safe
-  );
-
-  if (!matchedFile) {
-    return res.status(404).send('Recording not found');
-  }
-
-  res.sendFile(matchedFile);
 });
 
 // ═══════════════════════════════════════════════════════════════════

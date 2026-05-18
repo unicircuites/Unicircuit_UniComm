@@ -229,6 +229,7 @@ function parseSMDR(line) {
         destination: (type === 'In') ? ext : num,
         trunk: null,
         raw_line: trimmedLine,
+        recording_file: `${callDate.slice(6, 10)}/${callDate.slice(3, 5)}/${recordingId}`,
       };
     }
   }
@@ -274,7 +275,7 @@ function parseSMDR(line) {
       destination: connectedNum,
       trunk: trunk || null,
       raw_line: rawLine.trim(),
-      recording_file: recordingId
+      recording_file: `${callDate.slice(6, 10)}/${callDate.slice(3, 5)}/${recordingId}`
     };
 
     if (type === 'In') {
