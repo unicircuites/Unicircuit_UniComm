@@ -1,0 +1,510 @@
+/**
+ * UniComm Pro — Express REST API
+ * Unicircuit Engineering Services LLP
+ *
+ * Start:  node server.js
+ * Dev:    nodemon server.js
+ * Init DB: node db/init.js
+ */
+require('dotenv').config({ path: require('path').join(__dirname, '.env') });
+
+// Run security checks on startup
+const { runStartupSecurityChecks } = require('./utils/securityCheck');
+runStartupSecurityChecks();
+
+try {
+  require('./services/msGraph').logOutlookOAuthConfigAtStartup();
+} catch (e) {
+  console.warn('[Outlook] Could not log OAuth env:', e.message);
+}
+const express = require('express');
+const cors = require('cors');
+const path = require('path');
+const fs = require('fs');
+const http = require('http');
+const https = require('https');
+const { Server } = require('socket.io');
+const rateLimit = require('express-rate-limit');
+const wa = require('./services/whatsapp');
+const smdr = require('./services/matrixSmdr');
+const mktCron = require('./services/marketingCron');
+const taskNotifier = require('./services/taskNotifier');
+const automatedAI = require('./services/automatedAI');
+const aiTaskQueue = require('./services/aiTaskQueue');
+const pool = require('./db/pool');
+const activityLog = require('./services/activityLog');
+const systemRoutes = require('./routes/system');
+const { serviceState } = systemRoutes;
+const msGraph = require('./services/msGraph');
+const cron = require('node-cron');
+const maintenance = require('./services/maintenance');
+
+// ── DATABASE SCHEMA MIGRATION (Self-Healing) ───────────────────────────────
+async function ensureSchema() {
+  try {
+    await pool.query(`ALTER TABLE call_logs ADD COLUMN IF NOT EXISTS recording_file TEXT`);
+    console.log('[DB] ✅ Schema check complete: recording_file column ensured.');
+  } catch (err) {
+    console.error('[DB] ❌ Schema check failed:', err.message);
+  }
+}
+ensureSchema();
+
+
+const app = express();
+
+const PORT = process.env.PORT || 8088;
+const HOST = process.env.HOST || '0.0.0.0'; // 0.0.0.0 = LAN; 127.0.0.1 = local only
+
+let server;
+let urlScheme = 'http';
+const sslKey = process.env.SSL_KEY_PATH;
+const sslCert = process.env.SSL_CERT_PATH;
+if (sslKey && sslCert) {
+  const keyPath = path.isAbsolute(sslKey) ? sslKey : path.join(__dirname, sslKey);
+  const certPath = path.isAbsolute(sslCert) ? sslCert : path.join(__dirname, sslCert);
+  server = https.createServer({
+    key: fs.readFileSync(keyPath),
+    cert: fs.readFileSync(certPath),
+  }, app);
+  urlScheme = 'https';
+  console.log('[Server] Listening with TLS (HTTPS)');
+} else {
+  server = http.createServer(app);
+}
+
+// Force UTF-8 on JSON responses so emoji / Unicode round-trips without mojibake
+app.use((_req, res, next) => {
+  const sendJson = res.json.bind(res);
+  res.json = function (body) {
+    res.setHeader('Content-Type', 'application/json; charset=utf-8');
+    return sendJson(body);
+  };
+  next();
+});
+const io = new Server(server, {
+  cors: { origin: '*', methods: ['GET', 'POST'] },
+  path: '/socket.io'
+});
+
+// Inject Socket.IO into WhatsApp service for real-time push
+wa.setIO(io);
+smdr.setIO(io);
+
+// Initialize activity log with DB persistence (load previous events)
+activityLog.init(pool).catch(err => console.warn('[ActivityLog] Init error:', err.message));
+
+// ── SYSTEM BRIDGE & PROBES ─────────────────────────────────────────────────
+
+function _now() { return new Date().toISOString(); }
+
+function markOnline(service) {
+  serviceState[service].status = 'online';
+  serviceState[service].lastConnected = _now();
+  const ev = activityLog.append({ type: 'online', service, message: `${service} connected`, timestamp: _now() });
+  try { _origEmit('system:service_online', { service, timestamp: ev.timestamp, seq: ev.seq }); } catch (_) { }
+  try { _origEmit('system:activity', ev); } catch (_) { }
+}
+
+function markOffline(service, reason) {
+  serviceState[service].status = 'offline';
+  serviceState[service].lastDisconnected = _now();
+  const msg = reason ? `${service} disconnected: ${reason}` : `${service} disconnected`;
+  const ev = activityLog.append({ type: 'offline', service, message: msg, timestamp: _now() });
+  try { _origEmit('system:service_offline', { service, timestamp: ev.timestamp, reason: reason || 'Connection lost', seq: ev.seq }); } catch (_) { }
+  try { _origEmit('system:activity', ev); } catch (_) { }
+}
+
+function systemBridge(event, data) {
+  try {
+    // ── Service connect/disconnect ──────────────────────────────────────
+    if (event === 'wa:connected') { markOnline('whatsapp'); serviceState.whatsapp.phone = data?.jid || data?.phone || null; }
+    else if (event === 'wa:disconnected') markOffline('whatsapp', data?.reason || (data?.code ? `code ${data.code}` : null));
+    else if (event === 'pbx:connected') {
+      markOnline('pbx');
+      serviceState.pbx.clientHost = data?.host || null;
+      serviceState.pbx.status = 'connected'; // differentiate from 'online' (ready)
+    }
+    else if (event === 'pbx:ready') {
+      markOnline('pbx');
+      serviceState.pbx.port = data?.port || SMDR_PORT;
+      serviceState.pbx.mode = data?.mode || 'server';
+    }
+    else if (event === 'pbx:disconnected') {
+      serviceState.pbx.clientHost = null;
+      if (data?.fatal) {
+        markOffline('pbx', data.error || data.reason);
+      } else {
+        serviceState.pbx.status = 'online'; // back to ready mode
+      }
+    }
+
+    // ── WhatsApp activity ───────────────────────────────────────────────
+    else if (event === 'wa:message') {
+      const who = data?.fromMe ? 'You' : (data?.senderName || data?.chatId || 'Unknown');
+      const chat = data?.chatName || data?.chatId || '';
+      const body = (data?.body || '').slice(0, 60);
+      const msg = data?.fromMe
+        ? `WA sent to ${chat}: ${body}`
+        : `WA received from ${who} (${chat}): ${body}`;
+      activityLog.append({ type: 'info', service: 'whatsapp', message: msg, timestamp: _now() });
+    }
+    else if (event === 'wa:sync_complete') {
+      activityLog.append({ type: 'info', service: 'whatsapp', message: 'WhatsApp history sync complete', timestamp: _now() });
+    }
+    else if (event === 'wa:qr') {
+      activityLog.append({ type: 'info', service: 'whatsapp', message: 'WhatsApp QR code generated — waiting for scan', timestamp: _now() });
+    }
+
+    // ── PBX call ────────────────────────────────────────────────────────
+    else if (event === 'pbx:call') {
+      const d = data || {};
+      const type = d.call_type || 'Call';
+      const caller = d.caller || '?';
+      const dest = d.destination || d.extension || '?';
+      const dur = d.duration || '';
+      activityLog.append({
+        type: 'info', service: 'pbx',
+        message: `PBX ${type}: ${caller} → ${dest}${dur ? ' (' + dur + ')' : ''}`,
+        timestamp: _now(),
+      });
+    }
+
+    // ── Outlook mail sync ───────────────────────────────────────────────
+    else if (event === 'outlook:mail_synced') {
+      const count = data?.count || 0;
+      activityLog.append({ type: 'info', service: 'outlook', message: `Outlook synced ${count} new mail(s)`, timestamp: _now() });
+    }
+    else if (event === 'outlook:unread_update') {
+      activityLog.append({ type: 'info', service: 'outlook', message: `Outlook unread: ${data?.unread ?? '?'}`, timestamp: _now() });
+    }
+
+    // ── Marketing cron ──────────────────────────────────────────────────
+    else if (event === 'marketing:sync_reminder') {
+      activityLog.append({ type: 'info', service: 'system', message: `Marketing reminder: ${data?.message || 'Time to sync EngageBay stats'}`, timestamp: _now() });
+    }
+
+    // ── User login (emitted from auth route) ────────────────────────────
+    else if (event === 'system:user_login') {
+      const user = data?.name || data?.email || 'Unknown user';
+      activityLog.append({ type: 'user_login', service: 'system', message: `User logged in: ${user}`, timestamp: _now() });
+      try { _origEmit('system:activity', { type: 'user_login', service: 'system', message: `User logged in: ${user}`, timestamp: _now() }); } catch (_) { }
+    }
+    else if (event === 'system:user_logout') {
+      const user = data?.name || data?.email || 'Unknown user';
+      activityLog.append({ type: 'user_login', service: 'system', message: `User logged out: ${user}`, timestamp: _now() });
+    }
+
+    // ── Emit generic activity event for all non-connect/disconnect events ─
+    if (!['wa:connected', 'wa:disconnected', 'pbx:connected', 'pbx:disconnected'].includes(event)) {
+      const last = activityLog.getRecent(1)[0];
+      if (last) {
+        try { _origEmit('system:activity', last); } catch (_) { }
+      }
+    }
+  } catch (err) {
+    console.error('[SystemBridge] Error:', err.message);
+  }
+}
+
+// Wrap io.emit to intercept wa:* and pbx:* events for the system bridge
+const _origEmit = io.emit.bind(io);
+io.emit = function (event, ...args) {
+  _origEmit(event, ...args);
+  systemBridge(event, args[0]);
+};
+
+// Send activity log snapshot to newly connected Socket.IO clients
+io.on('connection', (socket) => {
+  socket.emit('system:log_snapshot', { events: activityLog.getRecent(100) });
+
+  socket.on('pbx:reconnect', () => {
+    console.log('[Socket] PBX reconnect requested by client');
+    smdr.reconnect();
+  });
+});
+
+// PostgreSQL pool error → mark offline
+pool.on('error', (err) => {
+  if (serviceState.postgres.status !== 'offline') {
+    markOffline('postgres', err.message);
+  }
+});
+
+// Periodic probes
+const outlookProbeMs = parseInt(process.env.OUTLOOK_PROBE_INTERVAL_MS, 10) || 60000;
+const dbProbeMs = parseInt(process.env.DB_PROBE_INTERVAL_MS, 10) || 30000;
+
+async function probeOutlook() {
+  try {
+    // Check if user has a valid delegated token (not client credentials)
+    const stored = await require('./db/pool').query(
+      `SELECT access_token, refresh_token, expires_at FROM ms_tokens WHERE user_email = $1`,
+      [process.env.MS_USER_EMAIL]
+    ).catch(() => ({ rows: [] }));
+
+    const row = stored.rows && stored.rows[0];
+    if (!row || (!row.access_token && !row.refresh_token)) {
+      // No delegated token at all — needs full re-auth
+      if (serviceState.outlook.status !== 'offline') {
+        markOffline('outlook', 'No token — full re-authentication required (MFA may be needed)');
+      }
+      return;
+    }
+
+    // Token exists — verify it actually works with a real Graph call
+    const auth = await msGraph.isAuthenticated();
+    if (auth) {
+      if (serviceState.outlook.status !== 'online') markOnline('outlook');
+    } else {
+      // Token exists but rejected — likely expired, can re-auth without MFA
+      if (serviceState.outlook.status !== 'offline') {
+        markOffline('outlook', 'Token expired — click Connect Outlook to re-authenticate (no MFA needed)');
+      }
+    }
+  } catch (err) {
+    console.error('[System] Outlook probe error:', err.message);
+    if (serviceState.outlook.status !== 'offline') {
+      markOffline('outlook', `Outlook probe error: ${err.message}`);
+    }
+  }
+}
+
+async function probePostgres() {
+  try {
+    await pool.query('SELECT 1');
+    if (serviceState.postgres.status !== 'online') markOnline('postgres');
+  } catch (err) {
+    if (serviceState.postgres.status !== 'offline') markOffline('postgres', err.message);
+  }
+}
+
+// Run initial probes after 3s (give server time to fully start)
+setTimeout(() => { probeOutlook(); probePostgres(); }, 3000);
+
+// ── Token keepalive — refresh token every 6h to prevent expiry ────────────
+// Microsoft refresh tokens expire after 90 days of inactivity.
+// This lightweight call every 6h keeps the token alive indefinitely.
+const tokenKeepaliveMs = parseInt(process.env.TOKEN_KEEPALIVE_MS, 10) || (6 * 60 * 60 * 1000); // 6 hours
+setInterval(async () => {
+  try {
+    const token = await msGraph.getAccessToken(process.env.MS_USER_EMAIL);
+    if (token) {
+      console.log('[System] ✅ Outlook token keepalive — token refreshed');
+      activityLog.append({ type: 'info', service: 'outlook', message: 'Outlook token keepalive — token refreshed successfully', timestamp: new Date().toISOString() });
+    }
+  } catch (err) {
+    console.warn('[System] Token keepalive failed:', err.message);
+  }
+}, tokenKeepaliveMs);
+
+// Outlook probe
+setInterval(probeOutlook, outlookProbeMs);
+
+// PostgreSQL probe
+setInterval(probePostgres, dbProbeMs);
+
+// ── SERVE STATIC HTML FILES — after socket.io path is registered ──────────
+app.use(express.static(path.join(__dirname, '..'), {
+  setHeaders(res, filePath) {
+    const ext = path.extname(filePath).toLowerCase();
+    if (ext === '.html' || ext === '.htm') {
+      res.setHeader('Content-Type', 'text/html; charset=UTF-8');
+      res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, private');
+      res.setHeader('Pragma', 'no-cache');
+    } else if (ext === '.js') {
+      res.setHeader('Content-Type', 'text/javascript; charset=UTF-8');
+      res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, private');
+    } else if (ext === '.css') {
+      res.setHeader('Content-Type', 'text/css; charset=UTF-8');
+      res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, private');
+    } else if (ext === '.json') {
+      res.setHeader('Content-Type', 'application/json; charset=UTF-8');
+    }
+  },
+}));
+
+// Redirect root → login page
+app.get('/', (_req, res) => {
+  res.redirect('/login.html');
+});
+
+// ── CORS ───────────────────────────────────────────────────────────────────
+app.use(cors({
+  origin: function (origin, callback) {
+    // Allow same-origin requests (served by this server) and local dev
+    const allowed = [
+      'http://localhost:4551',
+      'http://127.0.0.1:4551',
+      'http://192.168.0.149:4551',
+      'http://localhost:8088',
+      'http://127.0.0.1:8088',
+      'https://localhost:8088',
+      'https://127.0.0.1:8088',
+      'http://192.168.0.149:8088',
+      'https://192.168.0.149:8088',
+      'http://192.168.0.205:8088',
+      'https://192.168.0.205:8088',
+      'http://localhost:3000',
+      'http://127.0.0.1:3000',
+      'http://localhost:5500',
+      'http://127.0.0.1:5500',
+      'null', // For file:// protocol
+    ];
+    // Allow requests with no origin (same-server, mobile apps, curl)
+    if (!origin || allowed.includes(origin)) return callback(null, true);
+    callback(null, true); // Allow all origins in dev — restrict in production
+  },
+  credentials: true,
+}));
+
+// ── BODY PARSING ───────────────────────────────────────────────────────────
+app.use(express.json({ limit: '500mb' }));
+app.use(express.urlencoded({ limit: '500mb', extended: true }));
+
+// ── INPUT VALIDATION (Security) ────────────────────────────────────────────
+const { validateInput } = require('./middleware/inputValidation');
+// Apply to all API routes (skip static files and auth callback)
+app.use((req, res, next) => {
+
+  // Skip validation for Outlook backup APIs
+  if (
+    req.path.includes('/outlook-backups/create') ||
+    req.path.includes('/outlook-backups/restore')
+  ) {
+    return next();
+  }
+
+  validateInput(req, res, next);
+
+});
+
+// ── DEBUG ROUTE (PRIORITY) ──
+app.get('/debug-messages', async (req, res) => {
+  try {
+    const connectedPhone = wa.getConnectedPhone();
+    const result = await pool.query('SELECT chat_id, from_me, body, timestamp FROM wa_messages ORDER BY timestamp DESC LIMIT 15');
+    res.json({
+      instance_connected_as: connectedPhone || 'NOT CONNECTED',
+      latest_messages: result.rows
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.use(cors());
+// ── RATE LIMITING ──────────────────────────────────────────────────────────
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,  // 15 min
+  max: 20,
+  message: { error: 'Too many login attempts. Try again in 15 minutes.' },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+const apiLimiter = rateLimit({
+  windowMs: 60 * 1000,        // 1 min
+  max: 600,                   // raised — dashboard makes ~8 calls on load
+  message: { error: 'Rate limit exceeded.' },
+  skip: (req) => {
+    // never rate-limit the sync endpoint — it's a long-running manual action
+    return req.path.includes('sync-messages') || req.path.includes('sync-stats');
+  },
+});
+
+// ── ROUTES ─────────────────────────────────────────────────────────────────
+app.use('/api/auth', authLimiter, require('./routes/auth'));
+app.use('/api/contacts', apiLimiter, require('./routes/contacts'));
+app.use('/api/pipeline', apiLimiter, require('./routes/pipeline'));
+app.use('/api/calls', apiLimiter, require('./routes/calls'));
+app.use('/api/campaigns', apiLimiter, require('./routes/campaigns'));
+app.use('/api/dashboard', apiLimiter, require('./routes/dashboard'));
+app.use('/api/outlook', apiLimiter, require('./routes/outlook'));
+app.use('/api/wa', apiLimiter, require('./routes/whatsapp'));
+app.use('/api/eb', apiLimiter, require('./routes/engagebay'));
+app.use('/api/marketing', apiLimiter, require('./routes/marketing'));
+app.use('/api/broadcast', apiLimiter, require('./routes/broadcast'));
+app.use('/api/templates', apiLimiter, require('./routes/emailTemplates'));
+app.use('/api/marquee', require('./routes/marquee'));
+app.use('/api/groups', apiLimiter, require('./routes/recipientGroups'));
+app.use('/api/mail-tasks', apiLimiter, require('./routes/mailTasks'));
+app.use('/api/system', apiLimiter, require('./routes/system'));
+app.use('/api/outlook-backups', apiLimiter, require('./routes/outlookBackups'));
+
+// OAuth2 callback — must be at root level to match redirect URI
+app.use('/auth', require('./routes/outlook'));
+
+// ── HEALTH CHECK ───────────────────────────────────────────────────────────
+app.get('/api/health', (_req, res) => {
+  res.json({ status: 'ok', service: 'UniComm Pro API', version: '3.0.0', timestamp: new Date().toISOString() });
+});
+
+// ── 404 ────────────────────────────────────────────────────────────────────
+app.use((req, res) => {
+  res.status(404).json({ error: `${req.method} ${req.path} not found.` });
+});
+
+// ── GLOBAL ERROR HANDLER ───────────────────────────────────────────────────
+// eslint-disable-next-line no-unused-vars
+app.use((err, _req, res, _next) => {
+  console.error('[Server] Unhandled error:', err.message);
+  res.status(500).json({ error: 'Internal server error.' });
+});
+
+// ── START ──────────────────────────────────────────────────────────────────
+server.listen(PORT, HOST, async () => {
+  console.log(`\n🚀  UniComm Pro API  →  ${urlScheme}://localhost:${PORT}  (bind ${HOST})`);
+  console.log(`🏥  Health check    →  ${urlScheme}://localhost:${PORT}/api/health`);
+  console.log(`📱  WhatsApp        →  starting...\n`);
+
+  // Sequential Service Initialization for stability
+  try {
+    console.log('[System] Initializing services...');
+
+    // 1. Matrix SMDR listener (Critical for call logging)
+    await smdr.start().catch(err => console.error('[SMDR] Start error:', err.message));
+
+    // 2. WhatsApp — auto-reconnects, QR pushed via Socket.IO
+    await wa.startWA().catch(err => console.error('[WA] Start error:', err.message));
+
+    // 3. AI System Initialization (Ensure tables)
+    aiTaskQueue.init(io);
+    await aiTaskQueue.ensureTable();
+
+    // 4. Maintenance & Schedulers
+    mktCron.start(io);
+    taskNotifier.start(pool);
+
+    console.log('[System] ✅ All background services initialized.');
+  } catch (err) {
+    console.error('[System] ❌ Critical initialization failure:', err.message);
+  }
+
+  // ✅ 2. START DAILY PRUNING (7-day policy)
+  cron.schedule('0 0 * * *', async () => {
+    console.log('[Maintenance] Running daily AI task history pruning (7-day policy)...');
+    try {
+      await aiTaskQueue.pruneHistory(7);
+      await maintenance.pruneAntigravityLogs();
+    } catch (err) {
+      console.error('[Maintenance] Cron error:', err.message);
+    }
+  });
+
+  // Run initial maintenance on startup (async)
+  maintenance.pruneAntigravityLogs().catch(err => console.error('[Maintenance] Startup pruning failed:', err.message));
+});
+
+
+// Clear WhatsApp session on server stop so mobile shows disconnected
+process.on('SIGINT', async () => {
+  console.log('\n[Server] Shutting down — clearing WA session...');
+  try {
+    const wa = require('./services/whatsapp');
+    if (wa.getStatus().connected) {
+      await wa.logout();
+    }
+  } catch (_) { }
+  process.exit(0);
+});
