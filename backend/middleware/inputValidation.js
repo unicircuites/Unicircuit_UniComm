@@ -55,7 +55,7 @@ function isContentField(fieldPath) {
   if (!fieldPath) return false;
   const parts = fieldPath.split('.');
   const lastPart = parts[parts.length - 1];
-  
+
   // Check if last part matches content field names
   return CONTENT_FIELDS.some(cf => lastPart.toLowerCase().includes(cf.toLowerCase()));
 }
@@ -65,23 +65,23 @@ function isContentField(fieldPath) {
  */
 function containsDangerousPattern(str, isContent = false) {
   if (typeof str !== 'string') return false;
-  
+
   // For content fields, only check for XSS and script injection
   if (isContent) {
-    return /<script[^>]*>.*?<\/script>/i.test(str) || 
-           /javascript:/i.test(str) ||
-           /on\w+\s*=/i.test(str);
+    return /<script[^>]*>.*?<\/script>/i.test(str) ||
+      /javascript:/i.test(str) ||
+      /on\w+\s*=/i.test(str);
   }
-  
+
   // For non-content fields, check all patterns
   for (const pattern of DANGEROUS_PATTERNS) {
     if (pattern.test(str)) return true;
   }
-  
+
   for (const pattern of SQL_INJECTION_PATTERNS) {
     if (pattern.test(str)) return true;
   }
-  
+
   return false;
 }
 
@@ -90,7 +90,7 @@ function containsDangerousPattern(str, isContent = false) {
  */
 function scanObject(obj, path = '') {
   if (obj === null || obj === undefined) return null;
-  
+
   if (typeof obj === 'string') {
     const isContent = isContentField(path);
     if (containsDangerousPattern(obj, isContent)) {
@@ -98,7 +98,7 @@ function scanObject(obj, path = '') {
     }
     return null;
   }
-  
+
   if (Array.isArray(obj)) {
     for (let i = 0; i < obj.length; i++) {
       const result = scanObject(obj[i], `${path}[${i}]`);
@@ -106,7 +106,7 @@ function scanObject(obj, path = '') {
     }
     return null;
   }
-  
+
   if (typeof obj === 'object') {
     for (const key in obj) {
       if (obj.hasOwnProperty(key)) {
@@ -117,7 +117,7 @@ function scanObject(obj, path = '') {
     }
     return null;
   }
-  
+
   return null;
 }
 
@@ -140,45 +140,47 @@ function validateInput(req, res, next) {
       '/api/wa/send',
       '/wa/send-media',
       '/api/wa/send-media',
+      '/recordings',
+      '/api/calls/recordings'
     ];
-    
+
     if (skipRoutes.some(route => req.path.startsWith(route))) {
       return next();
     }
-    
+
     // Check query parameters
     const queryViolation = scanObject(req.query, 'query');
     if (queryViolation) {
       console.warn(`[Security] Dangerous pattern detected in ${queryViolation}:`, req.query);
-      return res.status(400).json({ 
+      return res.status(400).json({
         error: 'Invalid input detected',
         field: queryViolation,
         message: 'Input contains potentially dangerous characters'
       });
     }
-    
+
     // Check body parameters
     const bodyViolation = scanObject(req.body, 'body');
     if (bodyViolation) {
       console.warn(`[Security] Dangerous pattern detected in ${bodyViolation}:`, req.body);
-      return res.status(400).json({ 
+      return res.status(400).json({
         error: 'Invalid input detected',
         field: bodyViolation,
         message: 'Input contains potentially dangerous characters'
       });
     }
-    
+
     // Check URL parameters
     const paramsViolation = scanObject(req.params, 'params');
     if (paramsViolation) {
       console.warn(`[Security] Dangerous pattern detected in ${paramsViolation}:`, req.params);
-      return res.status(400).json({ 
+      return res.status(400).json({
         error: 'Invalid input detected',
         field: paramsViolation,
         message: 'Input contains potentially dangerous characters'
       });
     }
-    
+
     next();
   } catch (err) {
     console.error('[Security] Input validation error:', err.message);
@@ -191,13 +193,13 @@ function validateInput(req, res, next) {
  */
 function sanitizeString(str) {
   if (typeof str !== 'string') return str;
-  
+
   // Remove shell metacharacters
   return str.replace(/[;&|`$(){}[\]<>]/g, '')
-            .replace(/\.\.\//g, '')
-            .replace(/\.\.\\/g, '')
-            .replace(/\x00/g, '')
-            .replace(/\r\n|\r|\n/g, ' ');
+    .replace(/\.\.\//g, '')
+    .replace(/\.\.\\/g, '')
+    .replace(/\x00/g, '')
+    .replace(/\r\n|\r|\n/g, ' ');
 }
 
 /**
@@ -205,16 +207,16 @@ function sanitizeString(str) {
  */
 function isValidPath(filePath) {
   if (typeof filePath !== 'string') return false;
-  
+
   // Check for path traversal
   if (filePath.includes('..')) return false;
-  
+
   // Check for absolute paths (should be relative)
   if (filePath.startsWith('/') || /^[a-zA-Z]:/.test(filePath)) return false;
-  
+
   // Check for null bytes
   if (filePath.includes('\x00')) return false;
-  
+
   return true;
 }
 

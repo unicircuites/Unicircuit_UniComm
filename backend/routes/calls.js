@@ -738,6 +738,158 @@ router.post('/backup/restore', async (req, res) => {
   }
 });
 
+router.post('/backup/append', async (req, res) => {
+
+  try {
+
+    const { filename } = req.body;
+
+    if (!filename) {
+      return res.status(400).json({
+        error: 'Filename is required'
+      });
+    }
+
+    const backupPath = path.join(BACKUP_DIR, filename);
+
+    if (!fs.existsSync(backupPath)) {
+      return res.status(404).json({
+        error: 'Backup file not found'
+      });
+    }
+
+    // Read backup JSON
+    const raw = fs.readFileSync(backupPath, 'utf8');
+    const backup = JSON.parse(raw);
+
+    // Support multiple backup formats
+    let calls = [];
+
+    if (Array.isArray(backup)) {
+
+      calls = backup;
+
+    } else if (Array.isArray(backup.calls)) {
+
+      calls = backup.calls;
+
+    } else if (Array.isArray(backup.records)) {
+
+      calls = backup.records;
+
+    } else {
+
+      return res.status(400).json({
+        error: 'Invalid backup format'
+      });
+    }
+
+    console.log('Append records count:', calls.length);
+
+    let added = 0;
+    let skipped = 0;
+    const addedRecords = [];
+    const skippedRecords = [];
+
+    for (const rec of calls) {
+
+      // Duplicate check
+      const exists = await pool.query(
+        `SELECT id
+        FROM call_logs
+        WHERE caller = $1
+          AND destination = $2
+          AND duration = $3
+          AND call_date = $4
+          AND call_time = $5
+        LIMIT 1
+        `,
+        [
+          rec.caller || '',
+          rec.destination || '',
+          rec.duration || 0,
+          rec.call_date || null,
+          rec.call_time || null
+        ]
+      );
+
+      if (exists.rows.length > 0) {
+
+        skipped++;
+
+        skippedRecords.push({
+          caller: rec.caller,
+          destination: rec.destination,
+          duration: rec.duration,
+          call_date: rec.call_date,
+          call_time: rec.call_time
+        });
+
+        continue;
+
+      }
+
+      // Insert new record
+      await pool.query(
+        `INSERT INTO call_logs
+        (
+          caller,
+          extension,
+          destination,
+          duration,
+          call_type,
+          ai_summary,
+          call_date,
+          call_time,
+          trunk,
+          raw_line
+        )
+        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
+        `,
+        [
+          rec.caller || '',
+          rec.extension || '',
+          rec.destination || '',
+          rec.duration || 0,
+          rec.call_type || '',
+          rec.ai_summary || '',
+          rec.call_date || null,
+          rec.call_time || null,
+          rec.trunk || '',
+          rec.raw_line || JSON.stringify(rec)
+        ]
+      );
+
+      added++;
+
+      addedRecords.push({
+        caller: rec.caller,
+        destination: rec.destination,
+        duration: rec.duration,
+        call_date: rec.call_date,
+        call_time: rec.call_time
+      });
+    }
+
+    return res.json({
+      success: true,
+      added,
+      skipped,
+      total: calls.length,
+      addedRecords,
+      skippedRecords
+    });
+
+  } catch (err) {
+
+    console.error('Append backup error:', err);
+
+    return res.status(500).json({
+      error: err.message
+    });
+  }
+});
+
 /** GET /api/calls/backup/read */
 router.get('/backup/read', (req, res) => {
   const { filename } = req.query;
@@ -810,9 +962,39 @@ function getAllRecordingFiles(dir) {
   return results;
 }
 
+function buildRecordingTree(dir) {
+
+  if (!fs.existsSync(dir)) {
+    return [];
+  }
+
+  const items = fs.readdirSync(dir, {
+    withFileTypes: true
+  });
+
+  return items
+    .filter(item => item.isDirectory())
+    .map(item => {
+
+      const fullPath = path.join(dir, item.name);
+
+      return {
+        type: 'folder',
+        name: item.name,
+        path: path.relative(REC_DIR, fullPath).replace(/\\/g, '/'),
+        children: buildRecordingTree(fullPath)
+      };
+
+    });
+
+}
+
 // ═══════════════════════════════════════════════════════════════════
 // RECORDINGS — scan filesystem for .wav / .mp3 files
 // ═══════════════════════════════════════════════════════════════════
+
+
+
 router.get('/recordings', (req, res) => {
   try {
     const page = parseInt(req.query.page || '1');
@@ -860,7 +1042,9 @@ router.get('/recordings', (req, res) => {
           size_label: formatBytes(stat.size),
           created_at: stat.birthtime,
           relative_path: relativePath,
-          url: `/recordings/${encodeURIComponent(relativePath)}`
+          url: `/recordings/${encodeURIComponent(
+            relativePath.replace(/\\/g, '/')
+          )}`
         };
       })
       .sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
@@ -876,6 +1060,8 @@ router.get('/recordings', (req, res) => {
     return res.status(500).json({ error: 'Could not list recordings: ' + err.message });
   }
 });
+
+
 /** Find actual recording file on disk (smart guessing) */
 function findRecordingFile(baseDir, filename) {
   const cleanName = path.basename(filename);
@@ -905,32 +1091,233 @@ function findRecordingFile(baseDir, filename) {
 
   return search(baseDir);
 }
+
+router.get('/recordings/tree', (req, res) => {
+
+  try {
+
+    if (!fs.existsSync(REC_DIR)) {
+      return res.json({
+        success: true,
+        tree: []
+      });
+    }
+
+    const tree = buildRecordingTree(REC_DIR);
+
+    return res.json({
+      success: true,
+      tree
+    });
+
+  } catch (err) {
+
+    console.error('Recording tree error:', err);
+
+    return res.status(500).json({
+      error: err.message
+    });
+
+  }
+
+});
+
+// ═══════════════════════════════════════════════════════════════════
+// RECORDINGS — folder files with pagination
+// ═══════════════════════════════════════════════════════════════════
+
+router.get('/recordings/folder', (req, res) => {
+
+  try {
+
+    const relPath = decodeURIComponent(req.query.path || '');
+
+    const page = parseInt(req.query.page || '1');
+
+    const limit = parseInt(req.query.limit || '20');
+
+    const targetDir = path.resolve(REC_DIR, relPath);
+
+    console.log('REC_DIR:', REC_DIR);
+    console.log('relPath:', relPath);
+    console.log('targetDir:', targetDir);
+
+    if (!fs.existsSync(targetDir)) {
+
+      return res.status(404).json({
+        success: false,
+        error: 'Folder not found',
+        targetDir
+      });
+
+    }
+
+    const items = fs.readdirSync(targetDir, {
+      withFileTypes: true
+    });
+
+    const files = items
+      .filter(item => {
+
+        if (!item.isFile()) return false;
+
+        const ext = path.extname(item.name).toLowerCase();
+
+        return ['.wav', '.mp3', '.ogg', '.m4a']
+          .includes(ext);
+
+      })
+      .map(item => {
+
+        const fullPath = path.join(targetDir, item.name);
+
+        const stat = fs.statSync(fullPath);
+
+        return {
+          filename: item.name,
+          relative_path: path.join(relPath, item.name),
+          size_bytes: stat.size,
+          size_label: formatBytes(stat.size),
+          created_at: stat.birthtime,
+          modified_at: stat.mtime,
+          url: `/api/calls/recordings/${encodeURIComponent(
+            path.join(relPath, item.name).replace(/\\/g, '/')
+          )}`
+        };
+
+      })
+      .sort((a, b) =>
+        new Date(b.created_at) - new Date(a.created_at)
+      );
+
+    const start = (page - 1) * limit;
+
+    const paginatedFiles = files.slice(
+      start,
+      start + limit
+    );
+
+    return res.json({
+      success: true,
+      folder: relPath,
+      total: files.length,
+      page,
+      limit,
+      total_pages: Math.ceil(files.length / limit),
+      files: paginatedFiles
+    });
+
+  } catch (err) {
+
+    console.error('Folder recordings error:', err);
+
+    return res.status(500).json({
+      success: false,
+      error: err.message
+    });
+
+  }
+
+});
+
 /** GET /api/calls/recordings/:filename — Stream audio file */
 router.get('/recordings/*', (req, res) => {
+
   try {
-    const relativePath = decodeURIComponent(req.params[0]);
-    const filepath = findRecordingFile(REC_DIR, relativePath);
+
+    const relativePath =
+      decodeURIComponent(req.params[0]);
+
+    const filepath =
+      findRecordingFile(REC_DIR, relativePath);
 
     console.log('[RECORDING REQUEST]', filepath);
 
     if (!filepath || !fs.existsSync(filepath)) {
+
       console.log('[RECORDING NOT FOUND]', filepath);
-      return res.status(404).send('Recording not found');
+
+      return res.status(404)
+        .send('Recording not found');
     }
 
-    // Proper WAV headers
-    if (filepath.toLowerCase().endsWith('.wav')) {
-      res.setHeader('Content-Type', 'audio/wav');
+    const stat = fs.statSync(filepath);
+
+    const fileSize = stat.size;
+
+    const range = req.headers.range;
+
+    // MIME TYPE
+    let contentType = 'audio/wav';
+
+    if (filepath.toLowerCase().endsWith('.mp3')) {
+      contentType = 'audio/mpeg';
     }
 
-    res.setHeader('Accept-Ranges', 'bytes');
+    if (filepath.toLowerCase().endsWith('.ogg')) {
+      contentType = 'audio/ogg';
+    }
 
-    return res.sendFile(filepath);
+    if (filepath.toLowerCase().endsWith('.m4a')) {
+      contentType = 'audio/mp4';
+    }
+
+    // RANGE STREAMING
+    if (range) {
+
+      const parts =
+        range.replace(/bytes=/, '').split('-');
+
+      const start =
+        parseInt(parts[0], 10);
+
+      const end =
+        parts[1]
+          ? parseInt(parts[1], 10)
+          : fileSize - 1;
+
+      const chunkSize =
+        end - start + 1;
+
+      const stream =
+        fs.createReadStream(filepath, {
+          start,
+          end
+        });
+
+      res.writeHead(206, {
+        'Content-Range':
+          `bytes ${start}-${end}/${fileSize}`,
+        'Accept-Ranges': 'bytes',
+        'Content-Length': chunkSize,
+        'Content-Type': contentType
+      });
+
+      stream.pipe(res);
+
+    } else {
+
+      res.writeHead(200, {
+        'Content-Length': fileSize,
+        'Content-Type': contentType,
+        'Accept-Ranges': 'bytes'
+      });
+
+      fs.createReadStream(filepath)
+        .pipe(res);
+    }
 
   } catch (err) {
-    console.error('Recording stream error:', err);
-    return res.status(500).send('Failed to stream recording');
+
+    console.error(
+      'Recording stream error:',
+      err
+    );
+
+    return res.status(500)
+      .send('Failed to stream recording');
   }
+
 });
 
 // ═══════════════════════════════════════════════════════════════════

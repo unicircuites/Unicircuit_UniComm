@@ -1,0 +1,175 @@
+========================================
+PBX RECORDINGS UI + AUDIO FIXES
+Date: 19 May 2026
+========================================
+
+1. Implemented PBX recordings explorer layout:
+   - Left sidebar folder tree
+   - Right-side recordings table
+   - Folder navigation system
+   - Audio player UI
+
+2. Added recursive folder scanning:
+   - Backend now scans nested recording folders
+   - Supports:
+     .wav
+     .mp3
+     .ogg
+     .m4a
+
+3. Added recordings tree API:
+   GET /api/calls/recordings/tree
+
+4. Added folder recordings API:
+   GET /api/calls/recordings/folder?path=<folder>
+
+5. Added recording streaming API:
+   GET /api/calls/recordings/*
+
+6. Fixed Windows path issues:
+   - Converted backslashes to forward slashes
+   - Added encodeURIComponent handling
+   - Fixed relative path generation
+
+7. Fixed audio playback:
+   - Added Content-Type: audio/wav
+   - Added Accept-Ranges header
+   - Fixed 404 issues for streamed recordings
+   - Audio files now playable directly in browser
+
+8. Fixed frontend layout bleed issue:
+   Problem:
+   - Recordings section was overlapping PBX logs
+   - Backup/Restore tab rendering inside recordings section
+
+   Cause:
+   - Missing / misplaced:
+     <div id="pbx-panel-recordings" class="pbx-panel">
+
+   Fix:
+   - Wrapped entire recordings explorer inside:
+     <div id="pbx-panel-recordings" class="pbx-panel">
+   - Added proper closing </div>
+   - Restored correct HTML hierarchy
+
+9. Final result:
+   - Folder explorer working
+   - Audio playback working
+   - Proper split layout working
+   - No UI overlap
+   - Backup/Restore separated correctly
+
+--------------------------------------------------------------------------------------------------------------
+
+1. Added new "Append" button in PBX Backup / Restore section UI.
+2. Updated backup list rendering to include:
+   - Read
+   - Download
+   - Restore
+   - Delete
+   - Append
+3. Created frontend append function:
+   - pbxAppendBackup(filename)
+4. Added backend API route:
+   - POST /api/calls/backup/append
+5. Initially encountered:
+   - endpoint not found
+   - calls is not iterable
+   - CallLog is not defined
+   - column "receiver" does not exist
+6. Identified backend uses PostgreSQL with:
+   - const pool = require('../db/pool');
+7. Replaced incorrect mongoose logic with PostgreSQL queries.
+8. Implemented duplicate-check logic before inserting records.
+9. Final duplicate detection checks:
+   - caller
+   - destination
+   - duration
+   - call_date
+   - call_time
+10. Append now:
+   - reads backup JSON
+   - checks current DB for duplicates
+   - inserts only missing records
+   - skips existing duplicates
+11. Added support for backup formats:
+   - backup[]
+   - backup.calls[]
+   - backup.records[]
+12. Improved append response to return:
+   - added count
+   - skipped count
+   - addedRecords[]
+   - skippedRecords[]
+13. Designed popup modal UI for append results similar to backup read modal.
+14. Popup now shows:
+   - total records
+   - added records
+   - skipped duplicate records
+   - scrollable JSON data
+15. Clarified behavior:
+   - Append inserts into CURRENT LIVE DATABASE
+   - Backup file remains unchanged/read-only.
+
+Investigated SARVAM UCS Manual Backup workflow
+Opened:
+https://192.168.0.81:1026/MailboxBackup.html?BackupType=Manual
+Inspected backup button
+Identified:
+ConfirmSubmitHidden(document.MB_BACKUP_PARA,'BackupBtnPressed');
+Inspected PBX backup form HTML
+Found:
+Confirmed:
+POST form submission
+No explicit action URL
+Form submits to current page URL
+Understood PBX backup architecture
+Manual backup generates voicemail backup into network drive
+CRM will later trigger this automatically using backend API
+Planned automation architecture
+CRM Backup Button
+↓
+Backend API
+↓
+PBX POST request
+↓
+Backup generated
+↓
+Folder tree auto refresh
+Added frontend-only PBX Backup UI
+Added:
+Create Backup button
+Added:
+Animated loading progress bar
+Added:
+Percentage progress text
+Added:
+File count simulation
+Added:
+Backup size simulation
+Added:
+Loading spinner state
+Added:
+Backup completed state
+Added:
+Auto refresh recordings tree after completion
+Added JS function:
+startPBXBackup()
+Added global variable:
+pbxBackupInterval
+Added toolbar progress components
+pbx-backup-status
+pbx-backup-progress-fill
+pbx-backup-progress-text
+pbx-backup-details
+Current state
+Frontend UI working
+Progress currently simulated/fake
+Actual PBX backup backend integration pending
+Next backend tasks
+Create:
+/api/pbx-backup/start
+Trigger real POST request to SARVAM UCS
+Poll real PBX backup progress
+Replace fake progress with actual progress
+Add Abort Backup support

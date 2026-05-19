@@ -4495,19 +4495,259 @@
 
           <!-- ── TAB: RECORDINGS ── -->
           <div id="pbx-panel-recordings" class="pbx-panel" style="display:none;">
-            <div class="card" style="border-radius:0 0 12px 12px;border-top:none;">
-              <div class="card-header">
-                <h3><i class="fas fa-microphone" style="color:var(--gold);"></i> PBX Call Recordings</h3>
-                <div style="display:flex;gap:8px;align-items:center;">
-                  <button class="btn btn-ghost btn-sm" onclick="pbxLoadRecordings()"><i class="fas fa-sync-alt"></i>
-                    Refresh</button>
+            <!-- PBX EXPLORER LAYOUT -->
+            <div style="
+            display:grid;
+            grid-template-columns:300px 1fr;
+            gap:16px;
+            height:calc(100vh - 260px);
+            min-height:0;
+            overflow:hidden;
+            ">
+
+              <!-- LEFT SIDEBAR -->
+              <div style="
+              background:rgba(255,255,255,0.03);
+              border:1px solid rgba(255,255,255,0.06);
+              border-radius:16px;
+              overflow:auto;
+              min-height:0;
+              display:flex;
+              flex-direction:column;
+            ">
+
+                <div style="
+                padding:18px;
+                border-bottom:1px solid rgba(255,255,255,0.05);
+                font-size:18px;
+                font-weight:600;
+                color:white;
+              ">
+                  Folders
                 </div>
+
+                <div id="pbx-recordings-list" style="
+                  flex:1;
+                  overflow:auto;
+                  padding:10px;
+                ">
+
+                  <div style="
+                  text-align:center;
+                  padding:30px;
+                  color:var(--muted);
+                ">
+                    Loading...
+                  </div>
+
+                </div>
+
+                <!-- STORAGE INFO -->
+                <div style="
+                border-top:1px solid rgba(255,255,255,0.05);
+                padding:16px;
+                background:rgba(255,255,255,0.02);
+              ">
+
+                  <div style="
+                  color:#aaa;
+                  font-size:13px;
+                  margin-bottom:8px;
+                ">
+                    Storage Location
+                  </div>
+
+                  <div style="
+                  color:#4ea1ff;
+                  font-size:13px;
+                  word-break:break-all;
+                ">
+                    C:\\MatrixVMS\\Voicemail_Backup
+                  </div>
+
+                </div>
+
               </div>
-              <div id="pbx-recordings-list" style="padding:16px;">
-                <div style="text-align:center;padding:30px;color:var(--muted);">
-                  <i class="fas fa-microphone-slash"
-                    style="font-size:32px;opacity:0.3;display:block;margin-bottom:10px;"></i>
-                  Click Refresh to scan recordings directory
+
+              <!-- RIGHT PANEL -->
+              <div style="
+              background:rgba(255,255,255,0.03);
+              border:1px solid rgba(255,255,255,0.06);
+              border-radius:16px;
+              overflow:hidden;
+              display:flex;
+              flex-direction:column;
+              min-height:0;
+            ">
+
+                <!-- BREADCRUMB -->
+                <div id="pbx-breadcrumb" style="
+                  padding:18px 20px;
+                  border-bottom:1px solid rgba(255,255,255,0.05);
+                  color:#4ea1ff;
+                  font-weight:600;
+                  font-size:15px;
+                ">
+                  Select Folder
+                </div>
+
+                <!-- TOOLBAR -->
+                <div style="
+                  display:flex;
+                  gap:10px;
+                  padding:14px 18px;
+                  border-bottom:1px solid rgba(255,255,255,0.05);
+                  align-items:center;
+                  flex-wrap:wrap;
+                  ">
+
+                  <!-- BACKUP DETAILS -->
+                  <div id="pbx-backup-details" style="
+                    display:none;
+                    padding:12px 18px;
+                    border-bottom:
+                      1px solid rgba(255,255,255,0.05);
+                    font-size:13px;
+                    color:#aaa;
+                    background:
+                      rgba(255,255,255,0.02);
+                  "></div>
+
+                  <button class="btn btn-ghost btn-sm" onclick="pbxLoadRecordings()">
+                    <i class="fas fa-sync-alt"></i>
+                    Refresh
+                  </button>
+
+                  <button id="pbx-backup-btn" class="btn btn-sm" onclick="startPBXBackup()" style="
+                      background:#f59e0b;
+                      color:white;
+                      border:none;
+                    ">
+                    <i class="fas fa-database"></i>
+                    Create Backup
+                  </button>
+
+                  <!-- BACKUP PROGRESS -->
+                  <div id="pbx-backup-status" style="
+                      display:none;
+                      align-items:center;
+                      gap:12px;
+                      flex:1;
+                      max-width:420px;
+                    ">
+
+                    <div style="
+                      flex:1;
+                      height:12px;
+                      background:rgba(255,255,255,0.08);
+                      border-radius:999px;
+                      overflow:hidden;
+                    ">
+
+                      <div id="pbx-backup-progress-fill" style="
+                          width:0%;
+                          height:100%;
+                          background:
+                            linear-gradient(
+                              90deg,
+                              #f59e0b,
+                              #fbbf24
+                            );
+                          transition:width .4s ease;
+                          border-radius:999px;
+                        "></div>
+
+                    </div>
+
+                    <div id="pbx-backup-progress-text" style="
+                        min-width:42px;
+                        color:#fbbf24;
+                        font-size:13px;
+                        font-weight:600;
+                      ">
+                      0%
+                    </div>
+
+                  </div>
+
+                  <button id="pbx-backup-btn" class="btn btn-warning btn-sm" onclick="startPBXBackup()">
+                    <i class="fas fa-database"></i>
+                    Create Backup
+                  </button>
+
+                  <!-- BACKUP STATUS -->
+                  <div id="pbx-backup-status" style="
+                    display:none;
+                    align-items:center;
+                    gap:14px;
+                    min-width:320px;
+                    margin-left:10px;
+                  ">
+
+                    <!-- Progress Bar -->
+                    <div style="
+                      flex:1;
+                      height:12px;
+                      background:rgba(255,255,255,0.08);
+                      border-radius:999px;
+                      overflow:hidden;
+                      position:relative;
+                    ">
+
+                      <div id="pbx-backup-progress-fill" style="
+                      width:0%;
+                      height:100%;
+                      background:linear-gradient(90deg,#f59e0b,#fbbf24);
+                      border-radius:999px;
+                      transition:width .4s ease;
+                      box-shadow:0 0 12px rgba(245,158,11,.5);
+                    "></div>
+
+                    </div>
+
+                    <!-- Percentage -->
+                    <div id="pbx-backup-progress-text" style="
+                    color:#fbbf24;
+                      font-size:13px;
+                      min-width:42px;
+                      font-weight:600;
+                    ">
+                      0%
+                    </div>
+
+                  </div>
+
+                  <!-- DETAILS -->
+                  <div id="pbx-backup-details" style="
+                    display:none;
+                    padding:0 18px 14px 18px;
+                    color:#aaa;
+                    font-size:13px;
+                  ">
+                    Preparing backup...
+                  </div>
+
+                </div>
+                <!-- MAIN EXPLORER -->
+                <div id="pbx-right-panel" style="
+                  flex:1;
+                  overflow:auto;
+                  padding:18px;
+                  min-height: 0;
+                ">
+                  <div style="
+                  text-align:center;
+                  color:#777;
+                  padding-top:80px;
+                ">
+                    <i class="fas fa-folder-open" style="
+                      font-size:46px;
+                      margin-bottom:18px;
+                      opacity:0.3;
+                      display:block;
+                    "></i>
+                    Select a folder from left sidebar
+                  </div>
                 </div>
               </div>
             </div>
@@ -4523,7 +4763,8 @@
                   <h3><i class="fas fa-archive" style="color:var(--gold);"></i> Create Backup</h3>
                 </div>
                 <div class="card-body">
-                  <p style="font-size:12.5px;color:var(--muted2);margin-bottom:16px;">Snapshot all call log records to a
+                  <p style="font-size:12.5px;color:var(--muted2);margin-bottom:16px;">Snapshot all call log records to
+                    a
                     JSON file stored on the server.</p>
                   <button class="btn btn-gold" style="width:100%;justify-content:center;" onclick="pbxCreateBackup()">
                     <i class="fas fa-download"></i> Create Backup Now
@@ -4540,7 +4781,8 @@
                     Refresh</button>
                 </div>
                 <div id="pbx-backup-list" style="padding:14px;max-height:380px;overflow-y:auto;">
-                  <div style="color:var(--muted);font-size:12.5px;text-align:center;padding:20px;">Click Refresh to list
+                  <div style="color:var(--muted);font-size:12.5px;text-align:center;padding:20px;">Click Refresh to
+                    list
                     backups</div>
                 </div>
               </div>
@@ -4849,7 +5091,8 @@
               <div id="wa-qr-wrap" style="display:none;flex-direction:column;align-items:center;gap:8px;">
                 <img id="wa-qr-img" src=""
                   style="width:180px;height:180px;border-radius:10px;background:#fff;padding:8px;" />
-                <div style="font-size:11.5px;color:var(--muted);text-align:center;">Scan with WhatsApp > Linked Devices
+                <div style="font-size:11.5px;color:var(--muted);text-align:center;">Scan with WhatsApp > Linked
+                  Devices
                   > Link a Device</div>
                 <div style="display:flex;align-items:center;gap:6px;font-size:11px;color:var(--green2);"><span
                     class="live-pulse"></span> Waiting for scan...</div>
@@ -4857,9 +5100,11 @@
               <div style="flex:1;">
                 <div style="font-size:15px;font-weight:800;color:#fff;margin-bottom:6px;"><i class="fab fa-whatsapp"
                     style="color:#25D366;margin-right:8px;"></i>Connect WhatsApp</div>
-                <div style="font-size:12.5px;color:var(--muted);margin-bottom:14px;">Scan the QR code with your WhatsApp
+                <div style="font-size:12.5px;color:var(--muted);margin-bottom:14px;">Scan the QR code with your
+                  WhatsApp
                   to connect. Old chats will auto-sync to database.</div>
-                <button class="btn btn-green" id="wa-get-qr-btn" onclick="waGetQR()"><i class="fas fa-qrcode"></i> Show
+                <button class="btn btn-green" id="wa-get-qr-btn" onclick="waGetQR()"><i class="fas fa-qrcode"></i>
+                  Show
                   QR Code</button>
                 <button class="btn btn-red btn-sm" onclick="waResetConnection()" style="margin-left:8px;"><i
                     class="fas fa-redo"></i> Reset & Reconnect</button>
@@ -5252,7 +5497,8 @@
                 <span class="badge b-cyan" id="mkt-contact-total">0</span>
               </div>
               <div id="mkt-contacts-list" style="overflow-y:auto;max-height:260px;">
-                <div style="text-align:center;padding:30px;color:var(--muted);font-size:12px;">No contact data yet</div>
+                <div style="text-align:center;padding:30px;color:var(--muted);font-size:12px;">No contact data yet
+                </div>
               </div>
             </div>
 
@@ -5311,7 +5557,8 @@
                   </thead>
                   <tbody id="broadcast-tbody">
                     <tr>
-                      <td colspan="7" style="text-align:center;padding:20px;color:var(--muted);">No broadcasts yet</td>
+                      <td colspan="7" style="text-align:center;padding:20px;color:var(--muted);">No broadcasts yet
+                      </td>
                     </tr>
                   </tbody>
                 </table>
@@ -5421,7 +5668,8 @@
                     </button>
                     <div id="bc-fgcolor-popup"
                       style="display:none;position:absolute;top:34px;left:0;z-index:999;background:var(--card);border:1px solid var(--border2);border-radius:8px;padding:10px;box-shadow:0 4px 20px rgba(0,0,0,0.4);min-width:160px;">
-                      <div style="font-size:10px;color:var(--muted);margin-bottom:6px;font-weight:600;">TEXT COLOR</div>
+                      <div style="font-size:10px;color:var(--muted);margin-bottom:6px;font-weight:600;">TEXT COLOR
+                      </div>
                       <div style="display:flex;flex-wrap:wrap;gap:5px;margin-bottom:8px;">
                         <span onclick="bcPickColor('fg','#000000')"
                           style="width:20px;height:20px;border-radius:4px;background:#000000;cursor:pointer;border:2px solid transparent;"></span>
@@ -5460,7 +5708,8 @@
                     </button>
                     <div id="bc-bgcolor-popup"
                       style="display:none;position:absolute;top:34px;left:0;z-index:999;background:var(--card);border:1px solid var(--border2);border-radius:8px;padding:10px;box-shadow:0 4px 20px rgba(0,0,0,0.4);min-width:160px;">
-                      <div style="font-size:10px;color:var(--muted);margin-bottom:6px;font-weight:600;">HIGHLIGHT COLOR
+                      <div style="font-size:10px;color:var(--muted);margin-bottom:6px;font-weight:600;">HIGHLIGHT
+                        COLOR
                       </div>
                       <div style="display:flex;flex-wrap:wrap;gap:5px;margin-bottom:8px;">
                         <span onclick="bcPickColor('bg','transparent')"
@@ -5534,7 +5783,8 @@
                     </div>
                   </div>
                   <button type="button" class="btn btn-ghost btn-xs" onmousedown="bcToolbarMousedown(event)"
-                    onclick="bcInsertSignature()" title="Signature"><i class="fas fa-signature"></i> Signature</button>
+                    onclick="bcInsertSignature()" title="Signature"><i class="fas fa-signature"></i>
+                    Signature</button>
                   <button type="button" class="btn btn-ghost btn-xs"
                     onmousedown="bcToolbarMousedown(event);_bcSavedSel=window.getSelection()&&window.getSelection().rangeCount>0?window.getSelection().getRangeAt(0).cloneRange():null"
                     onclick="openInsertHtmlModal('bc-html')" title="Insert HTML (Auto-transforms for Outlook)
@@ -6148,7 +6398,8 @@
         <i class="fas fa-times modal-close" onclick="closeModal('contact-modal')"></i>
       </div>
       <div class="form-row">
-        <div><label class="form-label">First Name *</label><input class="inp" id="c-fname" placeholder="Ramesh" /></div>
+        <div><label class="form-label">First Name *</label><input class="inp" id="c-fname" placeholder="Ramesh" />
+        </div>
         <div><label class="form-label">Last Name *</label><input class="inp" id="c-lname" placeholder="Mehta" /></div>
       </div>
       <div class="form-group"><label class="form-label">Company *</label><input class="inp" id="c-company"
@@ -19405,81 +19656,353 @@ ${plainText}`;
     }
     let currentRecordingPage = 1;
     let totalRecordingPages = 1;
+    let pbxRecordingLimit = 10;
+    let pbxCurrentFolder = '';
+    let pbxBackupInterval = null;
     async function pbxLoadRecordings() {
 
       const list = document.getElementById('pbx-recordings-list');
-      list.innerHTML = `<div style="text-align:center;padding:40px;"><div class="spin-loader" style="margin:0 auto 10px;"></div>Scanning recordings...</div>`;
+
+      list.innerHTML = `
+        <div style="padding:30px;text-align:center;">
+          <div class="spin-loader" style="margin:auto;"></div>
+          <div style="margin-top:10px;">Loading recordings tree...</div>
+        </div>
+      `;
 
       try {
+
         const res = await fetch(
-          `${API_BASE}/calls/recordings?page=${currentRecordingPage}&limit=20`,
+          `${API_BASE}/calls/recordings/tree`,
           { headers: getAuthHeaders() }
         );
+
         const data = await res.json();
-        totalRecordingPages = data.total_pages || 1;
-        if (!data.recordings || !data.recordings.length) {
-          list.innerHTML = `<div style="text-align:center;padding:40px;color:var(--muted);"><i class="fas fa-microphone-slash" style="font-size:32px;display:block;margin-bottom:10px;opacity:0.3;"></i>No recordings found in server directory.</div>`;
+
+        if (!data.tree || !data.tree.length) {
+
+          list.innerHTML = `
+            <div style="padding:20px;color:var(--muted);">
+              No recordings found.
+            </div>
+          `;
+
           return;
         }
 
+        function renderSidebarTree(nodes, level = 0) {
+
+          return nodes.map(node => {
+
+            const hasChildren =
+              node.children &&
+              node.children.length > 0;
+
+            return `
+      <div>
+
+        <div
+          onclick="
+            event.stopPropagation();
+
+            ${hasChildren
+                ? `toggleFolderOnly(this, '${node.path}', '${node.name}')`
+                : ''
+              }
+
+            openPBXFolder('${node.path}')
+          "
+          style="
+            display:flex;
+            align-items:center;
+            gap:8px;
+            padding:10px 12px;
+            margin-left:${level * 18}px;
+            border-radius:10px;
+            cursor:pointer;
+            color:white;
+            font-size:14px;
+            transition:0.2s;
+          "
+          onmouseover="this.style.background='rgba(255,255,255,0.06)'"
+          onmouseout="this.style.background='transparent'"
+        >
+
+          ${hasChildren
+                ? '📂'
+                : '📁'
+              }
+
+          <span>
+            ${escHtml(node.name)}
+          </span>
+
+        </div>
+
+        ${hasChildren
+                ? `
+              <div
+                class="recording-folder-children"
+                style="
+                  padding-left:10px;
+                "
+              >
+                ${renderSidebarTree(
+                  node.children,
+                  level + 1
+                )}
+              </div>
+            `
+                : ''
+              }
+
+      </div>
+    `;
+
+          }).join('');
+
+        }
+
         list.innerHTML = `
-      <div style="display:grid;grid-template-columns:repeat(auto-fill, minmax(300px, 1fr));gap:12px;">
-        ${data.recordings.map(r => `
-          <div class="card" style="padding:12px;background:var(--bg2);">
-            <div style="display:flex;justify-content:space-between;margin-bottom:8px;">
-              <div style="font-size:12.5px;font-weight:700;color:var(--text);">${escHtml(r.filename)}</div>
-              <div style="font-size:11px;color:var(--muted);">${r.size_label}</div>
-            </div>
-            <div style="font-size:11px;color:var(--muted2);margin-bottom:6px;">
-              Modified: ${new Date(r.created_at).toLocaleString()}
-            </div>
+          <div style="padding:10px;">
+            ${renderSidebarTree(data.tree)}
+          </div>
+        `;
+
+      } catch (err) {
+
+        list.innerHTML = `
+          <div style="padding:20px;color:red;">
+            ${escHtml(err.message)}
+          </div>
+        `;
+
+      }
+
+    }
+
+    function toggleFolderOnly(el) {
+
+      const child = el.parentElement.querySelector('.recording-folder-children');
+
+      if (!child) return;
+
+      child.style.display =
+        child.style.display === 'none' ? 'block' : 'none';
+    }
+
+
+    async function openPBXFolder(folderPath, page = 1) {
+
+      pbxCurrentFolder = folderPath;
+
+      // ACTIVE SIDEBAR STATE
+      document
+        .querySelectorAll('.pbx-folder-row')
+        .forEach(el => {
+
+          el.classList.remove('active-folder');
+
+          el.style.background = 'transparent';
+        });
+
+      // RIGHT PANEL
+      const panel =
+        document.getElementById('pbx-right-panel');
+
+      // BREADCRUMB
+      const breadcrumb =
+        document.getElementById('pbx-breadcrumb');
+
+      breadcrumb.innerHTML =
+        folderPath.replaceAll('/', ' › ');
+
+      panel.innerHTML = `
+    <div style="
+      text-align:center;
+      padding:40px;
+      color:#888;
+    ">
+      Loading recordings...
+    </div>
+  `;
+
+      try {
+
+        const res = await fetch(
+          `${API_BASE}/calls/recordings/folder?path=${encodeURIComponent(folderPath)}&page=${page}&limit=10`,
+          { headers: getAuthHeaders() }
+        );
+
+        const data = await res.json();
+
+        panel.innerHTML = `
+
+      <!-- HEADER -->
+      <div style="
+        display:grid;
+        grid-template-columns:1fr 120px 180px 320px;
+        gap:16px;
+        padding:14px 16px;
+        background:rgba(255,255,255,0.04);
+        border-radius:12px;
+        margin-bottom:10px;
+        font-weight:600;
+        color:#ddd;
+      ">
+        <div>Name</div>
+        <div>Type</div>
+        <div>Size</div>
+        <div>Audio</div>
+      </div>
+
+      ${data.files.map(file => `
+
+        <div style="
+          display:grid;
+          grid-template-columns:1fr 120px 180px 320px;
+          gap:16px;
+          align-items:center;
+          padding:14px 16px;
+          margin-bottom:8px;
+          border-radius:14px;
+          background:rgba(255,255,255,0.03);
+          border:1px solid rgba(255,255,255,0.04);
+        ">
+
+          <!-- FILE -->
+          <div style="
+            display:flex;
+            align-items:center;
+            gap:12px;
+          ">
 
             <div style="
-              font-size:11px;
-              color:#7dd3fc;
-              margin-bottom:10px;
-              word-break:break-word;
-              background:rgba(255,255,255,0.03);
-              padding:6px 8px;
-              border-radius:6px;
+              width:34px;
+              height:34px;
+              border-radius:10px;
+              background:#7c3aed;
+              display:flex;
+              align-items:center;
+              justify-content:center;
+              font-size:16px;
             ">
-              📁 ${escHtml(r.relative_path || '')}
+              🎵
             </div>
 
-            <audio controls preload="metadata" style="width:100%;height:32px;">
-              <source
-                src="${API_BASE}/calls/recordings/${encodeURIComponent(r.relative_path)}"
-                type="audio/wav">
-              Your browser does not support audio playback.
-            </audio>
+            <div>
+
+              <div style="
+                color:white;
+                font-size:14px;
+                margin-bottom:4px;
+              ">
+                ${file.filename}
+              </div>
+
+              <div style="
+                color:#777;
+                font-size:12px;
+              ">
+                ${file.modified_at || ''}
+              </div>
+
+            </div>
+
           </div>
-        `).join('')}
+
+          <!-- TYPE -->
+          <div style="
+            color:#bbb;
+            font-size:13px;
+          ">
+            WAV File
+          </div>
+
+          <!-- SIZE -->
+          <div style="
+            color:#bbb;
+            font-size:13px;
+          ">
+            ${file.size_label}
+          </div>
+
+          <!-- AUDIO -->
+          <div>
+
+            <audio
+              controls
+              src="${window.location.origin}${file.url}"
+              style="
+                width:100%;
+                height:38px;
+              "
+            ></audio>
+
+          </div>
+
+        </div>
+
+      `).join('')}
+
+      <!-- PAGINATION -->
+      <div style="
+        display:flex;
+        justify-content:center;
+        align-items:center;
+        gap:14px;
+        margin-top:20px;
+      ">
+
+        <button
+          class="btn btn-ghost btn-sm"
+          onclick="
+            openPBXFolder(
+              '${folderPath}',
+              ${data.page - 1}
+            )
+          "
+          ${data.page <= 1 ? 'disabled' : ''}
+        >
+          Prev
+        </button>
+
+        <div style="color:white;">
+          Page ${data.page} / ${data.total_pages}
+        </div>
+
+        <button
+          class="btn btn-ghost btn-sm"
+          onclick="
+            openPBXFolder(
+              '${folderPath}',
+              ${data.page + 1}
+            )
+          "
+          ${data.page >= data.total_pages
+            ? 'disabled'
+            : ''
+          }
+        >
+          Next
+        </button>
+
       </div>
 
-    <div style="display:flex;justify-content:center;align-items:center;gap:12px;margin-top:20px;">
-
-      <button
-        onclick="changeRecordingPage(${currentRecordingPage - 1})"
-        ${currentRecordingPage <= 1 ? 'disabled' : ''}
-        style="padding:8px 14px;border:none;border-radius:8px;background:#222;color:white;cursor:pointer;">
-        Prev
-      </button>
-
-      <div style="color:white;font-size:13px;">
-        Page ${currentRecordingPage} of ${totalRecordingPages}
-      </div>
-
-      <button
-        onclick="changeRecordingPage(${currentRecordingPage + 1})"
-        ${currentRecordingPage >= totalRecordingPages ? 'disabled' : ''}
-        style="padding:8px 14px;border:none;border-radius:8px;background:#222;color:white;cursor:pointer;">
-        Next
-      </button>
-
-    </div>
     `;
+
       } catch (err) {
-        list.innerHTML = `<div style="padding:20px;color:var(--red2);">${escHtml(err.message)}</div>`;
+
+        console.error(err);
+
+        panel.innerHTML = `
+      <div style="
+        color:red;
+        padding:20px;
+      ">
+        Failed loading recordings
+      </div>
+    `;
       }
     }
 
@@ -19489,6 +20012,186 @@ ${plainText}`;
       currentRecordingPage = page;
 
       pbxLoadRecordings();
+    }
+
+    async function startPBXBackup() {
+
+      const btn =
+        document.getElementById(
+          'pbx-backup-btn'
+        );
+
+      const status =
+        document.getElementById(
+          'pbx-backup-status'
+        );
+
+      const details =
+        document.getElementById(
+          'pbx-backup-details'
+        );
+
+      const fill =
+        document.getElementById(
+          'pbx-backup-progress-fill'
+        );
+
+      const text =
+        document.getElementById(
+          'pbx-backup-progress-text'
+        );
+
+      // RESET
+      clearInterval(pbxBackupInterval);
+
+      fill.style.width = '0%';
+
+      text.innerText = '0%';
+
+      details.innerHTML =
+        'Preparing PBX backup...';
+
+      // SHOW UI
+      status.style.display = 'flex';
+
+      details.style.display = 'block';
+
+      // BUTTON LOADING
+      btn.disabled = true;
+
+      btn.innerHTML = `
+    <i class="fas fa-spinner fa-spin"></i>
+    Creating Backup...
+  `;
+
+      // FAKE FRONTEND PROGRESS
+      // Later we replace with backend API polling
+
+      let percent = 0;
+
+      let files = 0;
+
+      let totalFiles = 7654;
+
+      let totalSize = 274;
+
+      pbxBackupInterval = setInterval(() => {
+
+        // SLOWER TOWARDS END
+        if (percent < 70) {
+
+          percent += Math.random() * 7;
+
+        } else if (percent < 90) {
+
+          percent += Math.random() * 3;
+
+        } else {
+
+          percent += Math.random() * 1.2;
+        }
+
+        if (percent > 100) {
+
+          percent = 100;
+        }
+
+        files += Math.floor(
+          Math.random() * 180
+        );
+
+        if (files > totalFiles) {
+
+          files = totalFiles;
+        }
+
+        const currentSize =
+          (
+            (files / totalFiles)
+            * totalSize
+          ).toFixed(2);
+
+        // UPDATE BAR
+        fill.style.width =
+          percent + '%';
+
+        // UPDATE %
+        text.innerText =
+          Math.floor(percent) + '%';
+
+        // DETAILS
+        details.innerHTML = `
+      <div style="
+        display:flex;
+        gap:18px;
+        flex-wrap:wrap;
+      ">
+
+        <div>
+          📁 Files:
+          <b>${files}</b>
+          /
+          ${totalFiles}
+        </div>
+
+        <div>
+          💾 Size:
+          <b>${currentSize} MB</b>
+          /
+          ${totalSize} MB
+        </div>
+
+        <div style="
+          color:#fbbf24;
+        ">
+          Creating voicemail backup...
+        </div>
+
+      </div>
+    `;
+
+        // COMPLETE
+        if (percent >= 100) {
+
+          clearInterval(
+            pbxBackupInterval
+          );
+
+          fill.style.width = '100%';
+
+          text.innerText = '100%';
+
+          details.innerHTML = `
+        <div style="
+          color:#22c55e;
+          font-weight:600;
+        ">
+          ✅ Backup completed successfully
+        </div>
+      `;
+
+          btn.disabled = false;
+
+          btn.innerHTML = `
+        <i class="fas fa-check"></i>
+        Backup Complete
+      `;
+
+          // AUTO REFRESH TREE
+          pbxLoadRecordings();
+
+          // RESET BUTTON
+          setTimeout(() => {
+
+            btn.innerHTML = `
+          <i class="fas fa-database"></i>
+          Create Backup
+        `;
+
+          }, 4000);
+        }
+
+      }, 800);
     }
 
     async function pbxCreateBackup() {
@@ -19528,6 +20231,7 @@ ${plainText}`;
           <button class="btn btn-ghost btn-xs" onclick="pbxDownloadBackup(${jsArg(b.filename)})" title="Download"><i class="fas fa-download"></i> Download</button>
           <button class="btn btn-ghost btn-xs" onclick="pbxRestoreBackup(${jsArg(b.filename)})" title="Restore"><i class="fas fa-undo"></i> Restore</button>
           <button class="btn btn-red btn-xs" onclick="pbxDeleteBackup(${jsArg(b.filename)})" title="Delete"><i class="fas fa-trash"></i> Delete</button>
+          <button class="btn btn-gold btn-xs" onclick="pbxAppendBackup(${jsArg(b.filename)})" title="Append"><i class="fas fa-plus-circle"></i> Append</button>
         </div>
       </div>
     `).join('');
@@ -19625,6 +20329,171 @@ ${plainText}`;
         }
       } catch (err) {
         notify('Restore Failed', err.message, 'var(--red2)', 'fas fa-exclamation-circle');
+      }
+    }
+
+    async function pbxAppendBackup(filename) {
+
+      if (
+        !confirm(
+          `Append records from ${filename}?\n\n` +
+          `Duplicate records will be skipped automatically.`
+        )
+      ) return;
+
+      notify(
+        'Appending Records',
+        'Merging backup data into existing database...',
+        'var(--gold)',
+        'fas fa-plus-circle'
+      );
+
+      try {
+
+        const res = await fetch(`${API_BASE}/calls/backup/append`, {
+          method: 'POST',
+          headers: getAuthHeaders(),
+          body: JSON.stringify({ filename })
+        });
+
+        const data = await res.json();
+
+        if (res.ok) {
+
+          let html = `
+            <div style="
+              position:fixed;
+              inset:0;
+              background:rgba(0,0,0,0.7);
+              z-index:99999;
+              display:flex;
+              align-items:center;
+              justify-content:center;
+              padding:20px;
+            " id="pbx-append-modal">
+
+              <div style="
+                width:min(1100px,95vw);
+                max-height:90vh;
+                overflow:hidden;
+                background:var(--card);
+                border:1px solid var(--border);
+                border-radius:16px;
+                box-shadow:0 20px 60px rgba(0,0,0,0.5);
+                display:flex;
+                flex-direction:column;
+              ">
+
+                <div style="
+                  padding:16px 18px;
+                  border-bottom:1px solid var(--border);
+                  display:flex;
+                  justify-content:space-between;
+                  align-items:center;
+                ">
+                  <div style="font-weight:700;font-size:16px;">
+                    <i class="fas fa-plus-circle" style="color:var(--gold);"></i>
+                    Append Results
+                  </div>
+
+                  <button class="btn btn-ghost btn-xs"
+                    onclick="document.getElementById('pbx-append-modal').remove()">
+                    ✕
+                  </button>
+                </div>
+
+                <div style="
+                  padding:18px;
+                  overflow:auto;
+                  font-size:13px;
+                ">
+
+                  <div style="margin-bottom:16px;">
+                    <b>Total:</b> ${data.total || 0}
+                    &nbsp;&nbsp;
+                    <span style="color:#4ade80;">
+                      <b>Added:</b> ${data.added || 0}
+                    </span>
+                    &nbsp;&nbsp;
+                    <span style="color:#f87171;">
+                      <b>Skipped:</b> ${data.skipped || 0}
+                    </span>
+                  </div>
+
+                  <div style="
+                    display:grid;
+                    grid-template-columns:1fr 1fr;
+                    gap:18px;
+                  ">
+
+                    <div>
+                      <div style="
+                        font-weight:700;
+                        margin-bottom:10px;
+                        color:#4ade80;
+                      ">
+                        Added Records
+                      </div>
+
+                      <pre style="
+                        background:#0b1020;
+                        border:1px solid var(--border);
+                        border-radius:10px;
+                        padding:12px;
+                        overflow:auto;
+                        max-height:500px;
+                        font-size:12px;
+                      ">${JSON.stringify(data.addedRecords || [], null, 2)}</pre>
+                    </div>
+
+                    <div>
+                      <div style="
+                        font-weight:700;
+                        margin-bottom:10px;
+                        color:#f87171;
+                      ">
+                        Skipped Duplicate Records
+                      </div>
+
+                      <pre style="
+                        background:#0b1020;
+                        border:1px solid var(--border);
+                        border-radius:10px;
+                        padding:12px;
+                        overflow:auto;
+                        max-height:500px;
+                        font-size:12px;
+                      ">${JSON.stringify(data.skippedRecords || [], null, 2)}</pre>
+                    </div>
+
+                  </div>
+                </div>
+              </div>
+            </div>
+          `;
+
+          document.body.insertAdjacentHTML('beforeend', html);
+
+          loadCallLogs();
+
+          if (contactsSource === 'pbx') {
+            loadPbxContactsDirectory();
+          }
+        } else {
+
+          throw new Error(data.error || 'Append failed');
+
+        }
+
+      } catch (err) {
+
+        notify(
+          'Append Failed',
+          err.message,
+          'var(--red2)',
+          'fas fa-exclamation-circle'
+        );
+
       }
     }
 
@@ -19895,7 +20764,8 @@ ${plainText}`;
             </label>
             <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer;">
               <input type="radio" name="tm-channel" id="tm-channel-both" value="both"
-                onchange="updateTaskModalAssigneeDisplay()"> <i class="fas fa-bell" style="color:var(--gold);"></i> Both
+                onchange="updateTaskModalAssigneeDisplay()"> <i class="fas fa-bell" style="color:var(--gold);"></i>
+              Both
             </label>
           </div>
         </div>
@@ -20308,7 +21178,8 @@ ${plainText}`;
           <button type="button" class="btn btn-ghost btn-xs" onmousedown="composeToolbarMousedown(event)"
             onclick="composeInsertHR()" title="Horizontal Line"><i class="fas fa-minus"></i> HR</button>
           <button type="button" class="btn btn-ghost btn-xs" onmousedown="composeToolbarMousedown(event)"
-            onclick="composeInsertMarquee()" title="Scrolling text"><i class="fas fa-arrows-alt-h"></i> Marquee</button>
+            onclick="composeInsertMarquee()" title="Scrolling text"><i class="fas fa-arrows-alt-h"></i>
+            Marquee</button>
           <button type="button" class="btn btn-ghost btn-xs" onmousedown="composeToolbarMousedown(event)"
             onclick="composeInsertTable()" title="Insert Table"><i class="fas fa-table"></i> Table</button>
           <button type="button" class="btn btn-ghost btn-xs" onmousedown="composeToolbarMousedown(event)"
@@ -20683,7 +21554,8 @@ Preview shows final Outlook-compatible version"><i class="fas fa-code"></i> HTML
         <span><i class="fas fa-eye" style="color:var(--blue2);margin-right:8px;"></i>Template Preview</span>
         <span class="modal-close" onclick="closeModal('et-preview-modal')"><i class="fas fa-times"></i></span>
       </div>
-      <div id="et-preview-subject" style="font-size:13px;font-weight:700;color:var(--muted2);margin-bottom:10px;"></div>
+      <div id="et-preview-subject" style="font-size:13px;font-weight:700;color:var(--muted2);margin-bottom:10px;">
+      </div>
       <div style="border:1px solid var(--border);border-radius:8px;overflow:hidden;background:#fff;">
         <iframe id="et-preview-iframe" style="width:100%;min-height:400px;border:none;display:block;background:#fff;"
           sandbox="allow-same-origin"></iframe>
@@ -20735,7 +21607,8 @@ Preview shows final Outlook-compatible version"><i class="fas fa-code"></i> HTML
           <label style="cursor:pointer;display:flex;align-items:center;gap:5px;font-size:12px;"><input type="radio"
               name="sig-style" value="card" onchange="etRefreshSigPreview()"> Card (boxed)</label>
           <label style="cursor:pointer;display:flex;align-items:center;gap:5px;font-size:12px;"><input type="radio"
-              name="sig-style" value="custom" onchange="etRefreshSigPreview();etToggleCustomSig()"> Ã¢Å“ÂÃ¯Â¸Â Custom
+              name="sig-style" value="custom" onchange="etRefreshSigPreview();etToggleCustomSig()"> Ã¢Å“ÂÃ¯Â¸Â
+            Custom
             (build
             your own)</label>
         </div>
@@ -20833,7 +21706,8 @@ Preview shows final Outlook-compatible version"><i class="fas fa-code"></i> HTML
           </div>
         </div>
         <div class="form-group" style="margin-bottom:8px;">
-          <label class="form-label">Contact Info Text <span style="color:var(--muted);font-weight:400;">(HTML allowed —
+          <label class="form-label">Contact Info Text <span style="color:var(--muted);font-weight:400;">(HTML allowed
+              —
               use &lt;br&gt; for new lines)</span></label>
           <textarea class="inp" id="csig-contact" rows="5"
             style="font-size:12px;font-family:'JetBrains Mono',monospace;" oninput="etRefreshSigPreview()">
@@ -20846,7 +21720,8 @@ Nagpur, Maharashtra, 440017, India<br>
         </div>
 
         <!-- Row 2: Badge images -->
-        <div style="font-size:11px;color:var(--muted);margin-bottom:6px;font-weight:600;margin-top:8px;">ROW 2 — Badge /
+        <div style="font-size:11px;color:var(--muted);margin-bottom:6px;font-weight:600;margin-top:8px;">ROW 2 — Badge
+          /
           Certification Images</div>
         <div style="font-size:11px;color:var(--muted2);margin-bottom:8px;font-style:italic;">Badges will be displayed
           horizontally in a row. Width is required, height auto-scales to maintain aspect ratio (unless specified).
@@ -20856,7 +21731,8 @@ Nagpur, Maharashtra, 440017, India<br>
           onclick="csigAddBadge()"><i class="fas fa-plus"></i> Add Badge Image</button>
 
         <!-- Row 3: Extra block (e.g. Ariba button image) -->
-        <div style="font-size:11px;color:var(--muted);margin-bottom:6px;font-weight:600;margin-top:12px;">ROW 3 — Extra
+        <div style="font-size:11px;color:var(--muted);margin-bottom:6px;font-weight:600;margin-top:12px;">ROW 3 —
+          Extra
           Block (optional)</div>
         <div class="form-row" style="margin-bottom:0;">
           <div>
