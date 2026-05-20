@@ -4670,11 +4670,6 @@
 
                   </div>
 
-                  <button id="pbx-backup-btn" class="btn btn-warning btn-sm" onclick="startPBXBackup()">
-                    <i class="fas fa-database"></i>
-                    Create Backup
-                  </button>
-
                   <!-- BACKUP STATUS -->
                   <div id="pbx-backup-status" style="
                     display:none;
@@ -7181,6 +7176,7 @@ Always write in a professional yet warm Indian B2B communication style. Use form
         ==========================================
         */
 
+        console.log(contacts[0]);
         const res = await fetch('/api/outlook-backups/create', {
           method: 'POST',
           headers: {
@@ -7267,7 +7263,14 @@ Always write in a professional yet warm Indian B2B communication style. Use form
           </div>
         </div>
 
-        <div style="display:flex;gap:8px;">
+        <div style="display:flex;gap:8px;align-items:center;">
+
+          <button class="btn btn-ghost btn-xs"
+            onclick="previewOutlookBackup('${file.name}')"
+            title="Preview Contacts">
+            <i class="fas fa-eye"></i>
+          </button>
+
           <button class="btn btn-ghost btn-xs"
             onclick="downloadOutlookBackup('${file.name}')">
             <i class="fas fa-download"></i>
@@ -7295,6 +7298,447 @@ Always write in a professional yet warm Indian B2B communication style. Use form
       </div>
     `;
       }
+    }
+
+    async function previewOutlookBackup(filename) {
+
+      try {
+
+        const modal =
+          document.getElementById('outlook-preview-modal');
+
+        const list =
+          document.getElementById('preview-contact-list');
+
+        const count =
+          document.getElementById('preview-contact-count');
+
+        modal.style.display = 'flex';
+
+        list.innerHTML = `
+          <div style="
+            text-align:center;
+            padding:40px;
+            color:var(--muted2);
+          ">
+            Loading contacts...
+          </div>
+        `;
+
+        const res = await fetch(
+          `/api/outlook-backups/preview/${encodeURIComponent(filename)}`
+        );
+
+        const data = await res.json();
+
+        const contacts = data.contacts || [];
+
+        /*
+        ==================================================
+        DETECT REAL / SAVED CONTACT
+        ==================================================
+        */
+
+        function isRealContact(contact) {
+
+          const displayName =
+            (contact.displayName || '')
+              .trim()
+              .toLowerCase();
+
+          const email =
+            (
+              contact.emailAddresses?.[0]?.address ||
+              ''
+            )
+              .trim()
+              .toLowerCase();
+
+          const cleanDisplay =
+            displayName.replace(/\s/g, '');
+
+          const cleanEmail =
+            email.replace(/\s/g, '');
+
+          const hasDifferentName =
+            cleanDisplay &&
+            cleanEmail &&
+            cleanDisplay !== cleanEmail;
+
+          const hasExtraDetails =
+            !!(
+              contact.companyName ||
+              contact.mobilePhone ||
+              contact.businessPhones?.length
+            );
+
+          return hasDifferentName || hasExtraDetails;
+        }
+
+        /*
+        ==================================================
+        SORT CONTACTS
+        ==================================================
+        */
+
+        contacts.sort((a, b) => {
+
+          const aSaved = isRealContact(a);
+          const bSaved = isRealContact(b);
+
+          // Real contacts first
+          if (aSaved !== bSaved) {
+            return bSaved - aSaved;
+          }
+
+          // Alphabetical inside groups
+          const aName =
+            (
+              a.displayName ||
+              a.emailAddresses?.[0]?.address ||
+              ''
+            ).toLowerCase();
+
+          const bName =
+            (
+              b.displayName ||
+              b.emailAddresses?.[0]?.address ||
+              ''
+            ).toLowerCase();
+
+          return aName.localeCompare(bName);
+
+        });
+
+        count.innerText =
+          `${contacts.length} Contacts`;
+
+        if (!contacts.length) {
+
+          list.innerHTML = `
+            <div style="
+              text-align:center;
+              padding:40px;
+              color:var(--muted2);
+            ">
+              No contacts found in backup
+            </div>
+          `;
+
+          return;
+        }
+
+        /*
+        ==================================================
+        RENDER CONTACTS
+        ==================================================
+        */
+
+        /*
+          ==================================================
+          GROUP CONTACTS
+          ==================================================
+          */
+
+          const savedContacts =
+            contacts.filter(contact =>
+              isRealContact(contact)
+            );
+
+          const unsavedContacts =
+            contacts.filter(contact =>
+              !isRealContact(contact)
+            );
+
+          /*
+          ==================================================
+          RENDER CONTACT LIST
+          ==================================================
+          */
+
+          const renderContacts = (arr) => {
+
+            if (!arr.length) {
+
+              return `
+                <div style="
+                  text-align:center;
+                  padding:40px;
+                  color:var(--muted2);
+                ">
+                  No contacts found
+                </div>
+              `;
+            }
+
+            return arr.map(contact => {
+
+              const displayName =
+                (contact.displayName || '').trim();
+
+              const email =
+                (
+                  contact.emailAddresses?.[0]?.address ||
+                  ''
+                ).trim();
+
+              const hasSavedContact =
+                isRealContact(contact);
+
+              const finalName =
+                displayName ||
+                email ||
+                'Unknown Contact';
+
+              const initials =
+                finalName.charAt(0).toUpperCase();
+
+              return `
+
+                <div style="
+                  display:flex;
+                  justify-content:space-between;
+                  align-items:center;
+                  padding:14px;
+                  margin-bottom:12px;
+                  border-radius:14px;
+                  background:rgba(255,255,255,0.03);
+                  border:1px solid rgba(255,255,255,0.06);
+                ">
+
+                  <div style="
+                    display:flex;
+                    align-items:center;
+                    gap:14px;
+                    min-width:0;
+                  ">
+
+                    <div style="
+                      width:42px;
+                      height:42px;
+                      border-radius:50%;
+                      background:#173b6b;
+                      display:flex;
+                      align-items:center;
+                      justify-content:center;
+                      font-weight:700;
+                      color:white;
+                      flex-shrink:0;
+                    ">
+                      ${initials}
+                    </div>
+
+                    <div style="min-width:0;">
+
+                      <div style="
+                        font-size:14px;
+                        font-weight:700;
+                        color:white;
+                      ">
+                        ${finalName}
+                      </div>
+
+                      <div style="
+                        font-size:12px;
+                        color:var(--muted2);
+                        margin-top:3px;
+                      ">
+                        ${email || 'No Email'}
+                      </div>
+
+                    </div>
+
+                  </div>
+
+                  <div style="
+                    padding:4px 10px;
+                    border-radius:999px;
+                    font-size:10px;
+                    font-weight:600;
+                    background:${hasSavedContact
+                      ? 'rgba(34,197,94,0.15)'
+                      : 'rgba(255,255,255,0.08)'};
+
+                    color:${hasSavedContact
+                      ? '#22c55e'
+                      : '#cbd5e1'};
+                  ">
+                    ${hasSavedContact
+                      ? 'Saved Contact'
+                      : 'Unsaved'}
+                  </div>
+
+                </div>
+
+              `;
+
+            }).join('');
+          };
+
+          /*
+          ==================================================
+          TABS UI
+          ==================================================
+          */
+
+          list.innerHTML = `
+
+            <div style="margin-bottom:18px;">
+
+              <input
+                type="text"
+                id="backup-contact-search"
+                placeholder="Search by name or email..."
+                oninput="filterBackupContacts()"
+                style="
+                  width:100%;
+                  padding:12px 14px;
+                  border-radius:12px;
+                  border:1px solid rgba(255,255,255,0.08);
+                  background:rgba(255,255,255,0.04);
+                  color:white;
+                  font-size:14px;
+                  outline:none;
+                "
+              />
+
+            </div>
+
+            <div style="
+              display:flex;
+              gap:10px;
+              margin-bottom:20px;
+            ">
+
+              <button
+                id="saved-tab-btn"
+                onclick="showBackupTab('saved')"
+                style="
+                  padding:10px 16px;
+                  border:none;
+                  border-radius:10px;
+                  background:#22c55e;
+                  color:white;
+                  font-weight:700;
+                  cursor:pointer;
+                "
+              >
+                Saved (${savedContacts.length})
+              </button>
+
+              <button
+                id="unsaved-tab-btn"
+                onclick="showBackupTab('unsaved')"
+                style="
+                  padding:10px 16px;
+                  border:none;
+                  border-radius:10px;
+                  background:rgba(255,255,255,0.08);
+                  color:white;
+                  font-weight:700;
+                  cursor:pointer;
+                "
+              >
+                Unsaved (${unsavedContacts.length})
+              </button>
+
+            </div>
+
+            <div id="saved-tab-content">
+              ${renderContacts(savedContacts)}
+            </div>
+
+            <div
+              id="unsaved-tab-content"
+              style="display:none;"
+            >
+              ${renderContacts(unsavedContacts)}
+            </div>
+
+          `;
+
+      } catch (err) {
+
+        console.error(err);
+
+        document.getElementById(
+          'preview-contact-list'
+        ).innerHTML = `
+          <div style="
+            text-align:center;
+            padding:40px;
+            color:#ef4444;
+          ">
+            Failed to load backup preview
+          </div>
+        `;
+      }
+    }
+
+    function showBackupTab(tab) {
+
+      const savedContent =
+        document.getElementById('saved-tab-content');
+
+      const unsavedContent =
+        document.getElementById('unsaved-tab-content');
+
+      const savedBtn =
+        document.getElementById('saved-tab-btn');
+
+      const unsavedBtn =
+        document.getElementById('unsaved-tab-btn');
+
+      if (tab === 'saved') {
+
+        savedContent.style.display = 'block';
+        unsavedContent.style.display = 'none';
+
+        savedBtn.style.background = '#22c55e';
+        unsavedBtn.style.background =
+          'rgba(255,255,255,0.08)';
+
+      } else {
+
+        savedContent.style.display = 'none';
+        unsavedContent.style.display = 'block';
+
+        unsavedBtn.style.background = '#ef4444';
+        savedBtn.style.background =
+          'rgba(255,255,255,0.08)';
+      }
+    }
+
+    function filterBackupContacts() {
+
+      const query =
+        document.getElementById(
+          'backup-contact-search'
+        )
+        .value
+        .trim()
+        .toLowerCase();
+
+      const cards =
+        document.querySelectorAll(
+          '#saved-tab-content > div, #unsaved-tab-content > div'
+        );
+
+      cards.forEach(card => {
+
+        const text =
+          card.innerText.toLowerCase();
+
+        card.style.display =
+          text.includes(query)
+            ? 'flex'
+            : 'none';
+      });
+    }
+
+    function closeOutlookPreview() {
+
+      document.getElementById('outlook-preview-modal').style.display = 'none';
     }
 
     function downloadOutlookBackup(name) {
@@ -15863,19 +16307,59 @@ ${plainText}`;
     // ── THEME TOGGLE ─────────────────────────────────────────────────────────────
     // ── WHATSAPP REAL-TIME ────────────────────────────────────────────────────────
     let waSocket = null;
+    let socketInitialized = false;
     let socket = null; // Unified alias for waSocket
     let waActiveJid = null;
     let waAllChats = [];
     var waLidMap = {};
+    let socketReconnectInProgress = false;
 
     function initWASocket() {
-      console.log('[DASHBOARD] 🚀 Initializing Unified Socket.IO Connection...');
-      waSocket = io(window.location.origin);
+
+      // Prevent duplicate initialization
+      if (socketInitialized && waSocket) {
+
+        console.log(
+          '[SOCKET] Reusing existing socket connection'
+        );
+
+        return waSocket;
+      }
+
+      // Cleanup old socket completely
+      if (waSocket) {
+
+        waSocket.removeAllListeners();
+
+        waSocket.disconnect();
+
+        waSocket = null;
+      }
+
+      socketInitialized = true;
+
+      console.log(
+        '[DASHBOARD] 🚀 Initializing Unified Socket.IO Connection...'
+      );
+
+      waSocket = io(
+        window.location.origin,
+        {
+          transports: ['websocket'],
+          upgrade: false,
+
+          reconnection: true,
+          reconnectionAttempts: Infinity,
+
+          reconnectionDelay: 2000,
+          reconnectionDelayMax: 10000,
+
+          timeout: 30000
+        }
+      );
+
       socket = waSocket;
 
-      waSocket.on('connect', () => {
-        console.log('[SOCKET] ✅ Connected to Backend System (Transport: ' + (waSocket.io.engine.transport.name || 'unknown') + ')');
-      });
       waSocket.on('wa:qr', ({ qr }) => {
         const img = document.getElementById('wa-qr-img');
         const wrap = document.getElementById('wa-qr-wrap');
@@ -16038,52 +16522,134 @@ ${plainText}`;
 
       // ── SOCKET CONNECTION RESILIENCE ─────────────────────────────────────────
       waSocket.on('disconnect', (reason) => {
-        console.warn('[Socket] Disconnected:', reason);
-        // Don't change WA UI on transport disconnect — server may just be restarting
-        const indicator = document.querySelector('[data-service="server"]');
-        if (indicator) indicator.style.color = 'var(--muted)';
+
+        console.warn(
+          '[Socket] Disconnected:',
+          reason
+        );
+
+        socketReconnectInProgress = true;
+
+        const indicator =
+          document.querySelector('[data-service="server"]');
+
+        if (indicator) {
+          indicator.style.color = 'var(--muted)';
+        }
       });
 
-      waSocket.on('connect', () => {
-        console.log('[Socket] Connected/Reconnected to server');
-        // Re-check WA status after reconnect so UI reflects actual state.
-        // Use a longer delay to let checkWAStatus() complete first on initial load.
-        setTimeout(async () => {
-          try {
-            // If already showing connected state, no need to re-check
-            const sb = document.getElementById('wa-status-bar');
-            if (sb && sb.style.display === 'block') return;
+      waSocket.on('connect', async () => {
 
-            const res = await fetch(API_BASE + '/wa/status');
-            if (!res.ok) return;
-            const data = await res.json();
-            if (data.connected) {
-              waOnConnected(data.phone, data.name);
-            } else if (data.hasQR) {
-              // QR is available — fetch and show it, but only if not already connected in UI
-              if (sb && sb.style.display === 'block') return; // connected in the meantime
-              const qRes = await fetch(API_BASE + '/wa/qr');
-              const qData = await qRes.json();
-              if (qData.qr) {
-                const img = document.getElementById('wa-qr-img');
-                const wrap = document.getElementById('wa-qr-wrap');
-                const btn = document.getElementById('wa-get-qr-btn');
-                if (img) img.src = qData.qr;
-                if (wrap) wrap.style.display = 'flex';
-                if (btn) btn.style.display = 'none';
-                const cb = document.getElementById('wa-connect-banner');
-                if (cb) cb.style.display = 'block';
-                if (sb) sb.style.display = 'none';
-              }
-            } else {
-              // Not connected and no QR — only show connect banner if not already showing connected state
-              if (sb && sb.style.display === 'block') return; // connected in the meantime
-              const cb = document.getElementById('wa-connect-banner');
-              if (cb) cb.style.display = 'block';
-              if (sb) sb.style.display = 'none';
+        console.log(
+          '[SOCKET] ✅ Connected to Backend System (Transport: ' +
+          (waSocket.io.engine.transport.name || 'unknown') +
+          ')'
+        );
+
+        const indicator =
+          document.querySelector('[data-service="server"]');
+
+        if (indicator) {
+          indicator.style.color = 'var(--green2)';
+        }
+
+        // First connect only
+        if (!socketReconnectInProgress) {
+          return;
+        }
+
+        socketReconnectInProgress = false;
+
+        console.log(
+          '[SOCKET] Reconnected — syncing UI state...'
+        );
+
+        setTimeout(async () => {
+
+          try {
+
+            const sb =
+              document.getElementById('wa-status-bar');
+
+            if (sb && sb.style.display === 'block') {
+              return;
             }
-          } catch (_) { }
-        }, 2000);
+
+            const res =
+              await fetch(API_BASE + '/wa/status');
+
+            if (!res.ok) {
+              return;
+            }
+
+            const data =
+              await res.json();
+
+            if (data.connected) {
+
+              waOnConnected(
+                data.phone,
+                data.name
+              );
+
+            } else if (data.hasQR) {
+
+              if (sb && sb.style.display === 'block') {
+                return;
+              }
+
+              const qRes =
+                await fetch(API_BASE + '/wa/qr');
+
+              const qData =
+                await qRes.json();
+
+              if (qData.qr) {
+
+                const img =
+                  document.getElementById('wa-qr-img');
+
+                const wrap =
+                  document.getElementById('wa-qr-wrap');
+
+                const btn =
+                  document.getElementById('wa-get-qr-btn');
+
+                const cb =
+                  document.getElementById('wa-connect-banner');
+
+                if (img) {
+                  img.src = qData.qr;
+                }
+
+                if (wrap) {
+                  wrap.style.display = 'flex';
+                }
+
+                if (btn) {
+                  btn.style.display = 'none';
+                }
+
+                if (cb) {
+                  cb.style.display = 'block';
+                }
+
+                if (sb) {
+                  sb.style.display = 'none';
+                }
+              }
+
+            }
+
+          } catch (err) {
+
+            console.error(
+              '[SOCKET] Recovery sync failed:',
+              err
+            );
+          }
+
+        }, 3000);
       });
 
       waSocket.on('connect_error', (err) => {
@@ -20041,9 +20607,6 @@ ${plainText}`;
           'pbx-backup-progress-text'
         );
 
-      // RESET
-      clearInterval(pbxBackupInterval);
-
       fill.style.width = '0%';
 
       text.innerText = '0%';
@@ -20051,165 +20614,175 @@ ${plainText}`;
       details.innerHTML =
         'Preparing PBX backup...';
 
-      // SHOW UI
       status.style.display = 'flex';
 
       details.style.display = 'block';
 
-      // BUTTON LOADING
       btn.disabled = true;
 
       btn.innerHTML = `
-    <i class="fas fa-spinner fa-spin"></i>
-    Creating Backup...
-  `;
+        <i class="fas fa-spinner fa-spin"></i>
+        Creating Backup...
+      `;
 
-      // FAKE FRONTEND PROGRESS
-      // Later we replace with backend API polling
+      try {
 
-      let percent = 0;
-
-      let files = 0;
-
-      let totalFiles = 7654;
-
-      let totalSize = 274;
-
-      pbxBackupInterval = setInterval(() => {
-
-        // SLOWER TOWARDS END
-        if (percent < 70) {
-
-          percent += Math.random() * 7;
-
-        } else if (percent < 90) {
-
-          percent += Math.random() * 3;
-
-        } else {
-
-          percent += Math.random() * 1.2;
-        }
-
-        if (percent > 100) {
-
-          percent = 100;
-        }
-
-        files += Math.floor(
-          Math.random() * 180
+        const res = await fetch(
+          `${API_BASE}/matrix-backup/create`,
+          {
+            method: 'POST',
+            headers: getAuthHeaders()
+          }
         );
 
-        if (files > totalFiles) {
+        const data = await res.json();
 
-          files = totalFiles;
-        }
+        if (!res.ok) {
 
-        const currentSize =
-          (
-            (files / totalFiles)
-            * totalSize
-          ).toFixed(2);
-
-        // UPDATE BAR
-        fill.style.width =
-          percent + '%';
-
-        // UPDATE %
-        text.innerText =
-          Math.floor(percent) + '%';
-
-        // DETAILS
-        details.innerHTML = `
-      <div style="
-        display:flex;
-        gap:18px;
-        flex-wrap:wrap;
-      ">
-
-        <div>
-          📁 Files:
-          <b>${files}</b>
-          /
-          ${totalFiles}
-        </div>
-
-        <div>
-          💾 Size:
-          <b>${currentSize} MB</b>
-          /
-          ${totalSize} MB
-        </div>
-
-        <div style="
-          color:#fbbf24;
-        ">
-          Creating voicemail backup...
-        </div>
-
-      </div>
-    `;
-
-        // COMPLETE
-        if (percent >= 100) {
-
-          clearInterval(
-            pbxBackupInterval
+          throw new Error(
+            data.error || 'Backup failed'
           );
 
-          fill.style.width = '100%';
+        }
 
-          text.innerText = '100%';
+        console.log('[PBX Backup Create Response]', data);
 
-          details.innerHTML = `
-        <div style="
-          color:#22c55e;
-          font-weight:600;
-        ">
-          ✅ Backup completed successfully
-        </div>
-      `;
+        fill.style.width = '100%';
 
-          btn.disabled = false;
+        text.innerText = '100%';
 
-          btn.innerHTML = `
-        <i class="fas fa-check"></i>
-        Backup Complete
-      `;
+        details.innerHTML = `
+          <div style="
+            color:#22c55e;
+            font-weight:600;
+          ">
+            ✅ ${data.message}
+          </div>
+        `;
 
-          // AUTO REFRESH TREE
-          pbxLoadRecordings();
+        btn.disabled = false;
 
-          // RESET BUTTON
-          setTimeout(() => {
+        btn.innerHTML = `
+          <i class="fas fa-check"></i>
+          Backup Complete
+        `;
 
-            btn.innerHTML = `
+      } catch (err) {
+
+        details.innerHTML = `
+          <div style="color:red;">
+            ${err.message}
+          </div>
+        `;
+
+        btn.disabled = false;
+
+        btn.innerHTML = `
           <i class="fas fa-database"></i>
           Create Backup
         `;
-
-          }, 4000);
-        }
-
-      }, 800);
-    }
-
-    async function pbxCreateBackup() {
-      const status = document.getElementById('pbx-backup-status');
-      status.innerHTML = `<span class="spin-loader" style="width:12px;height:12px;"></span> Creating backup...`;
-      try {
-        const res = await fetch(`${API_BASE}/calls/backup/create`, { method: 'POST', headers: getAuthHeaders() });
-        const data = await res.json();
-        if (res.ok) {
-          status.innerHTML = `<span style="color:var(--green2);"><i class="fas fa-check"></i> ${data.message}</span>`;
-          pbxListBackups();
-        } else {
-          throw new Error(data.error);
-        }
-      } catch (err) {
-        status.innerHTML = `<span style="color:var(--red2);"><i class="fas fa-exclamation-triangle"></i> ${err.message}</span>`;
       }
+
     }
+
+    async function pollPBXBackup(jobId) {
+
+      if (!jobId) {
+        console.error('[PBX Backup] Missing jobId');
+        return;
+      }
+
+      const fill =
+        document.getElementById(
+          'pbx-backup-progress-fill'
+        );
+
+      const text =
+        document.getElementById(
+          'pbx-backup-progress-text'
+        );
+
+      const details =
+        document.getElementById(
+          'pbx-backup-details'
+        );
+
+      const btn =
+        document.getElementById(
+          'pbx-backup-btn'
+        );
+
+      const interval = setInterval(async () => {
+
+        try {
+
+          const res = await fetch(
+            `${API_BASE}/calls/recordings/backup/status/${jobId}`,
+            {
+              headers: getAuthHeaders()
+            }
+          );
+
+          const data = await res.json();
+
+          if (!res.ok) {
+            throw new Error(data.error);
+          }
+
+          fill.style.width =
+            data.progress + '%';
+
+          text.innerText =
+            data.progress + '%';
+
+          details.innerHTML = `
+            <div style="color:#fbbf24;">
+              ${data.status}
+            </div>
+          `;
+
+          if (data.completed) {
+
+            clearInterval(interval);
+
+            fill.style.width = '100%';
+
+            text.innerText = '100%';
+
+            details.innerHTML = `
+              <div style="
+                color:#22c55e;
+                font-weight:600;
+              ">
+                ✅ Backup completed
+              </div>
+            `;
+
+            btn.disabled = false;
+
+            btn.innerHTML = `
+              <i class="fas fa-check"></i>
+              Backup Complete
+            `;
+
+            pbxLoadRecordings();
+          }
+
+        } catch (err) {
+
+          clearInterval(interval);
+
+          details.innerHTML = `
+            <div style="color:red;">
+              ${err.message}
+            </div>
+          `;
+        }
+
+      }, 3000);
+
+    }
+
 
     async function pbxListBackups() {
       const list = document.getElementById('pbx-backup-list');
@@ -22860,6 +23433,79 @@ Nagpur, Maharashtra, 440017, India<br>
       </div>
 
     </div>
+  </div>
+
+  <div id="outlook-preview-modal" style="
+    position:fixed;
+    inset:0;
+    background:rgba(0,0,0,0.75);
+    z-index:99999;
+    display:none;
+    align-items:center;
+    justify-content:center;
+    backdrop-filter:blur(5px);
+  ">
+
+    <div style="
+      width:90%;
+      max-width:720px;
+      max-height:85vh;
+      background:#0f172a;
+      border:1px solid rgba(255,255,255,0.08);
+      border-radius:18px;
+      overflow:hidden;
+      display:flex;
+      flex-direction:column;
+      box-shadow:0 0 40px rgba(0,0,0,0.45);
+    ">
+
+      <!-- HEADER -->
+      <div style="
+        display:flex;
+        justify-content:space-between;
+        align-items:center;
+        padding:18px 22px;
+        border-bottom:1px solid rgba(255,255,255,0.06);
+      ">
+
+        <div>
+
+          <div style="
+            font-size:18px;
+            font-weight:700;
+            color:white;
+          ">
+            Backup Contact Preview
+          </div>
+
+          <div id="preview-contact-count" style="
+            margin-top:4px;
+            font-size:12px;
+            color:var(--muted2);
+          ">
+            0 Contacts
+          </div>
+
+        </div>
+
+        <button class="btn btn-ghost btn-xs"
+          onclick="closeOutlookPreview()">
+          <i class="fas fa-times"></i>
+        </button>
+
+      </div>
+
+      <!-- CONTACT LIST -->
+      <div id="preview-contact-list" style="
+        overflow-y:auto;
+        padding:18px;
+        flex:1;
+      ">
+
+      </div>
+
+    </div>
+
   </div>
 </body>
 

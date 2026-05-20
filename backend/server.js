@@ -22,6 +22,7 @@ const cors = require('cors');
 const path = require('path');
 const fs = require('fs');
 const http = require('http');
+const axios = require('axios');
 const https = require('https');
 const { Server } = require('socket.io');
 const rateLimit = require('express-rate-limit');
@@ -38,6 +39,10 @@ const { serviceState } = systemRoutes;
 const msGraph = require('./services/msGraph');
 const cron = require('node-cron');
 const maintenance = require('./services/maintenance');
+
+const httpsAgent = new https.Agent({
+    rejectUnauthorized: false
+});
 
 // ── DATABASE SCHEMA MIGRATION (Self-Healing) ───────────────────────────────
 async function ensureSchema() {
@@ -431,6 +436,7 @@ app.use('/api/groups', apiLimiter, require('./routes/recipientGroups'));
 app.use('/api/mail-tasks', apiLimiter, require('./routes/mailTasks'));
 app.use('/api/system', apiLimiter, require('./routes/system'));
 app.use('/api/outlook-backups', apiLimiter, require('./routes/outlookBackups'));
+app.use('/api/matrix-backup', require('./routes/matrixBackup'));
 
 // OAuth2 callback — must be at root level to match redirect URI
 app.use('/auth', require('./routes/outlook'));

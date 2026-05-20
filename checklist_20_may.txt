@@ -1,0 +1,83 @@
+PBX / Matrix UCS Manual Backup Automation — Final Summary
+Original Goal
+
+Automate the native Matrix UCS manual backup process directly from UniComm CRM without opening the UCS browser manually.
+
+Expected flow:
+
+Open UCS panel
+Open Manual Backup page
+Click Backup
+UCS creates its own native backup automatically
+What Was Implemented
+Frontend
+Added Create Backup button
+Added loading/progress UI
+Added backup status handling
+Added polling logic temporarily
+Backend
+Built temporary filesystem-based backup system
+Copied recordings from:
+C:\MatrixVMS\Voicemail_Backup
+
+into:
+
+_BACKUPS/backup_xxxxx
+Added exclusion logic for:
+_BACKUPS
+_BACK
+BACKUP
+BACKUPS
+
+to stop recursive duplication.
+
+Main Problem Found
+
+The implemented system was creating custom recording copies, NOT triggering the real native Matrix UCS backup.
+
+It kept copying folders like:
+
+16May_2026_175604
+16May_2026_183002
+18May_2026_183001
+19May_2026_180746
+19May_2026_183401
+
+into:
+
+_BACKUPS/backup_xxxxx
+
+which was never the intended goal.
+
+Investigation Performed
+
+Tried:
+
+frontend automation
+backend routes
+polling system
+filesystem backup logic
+recursive exclusion fixes
+DevTools/network investigation
+
+Expected proper solution was:
+
+capture the exact UCS backup POST request
+reproduce it from Node.js backend
+Final Conclusion
+
+Automating the native Matrix UCS backup directly from UniComm CRM is currently considered not practically possible/reliable because:
+
+Matrix UCS exposes no public backup API
+Backup request flow is extremely difficult to trace
+Likely depends on:
+hidden ASP sessions
+internal legacy browser logic
+session tokens/cookies
+non-obvious POST handling
+
+Therefore:
+continuing filesystem-copy based backups would only create duplicate recording copies, not real UCS backups.
+
+Best decision:
+stop further implementation attempts for native UCS backup automation.

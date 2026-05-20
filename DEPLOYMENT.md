@@ -114,15 +114,13 @@ Required files:
 - `server.crt`
 - `server.key`
 
-### 2. How to Generate Self-Signed Cert (Admin PowerShell)
-If you don't have a real certificate, run this in an Administrative PowerShell:
+### 2. How to Generate Self-Signed Cert
+Newer versions of Node.js (20+) block legacy Windows certificate encryption formats. Use Git's built-in OpenSSL to generate modern, Node-compatible certificates.
+
+Run this in PowerShell on the Tower server:
 ```powershell
 mkdir -Path "C:\UniComm\Unicircuit_UniComm-main\backend\certs" -ErrorAction SilentlyContinue
-$cert = New-SelfSignedCertificate -DnsName "192.168.0.205" -CertStoreLocation "cert:\LocalMachine\My"
-$bin = [System.Convert]::ToBase64String($cert.RawData, "InsertLineBreaks")
-"-----BEGIN CERTIFICATE-----`n$bin`n-----END CERTIFICATE-----" | Set-Content "C:\UniComm\Unicircuit_UniComm-main\backend\certs\server.crt"
-# Use the same file for key if you just want to stop the crash, but ideally export the real key.
-Set-Content -Path "C:\UniComm\Unicircuit_UniComm-main\backend\certs\server.key" -Value (Get-Content "C:\UniComm\Unicircuit_UniComm-main\backend\certs\server.crt")
+& "C:\Program Files\Git\usr\bin\openssl.exe" req -x509 -nodes -days 3650 -newkey rsa:2048 -keyout "C:\UniComm\Unicircuit_UniComm-main\backend\certs\server.key" -out "C:\UniComm\Unicircuit_UniComm-main\backend\certs\server.crt" -subj "/CN=192.168.0.205"
 ```
 
 ---
@@ -510,62 +508,3 @@ Logs mein `[Graph]` aur `[MSAL]` lines dekho — exact error wahan hoga.
 5. Tower pe: powershell -ExecutionPolicy Bypass -File C:\update-unicomm.ps1
 ```
 
-1. Go to certs folder
-
-cd C:\UniComm\Unicircuit_UniComm-main\backend\certs
-
-2. Create self-signed certificate in Windows Certificate Store
-
-$cert = New-SelfSignedCertificate -DnsName "192.168.0.205" -CertStoreLocation "cert:\LocalMachine\My"
-
-3. Create password for PFX export
-
-$pwd = ConvertTo-SecureString "StrongPass123!" -AsPlainText -Force
-
-4. Export certificate as server.pfx
-
-Export-PfxCertificate -Cert $cert -FilePath "C:\UniComm\Unicircuit_UniComm-main\backend\certs\server.pfx" -Password $pwd
-
-5. Verify files
-
-dir
-
-6. Go back to backend folder
-
-cd ..
-
-7. Check HTTPS section in server.js
-
-Select-String -Path server.js -Pattern "readFileSync" -Context 2,4
-
-8. Restart PM2 with updated environment
-
-pm2 restart unicomm --update-env
-
-9. Check PM2 logs
-
-pm2 logs unicomm --lines 30
-
-10. Verify server online
-
-pm2 status
-
-11. Verify HTTPS health API
-
-curl https://localhost:8088/api/health
-
-Then the manual code change done inside server.js was:
-
-OLD:
-
-server = https.createServer({
-key: fs.readFileSync(keyPath),
-cert: fs.readFileSync(certPath),
-}, app);
-
-NEW:
-
-server = https.createServer({
-pfx: fs.readFileSync(path.join(__dirname, 'certs', 'server.pfx')),
-passphrase: 'StrongPass123!'
-}, app);

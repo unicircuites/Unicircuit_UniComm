@@ -21,8 +21,10 @@ const express = require('express');
 const pool = require('../db/pool');
 const path = require('path');
 const fs = require('fs');
+const backupJobs = {};
 const { authenticate } = require('../middleware/auth');
 const smdr = require('../services/matrixSmdr');
+
 
 const router = express.Router();
 router.use((req, res, next) => {
@@ -42,7 +44,7 @@ console.log('[REC_DIR]', REC_DIR);
 
 // ── Backup directory ──────────────────────────────────────────────────────
 const BACKUP_DIR = process.env.CALL_BACKUP_DIR
-  || path.join(__dirname, '../../call_backups');
+  || 'C:\\MatrixVMS\\Voicemail_Backup\\_BACKUPS';
 
 // Ensure directories exist
 [REC_DIR, BACKUP_DIR].forEach(d => { try { fs.mkdirSync(d, { recursive: true }); } catch (_) { } });
@@ -949,7 +951,27 @@ function getAllRecordingFiles(dir) {
     const fullPath = path.join(dir, item.name);
 
     if (item.isDirectory()) {
-      results = results.concat(getAllRecordingFiles(fullPath));
+
+      // Skip backup / copied recording folders
+      const skipFolders = [
+        '_BACKUPS',
+        '_BACK',
+        'BACKUP',
+        'BACKUPS'
+      ];
+
+      if (
+        skipFolders.some(name =>
+          item.name.toUpperCase().includes(name)
+        )
+      ) {
+        console.log('[SKIPPED BACKUP FOLDER]', fullPath);
+        continue;
+      }
+
+      results = results.concat(
+        getAllRecordingFiles(fullPath)
+      );
     } else {
       const ext = path.extname(item.name).toLowerCase();
 
@@ -973,7 +995,24 @@ function buildRecordingTree(dir) {
   });
 
   return items
-    .filter(item => item.isDirectory())
+    .filter(item => {
+
+      if (!item.isDirectory()) {
+        return false;
+      }
+
+      const skipFolders = [
+        '_BACKUPS',
+        '_BACK',
+        'BACKUP',
+        'BACKUPS'
+      ];
+
+      return !skipFolders.some(name =>
+        item.name.toUpperCase().includes(name)
+      );
+
+    })
     .map(item => {
 
       const fullPath = path.join(dir, item.name);
@@ -1220,6 +1259,8 @@ router.get('/recordings/folder', (req, res) => {
 
 });
 
+
+
 /** GET /api/calls/recordings/:filename — Stream audio file */
 router.get('/recordings/*', (req, res) => {
 
@@ -1454,5 +1495,7 @@ function normalizeDateParam(value) {
 
   return raw;
 }
+
+
 
 module.exports = router;

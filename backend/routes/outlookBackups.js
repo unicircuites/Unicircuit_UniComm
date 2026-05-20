@@ -169,9 +169,7 @@ router.post('/restore', async (req, res) => {
 
         const raw = fs.readFileSync(filepath, 'utf8');
 
-        const backupData = JSON.parse(raw);
-
-        const contacts = backupData.contacts || [];
+        const contacts = JSON.parse(raw) || [];
 
         global.outlookContactsCache = contacts;
 
@@ -214,6 +212,41 @@ router.get('/download/:file', (req, res) => {
     }
 
     res.download(filepath);
+});
+
+router.get('/preview/:file', (req, res) => {
+
+    try {
+
+        const filePath = path.join(
+            BACKUP_DIR,
+            req.params.file
+        );
+
+        if (!fs.existsSync(filePath)) {
+
+            return res.status(404).json({
+                error: 'Backup not found'
+            });
+        }
+
+        const raw = fs.readFileSync(filePath, 'utf8');
+
+        const contacts = JSON.parse(raw) || [];
+
+        res.json({
+            success: true,
+            contacts
+        });
+
+    } catch (err) {
+
+        console.error(err);
+
+        res.status(500).json({
+            error: err.message
+        });
+    }
 });
 
 module.exports = router;
