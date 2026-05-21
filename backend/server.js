@@ -329,6 +329,17 @@ app.use(express.static(path.join(__dirname, '..'), {
   },
 }));
 
+app.use(
+  '/pbx-local-recordings',
+
+  express.static(
+    path.join(
+      __dirname,
+      'pbx_recordings'
+    )
+  )
+);
+
 // Redirect root → login page
 app.get('/', (_req, res) => {
   res.redirect('/login.html');
@@ -437,6 +448,7 @@ app.use('/api/mail-tasks', apiLimiter, require('./routes/mailTasks'));
 app.use('/api/system', apiLimiter, require('./routes/system'));
 app.use('/api/outlook-backups', apiLimiter, require('./routes/outlookBackups'));
 app.use('/api/matrix-backup', require('./routes/matrixBackup'));
+app.use('/api/pbx', require('./routes/pbx'));
 
 // OAuth2 callback — must be at root level to match redirect URI
 app.use('/auth', require('./routes/outlook'));

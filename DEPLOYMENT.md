@@ -508,3 +508,46 @@ Logs mein `[Graph]` aur `[MSAL]` lines dekho — exact error wahan hoga.
 5. Tower pe: powershell -ExecutionPolicy Bypass -File C:\update-unicomm.ps1
 ```
 
+TOWER SERVER — SAFE UPDATE COMMANDS (Recommended)
+# 1. Go to project root
+cd C:\UniComm\Unicircuit_UniComm-main
+
+# 2. Stash ONLY tracked changes
+# (does NOT touch .env or certs folder)
+git stash push -m "tower tracked changes before deploy"
+
+# 3. Pull latest code safely
+git checkout main
+git fetch origin
+git reset --hard origin/main
+
+# 4. Install/update backend packages
+cd backend
+npm install --prefer-offline
+
+# 5. Ensure certs folder exists
+mkdir certs -ErrorAction SilentlyContinue
+
+# 6. Auto-generate SSL certs ONLY if missing
+if (!(Test-Path ".\certs\server.key") -or !(Test-Path ".\certs\server.crt")) {
+
+  Write-Host "SSL certs missing. Generating new OpenSSL certs..." -ForegroundColor Yellow
+
+  & "C:\Program Files\Git\usr\bin\openssl.exe" req `
+    -x509 `
+    -nodes `
+    -days 3650 `
+    -newkey rsa:2048 `
+    -keyout ".\certs\server.key" `
+    -out ".\certs\server.crt" `
+    -subj "/CN=192.168.0.205"
+}
+
+# 7. Restart PM2
+pm2 restart unicomm --update-env
+
+# 8. Verify server status
+pm2 status
+
+# 9. View logs if needed
+pm2 logs unicomm --lines 30

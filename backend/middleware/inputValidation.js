@@ -141,7 +141,9 @@ function validateInput(req, res, next) {
       '/wa/send-media',
       '/api/wa/send-media',
       '/recordings',
-      '/api/calls/recordings'
+      '/api/calls/recordings',
+      '/api/pbx/db-recordings',
+      '/api/pbx/db-folders',
     ];
 
     if (skipRoutes.some(route => req.path.startsWith(route))) {

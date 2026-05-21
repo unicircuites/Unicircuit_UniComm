@@ -4542,27 +4542,50 @@
 
                 </div>
 
-                <!-- STORAGE INFO -->
+                <!-- STORAGE SOURCE -->
                 <div style="
-                border-top:1px solid rgba(255,255,255,0.05);
-                padding:16px;
-                background:rgba(255,255,255,0.02);
-              ">
+                  border-top:1px solid rgba(255,255,255,0.05);
+                  padding:16px;
+                  background:rgba(255,255,255,0.02);
+                ">
 
                   <div style="
-                  color:#aaa;
-                  font-size:13px;
-                  margin-bottom:8px;
-                ">
-                    Storage Location
+                    color:#aaa;
+                    font-size:13px;
+                    margin-bottom:10px;
+                  ">
+                    Recording Source
                   </div>
 
-                  <div style="
-                  color:#4ea1ff;
-                  font-size:13px;
-                  word-break:break-all;
-                ">
-                    C:\\MatrixVMS\\Voicemail_Backup
+                  <select id="pbx-storage-mode" onchange="switchPBXSource(this.value)" style="
+                      width:100%;
+                      padding:10px 12px;
+                      border-radius:10px;
+                      border:1px solid rgba(255,255,255,0.08);
+                      background:#111827;
+                      color:#fff;
+                      font-size:13px;
+                      outline:none;
+                      cursor:pointer;
+                    ">
+                    <option value="network">
+                      Network Drive
+                      (C:\MatrixVMS\Voicemail_Backup)
+                    </option>
+
+                    <option value="database">
+                      Database Recordings
+                    </option>
+                  </select>
+
+                  <div id="pbx-storage-path" style="
+                      margin-top:10px;
+                      color:#4ea1ff;
+                      font-size:12px;
+                      word-break:break-all;
+                      line-height:1.5;
+                    ">
+                    C:\MatrixVMS\Voicemail_Backup
                   </div>
 
                 </div>
@@ -4627,6 +4650,43 @@
                     Create Backup
                   </button>
 
+                  <div id="pbx-sync-progress-wrapper" style="
+                      display:none;
+                      margin-bottom:12px;
+                    ">
+
+                    <div style="
+                        width:100%;
+                        height:18px;
+                        background:#1f2937;
+                        border-radius:10px;
+                        overflow:hidden;
+                      ">
+
+                      <div id="pbx-sync-progress-bar" style="
+                          width:0%;
+                          height:100%;
+                          background:#f59e0b;
+                          transition:0.3s;
+                        "></div>
+
+                    </div>
+
+                    <div id="pbx-sync-status" style="
+                        margin-top:8px;
+                        font-size:13px;
+                        color:#cbd5e1;
+                      ">
+                      Preparing scan...
+                    </div>
+
+                  </div>
+
+                  <button class="btn btn-warning btn-sm" onclick="syncPBXRecordingsToDB(this)">
+                    <i class="fas fa-database"></i>
+                    Store In DB
+                  </button>
+
                   <!-- BACKUP PROGRESS -->
                   <div id="pbx-backup-status" style="
                       display:none;
@@ -4671,7 +4731,7 @@
                   </div>
 
                   <!-- BACKUP STATUS -->
-                  <div id="pbx-backup-status" style="
+                  <div id="pbx-db-sync-status" style="
                     display:none;
                     align-items:center;
                     gap:14px;
@@ -4689,7 +4749,7 @@
                       position:relative;
                     ">
 
-                      <div id="pbx-backup-progress-fill" style="
+                      <div id="pbx-db-sync-progress-fill" style="
                       width:0%;
                       height:100%;
                       background:linear-gradient(90deg,#f59e0b,#fbbf24);
@@ -4701,7 +4761,7 @@
                     </div>
 
                     <!-- Percentage -->
-                    <div id="pbx-backup-progress-text" style="
+                    <div id="pbx-db-sync-progress-text" style="
                     color:#fbbf24;
                       font-size:13px;
                       min-width:42px;
@@ -4713,7 +4773,7 @@
                   </div>
 
                   <!-- DETAILS -->
-                  <div id="pbx-backup-details" style="
+                  <div id="pbx-db-sync-details" style="
                     display:none;
                     padding:0 18px 14px 18px;
                     color:#aaa;
@@ -4764,7 +4824,7 @@
                   <button class="btn btn-gold" style="width:100%;justify-content:center;" onclick="pbxCreateBackup()">
                     <i class="fas fa-download"></i> Create Backup Now
                   </button>
-                  <div id="pbx-backup-status" style="margin-top:10px;font-size:12px;color:var(--muted);"></div>
+                  <div id="pbx-backup-message" style="margin-top:10px;font-size:12px;color:var(--muted);"></div>
                 </div>
               </div>
 
@@ -7440,27 +7500,27 @@ Always write in a professional yet warm Indian B2B communication style. Use form
           ==================================================
           */
 
-          const savedContacts =
-            contacts.filter(contact =>
-              isRealContact(contact)
-            );
+        const savedContacts =
+          contacts.filter(contact =>
+            isRealContact(contact)
+          );
 
-          const unsavedContacts =
-            contacts.filter(contact =>
-              !isRealContact(contact)
-            );
+        const unsavedContacts =
+          contacts.filter(contact =>
+            !isRealContact(contact)
+          );
 
-          /*
-          ==================================================
-          RENDER CONTACT LIST
-          ==================================================
-          */
+        /*
+        ==================================================
+        RENDER CONTACT LIST
+        ==================================================
+        */
 
-          const renderContacts = (arr) => {
+        const renderContacts = (arr) => {
 
-            if (!arr.length) {
+          if (!arr.length) {
 
-              return `
+            return `
                 <div style="
                   text-align:center;
                   padding:40px;
@@ -7469,31 +7529,31 @@ Always write in a professional yet warm Indian B2B communication style. Use form
                   No contacts found
                 </div>
               `;
-            }
+          }
 
-            return arr.map(contact => {
+          return arr.map(contact => {
 
-              const displayName =
-                (contact.displayName || '').trim();
+            const displayName =
+              (contact.displayName || '').trim();
 
-              const email =
-                (
-                  contact.emailAddresses?.[0]?.address ||
-                  ''
-                ).trim();
+            const email =
+              (
+                contact.emailAddresses?.[0]?.address ||
+                ''
+              ).trim();
 
-              const hasSavedContact =
-                isRealContact(contact);
+            const hasSavedContact =
+              isRealContact(contact);
 
-              const finalName =
-                displayName ||
-                email ||
-                'Unknown Contact';
+            const finalName =
+              displayName ||
+              email ||
+              'Unknown Contact';
 
-              const initials =
-                finalName.charAt(0).toUpperCase();
+            const initials =
+              finalName.charAt(0).toUpperCase();
 
-              return `
+            return `
 
                 <div style="
                   display:flex;
@@ -7556,32 +7616,32 @@ Always write in a professional yet warm Indian B2B communication style. Use form
                     font-size:10px;
                     font-weight:600;
                     background:${hasSavedContact
-                      ? 'rgba(34,197,94,0.15)'
-                      : 'rgba(255,255,255,0.08)'};
+                ? 'rgba(34,197,94,0.15)'
+                : 'rgba(255,255,255,0.08)'};
 
                     color:${hasSavedContact
-                      ? '#22c55e'
-                      : '#cbd5e1'};
+                ? '#22c55e'
+                : '#cbd5e1'};
                   ">
                     ${hasSavedContact
-                      ? 'Saved Contact'
-                      : 'Unsaved'}
+                ? 'Saved Contact'
+                : 'Unsaved'}
                   </div>
 
                 </div>
 
               `;
 
-            }).join('');
-          };
+          }).join('');
+        };
 
-          /*
-          ==================================================
-          TABS UI
-          ==================================================
-          */
+        /*
+        ==================================================
+        TABS UI
+        ==================================================
+        */
 
-          list.innerHTML = `
+        list.innerHTML = `
 
             <div style="margin-bottom:18px;">
 
@@ -7715,9 +7775,9 @@ Always write in a professional yet warm Indian B2B communication style. Use form
         document.getElementById(
           'backup-contact-search'
         )
-        .value
-        .trim()
-        .toLowerCase();
+          .value
+          .trim()
+          .toLowerCase();
 
       const cards =
         document.querySelectorAll(
@@ -20685,6 +20745,613 @@ ${plainText}`;
 
     }
 
+    function showToast(message, type = 'info') {
+
+      const toast = document.createElement('div');
+
+      toast.innerText = message;
+
+      toast.style.position = 'fixed';
+
+      toast.style.top = '20px';
+
+      toast.style.right = '20px';
+
+      toast.style.zIndex = '999999';
+
+      toast.style.padding = '12px 18px';
+
+      toast.style.borderRadius = '10px';
+
+      toast.style.color = 'white';
+
+      toast.style.fontSize = '14px';
+
+      toast.style.fontWeight = '600';
+
+      toast.style.background =
+        type === 'success'
+          ? '#16a34a'
+          : type === 'error'
+            ? '#dc2626'
+            : '#2563eb';
+
+      toast.style.boxShadow =
+        '0 10px 30px rgba(0,0,0,0.35)';
+
+      toast.style.transition =
+        'all 0.3s ease';
+
+      document.body.appendChild(toast);
+
+      setTimeout(() => {
+
+        toast.style.opacity = '0';
+
+        toast.style.transform =
+          'translateY(-10px)';
+
+        setTimeout(() => {
+          toast.remove();
+        }, 300);
+
+      }, 2500);
+
+    }
+
+    let pbxProgressInterval = null;
+
+    let pbxSourceMode = 'network';
+
+    /* =========================
+      SWITCH SOURCE
+    ========================= */
+
+    async function switchPBXSource(mode) {
+
+      pbxSourceMode = mode;
+
+
+        const pathText =
+          document.getElementById(
+            'pbx-storage-path'
+          );
+
+        const list =
+          document.getElementById(
+            'pbx-recordings-list'
+          );
+
+        list.innerHTML = `
+      <div style="
+        text-align:center;
+        padding:30px;
+        color:#777;
+      ">
+        Loading folders...
+      </div>
+    `;
+
+        try {
+
+          /* =========================
+            NETWORK DRIVE MODE
+          ========================= */
+
+          if (mode === 'network') {
+
+            pathText.innerText =
+              'C:\\MatrixVMS\\Voicemail_Backup';
+
+            await pbxLoadRecordings();
+
+          }
+
+          /* =========================
+            DATABASE MODE
+          ========================= */
+
+          else {
+
+            pathText.innerText =
+              'Database Stored Recordings';
+
+            const res = await fetch(
+              '/api/pbx/db-folders'
+            );
+
+            const data = await res.json();
+
+            renderPBXDatabaseTree(data);
+
+          }
+
+        } catch (err) {
+
+          console.error(err);
+
+          list.innerHTML = `
+        <div style="
+          color:#ef4444;
+          padding:20px;
+          text-align:center;
+        ">
+          Failed to load folders
+        </div>
+      `;
+
+        }
+
+      }
+
+    function renderPBXDatabaseTree(tree) {
+
+      const container =
+        document.getElementById(
+          'pbx-recordings-list'
+        );
+
+      container.innerHTML = '';
+
+      Object.keys(tree).forEach(
+        backupFolder => {
+
+          const backupDiv =
+            document.createElement('div');
+
+          backupDiv.innerHTML = `
+            <div style="
+              padding:10px 12px;
+              color:#fff;
+              font-weight:600;
+              font-size:14px;
+            ">
+              📁 ${backupFolder}
+            </div>
+          `;
+
+          container.appendChild(
+            backupDiv
+          );
+
+          const extensions =
+            tree[backupFolder];
+
+          Object.keys(extensions)
+          .forEach(extension => {
+
+            const extDiv =
+              document.createElement(
+                'div'
+              );
+
+            extDiv.style.marginLeft =
+              '18px';
+
+            extDiv.style.cursor =
+              'pointer';
+
+            extDiv.style.padding =
+              '8px 12px';
+
+            extDiv.style.color =
+              '#d1d5db';
+
+            extDiv.innerHTML =
+              `📂 ${extension}`;
+
+            extDiv.onclick = () => {
+
+              const safeExtension =
+                extension.replace(/[()]/g, '');
+
+              loadDBRecordings(
+                backupFolder,
+                safeExtension
+              );
+
+            };
+
+            container.appendChild(
+              extDiv
+            );
+
+          });
+
+        }
+      );
+
+    }
+
+    async function loadDBRecordings(
+      backupFolder,
+      extensionFolder
+    ) {
+
+      try {
+
+        const res = await fetch(
+          `/api/pbx/db-recordings?backup=${encodeURIComponent(backupFolder)}&extension=${encodeURIComponent(extensionFolder)}`
+        );
+
+        const files =
+          await res.json();
+
+        renderPBXFiles(files);
+
+        document.getElementById(
+          'pbx-breadcrumb'
+        ).innerText =
+          `${backupFolder} › ${extensionFolder}`;
+
+      } catch (err) {
+
+        console.error(err);
+
+      }
+
+    }
+
+    function renderPBXFiles(files) {
+
+      const panel =
+        document.getElementById(
+          'pbx-right-panel'
+        );
+
+      if (!files.length) {
+
+        panel.innerHTML = `
+          <div style="
+            text-align:center;
+            color:#777;
+            padding-top:80px;
+          ">
+            No recordings found
+          </div>
+        `;
+
+        return;
+
+      }
+
+      panel.innerHTML = `
+
+        <div style="
+          display:grid;
+          gap:12px;
+        ">
+
+          ${files.map(file => `
+
+            <div style="
+              background:rgba(255,255,255,0.03);
+              border:1px solid rgba(255,255,255,0.06);
+              border-radius:14px;
+              padding:14px;
+              display:grid;
+              grid-template-columns:1fr 120px 120px 320px;
+              align-items:center;
+              gap:14px;
+            ">
+
+              <div>
+
+                <div style="
+                  color:#fff;
+                  font-weight:600;
+                  margin-bottom:6px;
+                ">
+                  ${file.original_filename}
+                </div>
+
+                <div style="
+                  color:#777;
+                  font-size:12px;
+                ">
+                  ${file.recording_date || ''}
+                </div>
+
+              </div>
+
+              <div style="
+                color:#d1d5db;
+                font-size:13px;
+              ">
+                WAV File
+              </div>
+
+              <div style="
+                color:#d1d5db;
+                font-size:13px;
+              ">
+                ${formatBytes(file.file_size || 0)}
+              </div>
+
+              <audio
+                controls
+                style="width:100%;"
+              >
+                <source
+                  src="/api/pbx/play-db/${file.id}"
+                  type="audio/wav"
+                >
+              </audio>
+
+            </div>
+
+          `).join('')}
+
+        </div>
+      `;
+
+    }
+
+    async function loadPBXDatabaseFolders() {
+
+      try {
+
+        const res = await fetch(
+          '/api/pbx/db-folders'
+        );
+
+        const data = await res.json();
+
+        renderPBXFolderTree(data);
+
+      } catch (err) {
+
+        console.error(err);
+
+      }
+
+    }
+
+    async function monitorPBXSyncProgress() {
+
+      const syncFill =
+        document.getElementById(
+          'pbx-db-sync-progress-fill'
+        );
+
+      const syncText =
+        document.getElementById(
+          'pbx-db-sync-progress-text'
+        );
+
+      const syncDetails =
+        document.getElementById(
+          'pbx-db-sync-details'
+        );
+
+      try {
+
+        const res =
+          await fetch(
+            '/api/pbx/sync-progress'
+          );
+
+        const data =
+          await res.json();
+
+        const syncFill =
+          document.getElementById(
+            'pbx-db-sync-progress-fill'
+          );
+
+        const syncText =
+          document.getElementById(
+            'pbx-db-sync-progress-text'
+          );
+
+        const syncDetails =
+          document.getElementById(
+            'pbx-db-sync-details'
+          );
+
+        document.getElementById(
+          'pbx-sync-status'
+        ).innerText =
+
+          `File: ${data.currentFile}
+        | Processed: ${data.processed}/${data.total}
+        | Inserted: ${data.inserted}
+        | Duplicates: ${data.duplicates}`;
+
+        const percent = data.percent || 0;
+
+        document.getElementById(
+          'pbx-sync-progress-bar'
+        ).style.width =
+          `${percent}%`;
+
+        syncFill.style.width =
+          `${percent}%`;
+
+        syncText.innerText =
+          `${percent}%`;
+
+        syncDetails.innerHTML = `
+          <div style="color:#60a5fa;">
+            Processing:
+            ${data.currentFile}
+          </div>
+
+          <div style="
+            margin-top:6px;
+            color:#d1d5db;
+            font-size:13px;
+          ">
+            Processed:
+            ${data.processed} /
+            ${data.total}
+
+            | Inserted:
+            ${data.inserted}
+
+            | Duplicates:
+            ${data.duplicates}
+          </div>
+        `;
+
+        if (data.completed) {
+
+          clearInterval(
+            pbxProgressInterval
+          );
+
+          document.getElementById(
+            'pbx-sync-progress-bar'
+          ).style.width = '100%';
+
+          syncFill.style.width =
+            '100%';
+
+          syncText.innerText =
+            '100%';
+
+          syncDetails.innerHTML = `
+            <div style="
+              color:#22c55e;
+              font-weight:600;
+            ">
+              ✅ PBX DB sync completed
+            </div>
+          `;
+
+        }
+
+      } catch (err) {
+
+        console.error(err);
+
+      }
+
+    }
+
+    async function syncPBXRecordingsToDB(button) {
+
+      try {
+
+        const syncStatus =
+          document.getElementById(
+            'pbx-db-sync-status'
+          );
+
+        const syncDetails =
+          document.getElementById(
+            'pbx-db-sync-details'
+          );
+
+        const syncFill =
+          document.getElementById(
+            'pbx-db-sync-progress-fill'
+          );
+
+        const syncText =
+          document.getElementById(
+            'pbx-db-sync-progress-text'
+          );
+
+        syncStatus.style.display = 'flex';
+
+        syncDetails.style.display = 'block';
+
+        syncFill.style.width = '0%';
+
+        syncText.innerText = '0%';
+
+        syncDetails.innerHTML = `
+          <div style="color:#fbbf24;">
+            Scanning PBX recordings...
+          </div>
+        `;
+
+        pbxProgressInterval =
+          setInterval(
+            monitorPBXSyncProgress,
+            1000
+          );
+
+        button.disabled = true;
+
+        const originalText =
+          button.innerHTML;
+
+        button.innerHTML =
+          'Scanning Recordings...';
+
+        showToast(
+          'Scanning PBX recordings...',
+          'info'
+        );
+
+        const res = await fetch(
+          '/api/pbx/store-recordings',
+          {
+            method: 'POST'
+          }
+        );
+
+        const data = await res.json();
+
+        clearInterval(
+          pbxProgressInterval
+        );
+
+        document.getElementById(
+          'pbx-sync-progress-bar'
+        ).style.width = '100%';
+
+        if (!data.success) {
+
+          throw new Error(
+            data.error || 'Sync failed'
+          );
+
+        }
+
+        syncDetails.innerHTML = `
+          <div style="color:#22c55e;">
+            Inserted ${data.inserted} recordings
+          </div>
+        `;
+
+        showToast(
+          `Stored ${data.inserted} new recordings`,
+          'success'
+        );
+
+        button.innerHTML =
+          `Stored ${data.inserted}`;
+
+        setTimeout(() => {
+
+          button.innerHTML =
+            originalText;
+
+          button.disabled = false;
+
+        }, 3000);
+
+      } catch (err) {
+
+        console.error(err);
+
+        showToast(
+          err.message,
+          'error'
+        );
+
+        button.disabled = false;
+
+        button.innerHTML =
+          'Store In DB';
+
+      }
+
+    }
+
     async function pollPBXBackup(jobId) {
 
       if (!jobId) {
@@ -23488,8 +24155,7 @@ Nagpur, Maharashtra, 440017, India<br>
 
         </div>
 
-        <button class="btn btn-ghost btn-xs"
-          onclick="closeOutlookPreview()">
+        <button class="btn btn-ghost btn-xs" onclick="closeOutlookPreview()">
           <i class="fas fa-times"></i>
         </button>
 

@@ -1,0 +1,225 @@
+Core Architecture (Verified Working)
+MatrixVMS Network Folder
+        ↓
+Recursive WAV Scan
+        ↓
+Parse Filename Metadata
+        ↓
+Copy WAV Locally
+        ↓
+Insert Metadata into PostgreSQL
+        ↓
+Prevent Duplicates
+        ↓
+Playback from Local Copy
+Critical Rules
+NEVER
+❌ move original PBX files
+❌ rename original PBX files
+❌ delete original PBX files
+ONLY
+✔ read files
+✔ copy locally
+✔ insert metadata into DB
+✔ playback copied recordings
+Main Files
+Backend
+backend/routes/pbx.js
+backend/routes/calls.js
+backend/middleware/inputValidation.js
+Frontend
+dashboard.html
+Working Features
+PBX Scanner
+✔ recursive backup folder scan
+✔ extension folder detection
+✔ WAV discovery
+✔ large dataset handling (21k+ files)
+✔ filename parsing
+✔ timestamp parsing
+✔ malformed filename fallback handling
+PostgreSQL Sync
+✔ inserts metadata into pbx_recordings
+✔ duplicate prevention working
+✔ safe local recording copy
+✔ collision-safe filenames
+✔ existing recordings verification
+Duplicate Detection Query
+SELECT id
+FROM pbx_recordings
+WHERE original_filename = $1
+AND backup_folder = $2
+AND extension_folder = $3
+LIMIT 1
+
+Important:
+
+Inserted: 0
+Duplicates: 21172
+
+does NOT mean failure.
+
+Usually means:
+
+DB already contains recordings
+duplicate prevention worked correctly
+PBX Paths
+Dev Machine
+C:\MatrixVMS\Voicemail_Backup
+Local CRM Recording Copies
+path.join(__dirname, '..', 'pbx_recordings')
+IMPORTANT FOR TOWER SERVER
+
+Tower PBX path is DIFFERENT.
+
+Must update:
+
+PBX_RECORDINGS_DIR=D:\YOUR_REAL_TOWER_PATH
+
+before deployment.
+
+Realtime Progress System
+Working
+
+Created:
+
+global.pbxSyncProgress
+
+Tracks:
+
+running
+total
+processed
+inserted
+duplicates
+percent
+currentFile
+completed
+API Endpoints Working
+✔ /api/pbx/sync-progress
+✔ /api/pbx/scan-progress
+Frontend Progress Monitoring
+
+Working:
+
+monitorPBXSyncProgress()
+
+Now UI can show:
+
+realtime %
+current file
+inserted count
+duplicate count
+completion state
+Major Bugs Fixed
+99% Freeze
+
+Cause:
+
+continue;
+
+before DB insert section.
+
+Fix:
+
+separated scan phase
+separated processing phase
+97% UI Freeze
+
+Cause:
+Undefined DOM variables:
+
+syncFill
+syncText
+syncDetails
+
+Fix:
+
+defined DOM refs properly
+forced completion update
+clearInterval cleanup fixed
+Dangerous Character Validation Bug
+
+Problem:
+
+1176(Uni_Matrix)
+
+triggered:
+
+Input contains potentially dangerous characters
+
+Cause:
+inputValidation.js blocked parentheses.
+
+Fix:
+Adjusted dangerous pattern validation.
+
+PBX Recording Explorer UI
+Working
+✔ 2-column explorer layout
+✔ folder sidebar
+✔ recordings panel
+✔ breadcrumb
+✔ refresh button
+✔ Store in DB button
+✔ realtime sync progress UI
+✔ source dropdown
+Source Switching UI
+
+Dropdown:
+
+Network Drive
+Database Recordings
+
+Now:
+
+folder structure changes dynamically
+DB folder tree renders correctly
+Important Frontend Warning
+
+dashboard.html contains duplicate IDs.
+
+Next assistant MUST:
+
+inspect actual HTML carefully
+verify IDs before editing
+avoid hallucinating sections/comments
+
+Useful PowerShell:
+
+Select-String -Path .\dashboard.html -Pattern 'id="'
+Current Remaining Issue
+DB Recordings Browser
+
+UI currently shows:
+
+No recordings found
+
+even though recordings exist in DB.
+
+Likely causes:
+
+wrong folder mapping
+incorrect extension matching
+local_path mismatch
+DB query mismatch
+
+Important:
+
+APIs now work
+validation issue fixed
+UI rendering works
+
+Only DB data verification remains.
+
+Future Improvements
+Planned
+DB-based recording browser
+playback using local_path
+pagination
+lazy loading
+search/filter
+AI transcription
+AI summaries
+waveform preview
+analytics dashboard

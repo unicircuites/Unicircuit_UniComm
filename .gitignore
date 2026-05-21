@@ -29,3 +29,37 @@ Thumbs.db
 
 # Editor
 .vscode/settings.json
+
+# PBX recordings
+backend/pbx_recordings/
+pbx_recordings/
+
+# WAV recordings
+*.wav
+
+# Backup files
+backups/
+backup/
+*.zip
+
+# Logs
+logs/
+*.log
+
+# Node modules
+node_modules/
+
+# Environment files
+backend/.env
+.env
+
+# SSL certificates
+backend/certs/
+
+# Temporary uploads
+backend/temp/
+backend/uploads/
+
+# OS junk
+Thumbs.db
+.DS_Store
