@@ -515,14 +515,8 @@ server.listen(PORT, HOST, async () => {
 });
 
 
-// Clear WhatsApp session on server stop so mobile shows disconnected
-process.on('SIGINT', async () => {
-  console.log('\n[Server] Shutting down — clearing WA session...');
-  try {
-    const wa = require('./services/whatsapp');
-    if (wa.getStatus().connected) {
-      await wa.logout();
-    }
-  } catch (_) { }
+// Preserve WhatsApp auth on server stop so restart can reconnect silently.
+process.on('SIGINT', () => {
+  console.log('\n[Server] Shutting down - preserving WA session for stable reconnect.');
   process.exit(0);
 });

@@ -4072,7 +4072,7 @@
             PBX
           </div>
           <!-- WA Business -->
-          <div class="pill-tag" id="svc-whatsapp" style="cursor:default;">
+          <div class="pill-tag" id="svc-whatsapp" style="cursor:pointer;" onclick="nav('whatsapp', null)">
             <i class="fab fa-whatsapp" id="dot-whatsapp"
               style="font-size:11px;color:var(--muted);margin-right:4px;"></i>WA Business
           </div>
@@ -6631,8 +6631,7 @@ Always write in a professional yet warm Indian B2B communication style. Use form
       const topCompose = document.getElementById('topbar-compose-email');
       if (topCompose) topCompose.style.display = id === 'email' ? '' : 'none';
       if (id === 'contacts') refreshContactsSection();
-      if (id === 'pipeline')
-        if (id === 'whatsapp') checkWAStatus();
+      if (id === 'whatsapp') checkWAStatus(true);
       if (id === 'calls') { initWASocket(); loadCallLogs(); }
       if (id === 'marketing') { initWASocket(); loadMarketingData(); loadBroadcasts(); }
       if (id === 'email') { checkOutlookStatus(); loadOutlookFolders(); loadInbox(); }
@@ -16717,7 +16716,7 @@ ${plainText}`;
       });
     }
 
-    async function checkWAStatus() {
+    async function checkWAStatus(requestQR) {
       initWASocket();
       try {
         // /wa/status is public — no auth needed
@@ -16731,11 +16730,15 @@ ${plainText}`;
         } else {
           const cb = document.getElementById('wa-connect-banner');
           if (cb) cb.style.display = 'block';
-          // Do NOT auto-show QR — user must click "Show QR Code" button manually
+          const qrWrap = document.getElementById('wa-qr-wrap');
+          if (requestQR && (!qrWrap || qrWrap.style.display !== 'flex')) {
+            waGetQR();
+          }
         }
       } catch (_) {
         const cb = document.getElementById('wa-connect-banner');
         if (cb) cb.style.display = 'block';
+        if (requestQR) waGetQR();
       }
     }
 

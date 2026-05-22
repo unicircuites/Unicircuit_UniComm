@@ -9,7 +9,7 @@ const { authenticate } = require('../middleware/auth');
 const router = express.Router();
 
 // -- PUBLIC (no auth) -------------------------------------------------------
-router.get('/qr',     async (req, res) => { res.json({ qr: await wa.getQR() || null }); });
+router.get('/qr',     async (req, res) => { res.json({ qr: await wa.requestQR() || null }); });
 router.get('/status', (req, res)       => { res.json(wa.getStatus()); });
 
 // -- PROTECTED --------------------------------------------------------------
