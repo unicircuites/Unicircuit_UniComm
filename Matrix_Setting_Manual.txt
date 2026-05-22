@@ -1,0 +1,440 @@
+MATRIX SARVAM UCS + UNICOMM INTEGRATION GUIDE (BEGINNER FRIENDLY)
+
+This guide explains:
+
+where to go
+what to enable
+why it matters
+what mistakes to avoid
+
+so even a beginner can understand the PBX setup properly.
+
+STEP 1 — CONNECT THE PBX TO NETWORK
+Where to Go
+
+Physically check the PBX backside.
+
+Find:
+
+Ethernet Port (RJ45)
+
+Connect it to:
+
+Router
+OR
+LAN Switch
+Why This is Important
+
+Without LAN connection:
+
+SIP won't work
+call logs won't sync
+recordings may fail
+Jeeves web panel won't open
+UniComm backend cannot connect
+What to Do
+Recommended Setup
+PBX Ethernet Port
+        ↓
+LAN Switch / Router
+        ↓
+UniComm Server / PC
+What NOT to Do
+
+❌ Do not use unstable WiFi
+❌ Do not disconnect LAN during calls
+❌ Do not change router frequently
+
+STEP 2 — OPEN JEEVES WEB PANEL
+What is Jeeves?
+
+Jeeves is the PBX admin panel.
+
+You configure EVERYTHING here.
+
+Where to Go
+
+Open browser:
+
+http://PBX-IP
+
+Example:
+
+http://192.168.0.81
+
+Login using:
+
+admin credentials
+Why This is Important
+
+All settings below happen inside Jeeves.
+
+STEP 3 — CONFIGURE NETWORK SETTINGS
+Where to Go
+
+Inside Jeeves:
+
+Basic Settings
+   ↓
+Network Parameters
+What to Configure
+Recommended
+Setting	Value
+IP Type	Static
+PBX IP	Fixed IP
+Gateway	Router IP
+DNS	Stable DNS
+Why This is Important
+
+If IP changes:
+
+UniComm loses PBX
+recordings fail
+SIP disconnects
+call logs stop syncing
+What NOT to Do
+
+❌ Do not keep changing IP
+❌ Do not use random DHCP IPs for production
+
+STEP 4 — ENABLE VMS (VOICE MAIL SYSTEM)
+What is VMS?
+
+VMS controls:
+
+call recordings
+voicemail
+conversation recording
+call taping
+
+WITHOUT VMS:
+❌ recordings will not work properly
+
+Where to Go
+
+Inside Jeeves:
+
+Applications
+   ↓
+Voice Mail System (VMS)
+What to Check
+MUST VERIFY
+Setting	Status
+VMS License	ACTIVE
+Pen Drive Detected	YES
+Mailboxes Enabled	YES
+Channels Available	YES
+Why This is Important
+
+The PBX stores recordings using VMS.
+
+If VMS fails:
+
+recording stops
+playback fails
+recording files disappear
+What NOT to Do
+
+❌ Never remove USB while PBX running
+❌ Never disable VMS license
+❌ Never format storage casually
+
+STEP 5 — INSERT AND VERIFY USB STORAGE
+Why This is Important
+
+Recordings are usually stored on:
+
+Pen Drive
+USB Storage
+
+WITHOUT STORAGE:
+❌ no recordings saved
+
+What to Do
+Physically Check
+
+Insert:
+
+factory USB drive
+OR
+reliable USB storage
+Where to Verify
+
+Inside Jeeves:
+
+Maintenance
+   ↓
+Storage / Voice Mail Storage
+What to Check
+Check	Expected
+USB detected	YES
+Free space	Available
+Read/Write	Working
+What NOT to Do
+
+❌ Never unplug USB during active calls
+❌ Never let storage become 100% full
+
+STEP 6 — ENABLE CALL RECORDING
+Where to Go
+
+Inside Jeeves:
+
+Applications
+   ↓
+Conversation Recording
+
+OR
+
+Applications
+   ↓
+Call Taping
+What to Enable
+Recommended
+Setting	Value
+Auto Recording	ENABLE
+Incoming Recording	ENABLE
+Outgoing Recording	ENABLE
+Internal Recording	OPTIONAL
+Why This is Important
+
+Without enabling recording:
+
+no audio files generated
+What NOT to Do
+
+❌ Do not enable recording without enough storage
+❌ Do not disable mailbox assignment
+
+STEP 7 — CREATE MAILBOXES FOR EXTENSIONS
+Why This is Important
+
+Extensions need mailboxes because:
+
+recordings may map to mailbox
+voicemail needs mailbox
+user recordings attach to mailbox
+Where to Go
+
+Inside Jeeves:
+
+Extensions
+   ↓
+Mailbox Configuration
+What to Do
+
+Assign:
+
+extension number
+mailbox
+recording permission
+Example
+Extension	Mailbox
+101	Mailbox101
+102	Mailbox102
+What NOT to Do
+
+❌ Do not delete mailboxes randomly
+❌ Do not change extension IDs frequently
+
+STEP 8 — ENABLE SMDR (CALL LOGS)
+What is SMDR?
+
+SMDR = Call Logs System
+
+This powers:
+
+call history
+CRM logs
+analytics
+live dashboard
+Where to Go
+
+Inside Jeeves:
+
+Reports
+   ↓
+SMDR
+Enable These
+Feature	Status
+SMDR Online	ENABLE
+SMDR Posting	ENABLE
+SMDR Storage	ENABLE
+Why This is Important
+
+Without SMDR:
+❌ UniComm cannot fetch latest calls
+
+Recommended Architecture
+PBX
+ ↓
+SMDR
+ ↓
+UniComm Backend
+ ↓
+Dashboard
+What NOT to Do
+
+❌ Do not clear SMDR logs regularly
+❌ Do not disable SMDR Posting
+
+STEP 9 — CONFIGURE SIP EXTENSIONS
+What are SIP Extensions?
+
+These are:
+
+softphones
+IP phones
+UniComm calling agents
+Where to Go
+
+Inside Jeeves:
+
+VoIP
+   ↓
+SIP Extensions
+What to Configure
+Setting	Example
+SIP ID	101
+Password	secure123
+Registrar IP	PBX IP
+RTP	Enabled
+Why This is Important
+
+Without SIP registration:
+❌ calls fail
+❌ recording may fail
+❌ CRM sync breaks
+
+What NOT to Do
+
+❌ Never duplicate SIP IDs
+❌ Never mismatch passwords
+
+STEP 10 — VERIFY SIP REGISTRATION
+Where to Go
+
+Inside Jeeves:
+
+Status
+   ↓
+SIP Status
+What to Check
+
+Extensions should show:
+
+REGISTERED
+If NOT Registered
+
+Check:
+
+LAN
+Password
+SIP ID
+Firewall
+RTP ports
+STEP 11 — TEST RECORDINGS
+What to Do
+Make test call
+Talk for 10–20 seconds
+Disconnect
+Then Go To
+Applications
+   ↓
+Voice Mail / Recordings
+
+OR
+
+storage folder
+
+Verify
+Check	Expected
+Audio file exists	YES
+Playback works	YES
+Call duration correct	YES
+STEP 12 — TEST CALL LOGS
+What to Do
+
+Make:
+
+incoming call
+outgoing call
+Then Go To
+Reports
+   ↓
+SMDR Reports
+Verify
+Check	Expected
+Extension visible	YES
+Duration visible	YES
+Call type visible	YES
+STEP 13 — CONNECT TO UNICOMM BACKEND
+Recommended Flow
+PBX
+ ↓
+SMDR Logs
+ ↓
+UniComm Backend API
+ ↓
+Dashboard
+
+AND
+
+PBX
+ ↓
+VMS Recordings
+ ↓
+Recording Storage
+ ↓
+UniComm Preview/Playback
+STEP 14 — BACKUP SYSTEM (VERY IMPORTANT)
+Why This is Important
+
+Without backup:
+
+recordings lost forever
+logs lost
+configuration lost
+What to Backup
+
+✅ Recordings
+✅ SMDR logs
+✅ Jeeves configuration
+✅ SIP extension data
+
+Recommended
+Backup Type	Frequency
+Recordings	Daily
+SMDR Logs	Daily
+PBX Config	Weekly
+What NOT to Do
+
+❌ Never reset PBX without backup
+❌ Never format USB without copying recordings
+
+STEP 15 — THINGS THAT CAUSE DATA LOSS
+NEVER DO THESE
+Dangerous Action	Result
+Remove USB during call	Recording corruption
+Power off suddenly	File corruption
+Disable VMS	No recordings
+Disable SMDR	No logs
+Fill storage fully	Recording failure
+Change extensions randomly	CRM mismatch
+Reboot during recording	Broken audio
+Unstable LAN	SIP disconnects
+FINAL UNDERSTANDING
+VERY IMPORTANT
+CALL LOGS come from:
+SMDR
+CALL RECORDINGS come from:
+VMS / Conversation Recording
+
+These are TWO DIFFERENT systems.
+
+Your UniComm backend must handle:
+
+logs separately
+recordings separately
+
+That is the MOST IMPORTANT understanding of MATRIX SARVAM UCS integration.

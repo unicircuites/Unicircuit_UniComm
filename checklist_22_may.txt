@@ -1,0 +1,291 @@
+UNIComm PBX Call Logs / Matrix SMDR Progress Summary
+Date: 22 May 2026
+
+✅ Matrix PBX live call logs are now successfully appearing in:
+https://192.168.0.205:8088/dashboard.html
+
+✅ PostgreSQL insertion working
+✅ Real-time Socket.IO updates working
+✅ Matrix TCP SMDR server working
+✅ Incoming/Outgoing parsing working
+✅ PM2 service stable
+✅ Duplicate prevention partially implemented
+✅ Dashboard live rendering working
+
+PBX_HOST MISCONFIGURATION
+
+Problem:
+PBX_HOST was mistakenly set to:
+192.168.0.205 (local tower server)
+
+Correct PBX IP:
+192.168.0.81
+
+Fix:
+.env corrected so Matrix hardware IP is used.
+
+========================================
+
+WRONG TCP MODE
+
+Problem:
+Backend was trying outbound client connection:
+startClient()
+
+Matrix PBX was actually configured to PUSH logs to CRM.
+
+Fix:
+Disabled:
+startClient()
+
+Enabled only:
+startServer()
+
+Current working mode:
+PBX → CRM TCP Server Push
+
+========================================
+
+MATRIX SMDR PARSER REWRITE
+
+Completely rewrote parser logic.
+
+Added support for:
+
+A) Space-delimited format
+B) Fixed-width Matrix Eternity format
+
+Functions added:
+
+parseMatrixFixedLayout()
+parseMatrixDate()
+formatDurationFromSeconds()
+normaliseSmdrLineForDedupe()
+
+========================================
+
+DATABASE TABLE FIXES
+
+Created/updated:
+call_logs table
+
+Columns ensured:
+
+call_date
+call_time
+duration
+call_type
+caller
+extension
+destination
+trunk
+recording_file
+raw_line
+ai_summary
+created_at
+
+Added automatic ALTER TABLE safety checks.
+
+========================================
+
+RAW DATA CLEANING
+
+Added cleanup for:
+
+NULL bytes
+ASCII control characters
+malformed UTF characters
+
+Functions:
+cleanText()
+
+Also added:
+.replace(/\x00/g, '')
+
+========================================
+
+DUPLICATE ENTRY PREVENTION
+
+Implemented dedupe using:
+raw_line normalization
+
+Logic:
+regexp_replace(trim(raw_line), '^\d+\s+', '')
+
+Purpose:
+Prevent duplicate Matrix event inserts.
+
+========================================
+
+SOCKET.IO LIVE EVENTS
+
+Events working:
+
+pbx:connected
+pbx:disconnected
+pbx:call
+pbx:ready
+pbx:binding_error
+
+Dashboard now updates live.
+
+========================================
+
+CRM CONTACT AUTO-SYNC
+
+Call logs now auto-update CRM contacts.
+
+Logic:
+
+increments calls count
+updates last_contact
+matches using last 10 digits
+
+========================================
+
+MAJOR CRASHES FIXED
+========================================
+
+FIXED:
+SyntaxError: Unexpected identifier 'TABLE'
+
+Cause:
+Broken multiline SQL template string.
+
+========================================
+
+FIXED:
+Identifier 'recordingId' has already been declared
+
+Cause:
+Duplicate:
+const recordingId = null;
+
+inside fixed-width parser block.
+
+Resolution:
+Removed second declaration only.
+
+========================================
+
+CURRENTLY WORKING FEATURES
+========================================
+
+✅ Live Matrix PBX connectivity
+✅ Realtime call logging
+✅ PostgreSQL storage
+✅ Dashboard rendering
+✅ Incoming calls
+✅ Outgoing calls
+✅ Duration parsing
+✅ Trunk parsing
+✅ Socket updates
+✅ PM2 auto-restart
+✅ CRM sync
+
+========================================
+
+REMAINING IMPROVEMENTS
+
+Pending future improvements:
+
+Recording auto-linking
+AI call summaries
+Missed call detection
+Live ringing popup
+Better duplicate filtering
+Click-to-dial stabilization
+Recording playback integration
+Contact popup on incoming call
+Multi-extension live monitoring
+
+========================================
+
+IMPORTANT CURRENT FILE
+
+Main working file:
+backend/services/matrixSmdr.js
+
+Main functions:
+
+startServer()
+parseSMDR()
+saveCallLog()
+processBuffer()
+
+========================================
+
+IMPORTANT PM2 COMMANDS
+
+Restart:
+pm2 restart unicomm
+
+Logs:
+pm2 logs unicomm --lines 100
+
+Stop:
+pm2 stop unicomm
+
+Delete:
+pm2 delete unicomm
+
+========================================
+
+CURRENT SYSTEM ARCHITECTURE
+
+Matrix PBX (192.168.0.81)
+↓ TCP Push
+UNIComm Backend TCP Server
+↓
+parseSMDR()
+↓
+PostgreSQL call_logs
+↓
+Socket.IO realtime events
+↓
+dashboard.html live updates
+
+========================================
+
+CURRENT STATUS
+
+SYSTEM IS NOW FUNCTIONING AS:
+A WORKING REAL-TIME PBX CRM LOGGER
+FOR MATRIX ETERNITY / SARVAM SYSTEMS.
+
+# WhatsApp QR Lazy Connection Checklist
+
+Generated from current `git diff` after the WhatsApp QR/session stability changes.
+
+## Completed
+
+- [x] Changed `/api/wa/qr` to request/generate QR on demand via `wa.requestQR()`.
+- [x] Added `requestQR()` in `backend/services/whatsapp.js` to start WhatsApp only when QR is requested.
+- [x] Added saved-session detection with `hasSavedSession()` so startup can reconnect existing auth without creating a new QR.
+- [x] Prevented fresh QR generation when there is no saved WhatsApp session and the user has not opened/requested WhatsApp Biz.
+- [x] Suppressed accidental Baileys QR events unless QR generation was explicitly allowed by the WhatsApp Biz flow.
+- [x] Kept WhatsApp auto-reconnect behavior for existing connected/saved sessions.
+- [x] Prevented logout/reset from immediately restarting WhatsApp and generating another QR.
+- [x] Preserved WhatsApp auth on server `SIGINT` shutdown so restarts can reconnect silently.
+- [x] Fixed dashboard navigation so clicking `WhatsApp Biz` actually calls `checkWAStatus(true)`.
+- [x] Made the top `WA Business` status pill clickable and route to the WhatsApp Biz module.
+- [x] Updated the dashboard WhatsApp status check to show the connect banner and request the QR when WhatsApp Biz is opened.
+
+## Verification Done
+
+- [x] `node --check backend\services\whatsapp.js`
+- [x] `node --check backend\routes\whatsapp.js`
+- [x] `node --check backend\server.js`
+- [x] Dashboard inline `<script>` blocks parsed successfully with Node.
+
+## Expected Behavior
+
+- [x] QR is not generated just because the backend starts.
+- [x] QR is generated only when WhatsApp Biz is opened/requested.
+- [x] Existing saved WhatsApp sessions can reconnect without forcing a new QR.
+- [x] Activity logs should avoid unnecessary "WhatsApp QR generated" and avoid disconnect noise caused by idle QR sessions.
+
+## Notes
+
+- The current worktree contains other unrelated changes shown by `git status`; this checklist only covers the WhatsApp QR/session changes.
+- Restart the backend and hard refresh the dashboard after these changes.

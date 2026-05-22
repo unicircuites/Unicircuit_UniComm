@@ -741,4 +741,38 @@ router.get(
     }
 );
 
+// Start SMDR service on PBX via web automation
+router.post('/start-smdr-service', async (req, res) => {
+  try {
+    console.log('\n[API] POST /pbx/start-smdr-service — Starting SMDR automation...');
+    
+    const { startSmdrService } = require('../services/matrixSmdrControl');
+    const result = await startSmdrService();
+    
+    res.json(result);
+  } catch (err) {
+    console.error('[API] Error starting SMDR service:', err.message);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// Get SMDR connection status
+router.get('/status', (req, res) => {
+  try {
+    const smdr = require('../services/matrixSmdr');
+    const status = {
+      listening: smdr.isListening ? smdr.isListening() : false,
+      connected: smdr.getStatus ? smdr.getStatus().connected : false,
+      port: process.env.SMDR_PORT || 5001,
+      pbxHost: process.env.PBX_HOST || '192.168.0.81',
+      connectedPeers: smdr.getConnectedPeers ? smdr.getConnectedPeers() : 0,
+      lastActivity: smdr.getLastActivity ? smdr.getLastActivity() : null
+    };
+    res.json(status);
+  } catch (err) {
+    console.error('[API] Error getting SMDR status:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 module.exports = router;

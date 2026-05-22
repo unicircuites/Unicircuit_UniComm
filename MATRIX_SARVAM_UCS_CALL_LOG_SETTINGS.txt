@@ -1,0 +1,505 @@
+# Matrix Sarvam UCS Call Log Settings
+
+# PURPOSE
+
+This guide explains:
+
+* how to sync latest call logs
+* where to change IP settings
+* what settings should remain unchanged
+* how to switch between development and production environments safely
+
+---
+
+# CURRENT SYSTEM ARCHITECTURE
+
+## PBX
+
+Matrix Sarvam UCS PBX
+
+Example PBX IP:
+192.168.0.81
+
+(Static IP — should remain fixed)
+
+---
+
+## DEVELOPMENT MACHINE
+
+Purpose:
+
+* app development
+* testing
+* debugging
+* local verification
+
+IP Address:
+192.168.0.169
+
+---
+
+## TOWER SERVER (PRODUCTION)
+
+Purpose:
+
+* final deployment
+* production usage
+* live CRM sync
+
+IP Address:
+192.168.0.205
+
+---
+
+# MOST IMPORTANT UNDERSTANDING
+
+The PBX sends call logs using:
+
+SMDR Posting
+
+The ONLY thing normally changed while switching environments is:
+
+Destination IP Address
+
+---
+
+# SETTINGS THAT SHOULD REMAIN UNCHANGED
+
+| Setting            | Keep Same? |
+| ------------------ | ---------- |
+| PBX Static IP      | YES        |
+| SMDR Storage       | YES        |
+| Network Parameters | YES        |
+| Firewall Rules     | YES        |
+| SMDR Online        | YES        |
+| Router Settings    | YES        |
+
+---
+
+# SETTINGS THAT NEED IP CHANGE
+
+| Setting                     | Change Required? |
+| --------------------------- | ---------------- |
+| SMDR Posting Destination IP | YES              |
+| UniComm Backend IP          | YES              |
+
+---
+
+# ACTUAL SMDR SECTIONS THAT REQUIRE IP CHANGE
+
+The following sections inside Jeeves are the ONLY areas where Destination IP changes are normally required for call log syncing.
+
+---
+
+# 1. SMDR POSTING
+
+Inside Jeeves:
+
+Reports
+↓
+SMDR
+↓
+SMDR Posting
+
+Current Working Example:
+
+| Setting                | Value         |
+| ---------------------- | ------------- |
+| Protocol               | Matrix        |
+| Destination Port       | Ethernet      |
+| Destination IP Address | 192.168.0.169 |
+| Port                   | 05001         |
+| Process                | Start         |
+
+Purpose:
+
+* sends latest call logs automatically to UniComm backend
+* powers real-time CRM sync
+* used for latest/live call entries
+
+IMPORTANT:
+Only change:
+
+Destination IP Address
+
+when switching between:
+
+* development machine
+* production/tower server
+
+---
+
+# 2. SMDR ONLINE
+
+Inside Jeeves:
+
+Reports
+↓
+SMDR
+↓
+SMDR Online
+
+Current Working Example:
+
+Outgoing Call Online:
+
+* Destination IP = 192.168.0.169
+* Port = 05001
+
+Incoming Call Online:
+
+* Destination IP = 192.168.0.169
+* Port = 05001
+
+Internal Call Online:
+
+* Destination IP = 192.168.0.169
+* Port = 05001
+
+Purpose:
+
+* provides live call updates
+* updates active dashboard instantly
+* sends real-time call events
+
+IMPORTANT:
+Only change:
+
+Destination IP Address
+
+for all three sections when switching environments.
+
+---
+
+# 3. SMDR REPORT
+
+Inside Jeeves:
+
+Reports
+↓
+SMDR
+↓
+SMDR Report
+
+Current Working Example:
+
+Outgoing Call Report:
+
+* Destination IP = 192.168.0.169
+* Port = 05001
+
+Incoming Call Report:
+
+* Destination IP = 192.168.0.169
+* Port = 05001
+
+Internal Call Report:
+
+* Destination IP = 192.168.0.169
+* Port = 05001
+
+Purpose:
+
+* historical call reports
+* exported call logs
+* old call retrieval
+* report synchronization
+
+IMPORTANT:
+Only change:
+
+Destination IP Address
+
+for all report sections when switching between development and production.
+
+---
+
+# DEVELOPMENT VS PRODUCTION IP SWITCHING
+
+## During Development
+
+Use everywhere:
+
+192.168.0.169
+
+---
+
+## During Production
+
+Change everywhere to:
+
+192.168.0.205
+
+---
+
+# IMPORTANT RULE
+
+When switching environments:
+
+Change ALL these sections together:
+
+* SMDR Posting
+* SMDR Online
+* SMDR Report
+
+Otherwise:
+
+* partial logs may occur
+* live calls may mismatch
+* reports may go missing
+* dashboard may show incomplete data
+
+---
+
+# STEP-BY-STEP — CHANGE CALL LOG DESTINATION
+
+# STEP 1 — OPEN JEEVES PANEL
+
+Open browser:
+
+[http://PBX-IP](http://PBX-IP)
+
+Example:
+
+[http://192.168.0.81](http://192.168.0.81)
+
+Login using admin credentials.
+
+---
+
+# STEP 2 — OPEN SMDR POSTING
+
+Inside Jeeves:
+
+Reports
+↓
+SMDR
+↓
+SMDR Posting
+
+---
+
+# STEP 3 — FOR DEVELOPMENT MODE
+
+Use:
+
+Destination IP:
+192.168.0.169
+
+Meaning:
+
+PBX
+↓
+sends call logs
+↓
+Development Machine
+↓
+UniComm Development Backend
+
+---
+
+# STEP 4 — FOR PRODUCTION MODE
+
+Use:
+
+Destination IP:
+192.168.0.205
+
+Meaning:
+
+PBX
+↓
+sends call logs
+↓
+Tower Server
+↓
+Production UniComm Backend
+
+---
+
+# IMPORTANT RULE
+
+ONLY ONE DESTINATION SHOULD BE ACTIVE.
+
+Do NOT send logs simultaneously to:
+
+* 192.168.0.169
+* 192.168.0.205
+
+unless a custom relay/replication system exists.
+
+Otherwise:
+
+* duplicate logs may happen
+* missing entries may happen
+* database conflicts may happen
+
+---
+
+# SMDR ONLINE SETTINGS
+
+Inside Jeeves:
+
+Reports
+↓
+SMDR
+↓
+SMDR Online
+
+Recommended:
+
+KEEP ENABLED ALWAYS
+
+Reason:
+
+* enables latest/live call logs
+* enables real-time dashboard updates
+* helps CRM sync latest calls instantly
+
+---
+
+# SMDR STORAGE SETTINGS
+
+Inside Jeeves:
+
+Reports
+↓
+SMDR
+↓
+SMDR Storage
+
+Recommended:
+
+| Setting     | Recommended Value |
+| ----------- | ----------------- |
+| Storage     | ENABLED           |
+| Retention   | MAXIMUM           |
+| Auto Delete | DISABLED          |
+
+Reason:
+
+* preserves historical call logs
+* avoids accidental deletion
+* maintains long-term call history
+
+---
+
+# FIREWALL SETTINGS
+
+Normally no changes required.
+
+But ensure:
+
+* backend listener port is allowed
+* Node.js/backend app is allowed
+* LAN communication is not blocked
+
+---
+
+# NETWORK SETTINGS
+
+Inside Jeeves:
+
+Basic Settings
+↓
+Network Parameters
+
+Recommended:
+
+| Setting | Recommended |
+| ------- | ----------- |
+| IP Type | Static      |
+| PBX IP  | Fixed       |
+| Gateway | Router IP   |
+| DNS     | Stable DNS  |
+
+Reason:
+
+* prevents PBX disconnection
+* prevents CRM sync failures
+* prevents SMDR posting failures
+
+---
+
+# RECOMMENDED BACKUP SYSTEM
+
+This should be implemented inside UniComm application.
+
+Recommended Flow:
+
+PBX
+↓
+SMDR Posting
+↓
+UniComm Database
+↓
+Automatic Daily Backup
+↓
+ZIP / Archive
+↓
+Backup Folder
+
+---
+
+# RECOMMENDED ITEMS TO BACKUP
+
+Backup:
+
+* call logs database
+* SMDR raw logs
+* extension mapping
+* recording metadata
+* recording file paths
+
+---
+
+# THINGS THAT SHOULD NEVER BE DONE
+
+NEVER:
+
+* remove PBX storage during operation
+* disable SMDR Online
+* disable SMDR Posting
+* enable auto-delete casually
+* change PBX static IP frequently
+* reboot router during active calls
+* use both destination servers simultaneously without replication logic
+
+---
+
+# BEST WORKFLOW
+
+## During Development
+
+PBX
+↓
+192.168.0.169
+↓
+Local Testing
+
+---
+
+## During Production
+
+PBX
+↓
+192.168.0.205
+↓
+Tower Server
+↓
+Final Live CRM
+
+---
+
+# MOST IMPORTANT TAKEAWAY
+
+For latest live call logs:
+
+SMDR Online
++
+SMDR Posting
+must remain enabled.
+
+The MAIN setting you change while switching environments is:
+
+SMDR Posting Destination IP

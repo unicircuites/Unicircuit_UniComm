@@ -41,6 +41,11 @@ pbx_recordings/
 backups/
 backup/
 *.zip
+*_backup_*.json
+*backup*.js
+call_backups/
+backend/backups/
+backend/outlook_backups/
 
 # Logs
 logs/
@@ -63,3 +68,13 @@ backend/uploads/
 # OS junk
 Thumbs.db
 .DS_Store
+
+# Local scratch and one-off repair scripts
+scratch/
+backend/scratch/
+scratch*.js
+fix_*.js
+final_clean.js
+
+# Large local vendor/manual extracts
+ETERNITY NE V1R7.3.3 System Manual_compressed-compressed-pages-deleted-compressed.txt

@@ -15,25 +15,85 @@
 const net = require('net');
 const pool = require('../db/pool');
 
+function cleanText(value) {
+  return String(value || '')
+    .replace(/\x00/g, '')
+    .replace(/[\x01-\x1F\x7F-\x9F]/g, ' ')
+    .trim();
+}
+
 // ── CONFIG (from .env) ────────────────────────────────────────────────────
 const PBX_HOST = process.env.PBX_HOST || '192.168.0.81';
-if (PBX_HOST === '192.168.0.205') {
-  console.warn('[SMDR] ⚠️ WARNING: PBX_HOST is set to local server IP (192.168.0.205). Ensure this is the PBX IP (192.168.0.81).');
-}
 const SMDR_PORT = parseInt(process.env.SMDR_PORT || '5000');
 const CTI_PORT = parseInt(process.env.CTI_PORT || '5001');
 
-// ── STARTUP CONFIG DUMP ───────────────────────────────────────────────────
-console.log('[SMDR] ══════════════════════════════════════════════════════');
-console.log('[SMDR] Matrix Eternity CTI — configuration check');
-console.log(`[SMDR]   PBX_HOST  : ${PBX_HOST}  (Matrix Eternity IP)`);
-console.log(`[SMDR]   SMDR_PORT : ${SMDR_PORT}  (PBX → this server, raw call records)`);
-console.log(`[SMDR]   CTI_PORT  : ${CTI_PORT}  (click-to-dial / call control)`);
-console.log('[SMDR]   Source    : process.env (SMDR_PORT=' +
-  (process.env.SMDR_PORT ? process.env.SMDR_PORT + ' ✅ set in .env' : 'NOT SET — using default 5000 ⚠️') + ')');
-console.log('[SMDR]   Source    : process.env (CTI_PORT=' +
-  (process.env.CTI_PORT ? process.env.CTI_PORT + ' ✅ set in .env' : 'NOT SET — using default 5001 ⚠️') + ')');
-console.log('[SMDR] ══════════════════════════════════════════════════════');
+// ── DEEP DEBUG: CONFIG VALIDATION ──────────────────────────────────────────
+console.log('\n[SMDR-DEBUG] ╔════════════════════════════════════════════════════════╗');
+console.log('[SMDR-DEBUG] ║ MATRIX SMDR SERVICE — INITIALIZATION DEBUG              ║');
+console.log('[SMDR-DEBUG] ╚════════════════════════════════════════════════════════╝\n');
+
+console.log('[SMDR-DEBUG] 📋 STEP 1: Environment Configuration Validation');
+console.log('[SMDR-DEBUG] ─────────────────────────────────────────────────');
+console.log(`[SMDR-DEBUG]   process.env.PBX_HOST      = "${process.env.PBX_HOST}"`);
+console.log(`[SMDR-DEBUG]   process.env.SMDR_PORT     = "${process.env.SMDR_PORT}"`);
+console.log(`[SMDR-DEBUG]   process.env.CTI_PORT      = "${process.env.CTI_PORT}"`);
+console.log(`[SMDR-DEBUG]   process.env.NODE_ENV      = "${process.env.NODE_ENV}"`);
+console.log(`[SMDR-DEBUG]   process.env.HOST          = "${process.env.HOST}"`);
+
+console.log('\n[SMDR-DEBUG] 📋 STEP 2: Parsed Configuration Values');
+console.log('[SMDR-DEBUG] ─────────────────────────────────────────────────');
+console.log(`[SMDR-DEBUG]   PBX_HOST (final)          = "${PBX_HOST}" (type: ${typeof PBX_HOST})`);
+console.log(`[SMDR-DEBUG]   SMDR_PORT (final)         = ${SMDR_PORT} (type: ${typeof SMDR_PORT})`);
+console.log(`[SMDR-DEBUG]   CTI_PORT (final)          = ${CTI_PORT} (type: ${typeof CTI_PORT})`);
+
+console.log('\n[SMDR-DEBUG] 📋 STEP 3: Configuration Validation Checks');
+console.log('[SMDR-DEBUG] ─────────────────────────────────────────────────');
+
+// Validate PBX_HOST
+if (!PBX_HOST || PBX_HOST.trim() === '') {
+  console.error('[SMDR-DEBUG] ❌ CRITICAL: PBX_HOST is empty or undefined!');
+} else if (PBX_HOST === '192.168.0.205') {
+  console.error('[SMDR-DEBUG] ❌ CRITICAL: PBX_HOST is set to Tower Server IP (192.168.0.205)');
+  console.error('[SMDR-DEBUG]    This is WRONG. PBX_HOST must be the PBX hardware IP (192.168.0.81)');
+} else if (!/^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(PBX_HOST)) {
+  console.error(`[SMDR-DEBUG] ❌ CRITICAL: PBX_HOST "${PBX_HOST}" is not a valid IP address`);
+} else {
+  console.log(`[SMDR-DEBUG] ✅ PBX_HOST is valid: ${PBX_HOST}`);
+}
+
+// Validate SMDR_PORT
+if (isNaN(SMDR_PORT)) {
+  console.error('[SMDR-DEBUG] ❌ CRITICAL: SMDR_PORT is not a number!');
+} else if (SMDR_PORT < 1 || SMDR_PORT > 65535) {
+  console.error(`[SMDR-DEBUG] ❌ CRITICAL: SMDR_PORT ${SMDR_PORT} is out of valid range (1-65535)`);
+} else if (SMDR_PORT < 1024) {
+  console.warn(`[SMDR-DEBUG] ⚠️  WARNING: SMDR_PORT ${SMDR_PORT} is a privileged port (< 1024)`);
+} else {
+  console.log(`[SMDR-DEBUG] ✅ SMDR_PORT is valid: ${SMDR_PORT}`);
+}
+
+// Validate CTI_PORT
+if (isNaN(CTI_PORT)) {
+  console.error('[SMDR-DEBUG] ❌ CRITICAL: CTI_PORT is not a number!');
+} else if (CTI_PORT < 1 || CTI_PORT > 65535) {
+  console.error(`[SMDR-DEBUG] ❌ CRITICAL: CTI_PORT ${CTI_PORT} is out of valid range (1-65535)`);
+} else {
+  console.log(`[SMDR-DEBUG] ✅ CTI_PORT is valid: ${CTI_PORT}`);
+}
+
+// Check for port conflicts
+if (SMDR_PORT === CTI_PORT) {
+  console.warn(`[SMDR-DEBUG] ⚠️  WARNING: SMDR_PORT and CTI_PORT are the same (${SMDR_PORT})`);
+  console.warn('[SMDR-DEBUG]    This is allowed but unusual. Ensure PBX is configured correctly.');
+}
+
+console.log('\n[SMDR-DEBUG] 📋 STEP 4: Network Configuration Summary');
+console.log('[SMDR-DEBUG] ─────────────────────────────────────────────────');
+console.log('[SMDR-DEBUG] Expected Connection Flow:');
+console.log(`[SMDR-DEBUG]   PBX (${PBX_HOST}) → TCP Server (0.0.0.0:${SMDR_PORT})`);
+console.log('[SMDR-DEBUG]   Protocol: OG-Handshaking (ENQ/ACK handshake)');
+console.log('[SMDR-DEBUG]   Data Format: STX (0x02) + SMDR Records + ETX (0x03)');
+console.log('[SMDR-DEBUG] ═════════════════════════════════════════════════════════\n');
 
 let io = null;
 let isConnected = false;
@@ -140,22 +200,29 @@ async function ensureTable(retries = 3) {
     try {
       await pool.query(`
         CREATE TABLE IF NOT EXISTS call_logs (
-          id           SERIAL PRIMARY KEY,
-          call_date    DATE,
-          call_time    TIME,
-          duration     VARCHAR(20),
-          call_type    VARCHAR(20),
-          caller       VARCHAR(100),
-          extension    VARCHAR(20),
-          destination  VARCHAR(100),
-          trunk        VARCHAR(50),
-          ai_summary   TEXT,
-          raw_line     TEXT,
-          created_at   TIMESTAMPTZ DEFAULT NOW()
-        )
+  	id SERIAL PRIMARY KEY,
+ 	call_date DATE,
+  	call_time TIME,
+  	duration VARCHAR(20),
+  	call_type VARCHAR(20),
+  	caller VARCHAR(100),
+  	extension VARCHAR(20),
+  	destination VARCHAR(100),
+  	trunk VARCHAR(50),
+  	recording_file TEXT,
+  	ai_summary TEXT,
+  	raw_line TEXT,
+  	created_at TIMESTAMPTZ DEFAULT NOW()
+	)
       `);
       // Add columns if they don't exist (for existing tables)
-      const cols = ['call_date DATE', 'call_time TIME', 'trunk VARCHAR(50)', 'raw_line TEXT'];
+      const cols = [
+  	'call_date DATE',
+  	'call_time TIME',
+  	'trunk VARCHAR(50)',
+  	'raw_line TEXT',
+  	'recording_file TEXT'
+	];
       for (const col of cols) {
         const name = col.split(' ')[0];
         await pool.query(`ALTER TABLE call_logs ADD COLUMN IF NOT EXISTS ${name} ${col.split(' ').slice(1).join(' ')}`).catch(() => { });
@@ -171,14 +238,34 @@ async function ensureTable(retries = 3) {
 
 // ── PARSE MATRIX SMDR LINE ────────────────────────────────────────────────
 function parseSMDR(line) {
-  if (!line) return null;
+  console.log('\n[SMDR-DEBUG] ╔════════════════════════════════════════════════════════╗');
+  console.log('[SMDR-DEBUG] ║ SMDR RECORD PARSING — DETAILED ANALYSIS                ║');
+  console.log('[SMDR-DEBUG] ╚════════════════════════════════════════════════════════╝\n');
+
+  console.log('[SMDR-DEBUG] 📋 STEP 1: Input Validation');
+  console.log('[SMDR-DEBUG] ─────────────────────────────────────────────────');
+  console.log(`[SMDR-DEBUG]   Line provided?           = ${line ? 'YES' : 'NO'}`);
+  console.log(`[SMDR-DEBUG]   Line length              = ${line ? line.length : 0}`);
+  console.log(`[SMDR-DEBUG]   Line content             = ${JSON.stringify(line)}`);
+
+  if (!line) {
+    console.log('[SMDR-DEBUG] ❌ Skipped: No line provided');
+    return null;
+  }
+
   const trimmedLine = line.trim();
-  if (!trimmedLine) return null;
+  if (!trimmedLine) {
+    console.log('[SMDR-DEBUG] ❌ Skipped: Line is empty after trim');
+    return null;
+  }
+
+  console.log('\n[SMDR-DEBUG] 📋 STEP 2: Format Detection');
+  console.log('[SMDR-DEBUG] ─────────────────────────────────────────────────');
 
   // Matrix Eternity SMDR lines can be fixed-width (70+ chars) or space-delimited
-  // Let's try space-delimited first if it looks like the user's reported format:
-  // [ID] [Date] [Time] [Duration] [Type] [Number] [Ext]
   const parts = trimmedLine.split(/\s+/);
+  console.log(`[SMDR-DEBUG]   Space-delimited parts    = ${parts.length}`);
+  console.log(`[SMDR-DEBUG]   Parts: ${JSON.stringify(parts)}`);
 
   let record = null;
 
@@ -187,16 +274,27 @@ function parseSMDR(line) {
     const isDate = /^\d{2,4}-\d{2}-\d{2}$/.test(parts[1]);
     const isTime = /^\d{2}:\d{2}:\d{2}$/.test(parts[2]);
 
+    console.log(`[SMDR-DEBUG]   Part[1] is date?         = ${isDate} (${parts[1]})`);
+    console.log(`[SMDR-DEBUG]   Part[2] is time?         = ${isTime} (${parts[2]})`);
+
     if (isDate && isTime) {
-      // Space-delimited format detected
-      console.log(`[SMDR] ℹ️  Space-delimited format detected (${parts.length} parts)`);
+      console.log('[SMDR-DEBUG] ✅ Space-delimited format detected');
 
       let rawDate = parts[1];
       let rawTime = parts[2];
-      let rawDur = parts[3]; // Might be HH:MM:SS or seconds
+      let rawDur = parts[3];
       let type = parts[4] || 'Out';
       let num = parts[5] || '';
       let ext = parts[6] || '';
+
+      console.log('\n[SMDR-DEBUG] 📋 STEP 3: Field Extraction');
+      console.log('[SMDR-DEBUG] ─────────────────────────────────────────────────');
+      console.log(`[SMDR-DEBUG]   Raw Date                 = ${rawDate}`);
+      console.log(`[SMDR-DEBUG]   Raw Time                 = ${rawTime}`);
+      console.log(`[SMDR-DEBUG]   Raw Duration             = ${rawDur}`);
+      console.log(`[SMDR-DEBUG]   Call Type                = ${type}`);
+      console.log(`[SMDR-DEBUG]   Number                   = ${num}`);
+      console.log(`[SMDR-DEBUG]   Extension                = ${ext}`);
 
       // Normalize Date
       let callDate = rawDate;
@@ -204,8 +302,10 @@ function parseSMDR(line) {
         const dp = rawDate.split('-');
         if (dp[0].length === 2 && dp[2].length === 2) { // DD-MM-YY
           callDate = `20${dp[2]}-${dp[1].padStart(2, '0')}-${dp[0].padStart(2, '0')}`;
+          console.log(`[SMDR-DEBUG]   Date normalized (DD-MM-YY) = ${callDate}`);
         } else if (dp[0].length === 4) { // YYYY-MM-DD
           callDate = rawDate;
+          console.log(`[SMDR-DEBUG]   Date already normalized  = ${callDate}`);
         }
       }
 
@@ -217,6 +317,7 @@ function parseSMDR(line) {
         const m = Math.floor((sec % 3600) / 60);
         const s = sec % 60;
         duration = [h, m, s].map(v => v.toString().padStart(2, '0')).join(':');
+        console.log(`[SMDR-DEBUG]   Duration normalized      = ${duration} (from ${rawDur}s)`);
       }
 
       record = {
@@ -229,18 +330,33 @@ function parseSMDR(line) {
         destination: (type === 'In') ? ext : num,
         trunk: null,
         raw_line: trimmedLine,
-        recording_file: `${callDate.slice(6, 10)}/${callDate.slice(3, 5)}/${recordingId}`,
+        recording_file: null
       };
+
+      console.log('\n[SMDR-DEBUG] 📋 STEP 4: Record Created');
+      console.log('[SMDR-DEBUG] ─────────────────────────────────────────────────');
+      console.log(`[SMDR-DEBUG]   ✅ Record successfully created`);
+      return record;
     }
   }
 
   // ── ATTEMPT 2: Fixed-Width Parsing (For Matrix SARVAM / ETERNITY) ──────
-  // Note: We use the raw line (not trimmed) because Matrix depends on exact column positions.
+  console.log('\n[SMDR-DEBUG] 📋 STEP 3: Attempting Fixed-Width Format');
+  console.log('[SMDR-DEBUG] ─────────────────────────────────────────────────');
+  console.log(`[SMDR-DEBUG]   Line length              = ${trimmedLine.length}`);
+
   const rawLine = line;
   if (rawLine.length >= 70) {
-    const getFixed = (start, len) => rawLine.substring(start - 1, (start - 1) + len).trim();
+    console.log('[SMDR-DEBUG] ✅ Line length sufficient for fixed-width parsing');
+
     const parsedLayout = parseMatrixFixedLayout(rawLine);
-    if (!parsedLayout) return null;
+    if (!parsedLayout) {
+      console.log('[SMDR-DEBUG] ❌ Fixed-width parsing failed');
+      return null;
+    }
+
+    console.log('[SMDR-DEBUG] ✅ Fixed-width parsing successful');
+    console.log(`[SMDR-DEBUG]   Layout type              = ${parsedLayout.layout}`);
 
     const callingNum = parsedLayout.callingNum;
     const trunk = parsedLayout.trunk;
@@ -249,21 +365,29 @@ function parseSMDR(line) {
     const rawTime = parsedLayout.rawTime;
     const speechSec = parsedLayout.durationSeconds;
 
-    // RECORDING FILENAME: Standard Matrix position is usually 80+ if enabled
-    const recordingId = rawLine.length > 80 ? getFixed(80, 30) : null;
+    console.log(`[SMDR-DEBUG]   Calling Number           = ${callingNum}`);
+    console.log(`[SMDR-DEBUG]   Trunk                    = ${trunk}`);
+    console.log(`[SMDR-DEBUG]   Connected Number         = ${connectedNum}`);
+    console.log(`[SMDR-DEBUG]   Date                     = ${rawDate}`);
+    console.log(`[SMDR-DEBUG]   Time                     = ${rawTime}`);
+    console.log(`[SMDR-DEBUG]   Duration (seconds)       = ${speechSec}`);
+
+    const recordingId = rawLine.length > 80 ? rawLine.substring(79, 109).trim() : null;
 
     // VALIDATION: If the date or time fields contain dashes or non-digits, it's a summary line
     if (!rawDate || rawDate.includes('-') && rawDate.length < 5 || rawTime.includes('-')) {
+      console.log('[SMDR-DEBUG] ❌ Invalid date/time format detected');
       return null;
     }
 
     const callDate = parseMatrixDate(rawDate);
-
     const duration = formatDurationFromSeconds(speechSec);
 
     let type = 'Out';
     if (callingNum.length > 5) type = 'In';
     else if (connectedNum.length <= 5 && connectedNum.length > 0) type = 'Internal';
+
+    console.log(`[SMDR-DEBUG]   Detected call type       = ${type}`);
 
     record = {
       call_date: callDate,
@@ -275,7 +399,9 @@ function parseSMDR(line) {
       destination: connectedNum,
       trunk: trunk || null,
       raw_line: rawLine.trim(),
-      recording_file: `${callDate.slice(6, 10)}/${callDate.slice(3, 5)}/${recordingId}`
+      recording_file: recordingId
+        ? `${callDate.slice(0,4)}/${callDate.slice(5,7)}/${String(recordingId).trim()}`
+        : null
     };
 
     if (type === 'In') {
@@ -283,13 +409,19 @@ function parseSMDR(line) {
       record.destination = connectedNum;
       record.extension = connectedNum;
     }
+
+    console.log('[SMDR-DEBUG] ✅ Fixed-width record created');
+    return record;
+  } else {
+    console.log(`[SMDR-DEBUG] ❌ Line too short for fixed-width (${rawLine.length} < 70)`);
   }
 
   if (record && record.call_time && !record.call_time.includes('-')) {
-    console.log(`[SMDR] ✅ Parsed successfully: ${record.call_type} | ${record.caller} -> ${record.destination}`);
+    console.log(`[SMDR-DEBUG] ✅ Final validation passed`);
     return record;
   }
 
+  console.log('[SMDR-DEBUG] ❌ No valid format detected');
   return null;
 }
 
@@ -334,9 +466,13 @@ async function saveCallLog(record) {
       RETURNING *
     `, [
       record.call_date, record.call_time, record.duration,
-      record.call_type, record.caller, record.extension,
-      record.destination, record.trunk, cleanRawLine,
-      record.recording_file
+      cleanText(record.call_type),
+      cleanText(record.caller),
+      cleanText(record.extension),
+      cleanText(record.destination),
+      cleanText(record.trunk),
+      cleanRawLine,
+      cleanText(record.recording_file)
     ]);
     const row = result.rows[0];
     console.log(`[SMDR] Saved to call_logs: ${record.call_type} | ${record.caller} → ${record.destination}`);
@@ -377,30 +513,60 @@ async function saveCallLog(record) {
 
 // ── PROCESS BUFFER ────────────────────────────────────────────────────────
 function processBuffer() {
-  if (!buffer.includes('\n')) {
-    if (buffer.length > 0) {
-      console.log(`[SMDR] ⏳ Buffer accumulating (${buffer.length} bytes), but no newline character (\\n) found yet.`);
-      console.log(`[SMDR]    Current Buffer Hex: ${Buffer.from(buffer).toString('hex')}`);
-    }
-    return;
-  }
-  const lines = buffer.split('\n');
-  buffer = lines.pop(); // keep incomplete last line
-  for (const line of lines) {
-    if (!line || line.trim().length < 10) continue;
+  console.log('\n[SMDR-DEBUG] ╔════════════════════════════════════════════════════════╗');
+  console.log('[SMDR-DEBUG] ║ BUFFER PROCESSING — SMDR RECORD PARSING                ║');
+  console.log('[SMDR-DEBUG] ╚════════════════════════════════════════════════════════╝\n');
 
-    // Ignore explicit header/summary lines
-    if (line.includes('---') || line.includes('Total Calls') || line.includes('Trunk    :') || line.includes('Page :')) {
+  console.log('[SMDR-DEBUG] 📋 STEP 1: Buffer Analysis');
+  console.log('[SMDR-DEBUG] ─────────────────────────────────────────────────');
+  console.log(`[SMDR-DEBUG]   Buffer size                = ${buffer.length} bytes`);
+  console.log(`[SMDR-DEBUG]   Buffer content (first 200) = ${JSON.stringify(buffer.substring(0, 200))}`);
+
+  const matches = buffer.match(/[^\x02\x03]+/g) || [];
+  console.log(`[SMDR-DEBUG]   Records found              = ${matches.length}`);
+
+  buffer = '';
+
+  console.log('\n[SMDR-DEBUG] 📋 STEP 2: Processing Records');
+  console.log('[SMDR-DEBUG] ─────────────────────────────────────────────────');
+
+  for (let i = 0; i < matches.length; i++) {
+    let line = matches[i];
+
+    console.log(`\n[SMDR-DEBUG] Record ${i + 1}/${matches.length}:`);
+
+    line = line
+      .replace(/\x02/g, '')
+      .replace(/\x03/g, '')
+      .replace(/\x00/g, '')
+      .replace(/[^\x20-\x7E\r\n]/g, '')
+      .trim();
+
+    console.log(`[SMDR-DEBUG]   Raw line: ${JSON.stringify(line)}`);
+
+    if (!line || line.length < 10) {
+      console.log('[SMDR-DEBUG]   ⚠️  Skipped: Line too short');
       continue;
     }
 
-    console.log('[SMDR] 📋 Raw line:', JSON.stringify(line));
     const record = parseSMDR(line);
+
     if (record) {
-      console.log('[SMDR] ✅ Parsed:', JSON.stringify(record));
+      console.log('[SMDR-DEBUG] ✅ Parsed successfully');
+      console.log(`[SMDR-DEBUG]   Type: ${record.call_type}`);
+      console.log(`[SMDR-DEBUG]   Caller: ${record.caller}`);
+      console.log(`[SMDR-DEBUG]   Destination: ${record.destination}`);
+      console.log(`[SMDR-DEBUG]   Duration: ${record.duration}`);
       saveCallLog(record);
+    } else {
+      console.warn('[SMDR-DEBUG] ❌ Failed to parse record');
+      console.warn(`[SMDR-DEBUG]   Line: ${JSON.stringify(line)}`);
     }
   }
+
+  console.log('\n[SMDR-DEBUG] 📋 STEP 3: Buffer Processing Complete');
+  console.log('[SMDR-DEBUG] ─────────────────────────────────────────────────');
+  console.log(`[SMDR-DEBUG]   Records processed: ${matches.length}`);
 }
 
 // ── TCP CLIENT — Proactively connect TO the PBX ──────────────────────────
@@ -436,6 +602,7 @@ function startClient() {
   smdrClient.on('data', (data) => {
     const raw = data.toString();
     console.log(`[SMDR] 📥 Data from PBX (${data.length} bytes): ${JSON.stringify(raw)}`);
+    lastActivityTime = new Date();
     buffer += raw;
     processBuffer();
   });
@@ -488,87 +655,323 @@ function startClient() {
 // ── TCP SERVER — PBX connects TO us ──────────────────────────────────────
 let tcpServer = null;
 let connectedPeers = 0;  // track simultaneous connections
+let lastActivityTime = null;  // track last SMDR record received
 
 function startServer() {
   if (tcpServer) { try { tcpServer.close(); } catch (_) { } }
 
-  console.log('[SMDR] ── startServer() ──────────────────────────────────');
-  console.log(`[SMDR]   Binding TCP server on 0.0.0.0:${SMDR_PORT}`);
-  console.log(`[SMDR]   Verify PBX_HOST : "${PBX_HOST}" (Type: ${typeof PBX_HOST})`);
-  if (PBX_HOST === '192.168.0.205') {
-    console.error('[SMDR] ⚠️  CRITICAL CONFIG ERROR: PBX_HOST is set to the Tower Server IP (192.168.0.205).');
-    console.error('[SMDR]    It MUST be set to the PBX Hardware IP (likely 192.168.0.81).');
-  }
+  console.log('\n[SMDR-DEBUG] ╔════════════════════════════════════════════════════════╗');
+  console.log('[SMDR-DEBUG] ║ TCP SERVER STARTUP — DETAILED TRACE                    ║');
+  console.log('[SMDR-DEBUG] ╚════════════════════════════════════════════════════════╝\n');
 
-  // Debug: Ensure port is open in Windows Firewall
-  console.log('[SMDR]   💡 HINT: Run `netsh advfirewall firewall add rule name="PBX-SMDR" dir=in action=allow protocol=TCP localport=5001` if connection is timed out.');
+  console.log('[SMDR-DEBUG] 📋 STEP 1: Pre-Startup Validation');
+  console.log('[SMDR-DEBUG] ─────────────────────────────────────────────────');
+  console.log(`[SMDR-DEBUG]   tcpServer exists?        = ${tcpServer ? 'YES (closing)' : 'NO'}`);
+  console.log(`[SMDR-DEBUG]   SMDR_PORT value          = ${SMDR_PORT}`);
+  console.log(`[SMDR-DEBUG]   SMDR_PORT type           = ${typeof SMDR_PORT}`);
+  console.log(`[SMDR-DEBUG]   PBX_HOST value           = ${PBX_HOST}`);
+  console.log(`[SMDR-DEBUG]   PBX_HOST type            = ${typeof PBX_HOST}`);
+  console.log(`[SMDR-DEBUG]   connectedPeers           = ${connectedPeers}`);
+  console.log(`[SMDR-DEBUG]   isConnected              = ${isConnected}`);
 
-  tcpServer = net.createServer((socket) => {
-    connectedPeers++;
-    isConnected = true;
-    const remote = `${socket.remoteAddress}:${socket.remotePort}`;
-    const isPBX = socket.remoteAddress === PBX_HOST ||
-      socket.remoteAddress === `::ffff:${PBX_HOST}`;
+  console.log('\n[SMDR-DEBUG] 📋 STEP 2: Creating net.createServer()');
+  console.log('[SMDR-DEBUG] ─────────────────────────────────────────────────');
+  
+  try {
+    tcpServer = net.createServer((socket) => {
+      console.log('\n[SMDR-DEBUG] ╔════════════════════════════════════════════════════════╗');
+      console.log('[SMDR-DEBUG] ║ INBOUND CONNECTION RECEIVED — DETAILED TRACE            ║');
+      console.log('[SMDR-DEBUG] ╚════════════════════════════════════════════════════════╝\n');
 
-    console.log('[SMDR] ── INBOUND CONNECTION ─────────────────────────────');
-    console.log(`[SMDR]   Remote  : ${remote}`);
-    console.log(`[SMDR]   Is PBX? : ${isPBX ? '✅ YES — matches PBX_HOST (' + PBX_HOST + ')' : '⚠️  NO  — unexpected source (PBX_HOST=' + PBX_HOST + ')'}`);
-    console.log(`[SMDR]   Socket  : readable=${socket.readable} writable=${socket.writable}`);
-    console.log(`[SMDR]   Active connections: ${connectedPeers}`);
-    if (!isPBX) {
-      console.warn(`[SMDR]   ⚠️  Connection from unknown host ${socket.remoteAddress} — check PBX_HOST in .env`);
-    }
-    emit('pbx:connected', { host: socket.remoteAddress, port: SMDR_PORT, mode: 'server' });
+      console.log('[SMDR-DEBUG] 📋 STEP 1: Socket Object Analysis');
+      console.log('[SMDR-DEBUG] ─────────────────────────────────────────────────');
+      console.log(`[SMDR-DEBUG]   socket.remoteAddress     = "${socket.remoteAddress}"`);
+      console.log(`[SMDR-DEBUG]   socket.remotePort        = ${socket.remotePort}`);
+      console.log(`[SMDR-DEBUG]   socket.localAddress      = "${socket.localAddress}"`);
+      console.log(`[SMDR-DEBUG]   socket.localPort         = ${socket.localPort}`);
+      console.log(`[SMDR-DEBUG]   socket.readable          = ${socket.readable}`);
+      console.log(`[SMDR-DEBUG]   socket.writable          = ${socket.writable}`);
+      console.log(`[SMDR-DEBUG]   socket.destroyed         = ${socket.destroyed}`);
+      console.log(`[SMDR-DEBUG]   socket.connecting        = ${socket.connecting}`);
 
-    socket.on('data', (data) => {
-      const raw = data.toString();
-      console.log(`[SMDR] 📥 Data from ${remote} (${data.length} bytes): ${JSON.stringify(raw)}`);
-      buffer += raw;
-      processBuffer();
-    });
+      console.log('\n[SMDR-DEBUG] 📋 STEP 2: PBX Identification');
+      console.log('[SMDR-DEBUG] ─────────────────────────────────────────────────');
+      const remote = `${socket.remoteAddress}:${socket.remotePort}`;
+      console.log(`[SMDR-DEBUG]   Remote endpoint          = ${remote}`);
+      console.log(`[SMDR-DEBUG]   Expected PBX_HOST        = ${PBX_HOST}`);
+      
+      const isPBX = socket.remoteAddress === PBX_HOST ||
+        socket.remoteAddress === `::ffff:${PBX_HOST}`;
+      
+      console.log(`[SMDR-DEBUG]   Direct match?            = ${socket.remoteAddress === PBX_HOST}`);
+      console.log(`[SMDR-DEBUG]   IPv6-mapped match?       = ${socket.remoteAddress === `::ffff:${PBX_HOST}`}`);
+      console.log(`[SMDR-DEBUG]   Is PBX?                  = ${isPBX ? '✅ YES' : '❌ NO'}`);
+      
+      if (!isPBX) {
+        console.warn(`[SMDR-DEBUG] ⚠️  UNEXPECTED SOURCE: Connection from ${socket.remoteAddress}`);
+        console.warn(`[SMDR-DEBUG]    Expected: ${PBX_HOST}`);
+        console.warn('[SMDR-DEBUG]    Possible causes:');
+        console.warn('[SMDR-DEBUG]      1. PBX_HOST in .env is incorrect');
+        console.warn('[SMDR-DEBUG]      2. PBX is configured to send to wrong IP');
+        console.warn('[SMDR-DEBUG]      3. Network routing issue');
+      }
 
-    socket.on('close', (hadError) => {
-      connectedPeers = Math.max(0, connectedPeers - 1);
-      isConnected = connectedPeers > 0 || (smdrClient && !smdrClient.destroyed);
-      console.log('[SMDR] ── INBOUND DISCONNECTED ───────────────────────────');
-      console.log(`[SMDR]   Remote  : ${remote}`);
-      console.log(`[SMDR]   hadError: ${hadError}`);
-      console.log(`[SMDR]   Active connections remaining: ${connectedPeers}`);
-      console.log(`[SMDR]   No PBX connections — waiting for Matrix PBX to reconnect...`);
-      emit('pbx:disconnected', { fatal: false, reason: 'Peer disconnected', peers: connectedPeers });
-    });
+      // Prevent multiple PBX sockets
+      if (global.activePbxSocket) {
+        console.log('\n[SMDR-DEBUG] 📋 STEP 3: Active Socket Management');
+        console.log('[SMDR-DEBUG] ─────────────────────────────────────────────────');
+        console.log('[SMDR-DEBUG] ⚠️  Previous PBX socket exists, closing it...');
+        try {
+          global.activePbxSocket.destroy();
+          console.log('[SMDR-DEBUG] ✅ Previous socket destroyed');
+        } catch (e) {
+          console.error('[SMDR-DEBUG] ❌ Error destroying previous socket:', e.message);
+        }
+        connectedPeers = 0;
+      }
 
-    socket.on('error', (err) => {
-      console.error(`[SMDR] ❌ Socket error from ${remote}: ${err.message} (code=${err.code})`);
-      emit('pbx:binding_error', {
-        service: 'matrixSmdr',
-        mode: 'server_socket',
-        error: err.message,
-        code: err.code,
-        remote: remote
+      global.activePbxSocket = socket;
+      connectedPeers = 1;
+      isConnected = true;
+
+      console.log('\n[SMDR-DEBUG] 📋 STEP 4: Connection State Update');
+      console.log('[SMDR-DEBUG] ─────────────────────────────────────────────────');
+      console.log(`[SMDR-DEBUG]   global.activePbxSocket   = SET`);
+      console.log(`[SMDR-DEBUG]   connectedPeers           = ${connectedPeers}`);
+      console.log(`[SMDR-DEBUG]   isConnected              = ${isConnected}`);
+
+      // ── OG HANDSHAKING PROTOCOL ──────────────────────────────────────────
+      let handshakeComplete = false;
+      const handshakeTimeout = setTimeout(() => {
+        if (!handshakeComplete) {
+          console.warn(`\n[SMDR-DEBUG] ⏱️  HANDSHAKE TIMEOUT from ${remote}`);
+          console.warn('[SMDR-DEBUG]    No ENQ (0x00) received within 5 seconds');
+          console.warn('[SMDR-DEBUG]    Possible causes:');
+          console.warn('[SMDR-DEBUG]      1. PBX SMDR service not fully started');
+          console.warn('[SMDR-DEBUG]      2. PBX sending SMDR Report instead of SMDR Online');
+          console.warn('[SMDR-DEBUG]      3. PBX configuration mismatch');
+          socket.destroy();
+        }
+      }, 5000);
+
+      console.log('\n[SMDR-DEBUG] 📋 STEP 5: Handshake Protocol Setup');
+      console.log('[SMDR-DEBUG] ─────────────────────────────────────────────────');
+      console.log('[SMDR-DEBUG] Waiting for ENQ (0x00) handshake from PBX...');
+      console.log('[SMDR-DEBUG] Timeout: 5 seconds');
+
+      socket.on('data', (data) => {
+        console.log('\n[SMDR-DEBUG] ╔════════════════════════════════════════════════════════╗');
+        console.log('[SMDR-DEBUG] ║ DATA RECEIVED — DETAILED ANALYSIS                      ║');
+        console.log('[SMDR-DEBUG] ╚════════════════════════════════════════════════════════╝\n');
+
+        console.log('[SMDR-DEBUG] 📋 STEP 1: Raw Data Inspection');
+        console.log('[SMDR-DEBUG] ─────────────────────────────────────────────────');
+        console.log(`[SMDR-DEBUG]   Bytes received           = ${data.length}`);
+        console.log(`[SMDR-DEBUG]   Data type                = ${data.constructor.name}`);
+        console.log(`[SMDR-DEBUG]   Hex dump                 = ${data.toString('hex')}`);
+        console.log(`[SMDR-DEBUG]   ASCII dump               = ${JSON.stringify(data.toString('utf8'))}`);
+        console.log(`[SMDR-DEBUG]   First byte (decimal)     = ${data.length > 0 ? data[0] : 'N/A'}`);
+        console.log(`[SMDR-DEBUG]   First byte (hex)         = ${data.length > 0 ? '0x' + data[0].toString(16).padStart(2, '0') : 'N/A'}`);
+
+        // If handshake not complete, check for ENQ
+        if (!handshakeComplete) {
+          console.log('\n[SMDR-DEBUG] 📋 STEP 2: Handshake Phase Analysis');
+          console.log('[SMDR-DEBUG] ─────────────────────────────────────────────────');
+          console.log('[SMDR-DEBUG] Handshake status: NOT COMPLETE');
+          
+          // Check if this is ENQ (0x00) character
+          if (data.length > 0 && data[0] === 0x00) {
+            console.log('[SMDR-DEBUG] ✅ ENQ (0x00) DETECTED — Handshake initiated!');
+            
+            // Send ACK (0x06) to acknowledge
+            console.log('[SMDR-DEBUG] 📤 Sending ACK (0x06) response...');
+            socket.write(Buffer.from([0x06]));
+            console.log('[SMDR-DEBUG] ✅ ACK sent successfully');
+            
+            handshakeComplete = true;
+            clearTimeout(handshakeTimeout);
+
+            console.log('\n[SMDR-DEBUG] 📋 STEP 3: Handshake Complete — Emitting pbx:connected');
+            console.log('[SMDR-DEBUG] ─────────────────────────────────────────────────');
+            console.log('[SMDR-DEBUG] ✅ Emitting pbx:connected event');
+            console.log(`[SMDR-DEBUG]   IP: ${socket.remoteAddress}`);
+            console.log(`[SMDR-DEBUG]   Port: ${socket.remotePort}`);
+            console.log('[SMDR-DEBUG]   Protocol: OG-Handshaking');
+            
+            emit('pbx:connected', { 
+              ip: socket.remoteAddress, 
+              port: socket.remotePort, 
+              connectedAt: Date.now(),
+              mode: 'server',
+              isPBX: isPBX,
+              protocol: 'OG-Handshaking'
+            });
+            return; // Don't process this as data
+          } else {
+            console.warn('[SMDR-DEBUG] ⚠️  UNEXPECTED DATA — Expected ENQ (0x00)');
+            console.warn(`[SMDR-DEBUG]    Received: ${JSON.stringify(data.toString('utf8'))}`);
+            console.warn('[SMDR-DEBUG]    Hex: ' + data.toString('hex'));
+            console.warn('[SMDR-DEBUG]    Possible causes:');
+            console.warn('[SMDR-DEBUG]      1. PBX sending SMDR Report (historical) instead of SMDR Online (real-time)');
+            console.warn('[SMDR-DEBUG]      2. PBX SMDR service not fully initialized');
+            console.warn('[SMDR-DEBUG]      3. PBX configuration mismatch');
+            console.warn('[SMDR-DEBUG]    FIX: Restart SMDR service on PBX (System → Services → SMDR)');
+            
+            handshakeComplete = true; // Assume no handshaking required
+            clearTimeout(handshakeTimeout);
+            
+            console.log('[SMDR-DEBUG] ✅ Treating as raw-tcp protocol (no handshaking)');
+            console.log('[SMDR-DEBUG] ✅ Emitting pbx:connected event');
+            
+            emit('pbx:connected', { 
+              ip: socket.remoteAddress, 
+              port: socket.remotePort, 
+              connectedAt: Date.now(),
+              mode: 'server',
+              isPBX: isPBX,
+              protocol: 'raw-tcp'
+            });
+          }
+        }
+
+        // Process data (after handshake or if no handshaking)
+        console.log('\n[SMDR-DEBUG] 📋 STEP 4: Data Processing');
+        console.log('[SMDR-DEBUG] ─────────────────────────────────────────────────');
+        console.log('[SMDR-DEBUG] Handshake status: COMPLETE');
+        console.log('[SMDR-DEBUG] Processing SMDR records...');
+
+        let raw = data.toString('utf8')
+          .replace(/\x02/g, '')
+          .replace(/\x03/g, '')
+          .replace(/\x00/g, '')
+          .replace(/[^\x20-\x7E\r\n]/g, '');
+
+        console.log(`[SMDR-DEBUG]   Cleaned data: ${JSON.stringify(raw)}`);
+        console.log(`[SMDR-DEBUG]   Cleaned length: ${raw.length} bytes`);
+
+        if (!raw.trim()) {
+          console.log('[SMDR-DEBUG] ℹ️  No data after cleaning, skipping...');
+          return;
+        }
+
+        lastActivityTime = new Date();
+        buffer += raw;
+        console.log(`[SMDR-DEBUG]   Buffer size: ${buffer.length} bytes`);
+
+        processBuffer();
+      });
+
+      socket.on('close', (hadError) => {
+        console.log('\n[SMDR-DEBUG] ╔════════════════════════════════════════════════════════╗');
+        console.log('[SMDR-DEBUG] ║ SOCKET CLOSED — DETAILED TRACE                         ║');
+        console.log('[SMDR-DEBUG] ╚════════════════════════════════════════════════════════╝\n');
+
+        console.log('[SMDR-DEBUG] 📋 STEP 1: Close Event Analysis');
+        console.log('[SMDR-DEBUG] ─────────────────────────────────────────────────');
+        console.log(`[SMDR-DEBUG]   Remote endpoint          = ${remote}`);
+        console.log(`[SMDR-DEBUG]   Had error?               = ${hadError}`);
+        console.log(`[SMDR-DEBUG]   Buffer cleared           = YES`);
+
+        buffer = '';
+        connectedPeers = Math.max(0, connectedPeers - 1);
+        isConnected = connectedPeers > 0 || (smdrClient && !smdrClient.destroyed);
+
+        console.log('\n[SMDR-DEBUG] 📋 STEP 2: Connection State Update');
+        console.log('[SMDR-DEBUG] ─────────────────────────────────────────────────');
+        console.log(`[SMDR-DEBUG]   connectedPeers (after)   = ${connectedPeers}`);
+        console.log(`[SMDR-DEBUG]   isConnected (after)      = ${isConnected}`);
+        console.log(`[SMDR-DEBUG]   Reason                   = ${hadError ? 'Socket error' : 'Peer disconnected'}`);
+
+        console.log('\n[SMDR-DEBUG] 📋 STEP 3: Emitting pbx:disconnected');
+        console.log('[SMDR-DEBUG] ─────────────────────────────────────────────────');
+        
+        emit('pbx:disconnected', { 
+          disconnectedAt: Date.now(),
+          reason: hadError ? 'Socket error' : 'Peer disconnected',
+          peers: connectedPeers,
+          fatal: false
+        });
+      });
+
+      socket.on('error', (err) => {
+        console.error('\n[SMDR-DEBUG] ╔════════════════════════════════════════════════════════╗');
+        console.error('[SMDR-DEBUG] ║ SOCKET ERROR — DETAILED TRACE                          ║');
+        console.error('[SMDR-DEBUG] ╚════════════════════════════════════════════════════════╝\n');
+
+        console.error('[SMDR-DEBUG] 📋 STEP 1: Error Details');
+        console.error('[SMDR-DEBUG] ─────────────────────────────────────────────────');
+        console.error(`[SMDR-DEBUG]   Remote endpoint          = ${remote}`);
+        console.error(`[SMDR-DEBUG]   Error message            = ${err.message}`);
+        console.error(`[SMDR-DEBUG]   Error code               = ${err.code}`);
+        console.error(`[SMDR-DEBUG]   Error stack              = ${err.stack}`);
+
+        emit('pbx:binding_error', {
+          service: 'matrixSmdr',
+          mode: 'server_socket',
+          error: err.message,
+          code: err.code,
+          remote: remote
+        });
       });
     });
-  });
+    console.log('[SMDR-DEBUG] ✅ net.createServer() created successfully');
+  } catch (err) {
+    console.error('[SMDR-DEBUG] ❌ Error creating server:', err.message);
+    throw err;
+  }
+
+  console.log('\n[SMDR-DEBUG] 📋 STEP 3: Binding Server to Port');
+  console.log('[SMDR-DEBUG] ─────────────────────────────────────────────────');
+  console.log(`[SMDR-DEBUG]   Binding to: 0.0.0.0:${SMDR_PORT}`);
 
   tcpServer.listen(SMDR_PORT, '0.0.0.0', () => {
-    console.log('[SMDR] ── SERVER READY ───────────────────────────────────');
-    console.log(`[SMDR]   ✅ Listening on 0.0.0.0:${SMDR_PORT}`);
-    console.log('[SMDR]   Waiting for Matrix PBX (192.168.0.81) to initiate TCP handshake...');
-    emit('pbx:ready', { mode: 'server', port: SMDR_PORT });
+    console.log('\n[SMDR-DEBUG] ╔════════════════════════════════════════════════════════╗');
+    console.log('[SMDR-DEBUG] ║ SERVER LISTENING — READY FOR CONNECTIONS               ║');
+    console.log('[SMDR-DEBUG] ╚════════════════════════════════════════════════════════╝\n');
+
+    console.log('[SMDR-DEBUG] 📋 STEP 1: Server Binding Successful');
+    console.log('[SMDR-DEBUG] ─────────────────────────────────────────────────');
+    console.log(`[SMDR-DEBUG]   ✅ Listening on 0.0.0.0:${SMDR_PORT}`);
+    console.log(`[SMDR-DEBUG]   Waiting for Matrix PBX (${PBX_HOST}) to initiate TCP handshake...`);
+    console.log('[SMDR-DEBUG]   Expected handshake: ENQ (0x00) → ACK (0x06)');
+    console.log('[SMDR-DEBUG]   Expected data format: STX (0x02) + SMDR Records + ETX (0x03)');
+
+    emit('pbx:listening', { mode: 'server', port: SMDR_PORT, connectedAt: Date.now() });
   });
 
   // Heartbeat to keep logs moving and show service is alive
   if (global.smdrHeartbeat) clearInterval(global.smdrHeartbeat);
   global.smdrHeartbeat = setInterval(() => {
     if (connectedPeers === 0) {
-      console.log(`[SMDR] 💓 Heartbeat: Still listening on port ${SMDR_PORT}... (No active PBX connection yet)`);
+      console.log(`[SMDR-DEBUG] 💓 Heartbeat: Listening on port ${SMDR_PORT}... (No active PBX connection yet)`);
     } else {
-      console.log(`[SMDR] 💓 Heartbeat: Active connection maintained. (Peers: ${connectedPeers})`);
+      console.log(`[SMDR-DEBUG] 💓 Heartbeat: Active connection maintained. (Peers: ${connectedPeers})`);
     }
   }, 60000);
 
   tcpServer.on('error', (err) => {
-    console.error('[SMDR] ❌ Server error:', err.message, `(code=${err.code})`);
+    console.error('\n[SMDR-DEBUG] ╔════════════════════════════════════════════════════════╗');
+    console.error('[SMDR-DEBUG] ║ SERVER ERROR — DETAILED TRACE                          ║');
+    console.error('[SMDR-DEBUG] ╚════════════════════════════════════════════════════════╝\n');
+
+    console.error('[SMDR-DEBUG] 📋 STEP 1: Server Error Details');
+    console.error('[SMDR-DEBUG] ─────────────────────────────────────────────────');
+    console.error(`[SMDR-DEBUG]   Error message            = ${err.message}`);
+    console.error(`[SMDR-DEBUG]   Error code               = ${err.code}`);
+    console.error(`[SMDR-DEBUG]   Error stack              = ${err.stack}`);
+
+    if (err.code === 'EADDRINUSE') {
+      console.error(`[SMDR-DEBUG] ❌ Port ${SMDR_PORT} is already in use!`);
+      console.error('[SMDR-DEBUG]    Possible causes:');
+      console.error('[SMDR-DEBUG]      1. Another instance of this service is running');
+      console.error('[SMDR-DEBUG]      2. Previous process did not clean up properly');
+      console.error('[SMDR-DEBUG]      3. Another application is using this port');
+      console.error('[SMDR-DEBUG]    FIX: Kill the process using this port or change SMDR_PORT');
+    } else if (err.code === 'EACCES') {
+      console.error(`[SMDR-DEBUG] ❌ Permission denied for port ${SMDR_PORT}!`);
+      console.error('[SMDR-DEBUG]    Ports < 1024 require elevated privileges');
+    }
+
     emit('pbx:disconnected', {
       service: 'matrixSmdr',
       mode: 'server',
@@ -577,10 +980,10 @@ function startServer() {
       code: err.code,
       port: SMDR_PORT
     });
-    if (err.code === 'EADDRINUSE') {
-      console.error(`[SMDR]   Port ${SMDR_PORT} already in use.`);
-    }
-    console.log('[SMDR]   Retrying server in 30 seconds...');
+
+    console.log('[SMDR-DEBUG] 📋 STEP 2: Retry Schedule');
+    console.log('[SMDR-DEBUG] ─────────────────────────────────────────────────');
+    console.log('[SMDR-DEBUG] Retrying server in 30 seconds...');
     setTimeout(startServer, 30000);
   });
 }
@@ -590,11 +993,29 @@ function getStatus() {
 }
 
 async function start() {
-  await ensureTable();
-  // We only start the Server mode because the Matrix PBX is configured to PUSH data to us.
-  // This avoids the ECONNREFUSED error when trying to connect to the PBX as a client.
+  console.log('\n[SMDR-DEBUG] ╔════════════════════════════════════════════════════════╗');
+  console.log('[SMDR-DEBUG] ║ SMDR SERVICE START — INITIALIZATION SEQUENCE            ║');
+  console.log('[SMDR-DEBUG] ╚════════════════════════════════════════════════════════╝\n');
+
+  console.log('[SMDR-DEBUG] 📋 STEP 1: Database Table Initialization');
+  console.log('[SMDR-DEBUG] ─────────────────────────────────────────────────');
+  try {
+    await ensureTable();
+    console.log('[SMDR-DEBUG] ✅ Database table ready');
+  } catch (err) {
+    console.error('[SMDR-DEBUG] ❌ Database initialization failed:', err.message);
+    throw err;
+  }
+
+  console.log('\n[SMDR-DEBUG] 📋 STEP 2: TCP Server Startup');
+  console.log('[SMDR-DEBUG] ─────────────────────────────────────────────────');
+  console.log('[SMDR-DEBUG] Starting TCP server in passive mode (PBX connects to us)...');
   startServer();
-  // startClient(); 
+  console.log('[SMDR-DEBUG] ✅ TCP server startup initiated');
+
+  console.log('\n[SMDR-DEBUG] ╔════════════════════════════════════════════════════════╗');
+  console.log('[SMDR-DEBUG] ║ SMDR SERVICE READY — WAITING FOR PBX CONNECTION         ║');
+  console.log('[SMDR-DEBUG] ╚════════════════════════════════════════════════════════╝\n');
 }
 
 
@@ -673,4 +1094,17 @@ async function reconnect() {
   }, 1000);
 }
 
-module.exports = { start, setIO, getStatus, dial, reconnect };
+// Status helper functions
+function isListening() {
+  return tcpServer !== null && tcpServer.listening;
+}
+
+function getConnectedPeers() {
+  return connectedPeers;
+}
+
+function getLastActivity() {
+  return lastActivityTime || null;
+}
+
+module.exports = { start, setIO, getStatus, dial, reconnect, isListening, getConnectedPeers, getLastActivity };

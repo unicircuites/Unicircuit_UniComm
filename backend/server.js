@@ -8,6 +8,10 @@
  */
 require('dotenv').config({ path: require('path').join(__dirname, '.env') });
 
+// DEBUG: Check if .env loaded
+console.log('[SERVER] .env loaded. SMDR_PORT from env:', process.env.SMDR_PORT);
+console.log('[SERVER] .env file path:', require('path').join(__dirname, '.env'));
+
 // Run security checks on startup
 const { runStartupSecurityChecks } = require('./utils/securityCheck');
 runStartupSecurityChecks();
@@ -125,22 +129,41 @@ function systemBridge(event, data) {
     // ── Service connect/disconnect ──────────────────────────────────────
     if (event === 'wa:connected') { markOnline('whatsapp'); serviceState.whatsapp.phone = data?.jid || data?.phone || null; }
     else if (event === 'wa:disconnected') markOffline('whatsapp', data?.reason || (data?.code ? `code ${data.code}` : null));
-    else if (event === 'pbx:connected') {
-      markOnline('pbx');
-      serviceState.pbx.clientHost = data?.host || null;
-      serviceState.pbx.status = 'connected'; // differentiate from 'online' (ready)
-    }
-    else if (event === 'pbx:ready') {
+    else if (event === 'pbx:listening') {
+      // Server is listening but no PBX connected yet
       markOnline('pbx');
       serviceState.pbx.port = data?.port || SMDR_PORT;
       serviceState.pbx.mode = data?.mode || 'server';
+      serviceState.pbx.status = 'listening';
+    }
+    else if (event === 'pbx:connected') {
+      // Actual PBX socket connected
+      markOnline('pbx');
+      serviceState.pbx.clientHost = data?.ip || data?.host || null;
+      serviceState.pbx.status = 'connected';
+      serviceState.pbx.connectedAt = data?.connectedAt || Date.now();
+    }
+    else if (event === 'pbx:ready') {
+      // Legacy event — treat as listening
+      markOnline('pbx');
+      serviceState.pbx.port = data?.port || SMDR_PORT;
+      serviceState.pbx.mode = data?.mode || 'server';
+      serviceState.pbx.status = 'listening';
     }
     else if (event === 'pbx:disconnected') {
       serviceState.pbx.clientHost = null;
+      serviceState.pbx.status = 'listening'; // Back to listening mode
       if (data?.fatal) {
         markOffline('pbx', data.error || data.reason);
       } else {
-        serviceState.pbx.status = 'online'; // back to ready mode
+        // Non-fatal disconnect — server still listening
+        const ev = activityLog.append({ 
+          type: 'info', 
+          service: 'pbx', 
+          message: `PBX disconnected: ${data?.reason || 'Connection lost'} — listening for reconnection`,
+          timestamp: _now() 
+        });
+        try { _origEmit('system:activity', ev); } catch (_) { }
       }
     }
 
@@ -201,7 +224,7 @@ function systemBridge(event, data) {
     }
 
     // ── Emit generic activity event for all non-connect/disconnect events ─
-    if (!['wa:connected', 'wa:disconnected', 'pbx:connected', 'pbx:disconnected'].includes(event)) {
+    if (!['wa:connected', 'wa:disconnected', 'pbx:connected', 'pbx:disconnected', 'pbx:listening', 'pbx:ready'].includes(event)) {
       const last = activityLog.getRecent(1)[0];
       if (last) {
         try { _origEmit('system:activity', last); } catch (_) { }

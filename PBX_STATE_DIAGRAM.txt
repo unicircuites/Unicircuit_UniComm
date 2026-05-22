@@ -1,0 +1,168 @@
+╔════════════════════════════════════════════════════════════════════════════════╗
+║                    PBX 3-STATE CONNECTION MODEL                               ║
+╚════════════════════════════════════════════════════════════════════════════════╝
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ STATE 1: LISTENING (🟡 Yellow)                                              │
+├─────────────────────────────────────────────────────────────────────────────┤
+│ Condition:                                                                  │
+│   • TCP server started                                                      │
+│   • Waiting for PBX socket connection                                       │
+│                                                                             │
+│ Backend Event:                                                              │
+│   emit('pbx:listening', { mode: 'server', port: 5000, ... })              │
+│                                                                             │
+│ Frontend UI:                                                                │
+│   🟡 Matrix PBX · Passive Standby · Waiting for PBX Connection             │
+│   Listening on Port 5000 (server)                                          │
+│                                                                             │
+│ Behavior:                                                                   │
+│   ✓ Show stored DB call logs                                               │
+│   ✓ No realtime updates                                                    │
+│   ✓ Continue listening on port 5000                                        │
+│   ✓ Service marked as ONLINE                                               │
+└─────────────────────────────────────────────────────────────────────────────┘
+                                    ↓
+                        [PBX connects to server]
+                                    ↓
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ STATE 2: CONNECTED (🟢 Green)                                               │
+├─────────────────────────────────────────────────────────────────────────────┤
+│ Condition:                                                                  │
+│   • PBX socket actually connected                                           │
+│   • net.createServer((socket) => {}) fired                                  │
+│                                                                             │
+│ Backend Event:                                                              │
+│   emit('pbx:connected', {                                                  │
+│     ip: '192.168.0.81',                                                    │
+│     port: 54321,                                                           │
+│     connectedAt: Date.now(),                                               │
+│     mode: 'server',                                                        │
+│     isPBX: true                                                            │
+│   })                                                                        │
+│                                                                             │
+│ Frontend UI:                                                                │
+│   🟢 Matrix PBX · Live Connected · Receiving Realtime SMDR Data            │
+│   Active SMDR session from 192.168.0.81                                    │
+│   [Live badge visible]                                                     │
+│                                                                             │
+│ Behavior:                                                                   │
+│   ✓ Realtime live updates                                                  │
+│   ✓ Active SMDR packet processing                                          │
+│   ✓ Active connection indicators                                           │
+│   ✓ Call logs refresh on new calls                                         │
+│   ✓ Service marked as ONLINE                                               │
+└─────────────────────────────────────────────────────────────────────────────┘
+                                    ↓
+                    [PBX disconnects or socket closes]
+                                    ↓
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ STATE 3: DISCONNECTED (🟡 Yellow or 🔴 Red)                                 │
+├─────────────────────────────────────────────────────────────────────────────┤
+│ Condition:                                                                  │
+│   • socket.on('close') OR socket.on('error')                               │
+│   • OR tcpServer.on('error') with fatal flag                               │
+│                                                                             │
+│ Backend Event (Non-Fatal):                                                 │
+│   emit('pbx:disconnected', {                                               │
+│     disconnectedAt: Date.now(),                                            │
+│     reason: 'Peer disconnected',                                           │
+│     peers: 0,                                                              │
+│     fatal: false                                                           │
+│   })                                                                        │
+│                                                                             │
+│ Backend Event (Fatal):                                                     │
+│   emit('pbx:disconnected', {                                               │
+│     disconnectedAt: Date.now(),                                            │
+│     reason: 'EADDRINUSE',                                                  │
+│     fatal: true                                                            │
+│   })                                                                        │
+│                                                                             │
+│ Frontend UI (Non-Fatal):                                                   │
+│   🟡 Matrix PBX · Passive Standby · Waiting for PBX Connection             │
+│   [Back to listening state]                                                │
+│                                                                             │
+│ Frontend UI (Fatal):                                                       │
+│   🔴 Matrix PBX · Offline · EADDRINUSE                                     │
+│   [Error state]                                                            │
+│                                                                             │
+│ Behavior (Non-Fatal):                                                      │
+│   ✓ Stop realtime indicators                                               │
+│   ✓ Continue showing stored DB records                                     │
+│   ✓ Continue passive listening for reconnection                            │
+│   ✓ Service marked as ONLINE (listening)                                   │
+│   ✓ Auto-reconnect when PBX connects again                                 │
+│                                                                             │
+│ Behavior (Fatal):                                                          │
+│   ✗ Server offline                                                         │
+│   ✗ Requires manual restart                                                │
+│   ✓ Service marked as OFFLINE                                              │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+╔════════════════════════════════════════════════════════════════════════════════╗
+║                           STATE TRANSITIONS                                    ║
+╚════════════════════════════════════════════════════════════════════════════════╝
+
+LISTENING ──[PBX connects]--> CONNECTED
+   🟡                            🟢
+   
+CONNECTED ──[PBX disconnects]--> LISTENING (non-fatal)
+   🟢                              🟡
+   
+LISTENING ──[Server error]--> DISCONNECTED (fatal)
+   🟡                           🔴
+   
+CONNECTED ──[Server error]--> DISCONNECTED (fatal)
+   🟢                           🔴
+
+DISCONNECTED (fatal) ──[Manual restart]--> LISTENING
+   🔴                                        🟡
+
+╔════════════════════════════════════════════════════════════════════════════════╗
+║                        SOCKET.IO EVENTS EMITTED                                ║
+╚════════════════════════════════════════════════════════════════════════════════╝
+
+Event: pbx:listening
+  When: Server starts listening
+  Data: { mode: 'server', port: 5000, connectedAt: timestamp }
+  
+Event: pbx:connected
+  When: PBX socket connects
+  Data: { ip: '192.168.0.81', port: 54321, connectedAt: timestamp, mode: 'server', isPBX: true }
+  
+Event: pbx:disconnected
+  When: PBX socket closes or server error
+  Data: { disconnectedAt: timestamp, reason: string, peers: 0, fatal: boolean }
+  
+Event: pbx:call
+  When: New call record received
+  Data: { id, call_date, call_time, duration, call_type, caller, destination, ... }
+
+╔════════════════════════════════════════════════════════════════════════════════╗
+║                         ARCHITECTURE NOTES                                     ║
+╚════════════════════════════════════════════════════════════════════════════════╝
+
+✅ PASSIVE TCP SERVER
+   • PBX connects TO us (not the other way around)
+   • Server listens on 0.0.0.0:5000
+   • PBX initiates connection from 192.168.0.81
+
+✅ NO ACTIVE CLIENT MODE
+   • Legacy startClient() remains disabled
+   • Prevents ECONNREFUSED errors
+   • Simplifies connection logic
+
+✅ EXISTING CALL PARSING
+   • No changes to SMDR parsing logic
+   • All calls saved to call_logs table
+   • CRM contact sync still works
+
+✅ SOCKET.IO FORWARDING
+   • All events forwarded to frontend
+   • Real-time updates during connected state
+   • Activity log maintained
+
+✅ DATABASE PERSISTENCE
+   • Stored logs always visible
+   • Works in all states (listening, connected, disconnected)
+   • No data loss on disconnect
