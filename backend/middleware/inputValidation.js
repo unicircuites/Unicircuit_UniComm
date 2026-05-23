@@ -144,6 +144,8 @@ function validateInput(req, res, next) {
       '/api/calls/recordings',
       '/api/pbx/db-recordings',
       '/api/pbx/db-folders',
+      '/ai/chat',
+      '/api/system/ai/chat',
     ];
 
     if (skipRoutes.some(route => req.path.startsWith(route))) {

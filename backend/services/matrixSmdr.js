@@ -22,6 +22,11 @@ function cleanText(value) {
     .trim();
 }
 
+function cleanNullableText(value) {
+  const cleaned = cleanText(value);
+  return cleaned ? cleaned : null;
+}
+
 // ── CONFIG (from .env) ────────────────────────────────────────────────────
 const PBX_HOST = process.env.PBX_HOST || '192.168.0.81';
 const SMDR_PORT = parseInt(process.env.SMDR_PORT || '5000');
@@ -227,6 +232,13 @@ async function ensureTable(retries = 3) {
         const name = col.split(' ')[0];
         await pool.query(`ALTER TABLE call_logs ADD COLUMN IF NOT EXISTS ${name} ${col.split(' ').slice(1).join(' ')}`).catch(() => { });
       }
+      await pool.query(`UPDATE call_logs SET recording_file = NULL WHERE recording_file = ''`).catch(() => { });
+      await pool.query(`DROP INDEX IF EXISTS idx_call_logs_recording_file_unique`).catch(() => { });
+      await pool.query(`
+        CREATE UNIQUE INDEX IF NOT EXISTS idx_call_logs_recording_file_unique
+        ON call_logs (recording_file)
+        WHERE recording_file IS NOT NULL AND recording_file <> ''
+      `).catch(() => { });
       return; // Success
     } catch (err) {
       console.warn(`[SMDR] Table ensure attempt ${i + 1} failed: ${err.message}`);
@@ -276,6 +288,45 @@ function parseSMDR(line) {
 
     console.log(`[SMDR-DEBUG]   Part[1] is date?         = ${isDate} (${parts[1]})`);
     console.log(`[SMDR-DEBUG]   Part[2] is time?         = ${isTime} (${parts[2]})`);
+
+    const matrixPostingDateIndex = parts.findIndex((part, idx) =>
+      idx > 0 && isMatrixDate(part) && isMatrixTime(parts[idx + 1])
+    );
+
+    if (!isDate && matrixPostingDateIndex >= 4) {
+      console.log('[SMDR-DEBUG] Matrix Posting space-delimited format detected');
+
+      const callingNum = parts[1] || '';
+      const trunk = parts[2] || '';
+      const connectedNum = parts[3] || '';
+      const rawDate = parts[matrixPostingDateIndex];
+      const rawTime = parts[matrixPostingDateIndex + 1];
+      const tail = parts.slice(matrixPostingDateIndex + 2);
+      const numericTail = tail.filter(v => /^\d+$/.test(v));
+      const durationSeconds = parseInt(numericTail[numericTail.length - 1] || '0', 10) || 0;
+      const callDate = parseMatrixDate(rawDate);
+      const duration = formatDurationFromSeconds(durationSeconds);
+
+      let type = 'Out';
+      if (callingNum.length > 5) type = 'In';
+      else if (connectedNum.length <= 5 && connectedNum.length > 0) type = 'Internal';
+
+      record = {
+        call_date: callDate,
+        call_time: rawTime,
+        duration: duration,
+        call_type: type,
+        caller: callingNum || null,
+        extension: (type === 'In') ? connectedNum : callingNum,
+        destination: connectedNum || null,
+        trunk: trunk || null,
+        raw_line: trimmedLine,
+        recording_file: null
+      };
+
+      console.log('[SMDR-DEBUG] Matrix Posting record created', record);
+      return record;
+    }
 
     if (isDate && isTime) {
       console.log('[SMDR-DEBUG] ✅ Space-delimited format detected');
@@ -460,6 +511,48 @@ async function saveCallLog(record) {
     // Strip null bytes and non-printable characters to prevent DB UTF-8 encoding errors
     const cleanRawLine = String(record.raw_line || '').replace(/\x00/g, '').replace(/[\x01-\x1F\x7F-\x9F]/g, ' ').trim();
 
+    // ── MULTI-HOP CALL DEDUPLICATION ──────────────────────
+    // If a call is transferred from an IVR/Group to an extension, Matrix sends two SMDR records.
+    // We combine them into a single row to prevent dashboard duplicates.
+    if (record.call_type === 'In' && record.caller) {
+      const recentCall = await pool.query(`
+        SELECT id, destination, duration
+        FROM call_logs
+        WHERE call_type = 'In'
+          AND caller = $1
+          AND created_at >= NOW() - INTERVAL '5 minutes'
+        ORDER BY id DESC
+        LIMIT 1
+      `, [record.caller]);
+
+      if (recentCall.rowCount > 0) {
+        const oldId = recentCall.rows[0].id;
+        const oldDest = recentCall.rows[0].destination;
+        console.log(`[SMDR] Multi-hop dedupe: Updating call ${oldId} (was dest ${oldDest}) with new dest ${record.destination}`);
+        
+        // Update the existing record with the final hop's details
+        const updateResult = await pool.query(`
+          UPDATE call_logs
+          SET call_time = $1, duration = $2, extension = $3, destination = $4, raw_line = $5, recording_file = COALESCE($6, recording_file)
+          WHERE id = $7
+          RETURNING *
+        `, [
+          record.call_time,
+          record.duration,
+          cleanText(record.extension),
+          cleanText(record.destination),
+          cleanRawLine,
+          cleanNullableText(record.recording_file),
+          oldId
+        ]);
+        
+        const row = updateResult.rows[0];
+        // Emit event to update UI without duplicating Contact calls count
+        emit('pbx:call', row);
+        return row;
+      }
+    }
+
     const result = await pool.query(`
       INSERT INTO call_logs (call_date, call_time, duration, call_type, caller, extension, destination, trunk, raw_line, recording_file)
       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
@@ -472,7 +565,7 @@ async function saveCallLog(record) {
       cleanText(record.destination),
       cleanText(record.trunk),
       cleanRawLine,
-      cleanText(record.recording_file)
+      cleanNullableText(record.recording_file)
     ]);
     const row = result.rows[0];
     console.log(`[SMDR] Saved to call_logs: ${record.call_type} | ${record.caller} → ${record.destination}`);
@@ -522,10 +615,41 @@ function processBuffer() {
   console.log(`[SMDR-DEBUG]   Buffer size                = ${buffer.length} bytes`);
   console.log(`[SMDR-DEBUG]   Buffer content (first 200) = ${JSON.stringify(buffer.substring(0, 200))}`);
 
-  const matches = buffer.match(/[^\x02\x03]+/g) || [];
-  console.log(`[SMDR-DEBUG]   Records found              = ${matches.length}`);
+  // Matrix PBX might send records separated by newlines, OR it might just stream them continuously.
+  // We split by newlines if they exist, otherwise we split by the record sequence pattern.
+  let records = [];
+  if (buffer.includes('\n')) {
+    records = buffer.split(/\r?\n/);
+  } else {
+    records = buffer.split(/(?=\s+\d{1,6}\s+[\+\d])/);
+  }
 
-  buffer = '';
+  // The last chunk might be an incomplete record due to TCP fragmentation.
+  const lastChunk = records.pop() || '';
+  const trimmedLast = lastChunk.trim();
+
+  const matches = [];
+  for (const rec of records) {
+    if (rec.trim().length >= 10) matches.push(rec.trim());
+  }
+
+  // Determine if the last chunk is actually a complete record.
+  // A complete space-delimited Matrix record has at least 6 fields (Seq, Date, Time, Duration, Type, Number).
+  // A fixed-width record is >= 70 characters.
+  const tokens = trimmedLast.split(/\s+/);
+  if (tokens.length >= 6 || trimmedLast.length >= 70) {
+    // It looks complete! Push it to matches and clear the buffer.
+    if (trimmedLast.length >= 10) matches.push(trimmedLast);
+    buffer = '';
+  } else {
+    // It's incomplete! Leave it in the buffer so the next TCP packet can append to it.
+    buffer = lastChunk;
+    console.log(`[SMDR-DEBUG]   Keeping incomplete chunk in buffer (${lastChunk.length} bytes)`);
+  }
+
+  console.log(`[SMDR-DEBUG]   Records found (after split) = ${matches.length}`);
+
+
 
   console.log('\n[SMDR-DEBUG] 📋 STEP 2: Processing Records');
   console.log('[SMDR-DEBUG] ─────────────────────────────────────────────────');
@@ -740,6 +864,16 @@ function startServer() {
       console.log(`[SMDR-DEBUG]   connectedPeers           = ${connectedPeers}`);
       console.log(`[SMDR-DEBUG]   isConnected              = ${isConnected}`);
 
+      console.log('[SMDR-DEBUG] TCP session accepted; emitting pbx:connected before any call data.');
+      emit('pbx:connected', {
+        ip: socket.remoteAddress,
+        port: socket.remotePort,
+        connectedAt: Date.now(),
+        mode: 'server',
+        isPBX: isPBX,
+        protocol: 'tcp-accepted'
+      });
+
       // ── OG HANDSHAKING PROTOCOL ──────────────────────────────────────────
       let handshakeComplete = false;
       const handshakeTimeout = setTimeout(() => {
@@ -750,14 +884,14 @@ function startServer() {
           console.warn('[SMDR-DEBUG]      1. PBX SMDR service not fully started');
           console.warn('[SMDR-DEBUG]      2. PBX sending SMDR Report instead of SMDR Online');
           console.warn('[SMDR-DEBUG]      3. PBX configuration mismatch');
-          socket.destroy();
+          console.warn('[SMDR-DEBUG]    Keeping socket open instead of destroying it; waiting for call data.');
         }
       }, 5000);
 
       console.log('\n[SMDR-DEBUG] 📋 STEP 5: Handshake Protocol Setup');
       console.log('[SMDR-DEBUG] ─────────────────────────────────────────────────');
       console.log('[SMDR-DEBUG] Waiting for ENQ (0x00) handshake from PBX...');
-      console.log('[SMDR-DEBUG] Timeout: 5 seconds');
+      console.log('[SMDR-DEBUG] Idle sockets are kept open; no forced handshake disconnect.');
 
       socket.on('data', (data) => {
         console.log('\n[SMDR-DEBUG] ╔════════════════════════════════════════════════════════╗');
@@ -989,7 +1123,25 @@ function startServer() {
 }
 
 function getStatus() {
-  return { connected: isConnected, host: PBX_HOST, port: SMDR_PORT, peers: connectedPeers };
+  const status = {
+    connected: isConnected,
+    host: PBX_HOST,
+    port: SMDR_PORT,
+    ctiPort: CTI_PORT,
+    peers: connectedPeers,
+    listening: isListening(),
+    mode: 'server',
+    lastActivity: lastActivityTime ? lastActivityTime.toISOString() : null,
+    activeSocket: !!global.activePbxSocket && !global.activePbxSocket.destroyed,
+    activeSocketRemote: global.activePbxSocket && !global.activePbxSocket.destroyed
+      ? `${global.activePbxSocket.remoteAddress}:${global.activePbxSocket.remotePort}`
+      : null,
+    serverAddress: tcpServer && tcpServer.listening ? tcpServer.address() : null,
+    outboundClientActive: !!smdrClient && !smdrClient.destroyed,
+    timestamp: new Date().toISOString(),
+  };
+  console.log('[SMDR-STATUS] getStatus snapshot:', status);
+  return status;
 }
 
 async function start() {

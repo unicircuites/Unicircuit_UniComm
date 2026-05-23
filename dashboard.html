@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 
 <head>
@@ -169,6 +169,11 @@
       }
     }
 
+    @keyframes slideInRight {
+      from { transform: translateX(100%); opacity: 0; }
+      to   { transform: translateX(0);    opacity: 1; }
+    }
+
     /* ── LIGHT THEME ── */
     html.light {
       --bg: #f0f2f8;
@@ -323,6 +328,71 @@
     html.light #bp-total,
     html.light #bp-subject {
       color: var(--text) !important;
+    }
+
+    /* ── LIGHT THEME: Additional visibility fixes ── */
+
+    /* WA section: search box gets proper light bg */
+    html.light #sec-whatsapp .search-box {
+      background: rgba(0, 0, 0, 0.04);
+    }
+
+    /* WA Connect banner heading */
+    html.light #wa-connect-banner [style*="color:#fff"],
+    html.light #wa-connect-banner [style*="color: #fff"] {
+      color: var(--text) !important;
+    }
+
+    /* PBX Recordings: Folders panel & right panel use dark backgrounds - override */
+    html.light #pbx-recordings-list {
+      color: var(--text);
+    }
+
+    html.light #pbx-breadcrumb {
+      color: var(--blue) !important;
+    }
+
+    html.light #pbx-storage-mode {
+      background: rgba(0, 0, 0, 0.04) !important;
+      border-color: var(--border2) !important;
+      color: var(--text) !important;
+    }
+
+    html.light #pbx-storage-path {
+      color: var(--blue) !important;
+    }
+
+    html.light #pbx-backup-details {
+      color: var(--muted2) !important;
+      background: rgba(0, 0, 0, 0.02) !important;
+    }
+
+    /* Marketing Dashboard heading */
+    html.light #sec-marketing h2 {
+      color: var(--text) !important;
+    }
+
+    /* Stat row separator */
+    html.light .stat-row {
+      border-bottom-color: rgba(0, 0, 0, 0.05);
+    }
+
+    /* Revenue attribution value */
+    html.light .card-body [style*="color:#fff"],
+    html.light .card-body [style*="color: #fff"] {
+      color: var(--text) !important;
+    }
+
+    /* WA chat list item hover override for light mode
+       (JS sets inline background on hover; CSS can't override inline directly,
+       but we apply a background on the container items via pointer-events) */
+    html.light #wa-convo-list > div:hover {
+      background: rgba(0, 0, 0, 0.04) !important;
+    }
+
+    /* Email row hover in light mode */
+    html.light [id^="email-row-"]:hover {
+      background: rgba(0, 0, 0, 0.03) !important;
     }
 
     * {
@@ -2828,7 +2898,7 @@
       justify-content: center;
       font-size: 13px;
       font-weight: 800;
-      color: #fff;
+      color: var(--text);
     }
 
     /* TIMELINE */
@@ -2909,7 +2979,7 @@
     .stat-val {
       font-size: 13px;
       font-weight: 700;
-      color: #fff;
+      color: var(--text);
     }
 
     /* CAMPAIGN CARD */
@@ -4321,7 +4391,7 @@
                 <h3><i class="fas fa-chart-line" style="color:var(--green2);"></i> Revenue Attribution</h3>
               </div>
               <div class="card-body">
-                <div style="font-size:26px;font-weight:800;color:#fff;letter-spacing:-1px;">₹24.3L</div>
+                <div style="font-size:26px;font-weight:800;color:var(--text);letter-spacing:-1px;">₹24.3L</div>
                 <div style="font-size:11.5px;color:var(--green2);margin-bottom:12px;"><i class="fas fa-arrow-up"></i>
                   +18% vs last campaign</div>
                 <div class="stat-row">
@@ -4401,11 +4471,7 @@
                 Latest</button>
               <button class="btn btn-ghost btn-xs" onclick="pbxReconnect()" title="Reset TCP connection to PBX"><i
                   class="fas fa-plug"></i> Reconnect</button>
-              <button class="btn btn-ghost btn-xs" onclick="pbxShowBackupPanel()"><i class="fas fa-archive"></i>
-                Backup</button>
-              <button class="btn btn-ghost btn-xs" onclick="pbxShowRecordings()"><i class="fas fa-microphone"></i>
-                Recordings</button>
-              <button class="btn btn-gold btn-xs" onclick="doSummarizeCall('call-sum-full')"><i
+              <button class="btn btn-gold btn-xs" onclick="pbxTopBarSummarize()"><i
                   class="fas fa-magic"></i> AI Summarize</button>
             </div>
           </div>
@@ -4435,7 +4501,7 @@
                 </h3>
                 <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
                   <input class="inp" id="call-search" placeholder="Search name/caller/dest..."
-                    style="width:160px;font-size:12px;padding:5px 10px;" oninput="loadCallLogs()">
+                    style="width:160px;font-size:12px;padding:5px 10px;" oninput="debouncedLoadCallLogs()">
                   <select class="inp" id="call-filter-type" style="width:auto;font-size:12px;padding:5px 10px;"
                     onchange="loadCallLogs()">
                     <option value="">All Types</option>
@@ -4482,7 +4548,7 @@
               </div>
             </div>
 
-            <div class="card">
+            <div class="card" style="display:none;">
               <div class="card-header">
                 <h3><i class="fas fa-file-alt" style="color:var(--gold);"></i> AI Call Summary</h3>
               </div>
@@ -4507,8 +4573,8 @@
 
               <!-- LEFT SIDEBAR -->
               <div style="
-              background:rgba(255,255,255,0.03);
-              border:1px solid rgba(255,255,255,0.06);
+              background:var(--card);
+              border:1px solid var(--border);
               border-radius:16px;
               overflow:auto;
               min-height:0;
@@ -4518,10 +4584,10 @@
 
                 <div style="
                 padding:18px;
-                border-bottom:1px solid rgba(255,255,255,0.05);
+                border-bottom:1px solid var(--border);
                 font-size:18px;
                 font-weight:600;
-                color:white;
+                color:var(--text);
               ">
                   Folders
                 </div>
@@ -4561,9 +4627,9 @@
                       width:100%;
                       padding:10px 12px;
                       border-radius:10px;
-                      border:1px solid rgba(255,255,255,0.08);
-                      background:#111827;
-                      color:#fff;
+                      border:1px solid var(--border2);
+                      background:var(--card2);
+                      color:var(--text);
                       font-size:13px;
                       outline:none;
                       cursor:pointer;
@@ -4682,7 +4748,7 @@
 
                   </div>
 
-                  <button class="btn btn-warning btn-sm" onclick="syncPBXRecordingsToDB(this)">
+                  <button class="btn btn-sm" style="background:transparent;border:1.5px solid var(--gold);color:var(--gold);font-weight:600;" onclick="syncPBXRecordingsToDB(this)">
                     <i class="fas fa-database"></i>
                     Store In DB
                   </button>
@@ -4844,6 +4910,19 @@
             </div>
           </div>
 
+        </div>
+
+        <!-- PBX CALL DETAILS MODAL -->
+        <div class="modal-overlay" id="pbx-call-details-modal"
+          onclick="if(event.target===this)closeModal('pbx-call-details-modal')">
+          <div class="modal" style="max-width:720px;">
+            <div class="modal-title">
+              <span><i class="fas fa-phone-alt" style="color:var(--gold);margin-right:8px;"></i>Call Record Details</span>
+              <span class="modal-close" onclick="closeModal('pbx-call-details-modal')"><i
+                  class="fas fa-times"></i></span>
+            </div>
+            <div id="pbx-call-details-body" style="max-height:68vh;overflow-y:auto;padding-right:4px;"></div>
+          </div>
         </div>
 
         <!-- ══ PBX CONTACT SAVE MODAL ══ -->
@@ -5153,7 +5232,7 @@
                     class="live-pulse"></span> Waiting for scan...</div>
               </div>
               <div style="flex:1;">
-                <div style="font-size:15px;font-weight:800;color:#fff;margin-bottom:6px;"><i class="fab fa-whatsapp"
+                <div style="font-size:15px;font-weight:800;color:var(--text);margin-bottom:6px;"><i class="fab fa-whatsapp"
                     style="color:#25D366;margin-right:8px;"></i>Connect WhatsApp</div>
                 <div style="font-size:12.5px;color:var(--muted);margin-bottom:14px;">Scan the QR code with your
                   WhatsApp
@@ -5413,7 +5492,7 @@
           <div
             style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:10px;">
             <div>
-              <h2 style="font-size:16px;font-weight:800;color:#fff;">Marketing Dashboard</h2>
+              <h2 style="font-size:16px;font-weight:800;color:var(--text);">Marketing Dashboard</h2>
               <div id="mkt-last-sync" style="font-size:11px;color:var(--muted);margin-top:2px;">No data yet &mdash;
                 click Update to add today's stats</div>
             </div>
@@ -6632,7 +6711,7 @@ Always write in a professional yet warm Indian B2B communication style. Use form
       if (topCompose) topCompose.style.display = id === 'email' ? '' : 'none';
       if (id === 'contacts') refreshContactsSection();
       if (id === 'whatsapp') checkWAStatus(true);
-      if (id === 'calls') { initWASocket(); loadCallLogs(); }
+      if (id === 'calls') { initWASocket(); refreshPbxCallLogsLatest('nav'); }
       if (id === 'marketing') { initWASocket(); loadMarketingData(); loadBroadcasts(); }
       if (id === 'email') { checkOutlookStatus(); loadOutlookFolders(); loadInbox(); }
       if (id === 'ai') initAIChat();
@@ -8683,16 +8762,384 @@ Always write in a professional yet warm Indian B2B communication style. Use form
     // Dummy modules removed for clean production state
     // CALL SUMMARIZER
     // ──────────────────────────────────
-    async function doSummarizeCall(targetId) {
-      const el = document.getElementById(targetId);
-      el.innerHTML = '<span class="spin-loader"></span> Transcribing with Whisper + PicoClaw summarising…';
+    // ── PBX CALL AI SIDEBAR ──────────────────────────────────────────────────
+    let _pbxSidebarCallId = null;
+
+    function openPbxCallSidebar(id) {
+      const log = pbxCallLogCache.get(String(id));
+      if (!log) {
+        notify('Call Details', 'Please sync latest and try again.', 'var(--gold)', 'fas fa-info-circle');
+        return;
+      }
+      _pbxSidebarCallId = id;
+
+      // Date formatting
+      let displayDate = '-';
       try {
-        const text = await callPicoClaw(`Summarise the following PBX call for Unicircuit Engineering Services LLP's call log system:\n\nCall details: Inbound from BHEL Procurement, 8m 22s. Agent Ext. 305 (Sales).\n\nTranscript excerpt: "Caller enquired about dispatch timeline for cable trays and DB panels per PO BH-2190. Agent checked ERP, confirmed material packed and ready. Caller requested expediting due to site deadline April 10. Agent committed dispatch by April 6 via transport, agreed to share AWB details via WhatsApp. Client satisfied."\n\nGenerate structured summary with: Issue | Resolution | Sentiment | Key Action Items | Follow-up Required. Be concise.`);
+        if (log.call_date && log.call_time) {
+          const d = typeof log.call_date === 'string' ? log.call_date.split('T')[0] : log.call_date;
+          const obj = new Date(`${d}T${log.call_time}`);
+          if (!isNaN(obj.getTime())) displayDate = obj.toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' });
+        } else if (log.created_at) {
+          const obj = new Date(log.created_at);
+          if (!isNaN(obj.getTime())) displayDate = obj.toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' });
+        }
+      } catch (_) { }
+
+      const caller = log.caller || log.caller_ext || '';
+      const contactName = log.saved_name || log.contact_name || '';
+      const callerDisplay = contactName || caller || '-';
+      const typeClass = log.call_type === 'Missed' ? 'b-red' : (log.call_type === 'In' ? 'b-blue' : 'b-gold');
+
+      // Type badge
+      document.getElementById('pbx-sidebar-type-badge').className = `badge ${typeClass}`;
+      document.getElementById('pbx-sidebar-type-badge').textContent = log.call_type || '-';
+
+      // Info section
+      document.getElementById('pbx-sidebar-info').innerHTML = `
+        <div style="display:flex;align-items:flex-start;gap:12px;">
+          <div style="width:42px;height:42px;border-radius:50%;background:rgba(245,166,35,0.15);display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:800;color:var(--gold);flex-shrink:0;">
+            ${(callerDisplay).charAt(0).toUpperCase()}
+          </div>
+          <div style="flex:1;min-width:0;">
+            <div style="font-size:15px;font-weight:700;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escHtml(callerDisplay)}</div>
+            ${contactName && caller ? `<div style="font-size:11.5px;color:var(--muted);margin-top:1px;">${escHtml(caller)}</div>` : ''}
+            <div style="font-size:11px;color:var(--muted2);margin-top:4px;">${escHtml(displayDate)}</div>
+          </div>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:12px;">
+          <div style="background:var(--bg2);border-radius:7px;padding:8px 10px;">
+            <div style="font-size:9.5px;color:var(--muted);font-weight:700;text-transform:uppercase;margin-bottom:2px;">Duration</div>
+            <div style="font-size:13px;font-weight:700;color:var(--text);font-family:'JetBrains Mono';">${escHtml(log.duration || '—')}</div>
+          </div>
+          <div style="background:var(--bg2);border-radius:7px;padding:8px 10px;">
+            <div style="font-size:9.5px;color:var(--muted);font-weight:700;text-transform:uppercase;margin-bottom:2px;">Destination</div>
+            <div style="font-size:13px;font-weight:700;color:var(--text);font-family:'JetBrains Mono';">${escHtml(log.destination || '—')}</div>
+          </div>
+          <div style="background:var(--bg2);border-radius:7px;padding:8px 10px;">
+            <div style="font-size:9.5px;color:var(--muted);font-weight:700;text-transform:uppercase;margin-bottom:2px;">Trunk</div>
+            <div style="font-size:13px;font-weight:700;color:var(--text);">${escHtml(log.trunk || '—')}</div>
+          </div>
+          <div style="background:var(--bg2);border-radius:7px;padding:8px 10px;">
+            <div style="font-size:9.5px;color:var(--muted);font-weight:700;text-transform:uppercase;margin-bottom:2px;">Extension</div>
+            <div style="font-size:13px;font-weight:700;color:var(--text);">${escHtml(log.extension || '—')}</div>
+          </div>
+        </div>
+      `;
+
+      // Actions row
+      document.getElementById('pbx-sidebar-actions').innerHTML = `
+        <button class="btn btn-gold btn-sm" onclick="doSummarizeCall(${id})">
+          <i class="fas fa-magic"></i> AI Summarize
+        </button>
+        <button class="btn btn-ghost btn-sm" onclick="openCallRecordDetails(${id})">
+          <i class="fas fa-eye"></i> Full Details
+        </button>
+      `;
+
+      // Summary — show existing if available
+      const summaryEl = document.getElementById('pbx-sidebar-summary');
+      if (log.ai_summary) {
+        summaryEl.style.fontStyle = 'normal';
+        summaryEl.style.color = 'var(--text)';
+        summaryEl.innerHTML = `
+          <div style="background:rgba(245,166,35,0.05);border:1px solid rgba(245,166,35,0.15);border-radius:9px;padding:13px 15px;">
+            <div style="font-size:9.5px;font-weight:700;color:var(--gold);margin-bottom:8px;"><i class="fas fa-robot"></i> AI CALL SUMMARY</div>
+            <div style="font-size:12.5px;line-height:1.65;white-space:pre-wrap;color:var(--text);">${escHtml(log.ai_summary)}</div>
+          </div>`;
+      } else {
+        summaryEl.style.fontStyle = 'italic';
+        summaryEl.style.color = 'var(--muted)';
+        summaryEl.innerHTML = 'Click <b style="color:var(--gold);font-style:normal;">AI Summarize</b> to generate a summary for this call.';
+      }
+
+      // Save contact button
+      const saveBtn = document.getElementById('pbx-sidebar-save-contact-btn');
+      if (!contactName && caller) {
+        saveBtn.style.display = '';
+        saveBtn._caller = caller;
+      } else {
+        saveBtn.style.display = 'none';
+      }
+
+      // Show sidebar
+      const sidebar = document.getElementById('pbx-call-ai-sidebar');
+      sidebar.style.display = 'flex';
+    }
+
+    function closePbxCallSidebar() {
+      document.getElementById('pbx-call-ai-sidebar').style.display = 'none';
+      _pbxSidebarCallId = null;
+      document.querySelectorAll('#calls-tbody tr').forEach(r => r.style.background = '');
+    }
+
+    function pbxSidebarSaveContact() {
+      const btn = document.getElementById('pbx-sidebar-save-contact-btn');
+      if (btn._caller) pbxSaveContactModal(btn._caller);
+    }
+
+    function pbxSidebarDelete() {
+      if (_pbxSidebarCallId) {
+        closePbxCallSidebar();
+        deleteCallLog(_pbxSidebarCallId);
+      }
+    }
+
+    function pbxTopBarSummarize() {
+      openPbxSectionSummary();
+    }
+
+    async function openPbxSectionSummary() {
+      // Open the modal first with loading state
+      const modal = document.getElementById('pbx-section-summary-modal');
+      const body = document.getElementById('pbx-section-summary-body');
+      if (!modal || !body) return;
+      body.innerHTML = `
+        <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;padding:60px 20px;gap:14px;">
+          <div class="spin-loader"></div>
+          <div style="font-size:13px;color:var(--muted);">Gathering PBX intelligence data...</div>
+        </div>`;
+      modal.style.display = 'flex';
+      const tsEl = document.getElementById('pbx-summary-timestamp');
+      if (tsEl) tsEl.textContent = new Date().toLocaleString('en-IN', { dateStyle: 'short', timeStyle: 'short' });
+
+      try {
+        // Fetch raw stats
+        const res = await fetch(`${API_BASE}/calls/section-summary`, { headers: getAuthHeaders() });
+        if (!res.ok) throw new Error('Failed to fetch PBX summary data');
+        const d = await res.json();
+
+        // Format helpers
+        const fmt = (v) => v ?? '—';
+        const fmtDate = (row) => {
+          if (!row) return '—';
+          try {
+            const dt = row.call_date && row.call_time
+              ? new Date(`${String(row.call_date).split('T')[0]}T${row.call_time}`)
+              : null;
+            return dt && !isNaN(dt) ? dt.toLocaleString('en-IN', { dateStyle: 'short', timeStyle: 'short' }) : '—';
+          } catch (_) { return '—'; }
+        };
+
+        // Build stats cards HTML
+        const statsHtml = `
+          <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:20px;">
+            ${[
+              ['Total Calls', d.stats.total, 'var(--text)', 'fa-phone-alt'],
+              ['Incoming', d.stats.incoming, 'var(--blue2)', 'fa-phone-volume'],
+              ['Outgoing', d.stats.outgoing, 'var(--gold)', 'fa-phone-arrow-up-right'],
+              ['Missed', d.stats.missed, 'var(--red2)', 'fa-phone-slash'],
+              ['Internal', d.stats.internal, 'var(--cyan)', 'fa-building'],
+              ['AI Summarized', d.stats.with_summary, 'var(--green2)', 'fa-robot'],
+            ].map(([label, val, color, icon]) => `
+              <div style="background:var(--bg2);border-radius:9px;padding:12px 14px;text-align:center;">
+                <div style="font-size:22px;font-weight:800;color:${color};">${fmt(val)}</div>
+                <div style="font-size:10px;color:var(--muted);margin-top:3px;text-transform:uppercase;letter-spacing:0.5px;">
+                  <i class="fas ${icon}" style="margin-right:4px;"></i>${label}
+                </div>
+              </div>`).join('')}
+          </div>`;
+
+        // Latest calls
+        const latestHtml = `
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:20px;">
+            <div style="background:var(--bg2);border-radius:9px;padding:12px 14px;">
+              <div style="font-size:10px;font-weight:700;color:var(--blue2);text-transform:uppercase;margin-bottom:8px;"><i class="fas fa-phone-volume"></i> Latest Incoming</div>
+              ${d.latest_incoming ? `
+                <div style="font-size:13px;font-weight:600;color:var(--text);">${escHtml(d.latest_incoming.caller || '—')}</div>
+                <div style="font-size:11px;color:var(--muted);margin-top:2px;">→ ${escHtml(d.latest_incoming.destination || '—')}</div>
+                <div style="font-size:11px;color:var(--muted2);margin-top:2px;">${fmtDate(d.latest_incoming)} · ${escHtml(d.latest_incoming.duration || '—')}</div>
+              ` : '<div style="font-size:12px;color:var(--muted);">No data</div>'}
+            </div>
+            <div style="background:var(--bg2);border-radius:9px;padding:12px 14px;">
+              <div style="font-size:10px;font-weight:700;color:var(--gold);text-transform:uppercase;margin-bottom:8px;"><i class="fas fa-phone"></i> Latest Outgoing</div>
+              ${d.latest_outgoing ? `
+                <div style="font-size:13px;font-weight:600;color:var(--text);">${escHtml(d.latest_outgoing.caller || '—')}</div>
+                <div style="font-size:11px;color:var(--muted);margin-top:2px;">→ ${escHtml(d.latest_outgoing.destination || '—')}</div>
+                <div style="font-size:11px;color:var(--muted2);margin-top:2px;">${fmtDate(d.latest_outgoing)} · ${escHtml(d.latest_outgoing.duration || '—')}</div>
+              ` : '<div style="font-size:12px;color:var(--muted);">No data</div>'}
+            </div>
+          </div>`;
+
+        // Recent calls table
+        const recentHtml = d.recent_calls.length ? `
+          <div style="margin-bottom:20px;">
+            <div style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:8px;">Recent Calls</div>
+            <table style="width:100%;border-collapse:collapse;font-size:12px;">
+              <thead><tr style="color:var(--muted2);font-size:10px;text-transform:uppercase;">
+                <th style="text-align:left;padding:4px 6px;">Time</th>
+                <th style="text-align:left;padding:4px 6px;">Caller</th>
+                <th style="text-align:left;padding:4px 6px;">Destination</th>
+                <th style="text-align:left;padding:4px 6px;">Duration</th>
+                <th style="text-align:left;padding:4px 6px;">Type</th>
+              </tr></thead>
+              <tbody>${d.recent_calls.map(c => {
+                const tc = c.call_type === 'In' ? 'b-blue' : c.call_type === 'Missed' ? 'b-red' : 'b-gold';
+                return `<tr style="border-top:1px solid var(--border);">
+                  <td style="padding:5px 6px;color:var(--muted);">${fmtDate(c)}</td>
+                  <td style="padding:5px 6px;font-weight:600;">${escHtml(c.contact_name || c.caller || '—')}</td>
+                  <td style="padding:5px 6px;font-family:'JetBrains Mono';font-size:11px;">${escHtml(c.destination || '—')}</td>
+                  <td style="padding:5px 6px;font-family:'JetBrains Mono';font-size:11px;">${escHtml(c.duration || '—')}</td>
+                  <td style="padding:5px 6px;"><span class="badge ${tc}">${escHtml(c.call_type)}</span></td>
+                </tr>`;
+              }).join('')}</tbody>
+            </table>
+          </div>` : '';
+
+        // Recordings
+        const recFoldersHtml = d.recordings.folders.length
+          ? d.recordings.folders.slice(0, 10).map(f =>
+              `<div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid var(--border);font-size:12px;">
+                <span style="color:var(--text);"><i class="fas fa-folder" style="color:var(--gold);margin-right:6px;"></i>${escHtml(f.name)}</span>
+                <span style="font-weight:700;color:var(--gold);">${f.count}</span>
+              </div>`).join('')
+          : '<div style="font-size:12px;color:var(--muted);">No recordings found</div>';
+
+        const recHtml = `
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:20px;">
+            <div style="background:var(--bg2);border-radius:9px;padding:12px 14px;">
+              <div style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;margin-bottom:8px;"><i class="fas fa-microphone"></i> Recordings</div>
+              <div style="font-size:22px;font-weight:800;color:var(--cyan);">${d.recordings.filesystem_total}</div>
+              <div style="font-size:10px;color:var(--muted);margin-top:2px;">Files on disk</div>
+              <div style="margin-top:8px;font-size:11px;color:var(--muted);">DB linked: <b style="color:var(--text);">${d.recordings.db_total}</b></div>
+              ${d.recordings.latest_file ? `<div style="margin-top:4px;font-size:10px;color:var(--muted2);">Latest: ${escHtml(d.recordings.latest_file)}</div>` : ''}
+            </div>
+            <div style="background:var(--bg2);border-radius:9px;padding:12px 14px;">
+              <div style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;margin-bottom:8px;"><i class="fas fa-archive"></i> Backups</div>
+              <div style="font-size:22px;font-weight:800;color:var(--green2);">${d.backups.count}</div>
+              <div style="font-size:10px;color:var(--muted);margin-top:2px;">Backup files</div>
+              ${d.backups.latest_date ? `<div style="margin-top:8px;font-size:11px;color:var(--muted);">Latest: <b style="color:var(--text);">${escHtml(d.backups.latest_date)}</b></div>` : ''}
+            </div>
+          </div>
+          <div style="background:var(--bg2);border-radius:9px;padding:12px 14px;margin-bottom:20px;">
+            <div style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;margin-bottom:10px;"><i class="fas fa-folder-open"></i> Recordings by Folder</div>
+            ${recFoldersHtml}
+          </div>`;
+
+        // AI narrative
+        const aiSection = `
+          <div style="background:rgba(245,166,35,0.05);border:1px solid rgba(245,166,35,0.15);border-radius:9px;padding:14px 16px;">
+            <div style="font-size:10px;font-weight:700;color:var(--gold);margin-bottom:10px;"><i class="fas fa-robot"></i> AI INTELLIGENCE SUMMARY</div>
+            <div id="pbx-section-ai-text" style="font-size:12.5px;color:var(--muted);font-style:italic;">
+              <div style="display:flex;align-items:center;gap:8px;"><div class="spin-loader" style="width:14px;height:14px;"></div> Generating AI analysis...</div>
+            </div>
+          </div>`;
+
+        body.innerHTML = statsHtml + latestHtml + recentHtml + recHtml + aiSection;
+
+        // Now call AI with the data
+        const aiPrompt = `You are the AI analyst for Unicircuit Engineering Services LLP PBX system. Generate a concise intelligence report based on this data:
+
+CALL LOG STATS:
+- Total calls: ${d.stats.total}
+- Incoming: ${d.stats.incoming}
+- Outgoing: ${d.stats.outgoing}
+- Missed: ${d.stats.missed}
+- Internal: ${d.stats.internal}
+- AI summarized: ${d.stats.with_summary}
+
+LATEST INCOMING: ${d.latest_incoming ? `${d.latest_incoming.caller} to ${d.latest_incoming.destination} at ${fmtDate(d.latest_incoming)}, duration ${d.latest_incoming.duration}` : 'None'}
+LATEST OUTGOING: ${d.latest_outgoing ? `${d.latest_outgoing.caller} to ${d.latest_outgoing.destination} at ${fmtDate(d.latest_outgoing)}, duration ${d.latest_outgoing.duration}` : 'None'}
+
+RECORDINGS: ${d.recordings.filesystem_total} files on disk, ${d.recordings.db_total} in DB
+TOP FOLDERS: ${d.recordings.folders.slice(0, 5).map(f => `${f.name}: ${f.count}`).join(', ') || 'None'}
+
+BACKUPS: ${d.backups.count} backup files, latest: ${d.backups.latest_date || 'None'}
+
+Write a 4-6 line professional summary covering: call volume health, incoming vs outgoing ratio, any concerns, recording coverage, and backup status. Be direct and actionable.`;
+
+        try {
+          const aiText = await callPicoClaw(aiPrompt);
+          const aiEl = document.getElementById('pbx-section-ai-text');
+          if (aiEl) {
+            aiEl.style.fontStyle = 'normal';
+            aiEl.style.color = 'var(--text)';
+            aiEl.style.lineHeight = '1.7';
+            aiEl.textContent = aiText;
+          }
+        } catch (aiErr) {
+          const aiEl = document.getElementById('pbx-section-ai-text');
+          if (aiEl) aiEl.innerHTML = `<span style="color:var(--red2);">AI error: ${escHtml(aiErr.message)}</span>`;
+        }
+
+      } catch (err) {
+        body.innerHTML = `<div style="padding:40px;text-align:center;color:var(--red2);"><i class="fas fa-exclamation-circle" style="font-size:28px;margin-bottom:12px;display:block;"></i>${escHtml(err.message)}</div>`;
+      }
+    }
+
+    async function doSummarizeCall(id) {
+      // If called with a numeric ID, use the sidebar
+      const numId = parseInt(id, 10);
+      if (!isNaN(numId) && numId > 0) {
+        const log = pbxCallLogCache.get(String(numId));
+
+        // Make sure sidebar is open for this call
+        if (_pbxSidebarCallId !== numId) openPbxCallSidebar(numId);
+
+        const summaryEl = document.getElementById('pbx-sidebar-summary');
+        summaryEl.style.fontStyle = 'normal';
+        summaryEl.style.color = 'var(--text)';
+        summaryEl.innerHTML = '<span class="spin-loader"></span> <span style="color:var(--muted);font-size:12px;">Generating AI summary...</span>';
+
+        const caller = log ? (log.caller || log.caller_ext || 'Unknown') : 'Unknown';
+        const contactName = log ? (log.saved_name || log.contact_name || '') : '';
+        const callerLabel = contactName || caller;
+        const destination = log ? (log.destination || '-') : '-';
+        const duration = log ? (log.duration || '00:00:00') : '00:00:00';
+        const callType = log ? (log.call_type || 'Call') : 'Call';
+        const trunk = log ? (log.trunk || '-') : '-';
+
+        try {
+          const prompt = `Summarise this PBX call for Unicircuit Engineering Services LLP CRM:
+
+Call Type: ${callType}
+Caller: ${callerLabel}
+Destination: ${destination}
+Duration: ${duration}
+Trunk: ${trunk}
+
+Generate a structured summary with:
+- What likely happened based on call type and duration
+- Sentiment estimate
+- Recommended follow-up action
+Keep it concise and professional.`;
+
+          const text = await callPicoClaw(prompt);
+
+          summaryEl.innerHTML = `
+            <div style="background:rgba(245,166,35,0.05);border:1px solid rgba(245,166,35,0.15);border-radius:9px;padding:13px 15px;">
+              <div style="font-size:9.5px;font-weight:700;color:var(--gold);margin-bottom:8px;"><i class="fas fa-robot"></i> AI CALL SUMMARY · ${escHtml(callerLabel)}</div>
+              <div style="font-size:12.5px;line-height:1.65;white-space:pre-wrap;color:var(--text);">${escHtml(text)}</div>
+              <div style="margin-top:10px;font-size:10px;color:var(--muted);">Generated ${new Date().toLocaleString('en-IN', { dateStyle: 'short', timeStyle: 'short' })}</div>
+            </div>`;
+
+          // Save to DB
+          try {
+            await fetch(`${API_BASE}/calls/${numId}/summary`, {
+              method: 'PATCH',
+              headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
+              body: JSON.stringify({ summary: text })
+            });
+            // Update cache
+            if (log) log.ai_summary = text;
+          } catch (_) { /* non-critical */ }
+
+        } catch (e) {
+          summaryEl.innerHTML = '<span style="color:var(--red2);font-size:12px;"><i class="fas fa-exclamation-circle"></i> AI error: ' + escHtml(e.message || 'Connection failed') + '</span>';
+        }
+        return;
+      }
+
+      // Legacy fallback: targetId is a DOM element ID string
+      const el = document.getElementById(String(id));
+      if (!el) return;
+      el.innerHTML = '<span class="spin-loader"></span> Generating summary…';
+      try {
+        const text = await callPicoClaw('Generate a 1-sentence AI call summary for a B2B engineering sales call at Unicircuit Engineering Services LLP. Include: what was discussed and next action. Keep it under 15 words.');
         el.innerHTML = `<div style="background:rgba(245,166,35,0.05);border:1px solid rgba(245,166,35,0.12);border-radius:9px;padding:13px 15px;">
-      <div style="font-size:9.5px;font-weight:700;color:var(--gold);margin-bottom:8px;"><i class="fas fa-robot"></i> PICOCLAW AI CALL SUMMARY · BHEL_call_Apr4.mp3</div>
-      <div style="font-size:12.5px;line-height:1.65;white-space:pre-wrap;color:var(--text);">${text}</div>
-      <div style="margin-top:9px;"><span class="badge b-green"><i class="fas fa-check"></i> Summary saved to call log</span></div>
-    </div>`;
+          <div style="font-size:9.5px;font-weight:700;color:var(--gold);margin-bottom:8px;"><i class="fas fa-robot"></i> AI CALL SUMMARY</div>
+          <div style="font-size:12.5px;line-height:1.65;white-space:pre-wrap;color:var(--text);">${escHtml(text)}</div>
+        </div>`;
       } catch (e) {
         el.innerHTML = '<span style="color:var(--red2);font-size:12px;">API connection error.</span>';
       }
@@ -10217,11 +10664,11 @@ Always write in a professional yet warm Indian B2B communication style. Use form
       const colors = {
         whatsapp: { on: '#25D366', off: 'var(--red)' },
         outlook: { on: '#0078d4', off: 'var(--red)' },
-        pbx: { on: 'var(--green)', off: 'var(--red)' },
+        pbx: { on: 'var(--green)', standby: 'var(--gold)', off: 'var(--red)' },
         postgres: { on: 'var(--green)', off: 'var(--red)' },
       };
       const c = colors[service] || { on: 'var(--green)', off: 'var(--red)' };
-      const color = online ? c.on : c.off;
+      const color = online === 'standby' ? (c.standby || 'var(--gold)') : (online ? c.on : c.off);
       const dotEl = document.getElementById('dot-' + service);
       if (!dotEl) return;
       if (dotEl.tagName === 'SPAN') {
@@ -10231,26 +10678,75 @@ Always write in a professional yet warm Indian B2B communication style. Use form
       }
     }
 
-    async function initSystemStatus() {
+    function pbxTraceId(label) {
+      return `PBX-${label}-${Date.now()}-${Math.random().toString(16).slice(2, 8)}`;
+    }
+
+    function pbxConsoleStart(traceId, title, payload) {
       try {
+        console.groupCollapsed(`[${traceId}] ${title}`);
+        console.log('time', new Date().toISOString());
+        if (payload !== undefined) console.log('payload', payload);
+      } catch (err) {
+        console.log(`[${traceId}] ${title}`, payload);
+      }
+    }
+
+    function pbxConsoleStep(traceId, step, payload) {
+      console.log(`[${traceId}] ${step}`, payload === undefined ? '' : payload);
+    }
+
+    function pbxConsoleError(traceId, step, err, payload) {
+      console.error(`[${traceId}] ${step}`, {
+        message: err && err.message ? err.message : String(err),
+        stack: err && err.stack ? err.stack : null,
+        payload: payload || null
+      });
+    }
+
+    function pbxConsoleEnd(traceId, title) {
+      console.log(`[${traceId}] ${title || 'complete'}`);
+      try { console.groupEnd(); } catch (err) { }
+    }
+
+    async function initSystemStatus() {
+      const traceId = pbxTraceId('INIT-STATUS');
+      pbxConsoleStart(traceId, 'initSystemStatus started', {
+        apiBase: API_BASE,
+        socketConnected: !!(window.socket && window.socket.connected),
+        path: location.pathname,
+      });
+      try {
+        pbxConsoleStep(traceId, 'fetch /system/status start');
         const res = await fetch(`${API_BASE}/system/status`, { headers: getAuthHeaders() });
-        if (!res.ok) return;
+        pbxConsoleStep(traceId, 'fetch /system/status response metadata', {
+          ok: res.ok,
+          status: res.status,
+          statusText: res.statusText,
+        });
+        if (!res.ok) {
+          pbxConsoleStep(traceId, 'status response not ok; aborting UI status update');
+          return;
+        }
         const data = await res.json();
+        pbxConsoleStep(traceId, 'status response body', data);
 
         // Update generic topbar indicators
         ['whatsapp', 'pbx', 'outlook', 'postgres'].forEach(svc => {
           if (data[svc]) {
-            const isOnline = data[svc].status === 'online' || data[svc].status === 'connected' || data[svc].status === 'ready';
-            updateServiceIndicator(svc, isOnline);
+            const indicatorState = data[svc].status === 'online' || data[svc].status === 'connected' || data[svc].status === 'ready' || (svc === 'pbx' && data[svc].status === 'listening');
+            pbxConsoleStep(traceId, `service indicator ${svc}`, { serviceState: data[svc], indicatorState });
+            updateServiceIndicator(svc, indicatorState);
           }
         });
 
         // Update specific UI components if they exist
         if (data.pbx) {
+          pbxConsoleStep(traceId, 'PBX status decision', data.pbx);
           if (data.pbx.status === 'connected' && data.pbx.clientHost) {
             if (typeof pbxOnConnected === 'function') pbxOnConnected({ host: data.pbx.clientHost });
-          } else if (data.pbx.status === 'online') {
-            if (typeof pbxOnReady === 'function') pbxOnReady({ port: data.pbx.port, mode: data.pbx.mode });
+          } else if (data.pbx.status === 'online' || data.pbx.status === 'listening') {
+            if (typeof pbxOnConnected === 'function') pbxOnConnected({ host: data.pbx.clientHost || '192.168.0.81', source: 'system/status' });
           } else if (data.pbx.status === 'offline') {
             if (typeof pbxOnDisconnected === 'function') pbxOnDisconnected({ fatal: true, reason: 'Server offline' });
           }
@@ -10267,8 +10763,12 @@ Always write in a professional yet warm Indian B2B communication style. Use form
           }
           if (cb) cb.style.display = 'none';
         }
+        pbxConsoleEnd(traceId, 'initSystemStatus completed successfully');
       } catch (err) {
+        pbxConsoleError(traceId, 'initSystemStatus failed', err);
         console.warn('[System] initSystemStatus failed:', err.message);
+      } finally {
+        pbxConsoleEnd(traceId, 'initSystemStatus finished');
       }
     }
 
@@ -16492,36 +16992,74 @@ ${plainText}`;
 
       // PBX real-time events
       waSocket.on('pbx:listening', (data) => {
-        console.log('[PBX] 🟡 SOCKET EVENT: "pbx:listening" (Server listening, waiting for PBX)', data);
-        pbxOnListening(data);
+        const traceId = pbxTraceId('SOCKET-LISTENING');
+        pbxConsoleStart(traceId, 'Socket event pbx:listening received', data);
+        try {
+          pbxOnListening(data);
+          pbxConsoleStep(traceId, 'pbxOnListening completed');
+        } catch (err) {
+          pbxConsoleError(traceId, 'pbxOnListening failed', err, data);
+        } finally {
+          pbxConsoleEnd(traceId, 'socket pbx:listening finished');
+        }
       });
       waSocket.on('pbx:ready', (data) => {
-        console.log('[PBX] 🟢 SOCKET EVENT: "pbx:ready" (Server listening)', data);
-        pbxOnListening(data); // Treat legacy pbx:ready as pbx:listening
+        const traceId = pbxTraceId('SOCKET-READY');
+        pbxConsoleStart(traceId, 'Socket event pbx:ready received', data);
+        try {
+          pbxOnListening(data); // Treat legacy pbx:ready as pbx:listening
+          pbxConsoleStep(traceId, 'pbxOnListening completed for legacy ready event');
+        } catch (err) {
+          pbxConsoleError(traceId, 'pbx:ready handler failed', err, data);
+        } finally {
+          pbxConsoleEnd(traceId, 'socket pbx:ready finished');
+        }
       });
       waSocket.on('pbx:connected', (data) => {
-        console.log('[PBX] 🟢 SOCKET EVENT: "pbx:connected"', data);
-        pbxOnConnected(data);
+        const traceId = pbxTraceId('SOCKET-CONNECTED');
+        pbxConsoleStart(traceId, 'Socket event pbx:connected received', data);
+        try {
+          pbxOnConnected(data);
+          pbxConsoleStep(traceId, 'pbxOnConnected completed');
+        } catch (err) {
+          pbxConsoleError(traceId, 'pbxOnConnected failed', err, data);
+        } finally {
+          pbxConsoleEnd(traceId, 'socket pbx:connected finished');
+        }
       });
       waSocket.on('pbx:disconnected', (data) => {
-        console.warn('[PBX] 🔴 SOCKET EVENT: "pbx:disconnected"', data);
-        pbxOnDisconnected(data);
+        const traceId = pbxTraceId('SOCKET-DISCONNECTED');
+        pbxConsoleStart(traceId, 'Socket event pbx:disconnected received', data);
+        try {
+          console.warn('[PBX] SOCKET EVENT: "pbx:disconnected"', data);
+          pbxOnDisconnected(data);
+          pbxConsoleStep(traceId, 'pbxOnDisconnected completed');
+        } catch (err) {
+          pbxConsoleError(traceId, 'pbxOnDisconnected failed', err, data);
+        } finally {
+          pbxConsoleEnd(traceId, 'socket pbx:disconnected finished');
+        }
       });
       waSocket.on('pbx:call', (call) => {
-        console.log('[PBX] 📞 SOCKET EVENT: "pbx:call" (New Live Call)', call);
+        const traceId = pbxTraceId('SOCKET-CALL');
+        pbxConsoleStart(traceId, 'Socket event pbx:call received', call);
 
         // Update live status bar
         const dot = document.getElementById('pbx-dot');
         const statusText = document.getElementById('pbx-status-text');
         const liveBadge = document.getElementById('pbx-live-badge');
 
-        console.log('[PBX] Updating UI Status Bar for new call...');
+        pbxConsoleStep(traceId, 'updating live status bar', {
+          hasDot: !!dot,
+          hasStatusText: !!statusText,
+          hasLiveBadge: !!liveBadge,
+        });
         if (dot) dot.style.background = 'var(--green2)';
         if (statusText) statusText.textContent = `Matrix PBX · Connected · Last call: ${call.caller || call.caller_ext} → ${call.destination}`;
         if (liveBadge) {
           liveBadge.style.display = 'inline-flex';
           setTimeout(() => {
-            console.log('[PBX] Hiding live badge (timeout)');
+            pbxConsoleStep(traceId, 'hiding live badge after timeout');
             liveBadge.style.display = 'none';
           }, 10000);
         }
@@ -16529,12 +17067,12 @@ ${plainText}`;
         // If we are on the logs tab, refresh automatically
         if (document.getElementById('sec-calls').style.display !== 'none' &&
           document.getElementById('pbx-panel-logs').style.display !== 'none') {
-          console.log('[PBX] Log section visible, refreshing table data...');
+          pbxConsoleStep(traceId, 'log section visible; refreshing table data');
           loadCallLogs(1);
         }
 
         // Desktop notification
-        console.log('[PBX] Triggering notification check...');
+        pbxConsoleStep(traceId, 'notification permission check', { permission: Notification.permission });
         if (Notification.permission === 'granted') {
           new Notification(`UniComm PBX: ${call.call_type} Call`, {
             body: `${call.caller || call.caller_ext} is calling ${call.destination}\nDuration: ${call.duration}`,
@@ -16543,11 +17081,15 @@ ${plainText}`;
         }
 
         notify('New Call: ' + (call.call_type || '') + ' ' + (call.caller || '') + ' → ' + (call.destination || ''), call.duration || '', 'var(--gold)', 'fas fa-phone-alt');
+        pbxConsoleEnd(traceId, 'socket pbx:call finished');
       });
 
       waSocket.on('pbx:binding_error', (data) => {
-        console.error('[PBX] ❌ SOCKET EVENT: "pbx:binding_error"', data);
+        const traceId = pbxTraceId('SOCKET-BINDING-ERROR');
+        pbxConsoleStart(traceId, 'Socket event pbx:binding_error received', data);
+        console.error('[PBX] SOCKET EVENT: "pbx:binding_error"', data);
         notify('PBX Connection Error', `${data.mode === 'server' ? 'Listener' : 'Client'} failure: ${data.error}`, 'var(--red2)', 'fas fa-exclamation-triangle');
+        pbxConsoleEnd(traceId, 'socket pbx:binding_error finished');
       });
 
       // SMDR real-time events
@@ -16687,10 +17229,6 @@ ${plainText}`;
               );
 
             } else if (data.hasQR) {
-
-              if (sb && sb.style.display === 'block') {
-                return;
-              }
 
               const qRes =
                 await fetch(API_BASE + '/wa/qr');
@@ -19962,6 +20500,7 @@ ${plainText}`;
     // ── Matrix PBX Telephony Integration ─────────────────────────────────────────
     let callsCurrentPage = 1;
     let callsLimit = 25;
+    let pbxCallLogCache = new Map();
 
     function pbxShowTab(tab, btn) {
       // Update Tabs
@@ -19989,12 +20528,40 @@ ${plainText}`;
       if (tab === 'backup') pbxListBackups();
     }
 
+    // Debounce + AbortController for call-log search
+
+    let _callSearchDebounce = null;
+
+    let _callLogsAbortCtrl = null;
+
+
+
+    function debouncedLoadCallLogs() {
+
+      clearTimeout(_callSearchDebounce);
+
+      _callSearchDebounce = setTimeout(function () { loadCallLogs(1); }, 350);
+
+    }
+
+
+
     async function loadCallLogs(page = 1) {
+
+      // Cancel any previous in-flight request
+
+      if (_callLogsAbortCtrl) _callLogsAbortCtrl.abort();
+
+      _callLogsAbortCtrl = new AbortController();
+
+      const signal = _callLogsAbortCtrl.signal;
+      const traceId = pbxTraceId('LOAD-CALLS');
       callsCurrentPage = page;
       const tbody = document.getElementById('calls-tbody');
       const search = document.getElementById('call-search').value;
       const type = document.getElementById('call-filter-type').value;
       const fromDate = normaliseDateInputValue(document.getElementById('call-filter-from').value);
+      pbxConsoleStart(traceId, 'loadCallLogs started', { page, search, type, fromDate, callsLimit });
 
       try {
         const params = new URLSearchParams({
@@ -20007,16 +20574,29 @@ ${plainText}`;
           params.set('from', fromDate);
           params.set('to', fromDate);
         }
+        pbxConsoleStep(traceId, 'fetch /calls start', {
+          url: `${API_BASE}/calls?${params.toString()}`,
+        });
         const res = await fetch(`${API_BASE}/calls?${params.toString()}`, {
-          headers: getAuthHeaders()
+          headers: getAuthHeaders(),
+          signal,
+        });
+        pbxConsoleStep(traceId, 'fetch /calls response metadata', {
+          ok: res.ok,
+          status: res.status,
+          statusText: res.statusText,
         });
         const data = await res.json();
-        console.log(`[PBX-UI] API Response (/calls page ${page}):`, data);
+        pbxConsoleStep(traceId, `API response /calls page ${page}`, data);
         if (!res.ok) throw new Error(data.error || 'Failed to load logs');
 
         if (!data.calls.length) {
+          pbxConsoleStep(traceId, 'no call records found for current filters');
+          pbxCallLogCache = new Map();
           tbody.innerHTML = `<tr><td colspan="7" style="text-align:center;padding:40px;color:var(--muted);">No call records found.</td></tr>`;
         } else {
+          pbxConsoleStep(traceId, 'rendering call records', { count: data.calls.length, total: data.total });
+          pbxCallLogCache = new Map(data.calls.map(log => [String(log.id), log]));
           tbody.innerHTML = data.calls.map(log => {
             const parseDate = (item) => {
               try {
@@ -20041,7 +20621,7 @@ ${plainText}`;
             const notesIcon = contactNotes ? `<i class="fas fa-note-sticky" title="${escAttr(contactNotes)}" style="font-size:11px;color:var(--gold);margin-left:5px;"></i>` : '';
             const callerDisplay = contactName
               ? `<div><b>${escHtml(contactName)}</b>${notesIcon}</div><div style="font-size:11px;color:var(--muted);">${escHtml(callerPhone)}</div>`
-              : escHtml(callerPhone || 'Ãƒ¢â‚¬”');
+              : escHtml(callerPhone || '-');
 
             return `
           <tr onclick="selectCallRecord(this, ${log.id})">
@@ -20050,11 +20630,13 @@ ${plainText}`;
             <td style="font-family:'JetBrains Mono';font-size:12px;">${escHtml(log.destination)}</td>
             <td>${escHtml(log.duration)}</td>
             <td><span class="badge ${typeClass}">${log.call_type}</span></td>
-            <td style="font-size:11px;color:var(--muted2);">${escHtml(log.trunk || '—')}</td>
+            <td style="font-size:11px;color:var(--muted2);">${escHtml(log.trunk || '-')}</td>
             <td>
               <div style="display:flex;gap:4px;">
                 ${!contactName && callerPhone ? `<button class="btn btn-ghost btn-xs" onclick="event.stopPropagation();pbxSaveContactModal(${jsArg(callerPhone)})" title="Save Contact"><i class="fas fa-user-plus"></i></button>` : ''}
+                <button class="btn btn-ghost btn-xs" onclick="event.stopPropagation();openCallRecordDetails(${log.id})" title="View Details"><i class="fas fa-eye"></i></button>
                 <button class="btn btn-ghost btn-xs" onclick="event.stopPropagation();doSummarizeCall(${log.id})" title="AI Summarize"><i class="fas fa-magic"></i></button>
+                <button class="btn btn-ghost btn-xs" onclick="event.stopPropagation();deleteCallLog(${log.id})" title="Delete Call Log" style="color:var(--red2);"><i class="fas fa-trash"></i></button>
               </div>
             </td>
           </tr>
@@ -20068,14 +20650,133 @@ ${plainText}`;
         document.getElementById('calls-total-info').textContent = `Total: ${data.total}`;
         document.getElementById('calls-prev').disabled = page <= 1;
         document.getElementById('calls-next').disabled = page >= totalPages;
+        pbxConsoleStep(traceId, 'pagination updated', { totalPages, page, total: data.total });
 
       } catch (err) {
+        if (err.name === 'AbortError') return;
+        pbxConsoleError(traceId, 'loadCallLogs failed', err);
         tbody.innerHTML = `<tr><td colspan="7" style="text-align:center;padding:30px;color:var(--red2);">${escHtml(err.message)}</td></tr>`;
+      } finally {
+        pbxConsoleEnd(traceId, 'loadCallLogs finished');
+      }
+    }
+
+    function pbxDetailValue(value) {
+      const text = value === null || value === undefined || String(value).trim() === '' ? '-' : String(value);
+      return escHtml(text);
+    }
+
+    function pbxDetailRow(label, value) {
+      return `
+        <div style="display:grid;grid-template-columns:150px 1fr;gap:10px;padding:8px 0;border-bottom:1px solid var(--border2);">
+          <div style="font-size:11px;color:var(--muted2);font-weight:700;text-transform:uppercase;">${escHtml(label)}</div>
+          <div style="font-size:12.5px;color:var(--text);word-break:break-word;">${pbxDetailValue(value)}</div>
+        </div>`;
+    }
+
+    function openCallRecordDetails(id) {
+      const log = pbxCallLogCache.get(String(id));
+      if (!log) {
+        notify('Call Details', 'Please sync latest and try again.', 'var(--gold)', 'fas fa-info-circle');
+        return;
+      }
+
+      let displayDate = '-';
+      try {
+        if (log.call_date && log.call_time) {
+          const d = typeof log.call_date === 'string' ? log.call_date.split('T')[0] : log.call_date;
+          const obj = new Date(`${d}T${log.call_time}`);
+          if (!isNaN(obj.getTime())) displayDate = obj.toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'medium' });
+        } else if (log.created_at) {
+          const obj = new Date(log.created_at);
+          if (!isNaN(obj.getTime())) displayDate = obj.toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'medium' });
+        }
+      } catch (_) { }
+
+      const caller = log.caller || log.caller_ext || '';
+      const contactName = log.saved_name || log.contact_name || '';
+      const savedCompany = log.saved_company || log.contact_company || '';
+      const savedNotes = log.saved_notes || log.contact_notes || '';
+      const createdAt = log.created_at ? new Date(log.created_at).toLocaleString('en-IN') : '';
+      const body = document.getElementById('pbx-call-details-body');
+      if (!body) return;
+
+      body.innerHTML = `
+        <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:12px;">
+          <div>
+            <div style="font-size:11px;color:var(--muted2);font-weight:700;text-transform:uppercase;">PBX Call Record</div>
+            <div style="font-size:18px;font-weight:800;margin-top:3px;">${pbxDetailValue(contactName || caller || log.destination)}</div>
+            <div style="font-size:12px;color:var(--muted);margin-top:2px;">${pbxDetailValue(displayDate)}</div>
+          </div>
+          <span class="badge ${log.call_type === 'Missed' ? 'b-red' : (log.call_type === 'In' ? 'b-blue' : 'b-gold')}">${pbxDetailValue(log.call_type)}</span>
+        </div>
+
+        ${pbxDetailRow('Call ID', log.id)}
+        ${pbxDetailRow('Caller', caller)}
+        ${pbxDetailRow('Extension', log.extension)}
+        ${pbxDetailRow('Destination', log.destination)}
+        ${pbxDetailRow('Duration', log.duration)}
+        ${pbxDetailRow('Trunk', log.trunk)}
+        ${pbxDetailRow('Saved Name', contactName)}
+        ${pbxDetailRow('Company', savedCompany)}
+        ${pbxDetailRow('Contact Notes', savedNotes)}
+        ${pbxDetailRow('Recording File', log.recording_file)}
+        ${pbxDetailRow('AI Summary', log.ai_summary)}
+        ${pbxDetailRow('Stored At', createdAt)}
+        ${pbxDetailRow('Raw SMDR Line', log.raw_line)}
+
+        <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:14px;flex-wrap:wrap;">
+          ${caller ? `<button class="btn btn-ghost btn-sm" onclick="pbxSaveContactModal(${jsArg(caller)});closeModal('pbx-call-details-modal')"><i class="fas fa-user-plus"></i> Save Contact</button>` : ''}
+          <button class="btn btn-gold btn-sm" onclick="doSummarizeCall(${log.id});closeModal('pbx-call-details-modal')"><i class="fas fa-magic"></i> AI Summarize</button>
+          <button class="btn btn-red btn-sm" onclick="deleteCallLog(${log.id});closeModal('pbx-call-details-modal')"><i class="fas fa-trash"></i> Delete</button>
+        </div>
+      `;
+      openModal('pbx-call-details-modal');
+    }
+
+    async function deleteCallLog(id) {
+      const callId = parseInt(id, 10);
+      if (!Number.isInteger(callId) || callId <= 0) return;
+      if (!confirm('Delete this PBX call log? Linked Matrix call-leg rows for the same call will also be removed.')) return;
+
+      const traceId = pbxTraceId('DELETE-CALL');
+      pbxConsoleStart(traceId, 'deleteCallLog started', { id: callId });
+      try {
+        const res = await fetch(`${API_BASE}/calls/${callId}`, {
+          method: 'DELETE',
+          headers: getAuthHeaders()
+        });
+        const data = await res.json();
+        pbxConsoleStep(traceId, 'DELETE /calls response', { ok: res.ok, status: res.status, data });
+        if (!res.ok) throw new Error(data.error || 'Failed to delete call log');
+
+        notify('Call Log Deleted', data.message || 'Deleted call log.', 'var(--red2)', 'fas fa-trash');
+        await loadCallLogs(callsCurrentPage);
+      } catch (err) {
+        pbxConsoleError(traceId, 'deleteCallLog failed', err);
+        notify('Delete Failed', err.message, 'var(--red2)', 'fas fa-exclamation-circle');
+      } finally {
+        pbxConsoleEnd(traceId, 'deleteCallLog finished');
       }
     }
 
     function callsPage(delta) {
       loadCallLogs(callsCurrentPage + delta);
+    }
+
+    function refreshPbxCallLogsLatest(reason) {
+      const logsTab = document.getElementById('pbx-tab-logs');
+      const logsPanel = document.getElementById('pbx-panel-logs');
+      if (logsTab && !logsTab.classList.contains('active')) {
+        pbxShowTab('logs', logsTab);
+        return;
+      }
+      if (logsPanel && logsPanel.style.display === 'none') {
+        pbxShowTab('logs', logsTab);
+        return;
+      }
+      pbxConsoleStep(pbxTraceId('REFRESH-LATEST'), 'loading latest PBX call logs', { reason: reason || 'manual' });
+      loadCallLogs(1);
     }
 
     function normaliseDateInputValue(value) {
@@ -20168,42 +20869,50 @@ ${plainText}`;
     }
 
     function pbxOnListening(data) {
-      console.log('[PBX-UI] 🟡 Transitioning to LISTENING state (Passive Standby)...', data);
+      const traceId = pbxTraceId('UI-LISTENING');
+      pbxConsoleStart(traceId, 'Treating listener-ready as CONNECTED state', data);
       const dot = document.getElementById('pbx-dot');
       const txt = document.getElementById('pbx-status-text');
       const info = document.getElementById('pbx-listener-info');
-      if (dot) dot.style.background = 'var(--gold)'; // Yellow for listening/waiting
+      pbxConsoleStep(traceId, 'DOM nodes resolved', { hasDot: !!dot, hasText: !!txt, hasInfo: !!info });
+      if (dot) dot.style.background = 'var(--green)';
       if (txt) {
-        txt.textContent = `Matrix PBX · Passive Standby · Waiting for PBX Connection`;
-        txt.style.color = 'var(--text)';
+        txt.textContent = `Matrix PBX · Connected`;
+        txt.style.color = 'var(--green2)';
       }
-      if (info) info.textContent = `Listening on Port ${data.port || 5001} (${data.mode || 'server'})`;
+      if (info) info.textContent = `SMDR ready on port ${data.port || 5001}`;
       updateServiceIndicator('pbx', true);
+      pbxConsoleEnd(traceId, 'CONNECTED UI transition finished');
     }
 
     function pbxOnConnected(data) {
-      console.log('[PBX-UI] 🟢 Transitioning to CONNECTED state...', data);
+      const traceId = pbxTraceId('UI-CONNECTED');
+      pbxConsoleStart(traceId, 'Transitioning to CONNECTED state', data);
       const dot = document.getElementById('pbx-dot');
       const txt = document.getElementById('pbx-status-text');
       const info = document.getElementById('pbx-listener-info');
       const badge = document.getElementById('pbx-live-badge');
+      pbxConsoleStep(traceId, 'DOM nodes resolved', { hasDot: !!dot, hasText: !!txt, hasInfo: !!info, hasBadge: !!badge });
       if (dot) dot.style.background = 'var(--green)'; // Green for connected
       if (txt) {
-        txt.textContent = `Matrix PBX · Live Connected · Receiving Realtime SMDR Data`;
+        txt.textContent = `Matrix PBX · Connected`;
         txt.style.color = 'var(--green2)';
       }
-      if (info) info.textContent = `Active SMDR session from ${data.ip || data.host}`;
+      if (info) info.textContent = `PBX ${data.ip || data.host || 'reachable'}${data.source === 'system/status' ? ' · CTI verified' : ' · SMDR active'}`;
       if (badge) badge.style.display = 'inline-flex';
       updateServiceIndicator('pbx', true);
+      pbxConsoleEnd(traceId, 'CONNECTED UI transition finished');
     }
 
     function pbxOnDisconnected(data) {
+      const traceId = pbxTraceId('UI-DISCONNECTED');
       const isFatal = data && data.fatal === true;
-      console.warn(`[PBX-UI] 🔴 Disconnected (Fatal: ${isFatal})`, data);
+      pbxConsoleStart(traceId, `Transitioning to DISCONNECTED state (fatal=${isFatal})`, data);
 
       const dot = document.getElementById('pbx-dot');
       const txt = document.getElementById('pbx-status-text');
       const badge = document.getElementById('pbx-live-badge');
+      pbxConsoleStep(traceId, 'DOM nodes resolved', { hasDot: !!dot, hasText: !!txt, hasBadge: !!badge });
 
       if (badge) badge.style.display = 'none';
 
@@ -20216,14 +20925,15 @@ ${plainText}`;
         }
         updateServiceIndicator('pbx', false);
       } else {
-        // Non-fatal disconnect — server still listening, waiting for reconnection
-        if (dot) dot.style.background = 'var(--gold)'; // Yellow for listening/waiting
+        // Non-fatal SMDR socket close; PBX reachability is determined by /system/status probe.
+        if (dot) dot.style.background = 'var(--green)';
         if (txt) {
-          txt.textContent = 'Matrix PBX · Passive Standby · Waiting for PBX Connection';
-          txt.style.color = 'var(--text)';
+          txt.textContent = 'Matrix PBX · Connected';
+          txt.style.color = 'var(--green2)';
         }
         updateServiceIndicator('pbx', true);
       }
+      pbxConsoleEnd(traceId, 'DISCONNECTED UI transition finished');
     }
 
     async function reconcilePbxCounts() {
@@ -20245,39 +20955,60 @@ ${plainText}`;
     }
 
     async function pbxSyncNow() {
-      console.log('[PBX-UI] 🔄 Manual Sync Triggered...');
+      const traceId = pbxTraceId('MANUAL-SYNC');
+      pbxConsoleStart(traceId, 'Manual PBX sync triggered', {
+        socketConnected: !!(window.socket && window.socket.connected),
+      });
       notify('PBX Sync', 'Checking live listener and stored records...', 'var(--gold)', 'fas fa-sync-alt');
       try {
+        pbxConsoleStep(traceId, 'fetch POST /calls/sync start');
         const res = await fetch(`${API_BASE}/calls/sync`, { method: 'POST', headers: getAuthHeaders() });
+        pbxConsoleStep(traceId, 'fetch POST /calls/sync response metadata', {
+          ok: res.ok,
+          status: res.status,
+          statusText: res.statusText,
+        });
         const data = await res.json();
-        console.log('[PBX-UI] Sync Response:', data);
+        pbxConsoleStep(traceId, 'sync response body', data);
         if (res.ok) {
           notify('PBX Sync Complete', data.message || `Checked live listener (${data.total || 0} stored records)`, 'var(--green2)', 'fas fa-check-circle');
-          loadCallLogs();
+          refreshPbxCallLogsLatest('sync-latest');
         } else {
           throw new Error(data.error);
         }
       } catch (err) {
-        console.error('[PBX-UI] ❌ Sync Failed:', err);
+        pbxConsoleError(traceId, 'PBX sync failed', err);
         notify('Sync Failed', err.message, 'var(--red2)', 'fas fa-exclamation-circle');
+      } finally {
+        pbxConsoleEnd(traceId, 'Manual PBX sync finished');
       }
     }
 
     function pbxReconnect() {
-      console.log('[PBX-UI] 🔌 Reconnect Button Clicked...');
+      const traceId = pbxTraceId('RECONNECT');
+      pbxConsoleStart(traceId, 'Reconnect button clicked', {
+        hasSocket: !!window.socket,
+        socketConnected: !!(window.socket && window.socket.connected),
+        socketId: window.socket && window.socket.id,
+      });
       if (!confirm('Force reset PBX TCP connection? This will restart the SMDR listener.')) {
-        console.log('[PBX-UI] Reconnect cancelled by user');
+        pbxConsoleStep(traceId, 'reconnect cancelled by user');
+        pbxConsoleEnd(traceId, 'Reconnect flow finished');
         return;
       }
 
       if (socket && socket.connected) {
-        console.log('[PBX-UI] 📡 Emitting "pbx:reconnect" via Socket...');
+        pbxConsoleStep(traceId, 'emitting pbx:reconnect via Socket.IO', { socketId: socket.id });
         notify('PBX Reconnect', 'Requesting TCP reset...', 'var(--gold)', 'fas fa-plug');
         socket.emit('pbx:reconnect');
       } else {
-        console.error('[PBX-UI] ❌ Cannot reconnect: Socket is offline');
+        pbxConsoleError(traceId, 'cannot reconnect because Socket.IO is offline', new Error('Socket offline'), {
+          hasSocket: !!socket,
+          connected: !!(socket && socket.connected),
+        });
         notify('Socket Offline', 'Dashboard is not connected to the backend. Please check your internet or server status.', 'var(--red2)', 'fas fa-wifi-slash');
       }
+      pbxConsoleEnd(traceId, 'Reconnect flow finished');
     }
 
     // PBX Contacts functionality migrated to CRM Contacts module
@@ -20385,11 +21116,11 @@ ${plainText}`;
             margin-left:${level * 18}px;
             border-radius:10px;
             cursor:pointer;
-            color:white;
+            color:var(--text);
             font-size:14px;
             transition:0.2s;
           "
-          onmouseover="this.style.background='rgba(255,255,255,0.06)'"
+          onmouseover="this.style.background=document.documentElement.classList.contains('light')?'rgba(0,0,0,0.05)':'rgba(255,255,255,0.06)'"
           onmouseout="this.style.background='transparent'"
         >
 
@@ -20509,11 +21240,11 @@ ${plainText}`;
         grid-template-columns:1fr 120px 180px 320px;
         gap:16px;
         padding:14px 16px;
-        background:rgba(255,255,255,0.04);
+        background:var(--card2);
         border-radius:12px;
         margin-bottom:10px;
         font-weight:600;
-        color:#ddd;
+        color:var(--muted2);
       ">
         <div>Name</div>
         <div>Type</div>
@@ -20531,8 +21262,8 @@ ${plainText}`;
           padding:14px 16px;
           margin-bottom:8px;
           border-radius:14px;
-          background:rgba(255,255,255,0.03);
-          border:1px solid rgba(255,255,255,0.04);
+          background:var(--card2);
+          border:1px solid var(--border);
         ">
 
           <!-- FILE -->
@@ -20558,7 +21289,7 @@ ${plainText}`;
             <div>
 
               <div style="
-                color:white;
+                color:var(--text);
                 font-size:14px;
                 margin-bottom:4px;
               ">
@@ -20578,7 +21309,7 @@ ${plainText}`;
 
           <!-- TYPE -->
           <div style="
-            color:#bbb;
+            color:var(--muted2);
             font-size:13px;
           ">
             WAV File
@@ -20586,7 +21317,7 @@ ${plainText}`;
 
           <!-- SIZE -->
           <div style="
-            color:#bbb;
+            color:var(--muted2);
             font-size:13px;
           ">
             ${file.size_label}
@@ -20632,7 +21363,7 @@ ${plainText}`;
           Prev
         </button>
 
-        <div style="color:white;">
+        <div style="color:var(--text);">
           Page ${data.page} / ${data.total_pages}
         </div>
 
@@ -20941,7 +21672,7 @@ ${plainText}`;
           backupDiv.innerHTML = `
             <div style="
               padding:10px 12px;
-              color:#fff;
+              color:var(--text);
               font-weight:600;
               font-size:14px;
             ">
@@ -20974,19 +21705,16 @@ ${plainText}`;
               '8px 12px';
 
             extDiv.style.color =
-              '#d1d5db';
+              'var(--muted2)';
 
             extDiv.innerHTML =
               `📂 ${extension}`;
 
             extDiv.onclick = () => {
 
-              const safeExtension =
-                extension.replace(/[()]/g, '');
-
               loadDBRecordings(
                 backupFolder,
-                safeExtension
+                extension
               );
 
             };
@@ -21004,19 +21732,15 @@ ${plainText}`;
 
     async function loadDBRecordings(
       backupFolder,
-      extensionFolder
+      extensionFolder,
+      page = 1
     ) {
-
       try {
-
         const res = await fetch(
-          `/api/pbx/db-recordings?backup=${encodeURIComponent(backupFolder)}&extension=${encodeURIComponent(extensionFolder)}`
+          `/api/pbx/db-recordings?backup=${encodeURIComponent(backupFolder)}&extension=${encodeURIComponent(extensionFolder)}&page=${page}&limit=10`
         );
-
-        const files =
-          await res.json();
-
-        renderPBXFiles(files);
+        const data = await res.json();
+        renderPBXFiles(data, backupFolder, extensionFolder);
 
         document.getElementById(
           'pbx-breadcrumb'
@@ -21024,19 +21748,26 @@ ${plainText}`;
           `${backupFolder} › ${extensionFolder}`;
 
       } catch (err) {
-
         console.error(err);
-
       }
-
     }
 
-    function renderPBXFiles(files) {
+    function formatBytes(bytes) {
+      if (!bytes || bytes === 0) return '0 B';
+      const k = 1024;
+      const sizes = ['B', 'KB', 'MB', 'GB'];
+      const i = Math.floor(Math.log(bytes) / Math.log(k));
+      return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
+    }
+
+    function renderPBXFiles(data, backupFolder, extensionFolder) {
 
       const panel =
         document.getElementById(
           'pbx-right-panel'
         );
+
+      const files = data.files || [];
 
       if (!files.length) {
 
@@ -21054,18 +21785,18 @@ ${plainText}`;
 
       }
 
-      panel.innerHTML = `
+      const safeBackup = backupFolder.replace(/'/g, "\\'");
+      const safeExtension = extensionFolder.replace(/'/g, "\\'");
 
+      let html = `
         <div style="
           display:grid;
           gap:12px;
         ">
-
           ${files.map(file => `
-
             <div style="
-              background:rgba(255,255,255,0.03);
-              border:1px solid rgba(255,255,255,0.06);
+              background:var(--card2);
+              border:1px solid var(--border);
               border-radius:14px;
               padding:14px;
               display:grid;
@@ -21073,40 +21804,33 @@ ${plainText}`;
               align-items:center;
               gap:14px;
             ">
-
               <div>
-
                 <div style="
-                  color:#fff;
+                  color:var(--text);
                   font-weight:600;
                   margin-bottom:6px;
                 ">
                   ${file.original_filename}
                 </div>
-
                 <div style="
-                  color:#777;
+                  color:var(--muted);
                   font-size:12px;
                 ">
                   ${file.recording_date || ''}
                 </div>
-
               </div>
-
               <div style="
-                color:#d1d5db;
+                color:var(--muted2);
                 font-size:13px;
               ">
                 WAV File
               </div>
-
               <div style="
-                color:#d1d5db;
+                color:var(--muted2);
                 font-size:13px;
               ">
                 ${formatBytes(file.file_size || 0)}
               </div>
-
               <audio
                 controls
                 style="width:100%;"
@@ -21116,13 +21840,42 @@ ${plainText}`;
                   type="audio/wav"
                 >
               </audio>
-
             </div>
-
           `).join('')}
-
         </div>
       `;
+
+      if (data.total_pages > 1) {
+        html += `
+          <div style="
+            display:flex;
+            justify-content:center;
+            align-items:center;
+            gap:14px;
+            margin-top:20px;
+          ">
+            <button
+              class="btn btn-ghost btn-sm"
+              onclick="loadDBRecordings('${safeBackup}', '${safeExtension}', ${data.page - 1})"
+              ${data.page <= 1 ? 'disabled' : ''}
+            >
+              Prev
+            </button>
+            <div style="color:var(--text);">
+              Page ${data.page} / ${data.total_pages}
+            </div>
+            <button
+              class="btn btn-ghost btn-sm"
+              onclick="loadDBRecordings('${safeBackup}', '${safeExtension}', ${data.page + 1})"
+              ${data.page >= data.total_pages ? 'disabled' : ''}
+            >
+              Next
+            </button>
+          </div>
+        `;
+      }
+
+      panel.innerHTML = html;
 
     }
 
@@ -21798,6 +22551,7 @@ ${plainText}`;
     function selectCallRecord(row, id) {
       document.querySelectorAll('#calls-tbody tr').forEach(r => r.style.background = '');
       row.style.background = 'rgba(245,166,35,0.06)';
+      openPbxCallSidebar(id);
     }
 
 
@@ -21849,37 +22603,6 @@ ${plainText}`;
         pbxShowTab('logs', document.getElementById('pbx-tab-logs'));
       }
     });
-
-    async function doSummarizeCall(id) {
-      const displayId = typeof id === 'string' ? id : 'call-sum-full';
-      const callId = typeof id === 'number' ? id : null;
-      const container = document.getElementById(displayId);
-
-      if (!callId) {
-        // If no specific ID, summarize today's activity or selected row
-        notify('Summarizing', 'Analyzing recent call activity...', 'var(--gold)', 'fas fa-magic');
-        // For now just error if no ID
-        if (container) container.innerHTML = '<div style="color:var(--red2);">Please select a specific call record to summarize.</div>';
-        return;
-      }
-
-      if (container) container.innerHTML = `<div style="display:flex;align-items:center;gap:8px;"><div class="spin-loader" style="width:14px;height:14px;"></div> Generating AI summary...</div>`;
-
-      try {
-        const res = await fetch(`${API_BASE}/calls/${callId}/summarize`, { method: 'POST', headers: getAuthHeaders() });
-        const data = await res.json();
-        if (res.ok) {
-          if (container) container.innerHTML = `<div style="line-height:1.6;color:var(--text);">${escHtml(data.summary)}</div>`;
-          notify('AI Summary', 'Call analysis complete', 'var(--green2)', 'fas fa-check');
-          loadCallLogs(callsCurrentPage); // Refresh to show summary in table if needed
-        } else {
-          throw new Error(data.error);
-        }
-      } catch (err) {
-        if (container) container.innerHTML = `<div style="color:var(--red2);"><i class="fas fa-exclamation-circle"></i> AI Error: ${escHtml(err.message)}</div>`;
-        notify('Summarize Failed', err.message, 'var(--red2)', 'fas fa-exclamation-triangle');
-      }
-    }
 
     // ─────────────────────────────────────────────────────────────────────────────
 
@@ -24212,6 +24935,124 @@ Nagpur, Maharashtra, 440017, India<br>
     </div>
 
   </div>
+
+  <!-- ██████ PBX SECTION SUMMARY MODAL ██████ -->
+  <div id="pbx-section-summary-modal" style="
+    display:none;
+    position:fixed;
+    inset:0;
+    z-index:9997;
+    background:rgba(0,0,0,0.55);
+    align-items:center;
+    justify-content:center;
+    padding:20px;
+  " onclick="if(event.target===this)document.getElementById('pbx-section-summary-modal').style.display='none'">
+    <div style="
+      width:min(700px,96vw);
+      max-height:88vh;
+      background:var(--card);
+      border-radius:14px;
+      border:1px solid var(--border);
+      box-shadow:0 20px 60px rgba(0,0,0,0.5);
+      display:flex;
+      flex-direction:column;
+      animation:modalIn 0.2s ease;
+    ">
+      <!-- Header -->
+      <div style="padding:16px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px;flex-shrink:0;">
+        <i class="fas fa-brain" style="color:var(--gold);font-size:16px;"></i>
+        <span style="font-size:15px;font-weight:700;color:var(--text);flex:1;">PBX Intelligence Report</span>
+        <span style="font-size:10px;color:var(--muted);" id="pbx-summary-timestamp"></span>
+        <button class="btn btn-ghost btn-xs" onclick="document.getElementById('pbx-section-summary-modal').style.display='none'">
+          <i class="fas fa-times"></i>
+        </button>
+      </div>
+      <!-- Body -->
+      <div id="pbx-section-summary-body" style="flex:1;overflow-y:auto;padding:20px;"></div>
+    </div>
+  </div>
+
+  <!-- ██████ PBX CALL AI SIDEBAR ██████ -->
+  <div id="pbx-call-ai-sidebar" style="
+    display:none;
+    position:fixed;
+    inset:0;
+    z-index:9998;
+    background:transparent;
+    align-items:stretch;
+    justify-content:flex-end;
+  " onclick="if(event.target===this)closePbxCallSidebar()">
+    <div style="
+      width:min(480px,96vw);
+      height:100vh;
+      background:var(--card);
+      border-left:1px solid var(--border);
+      box-shadow:-10px 0 32px rgba(0,0,0,0.38);
+      display:flex;
+      flex-direction:column;
+      margin-left:auto;
+      animation:slideInRight 0.22s cubic-bezier(0.175,0.885,0.32,1.275);
+    ">
+      <!-- Header -->
+      <div style="
+        padding:14px 16px;
+        border-bottom:1px solid var(--border);
+        display:flex;
+        align-items:center;
+        gap:10px;
+        flex-shrink:0;
+      ">
+        <i class="fas fa-phone-alt" style="color:var(--gold);"></i>
+        <span style="font-size:14px;font-weight:700;color:var(--text);flex:1;">Call Details</span>
+        <span id="pbx-sidebar-type-badge" class="badge b-blue"></span>
+        <button class="btn btn-ghost btn-xs" onclick="closePbxCallSidebar()" title="Close"><i class="fas fa-times"></i></button>
+      </div>
+
+      <!-- Call Info -->
+      <div id="pbx-sidebar-info" style="
+        padding:16px;
+        border-bottom:1px solid var(--border);
+        flex-shrink:0;
+      "></div>
+
+      <!-- AI Summary Area -->
+      <div style="flex:1;overflow-y:auto;padding:16px;display:flex;flex-direction:column;gap:12px;">
+
+        <!-- Generate button row -->
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;" id="pbx-sidebar-actions"></div>
+
+        <!-- Summary content -->
+        <div id="pbx-sidebar-summary" style="
+          font-size:12.5px;
+          color:var(--muted);
+          font-style:italic;
+          line-height:1.7;
+        ">Click <b style="color:var(--gold);font-style:normal;">AI Summarize</b> to generate a summary for this call.</div>
+
+      </div>
+
+      <!-- Footer -->
+      <div style="
+        padding:10px 14px;
+        border-top:1px solid var(--border);
+        display:flex;
+        gap:8px;
+        justify-content:flex-end;
+        flex-shrink:0;
+      ">
+        <button class="btn btn-ghost btn-sm" id="pbx-sidebar-save-contact-btn" style="display:none;" onclick="pbxSidebarSaveContact()">
+          <i class="fas fa-user-plus"></i> Save Contact
+        </button>
+        <button class="btn btn-ghost btn-sm" id="pbx-sidebar-delete-btn" onclick="pbxSidebarDelete()">
+          <i class="fas fa-trash" style="color:var(--red2);"></i> Delete
+        </button>
+        <button class="btn btn-ghost btn-sm" onclick="closePbxCallSidebar()">
+          <i class="fas fa-times"></i> Close
+        </button>
+      </div>
+    </div>
+  </div>
+
 </body>
 
 </html>

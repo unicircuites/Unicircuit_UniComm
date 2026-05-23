@@ -124,17 +124,35 @@ function markOffline(service, reason) {
   try { _origEmit('system:activity', ev); } catch (_) { }
 }
 
+function markPbxListening(data) {
+  serviceState.pbx.status = 'connected';
+  serviceState.pbx.port = data?.port || SMDR_PORT;
+  serviceState.pbx.mode = data?.mode || 'server';
+  serviceState.pbx.clientHost = process.env.PBX_HOST || serviceState.pbx.clientHost || null;
+  const ev = activityLog.append({
+    type: 'info',
+    service: 'pbx',
+    message: `Matrix PBX reachable; SMDR listener active on port ${serviceState.pbx.port}`,
+    timestamp: _now(),
+  });
+  try { _origEmit('system:activity', ev); } catch (_) { }
+}
+
 function systemBridge(event, data) {
   try {
+    if (String(event || '').startsWith('pbx:')) {
+      console.log('[SYSTEM-BRIDGE][PBX] Event received', {
+        event,
+        data,
+        stateBefore: { ...serviceState.pbx },
+      });
+    }
     // ── Service connect/disconnect ──────────────────────────────────────
     if (event === 'wa:connected') { markOnline('whatsapp'); serviceState.whatsapp.phone = data?.jid || data?.phone || null; }
     else if (event === 'wa:disconnected') markOffline('whatsapp', data?.reason || (data?.code ? `code ${data.code}` : null));
     else if (event === 'pbx:listening') {
       // Server is listening but no PBX connected yet
-      markOnline('pbx');
-      serviceState.pbx.port = data?.port || SMDR_PORT;
-      serviceState.pbx.mode = data?.mode || 'server';
-      serviceState.pbx.status = 'listening';
+      markPbxListening(data);
     }
     else if (event === 'pbx:connected') {
       // Actual PBX socket connected
@@ -145,14 +163,11 @@ function systemBridge(event, data) {
     }
     else if (event === 'pbx:ready') {
       // Legacy event — treat as listening
-      markOnline('pbx');
-      serviceState.pbx.port = data?.port || SMDR_PORT;
-      serviceState.pbx.mode = data?.mode || 'server';
-      serviceState.pbx.status = 'listening';
+      markPbxListening(data);
     }
     else if (event === 'pbx:disconnected') {
-      serviceState.pbx.clientHost = null;
-      serviceState.pbx.status = 'listening'; // Back to listening mode
+      serviceState.pbx.status = data?.fatal ? 'offline' : 'connected';
+      serviceState.pbx.clientHost = data?.fatal ? null : (process.env.PBX_HOST || serviceState.pbx.clientHost || null);
       if (data?.fatal) {
         markOffline('pbx', data.error || data.reason);
       } else {
@@ -230,6 +245,13 @@ function systemBridge(event, data) {
         try { _origEmit('system:activity', last); } catch (_) { }
       }
     }
+
+    if (String(event || '').startsWith('pbx:')) {
+      console.log('[SYSTEM-BRIDGE][PBX] State after event', {
+        event,
+        stateAfter: serviceState.pbx,
+      });
+    }
   } catch (err) {
     console.error('[SystemBridge] Error:', err.message);
   }
@@ -247,8 +269,22 @@ io.on('connection', (socket) => {
   socket.emit('system:log_snapshot', { events: activityLog.getRecent(100) });
 
   socket.on('pbx:reconnect', () => {
-    console.log('[Socket] PBX reconnect requested by client');
-    smdr.reconnect();
+    const traceId = `PBX-RECONNECT-${Date.now()}-${Math.random().toString(16).slice(2, 8)}`;
+    console.log(`[${traceId}] Socket.IO pbx:reconnect received`, {
+      socketId: socket.id,
+      clientAddress: socket.handshake.address,
+      userAgent: socket.handshake.headers['user-agent'],
+      pbxStateBefore: serviceState.pbx,
+      smdrStatusBefore: smdr.getStatus(),
+    });
+    Promise.resolve(smdr.reconnect())
+      .then(() => console.log(`[${traceId}] smdr.reconnect() completed/queued`, {
+        smdrStatusAfter: smdr.getStatus(),
+      }))
+      .catch(err => console.error(`[${traceId}] smdr.reconnect() failed`, {
+        message: err.message,
+        stack: err.stack,
+      }));
   });
 });
 

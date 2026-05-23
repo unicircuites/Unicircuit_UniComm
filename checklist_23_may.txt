@@ -1,0 +1,21 @@
+
+1. AI Integration & UI Overhaul (dashboard.html)
+ Built PBX Call AI Sidebar: Created a new, animated sliding sidebar (#pbx-call-ai-sidebar) to view deep-dive details for individual calls.
+ Built PBX Intelligence Report Modal: Created the #pbx-section-summary-modal to present comprehensive, brain-icon AI analysis across multiple calls.
+ Refactored AI Summarize Logic: Removed the old inline doSummarizeCall() function and moved the AI analysis buttons/logic directly into the new Call Sidebar.
+ Added Recording Pagination: Built "Prev" and "Next" pagination buttons for the DB Recordings viewer to handle large amounts of stored .wav files smoothly.
+2. Backend Route Restructuring (backend/routes/calls.js & pbx.js)
+ Massive pbx.js Cleanup: Stripped out over 660 lines of bloated or legacy code from pbx.js to streamline PBX event handling.
+ Expanded calls.js: Added over 400 lines of new logic, successfully migrating the heavy AI summarization features, call fetching, and advanced DB recording queries into this dedicated route.
+ Updated System Status endpoints: Minor tweaks to system.js to handle the new state flows.
+3. Matrix SMDR Core Fixes (backend/services/matrixSmdr.js)
+ Fixed TCP Stream Fragmentation: Overhauled processBuffer so it no longer deletes split packets, ensuring no call logs are ever dropped if sent in chunks.
+ Newline-less Fallback: Added regex chunking /(?=\s+\d{1,6}\s+[\+\d])/ for Matrix firmware that doesn't use standard \n line breaks.
+ Multi-Hop Call Deduplication: Added PostgreSQL deduplication to merge "Group -> Extension" IVR transfers into a single, clean call log on the dashboard instead of spamming duplicates.
+4. System & Protocol Cleanup
+ Removed Rigid Protocol Locks: Deleted .kiro/steering/smdr-pbx-protocol.md and whatsapp-change-protocol.md to free up the development flow.
+ WA Session Handling (server.js): Improved shutdown logs for the WhatsApp connection state (Shutting down - preserving WA session for stable reconnect).
+ 5. Frontend Styling & Animations (dashboard.html CSS)
+ Custom Modal Animations: Added sleek modalIn easing animations (0.2s) for the new PBX Intelligence Report popup, making it feel native and smooth.
+ Sidebar Slide Effects: Built a custom slideInRight animation using a precise bezier curve (cubic-bezier(0.175,0.885,0.32,1.275)) for the new Call AI Sidebar, giving it a premium "spring" effect when it opens.
+ Inline UI Polishing: Added extensive layout styling (flexbox, z-index layering, glass-morphism backgrounds, and shadow depths box-shadow:0 20px 60px) to make the new AI popups look modern and float perfectly over the dashboard.

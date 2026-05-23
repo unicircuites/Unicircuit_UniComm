@@ -37,6 +37,10 @@ router.use((req, res, next) => {
   return authenticate(req, res, next);
 });
 
+function makePbxTraceId(prefix = 'PBX') {
+  return `${prefix}-${Date.now()}-${Math.random().toString(16).slice(2, 8)}`;
+}
+
 // ── Recordings directory (PBX may store files here via network share/FTP) ──
 const REC_DIR = process.env.PBX_RECORDINGS_DIR
   || path.join(__dirname, '../../recordings');
@@ -179,13 +183,29 @@ async function syncPbxContactsFromCallLogs() {
 // GET /api/calls/pbx-status
 // ═══════════════════════════════════════════════════════════════════
 router.get('/pbx-status', async (req, res) => {
+  const traceId = makePbxTraceId('PBX-STATUS');
+  console.log(`[${traceId}] GET /api/calls/pbx-status started`, {
+    ip: req.ip,
+    user: req.user?.id || req.user?.email || null,
+  });
   try {
+    console.log(`[${traceId}] Querying call_logs grouped date counts`);
     const dates = await pool.query(`SELECT call_date, COUNT(*) as count FROM call_logs GROUP BY call_date ORDER BY call_date DESC NULLS LAST`);
+    console.log(`[${traceId}] call_logs grouped date query success`, {
+      dateRows: dates.rowCount,
+    });
     const status = smdr.getStatus();
     status.db_dates = dates.rows;
+    console.log(`[${traceId}] GET /api/calls/pbx-status response`, status);
     res.json(status);
   } catch (err) {
-    res.json(smdr.getStatus());
+    console.error(`[${traceId}] GET /api/calls/pbx-status failed`, {
+      message: err.message,
+      stack: err.stack,
+    });
+    const fallbackStatus = smdr.getStatus();
+    console.log(`[${traceId}] Returning fallback SMDR status`, fallbackStatus);
+    res.json(fallbackStatus);
   }
 });
 
@@ -327,7 +347,23 @@ router.get('/contact/:phone', async (req, res) => {
         ELSE 'id:' || id::text
       END
     ) *
-    FROM call_logs
+    FROM call_logs candidate
+    WHERE NOT (
+      candidate.raw_line ~ '\\sT\\s*$'
+      AND EXISTS (
+        SELECT 1
+        FROM call_logs primary_leg
+        WHERE primary_leg.id <> candidate.id
+          AND primary_leg.raw_line ~ '\\sD\\s*$'
+          AND primary_leg.call_date IS NOT DISTINCT FROM candidate.call_date
+          AND COALESCE(primary_leg.trunk, '') = COALESCE(candidate.trunk, '')
+          AND regexp_replace(COALESCE(primary_leg.caller, ''), '[^0-9]', '', 'g') = regexp_replace(COALESCE(candidate.caller, ''), '[^0-9]', '', 'g')
+          AND ABS(EXTRACT(EPOCH FROM (
+            (primary_leg.call_date::timestamp + COALESCE(primary_leg.call_time, TIME '00:00:00')) -
+            (candidate.call_date::timestamp + COALESCE(candidate.call_time, TIME '00:00:00'))
+          ))) <= 90
+      )
+    )
     ORDER BY
       CASE
         WHEN raw_line IS NOT NULL AND trim(raw_line) <> ''
@@ -440,23 +476,63 @@ router.get('/', async (req, res) => {
   if (dateTo) { where.push(`call_date <= $${p++}`); params.push(dateTo); }
 
   const whereStr = where.join(' AND ');
+  // Dedup logic:
+  // 1. First remove exact duplicates (same date/trunk/caller/destination/time).
+  // 2. Then collapse Matrix PBX T/D legs — same caller + same trunk within a
+  //    120-second window are treated as one call; keep the row with the longest
+  //    duration (or highest id on tie).
   const dedupedCallsSql = `
-    SELECT DISTINCT ON (
-      CASE
-        WHEN raw_line IS NOT NULL AND trim(raw_line) <> ''
-          THEN regexp_replace(trim(raw_line), '^\\d+\\s+', '')
-        ELSE 'id:' || id::text
-      END
-    ) *
-    FROM call_logs
-    ORDER BY
-      CASE
-        WHEN raw_line IS NOT NULL AND trim(raw_line) <> ''
-          THEN regexp_replace(trim(raw_line), '^\\d+\\s+', '')
-        ELSE 'id:' || id::text
-      END,
-      created_at DESC,
-      id DESC
+    WITH base AS (
+      SELECT DISTINCT ON (
+        call_date::date,
+        COALESCE(trunk, ''),
+        regexp_replace(COALESCE(caller, ''), '[^0-9]', '', 'g'),
+        regexp_replace(COALESCE(destination, ''), '[^0-9]', '', 'g'),
+        COALESCE(call_time, TIME '00:00:00')
+      ) *
+      FROM call_logs
+      WHERE
+        -- Hide records where destination is a date (bad SMDR parse)
+        NOT (destination ~ '^\\d{2}-\\d{2}-\\d{2,4}$')
+        -- Hide records with no destination and zero/null duration (unanswered/noise)
+        AND NOT (
+          (destination IS NULL OR trim(destination) = '')
+          AND (duration IS NULL OR duration = '' OR duration = '00:00:00')
+        )
+        -- Hide zero-duration calls (not considered real calls)
+        AND NOT (duration IS NULL OR duration = '' OR duration = '00:00:00')
+      ORDER BY
+        call_date::date,
+        COALESCE(trunk, ''),
+        regexp_replace(COALESCE(caller, ''), '[^0-9]', '', 'g'),
+        regexp_replace(COALESCE(destination, ''), '[^0-9]', '', 'g'),
+        COALESCE(call_time, TIME '00:00:00'),
+        created_at DESC,
+        id DESC
+    ),
+    ranked AS (
+      SELECT *,
+        ROW_NUMBER() OVER (
+          PARTITION BY
+            call_date::date,
+            COALESCE(trunk, ''),
+            regexp_replace(COALESCE(caller, ''), '[^0-9]', '', 'g'),
+            -- Bucket call_time into 120-second windows so T/D legs from the
+            -- same Matrix PBX call collapse into one group (2-min window handles
+            -- edge cases where legs straddle a minute boundary)
+            FLOOR(EXTRACT(EPOCH FROM COALESCE(call_time, TIME '00:00:00')) / 120)
+          ORDER BY
+            -- Prefer the leg with the longest actual talk time
+            CASE
+              WHEN duration ~ '^\\d{2}:\\d{2}:\\d{2}$'
+              THEN EXTRACT(EPOCH FROM duration::interval)
+              ELSE 0
+            END DESC,
+            id DESC
+        ) AS _rn
+      FROM base
+    )
+    SELECT * FROM ranked WHERE _rn = 1
   `;
   try {
     const result = await pool.query(
@@ -527,6 +603,74 @@ router.post('/', async (req, res) => {
     return res.status(201).json(result.rows[0]);
   } catch (err) {
     return res.status(500).json({ error: 'Failed to log call.' });
+  }
+});
+
+// ═══════════════════════════════════════════════════════════════════
+// DELETE /api/calls/:id  — remove one PBX call log row
+// ═══════════════════════════════════════════════════════════════════
+router.delete('/:id', async (req, res) => {
+  const id = parseInt(req.params.id, 10);
+  if (!Number.isInteger(id) || id <= 0) {
+    return res.status(400).json({ error: 'Invalid call log id.' });
+  }
+
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+
+    const selected = await client.query(`
+      SELECT id, call_date, call_time, caller, trunk, raw_line
+      FROM call_logs
+      WHERE id = $1
+      FOR UPDATE
+    `, [id]);
+
+    if (!selected.rowCount) {
+      await client.query('ROLLBACK');
+      return res.status(404).json({ error: 'Call log not found.' });
+    }
+
+    const row = selected.rows[0];
+    const related = await client.query(`
+      SELECT id
+      FROM call_logs related
+      WHERE related.id <> $1
+        AND related.call_date IS NOT DISTINCT FROM $2
+        AND COALESCE(related.trunk, '') = COALESCE($3, '')
+        AND regexp_replace(COALESCE(related.caller, ''), '[^0-9]', '', 'g') = regexp_replace(COALESCE($4, ''), '[^0-9]', '', 'g')
+        AND (
+          ($5 ~ '\\sD\\s*$' AND related.raw_line ~ '\\sT\\s*$')
+          OR ($5 ~ '\\sT\\s*$' AND related.raw_line ~ '\\sD\\s*$')
+        )
+        AND ABS(EXTRACT(EPOCH FROM (
+          (related.call_date::timestamp + COALESCE(related.call_time, TIME '00:00:00')) -
+          ($2::date::timestamp + COALESCE($6::time, TIME '00:00:00'))
+        ))) <= 90
+      FOR UPDATE
+    `, [id, row.call_date, row.trunk, row.caller, row.raw_line || '', row.call_time]);
+
+    const ids = [id, ...related.rows.map(r => r.id)];
+    const deleted = await client.query(
+      `DELETE FROM call_logs WHERE id = ANY($1::int[]) RETURNING id`,
+      [ids]
+    );
+
+    await client.query('COMMIT');
+    return res.json({
+      success: true,
+      deleted: deleted.rowCount,
+      ids: deleted.rows.map(r => r.id),
+      message: deleted.rowCount > 1
+        ? `Deleted call log and ${deleted.rowCount - 1} linked Matrix call leg.`
+        : 'Deleted call log.'
+    });
+  } catch (err) {
+    await client.query('ROLLBACK').catch(() => { });
+    console.error('[Calls] delete error:', err.message);
+    return res.status(500).json({ error: 'Failed to delete call log.' });
+  } finally {
+    client.release();
   }
 });
 
@@ -984,6 +1128,43 @@ function getAllRecordingFiles(dir) {
   return results;
 }
 
+// ── Max folders cleanup — keep only latest 5 date-based folders ──────────
+const MAX_REC_FOLDERS = 5;
+
+function pruneOldRecordingFolders() {
+  try {
+    if (!fs.existsSync(REC_DIR)) return;
+
+    const skipFolders = ['_BACKUPS', '_BACK', 'BACKUP', 'BACKUPS'];
+
+    // Get all top-level directories (excluding backup folders)
+    const dirs = fs.readdirSync(REC_DIR, { withFileTypes: true })
+      .filter(d => d.isDirectory() && !skipFolders.some(s => d.name.toUpperCase().includes(s)))
+      .map(d => {
+        const fullPath = path.join(REC_DIR, d.name);
+        let mtime;
+        try { mtime = fs.statSync(fullPath).mtime; } catch (_) { mtime = new Date(0); }
+        return { name: d.name, fullPath, mtime };
+      })
+      .sort((a, b) => b.mtime - a.mtime); // newest first
+
+    if (dirs.length <= MAX_REC_FOLDERS) return; // nothing to prune
+
+    // Delete oldest folders beyond the limit
+    const toDelete = dirs.slice(MAX_REC_FOLDERS);
+    for (const folder of toDelete) {
+      try {
+        fs.rmSync(folder.fullPath, { recursive: true, force: true });
+        console.log(`[REC-PRUNE] Deleted old recording folder: ${folder.name}`);
+      } catch (err) {
+        console.error(`[REC-PRUNE] Failed to delete ${folder.name}:`, err.message);
+      }
+    }
+  } catch (err) {
+    console.error('[REC-PRUNE] pruneOldRecordingFolders error:', err.message);
+  }
+}
+
 function buildRecordingTree(dir) {
 
   if (!fs.existsSync(dir)) {
@@ -1027,6 +1208,154 @@ function buildRecordingTree(dir) {
     });
 
 }
+
+// ═══════════════════════════════════════════════════════════════════
+// GET /api/calls/section-summary  — full PBX section intelligence
+// ═══════════════════════════════════════════════════════════════════
+router.get('/section-summary', async (req, res) => {
+  try {
+    // ── Call log stats ──────────────────────────────────────────────
+    const statsQ = await pool.query(`
+      SELECT
+        COUNT(*)                                                        AS total,
+        COUNT(*) FILTER (WHERE call_type = 'In')                       AS incoming,
+        COUNT(*) FILTER (WHERE call_type = 'Out')                      AS outgoing,
+        COUNT(*) FILTER (WHERE call_type = 'Missed')                   AS missed,
+        COUNT(*) FILTER (WHERE call_type = 'Internal')                 AS internal,
+        COUNT(*) FILTER (WHERE ai_summary IS NOT NULL)                 AS with_summary
+      FROM call_logs
+      WHERE NOT (duration IS NULL OR duration = '' OR duration = '00:00:00')
+        AND NOT (destination ~ '^\\d{2}-\\d{2}-\\d{2,4}$')
+    `);
+    const stats = statsQ.rows[0];
+
+    // ── Latest incoming ─────────────────────────────────────────────
+    const latestInQ = await pool.query(`
+      SELECT caller, destination, duration, call_date, call_time, trunk
+      FROM call_logs
+      WHERE call_type = 'In'
+        AND NOT (duration IS NULL OR duration = '' OR duration = '00:00:00')
+      ORDER BY COALESCE(call_date::timestamp + COALESCE(call_time, TIME '00:00:00'), created_at) DESC
+      LIMIT 1
+    `);
+
+    // ── Latest outgoing ─────────────────────────────────────────────
+    const latestOutQ = await pool.query(`
+      SELECT caller, destination, duration, call_date, call_time, trunk
+      FROM call_logs
+      WHERE call_type = 'Out'
+        AND NOT (duration IS NULL OR duration = '' OR duration = '00:00:00')
+      ORDER BY COALESCE(call_date::timestamp + COALESCE(call_time, TIME '00:00:00'), created_at) DESC
+      LIMIT 1
+    `);
+
+    // ── Latest 5 calls ──────────────────────────────────────────────
+    const recentQ = await pool.query(`
+      SELECT caller, destination, duration, call_type, call_date, call_time, trunk,
+             COALESCE(pc1.name, pc2.name) AS contact_name
+      FROM call_logs cl
+      LEFT JOIN (
+        SELECT DISTINCT ON (regexp_replace(phone,'[^0-9]','','g'))
+          regexp_replace(phone,'[^0-9]','','g') AS pd, name FROM pbx_contacts
+        ORDER BY regexp_replace(phone,'[^0-9]','','g'), id DESC
+      ) pc1 ON pc1.pd = regexp_replace(cl.caller,'[^0-9]','','g')
+      LEFT JOIN (
+        SELECT DISTINCT ON (regexp_replace(phone,'[^0-9]','','g'))
+          regexp_replace(phone,'[^0-9]','','g') AS pd, name FROM pbx_contacts
+        ORDER BY regexp_replace(phone,'[^0-9]','','g'), id DESC
+      ) pc2 ON pc2.pd = regexp_replace(cl.destination,'[^0-9]','','g')
+      WHERE NOT (cl.duration IS NULL OR cl.duration = '' OR cl.duration = '00:00:00')
+        AND NOT (cl.destination ~ '^\\d{2}-\\d{2}-\\d{2,4}$')
+      ORDER BY COALESCE(cl.call_date::timestamp + COALESCE(cl.call_time, TIME '00:00:00'), cl.created_at) DESC
+      LIMIT 5
+    `);
+
+    // ── Recordings on filesystem ────────────────────────────────────
+    let recTotal = 0;
+    let recFolders = [];
+    let latestRecFile = null;
+    try {
+      if (fs.existsSync(REC_DIR)) {
+        const allRec = getAllRecordingFiles(REC_DIR);
+        recTotal = allRec.length;
+
+        // Count per folder
+        const folderMap = {};
+        for (const fp of allRec) {
+          const folder = path.basename(path.dirname(fp));
+          folderMap[folder] = (folderMap[folder] || 0) + 1;
+        }
+        recFolders = Object.entries(folderMap)
+          .sort((a, b) => b[1] - a[1])
+          .map(([name, count]) => ({ name, count }));
+
+        // Latest file by mtime
+        let latestMtime = 0;
+        for (const fp of allRec) {
+          try {
+            const mt = fs.statSync(fp).mtimeMs;
+            if (mt > latestMtime) { latestMtime = mt; latestRecFile = path.basename(fp); }
+          } catch (_) {}
+        }
+      }
+    } catch (_) {}
+
+    // ── Recordings in DB ────────────────────────────────────────────
+    const recDbQ = await pool.query(`
+      SELECT COUNT(*) AS total,
+             MAX(COALESCE(call_date::timestamp + COALESCE(call_time, TIME '00:00:00'), created_at)) AS latest_date,
+             (SELECT recording_file FROM call_logs
+              WHERE recording_file IS NOT NULL AND recording_file != ''
+              ORDER BY COALESCE(call_date::timestamp + COALESCE(call_time, TIME '00:00:00'), created_at) DESC
+              LIMIT 1) AS latest_file
+      FROM call_logs
+      WHERE recording_file IS NOT NULL AND recording_file != ''
+    `);
+
+    // ── Backups ─────────────────────────────────────────────────────
+    let backupCount = 0;
+    let latestBackupDate = null;
+    try {
+      if (fs.existsSync(BACKUP_DIR)) {
+        const bFiles = fs.readdirSync(BACKUP_DIR).filter(f => f.endsWith('.json'));
+        backupCount = bFiles.length;
+        if (bFiles.length) {
+          const dates = bFiles.map(f => fs.statSync(path.join(BACKUP_DIR, f)).mtime);
+          latestBackupDate = new Date(Math.max(...dates)).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' });
+        }
+      }
+    } catch (_) {}
+
+    res.json({
+      stats: {
+        total: parseInt(stats.total),
+        incoming: parseInt(stats.incoming),
+        outgoing: parseInt(stats.outgoing),
+        missed: parseInt(stats.missed),
+        internal: parseInt(stats.internal),
+        with_summary: parseInt(stats.with_summary),
+      },
+      latest_incoming: latestInQ.rows[0] || null,
+      latest_outgoing: latestOutQ.rows[0] || null,
+      recent_calls: recentQ.rows,
+      recordings: {
+        filesystem_total: recTotal,
+        folders: recFolders,
+        latest_file: latestRecFile,
+        db_total: parseInt(recDbQ.rows[0]?.total || 0),
+        db_latest_file: recDbQ.rows[0]?.latest_file || null,
+        db_latest_date: recDbQ.rows[0]?.latest_date || null,
+      },
+      backups: {
+        count: backupCount,
+        latest_date: latestBackupDate,
+      },
+    });
+  } catch (err) {
+    console.error('[section-summary] error:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
 
 // ═══════════════════════════════════════════════════════════════════
 // RECORDINGS — scan filesystem for .wav / .mp3 files
@@ -1141,6 +1470,9 @@ router.get('/recordings/tree', (req, res) => {
         tree: []
       });
     }
+
+    // Prune old folders — keep only latest MAX_REC_FOLDERS
+    pruneOldRecordingFolders();
 
     const tree = buildRecordingTree(REC_DIR);
 
@@ -1377,47 +1709,81 @@ router.delete('/contacts/:phone', async (req, res) => {
 // SYNC — pull latest rows from DB (called from dashboard)
 // ═══════════════════════════════════════════════════════════════════
 router.get('/sync', async (req, res) => {
+  const traceId = makePbxTraceId('PBX-SYNC-GET');
+  console.log(`[${traceId}] GET /api/calls/sync started`, {
+    ip: req.ip,
+    user: req.user?.id || req.user?.email || null,
+  });
   try {
+    console.log(`[${traceId}] Sync step 1: syncPbxContactsFromCallLogs`);
     const contactsSynced = await syncPbxContactsFromCallLogs();
+    console.log(`[${traceId}] Sync step 1 success`, { contactsSynced });
+    console.log(`[${traceId}] Sync step 2: repairPbxDurationsFromRawLines`);
     const durationsRepaired = await repairPbxDurationsFromRawLines();
+    console.log(`[${traceId}] Sync step 2 success`, { durationsRepaired });
+    console.log(`[${traceId}] Sync step 3: count call_logs totals`);
     const result = await pool.query(
       `SELECT COUNT(*) AS total,
               COUNT(*) FILTER (WHERE created_at > NOW() - INTERVAL '24 hours') AS today
        FROM call_logs`
     );
-    return res.json({
+    const payload = {
       synced: true,
       total: parseInt(result.rows[0].total),
       today: parseInt(result.rows[0].today),
       contacts_synced: contactsSynced,
       durations_repaired: durationsRepaired,
       timestamp: new Date().toISOString(),
-    });
+    };
+    console.log(`[${traceId}] GET /api/calls/sync response`, payload);
+    return res.json(payload);
   } catch (err) {
+    console.error(`[${traceId}] GET /api/calls/sync failed`, {
+      message: err.message,
+      stack: err.stack,
+    });
     return res.status(500).json({ error: 'Sync check failed: ' + err.message });
   }
 });
 
 router.post('/sync', async (req, res) => {
   // Matrix SMDR is a live push stream; this endpoint reports DB/listener state.
+  const traceId = makePbxTraceId('PBX-SYNC-POST');
+  console.log(`[${traceId}] POST /api/calls/sync started`, {
+    ip: req.ip,
+    user: req.user?.id || req.user?.email || null,
+    body: req.body,
+  });
   try {
+    console.log(`[${traceId}] Sync step 1: syncPbxContactsFromCallLogs`);
     const contactsSynced = await syncPbxContactsFromCallLogs();
+    console.log(`[${traceId}] Sync step 1 success`, { contactsSynced });
+    console.log(`[${traceId}] Sync step 2: repairPbxDurationsFromRawLines`);
     const durationsRepaired = await repairPbxDurationsFromRawLines();
+    console.log(`[${traceId}] Sync step 2 success`, { durationsRepaired });
+    console.log(`[${traceId}] Sync step 3: count current call_logs totals`);
     const result = await pool.query(`
       SELECT COUNT(*) AS total,
              COUNT(*) FILTER (WHERE call_date = CURRENT_DATE) AS today
       FROM call_logs
     `);
-    return res.json({
+    const pbxStatus = smdr.getStatus();
+    const payload = {
       message: 'Live SMDR listener checked. Historical PBX rows are stored only when the PBX pushes them to this server.',
       count: 0,
       total: parseInt(result.rows[0].total),
       today: parseInt(result.rows[0].today),
       contacts_synced: contactsSynced,
       durations_repaired: durationsRepaired,
-      pbx_status: smdr.getStatus(),
-    });
+      pbx_status: pbxStatus,
+    };
+    console.log(`[${traceId}] POST /api/calls/sync response`, payload);
+    return res.json(payload);
   } catch (err) {
+    console.error(`[${traceId}] POST /api/calls/sync failed`, {
+      message: err.message,
+      stack: err.stack,
+    });
     return res.status(500).json({ error: 'Sync failed: ' + err.message });
   }
 });
@@ -1497,5 +1863,10 @@ function normalizeDateParam(value) {
 }
 
 
+
+// Run once on startup to clean up any excess folders from before this feature was added
+setImmediate(() => {
+  try { pruneOldRecordingFolders(); } catch (_) {}
+});
 
 module.exports = router;

@@ -4,6 +4,7 @@
  * GET /api/system/log     — recent activity log entries (requires auth)
  */
 const express    = require('express');
+const net        = require('net');
 const { authenticate } = require('../middleware/auth');
 const activityLog = require('../services/activityLog');
 const pool       = require('../db/pool');
@@ -11,6 +12,12 @@ const pool       = require('../db/pool');
 const router = express.Router();
 const DEFAULT_FAST_MODEL = 'llama-3.1-8b-instant';
 const DEFAULT_CURRENT_MODEL = 'groq/compound-mini';
+const PBX_HOST = process.env.PBX_HOST || '192.168.0.81';
+const CTI_PORT = parseInt(process.env.CTI_PORT || '4000', 10);
+
+function makeTraceId(prefix = 'SYS') {
+  return `${prefix}-${Date.now()}-${Math.random().toString(16).slice(2, 8)}`;
+}
 
 function resolveAIModel() {
   const configuredModel = String(process.env.AI_API_MODEL || '').trim();
@@ -22,6 +29,25 @@ function safeModel(value, fallback) {
   const model = String(value || '').trim();
   if (!model || /^gemma2-9b-it$/i.test(model)) return fallback;
   return model;
+}
+
+function probeTcp(host, port, timeoutMs = 1500) {
+  return new Promise((resolve) => {
+    const socket = new net.Socket();
+    let settled = false;
+    const done = (ok, error = null) => {
+      if (settled) return;
+      settled = true;
+      socket.destroy();
+      resolve({ ok, error });
+    };
+
+    socket.setTimeout(timeoutMs);
+    socket.once('connect', () => done(true));
+    socket.once('timeout', () => done(false, 'timeout'));
+    socket.once('error', (err) => done(false, err.message));
+    socket.connect(port, host);
+  });
 }
 
 function shortText(value, max = 180) {
@@ -115,8 +141,17 @@ const serviceState = {
 
 // ── GET /api/system/status ────────────────────────────────────────────────
 router.get('/status', authenticate, async (req, res) => {
+  const traceId = makeTraceId('SYS-STATUS');
+  console.log(`[${traceId}] GET /api/system/status started`, {
+    user: req.user?.id || req.user?.email || null,
+    ip: req.ip,
+    ua: req.get('user-agent'),
+    currentPbxState: serviceState.pbx,
+  });
+
   // Probe PostgreSQL live with a 3000ms timeout
   try {
+    console.log(`[${traceId}] PostgreSQL probe started`);
     await Promise.race([
       pool.query('SELECT 1'),
       new Promise((_, reject) =>
@@ -124,10 +159,51 @@ router.get('/status', authenticate, async (req, res) => {
       ),
     ]);
     serviceState.postgres.status = 'online';
-  } catch (_) {
+    console.log(`[${traceId}] PostgreSQL probe success`);
+  } catch (err) {
     serviceState.postgres.status = 'offline';
+    console.error(`[${traceId}] PostgreSQL probe failed`, {
+      message: err.message,
+      stack: err.stack,
+    });
   }
 
+  try {
+    console.log(`[${traceId}] Matrix PBX CTI reachability probe started`, {
+      host: PBX_HOST,
+      port: CTI_PORT,
+    });
+    const pbxProbe = await probeTcp(PBX_HOST, CTI_PORT);
+    if (pbxProbe.ok) {
+      serviceState.pbx.status = 'connected';
+      serviceState.pbx.clientHost = PBX_HOST;
+      serviceState.pbx.mode = serviceState.pbx.mode || 'server';
+      serviceState.pbx.port = serviceState.pbx.port || parseInt(process.env.SMDR_PORT || '5001', 10);
+      serviceState.pbx.lastConnected = serviceState.pbx.lastConnected || new Date().toISOString();
+      serviceState.pbx.reachability = 'cti';
+      serviceState.pbx.ctiPort = CTI_PORT;
+      console.log(`[${traceId}] Matrix PBX CTI probe success`);
+    } else {
+      serviceState.pbx.status = 'offline';
+      serviceState.pbx.clientHost = null;
+      serviceState.pbx.lastDisconnected = new Date().toISOString();
+      serviceState.pbx.reachability = 'cti';
+      serviceState.pbx.ctiPort = CTI_PORT;
+      serviceState.pbx.lastError = pbxProbe.error;
+      console.warn(`[${traceId}] Matrix PBX CTI probe failed`, pbxProbe);
+    }
+  } catch (err) {
+    serviceState.pbx.status = 'offline';
+    serviceState.pbx.clientHost = null;
+    serviceState.pbx.lastDisconnected = new Date().toISOString();
+    serviceState.pbx.lastError = err.message;
+    console.error(`[${traceId}] Matrix PBX CTI probe error`, {
+      message: err.message,
+      stack: err.stack,
+    });
+  }
+
+  console.log(`[${traceId}] GET /api/system/status response`, serviceState);
   return res.json(serviceState);
 });
 
