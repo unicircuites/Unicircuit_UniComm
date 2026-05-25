@@ -4887,7 +4887,7 @@
                   <p style="font-size:12.5px;color:var(--muted2);margin-bottom:16px;">Snapshot all call log records to
                     a
                     JSON file stored on the server.</p>
-                  <button class="btn btn-gold" style="width:100%;justify-content:center;" onclick="pbxCreateBackup()">
+                  <button id="pbx-create-backup-now-btn" class="btn btn-gold" style="width:100%;justify-content:center;" onclick="pbxCreateBackup()">
                     <i class="fas fa-download"></i> Create Backup Now
                   </button>
                   <div id="pbx-backup-message" style="margin-top:10px;font-size:12px;color:var(--muted);"></div>
@@ -22269,6 +22269,52 @@ ${plainText}`;
     `).join('');
       } catch (err) {
         list.innerHTML = `<div style="color:var(--red2);">${escHtml(err.message)}</div>`;
+      }
+    }
+
+    async function pbxCreateBackup() {
+      const btn = document.getElementById('pbx-create-backup-now-btn');
+      const message = document.getElementById('pbx-backup-message');
+      const originalHtml = btn ? btn.innerHTML : '';
+
+      if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Creating Backup...';
+      }
+      if (message) {
+        message.style.color = 'var(--muted)';
+        message.textContent = 'Creating call log backup...';
+      }
+
+      try {
+        const res = await fetch(`${API_BASE}/calls/backup/create`, {
+          method: 'POST',
+          headers: getAuthHeaders()
+        });
+        const data = await res.json();
+
+        if (!res.ok) {
+          throw new Error(data.error || 'Backup failed');
+        }
+
+        const summary = `Created ${data.filename || 'backup'} (${data.calls || data.total || 0} calls, ${data.contacts || 0} contacts)`;
+        if (message) {
+          message.style.color = 'var(--green2)';
+          message.textContent = summary;
+        }
+        notify('Backup Created', summary, 'var(--green2)', 'fas fa-check-circle');
+        await pbxListBackups();
+      } catch (err) {
+        if (message) {
+          message.style.color = 'var(--red2)';
+          message.textContent = err.message;
+        }
+        notify('Backup Failed', err.message, 'var(--red2)', 'fas fa-exclamation-triangle');
+      } finally {
+        if (btn) {
+          btn.disabled = false;
+          btn.innerHTML = originalHtml || '<i class="fas fa-download"></i> Create Backup Now';
+        }
       }
     }
 
