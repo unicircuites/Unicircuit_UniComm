@@ -43,7 +43,8 @@ backup/
 *.zip
 *_backup_*.json
 *backup*.js
-call_backups/
+!call_backups/
+!call_backups/*.json
 backend/backups/
 backend/outlook_backups/
 
