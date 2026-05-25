@@ -1,0 +1,14 @@
+It compares the current pending git changes and separates:
+
+tracked app changes: backend/routes/pbx.js, dashboard.html
+untracked PBX diagnostic scripts/screenshots/reports
+completed PBX DB filename/date/number filter work
+pending manual checks before push
+verification already run
+suggested commit scope
+
+Latest call recordings are now syncing into the DB after the Matrix SARVAM UCS configuration/code changes.
+Matrix SARVAM UCS recording flow now supports pushing newly generated recordings into the backend DB workflow.
+
+Backup / Restore button issue was fixed.
+Backup generation was failing earlier because the required function call was missing; the function call is now wired correctly.

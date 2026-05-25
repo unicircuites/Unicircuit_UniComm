@@ -4707,15 +4707,6 @@
                     Refresh
                   </button>
 
-                  <button id="pbx-backup-btn" class="btn btn-sm" onclick="startPBXBackup()" style="
-                      background:#f59e0b;
-                      color:white;
-                      border:none;
-                    ">
-                    <i class="fas fa-database"></i>
-                    Create Backup
-                  </button>
-
                   <div id="pbx-sync-progress-wrapper" style="
                       display:none;
                       margin-bottom:12px;
@@ -21736,8 +21727,16 @@ ${plainText}`;
       page = 1
     ) {
       try {
+        const filters = getPBXRecordingFilters();
+        const query = new URLSearchParams({
+          backup: backupFolder,
+          extension: extensionFolder,
+          page,
+          limit: 10,
+          ...filters
+        });
         const res = await fetch(
-          `/api/pbx/db-recordings?backup=${encodeURIComponent(backupFolder)}&extension=${encodeURIComponent(extensionFolder)}&page=${page}&limit=10`
+          `/api/pbx/db-recordings?${query.toString()}`
         );
         const data = await res.json();
         renderPBXFiles(data, backupFolder, extensionFolder);
@@ -21750,6 +21749,44 @@ ${plainText}`;
       } catch (err) {
         console.error(err);
       }
+    }
+
+    function getPBXRecordingFilters() {
+      const fields = {
+        date_from: document.getElementById('pbx-filter-date-from')?.value || '',
+        date_to: document.getElementById('pbx-filter-date-to')?.value || '',
+        time_from: document.getElementById('pbx-filter-time-from')?.value || '',
+        time_to: document.getElementById('pbx-filter-time-to')?.value || '',
+        number: document.getElementById('pbx-filter-number')?.value || ''
+      };
+
+      return Object.fromEntries(
+        Object.entries(fields).filter(([, value]) => String(value || '').trim())
+      );
+    }
+
+    function clearPBXRecordingFilters(backupFolder, extensionFolder) {
+      ['pbx-filter-date-from', 'pbx-filter-date-to', 'pbx-filter-time-from', 'pbx-filter-time-to', 'pbx-filter-number']
+        .forEach(id => {
+          const el = document.getElementById(id);
+          if (el) el.value = '';
+        });
+      loadDBRecordings(backupFolder, extensionFolder, 1);
+    }
+
+    function formatPBXRecordingDate(value) {
+      if (!value) return '';
+      const date = new Date(value);
+      if (Number.isNaN(date.getTime())) return value;
+      return date.toLocaleString('en-IN', {
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+        hour12: false
+      });
     }
 
     function formatBytes(bytes) {
@@ -21768,6 +21805,9 @@ ${plainText}`;
         );
 
       const files = data.files || [];
+      const safeBackup = backupFolder.replace(/'/g, "\\'");
+      const safeExtension = extensionFolder.replace(/'/g, "\\'");
+      const filters = getPBXRecordingFilters();
 
       if (!files.length) {
 
@@ -21778,6 +21818,11 @@ ${plainText}`;
             padding-top:80px;
           ">
             No recordings found
+            <div style="margin-top:14px;">
+              <button class="btn btn-ghost btn-sm" onclick="clearPBXRecordingFilters('${safeBackup}', '${safeExtension}')">
+                Clear Filters
+              </button>
+            </div>
           </div>
         `;
 
@@ -21785,10 +21830,49 @@ ${plainText}`;
 
       }
 
-      const safeBackup = backupFolder.replace(/'/g, "\\'");
-      const safeExtension = extensionFolder.replace(/'/g, "\\'");
-
       let html = `
+        <div style="
+          background:var(--card2);
+          border:1px solid var(--border);
+          border-radius:10px;
+          padding:12px;
+          margin-bottom:12px;
+          display:grid;
+          grid-template-columns:repeat(5,minmax(110px,1fr)) auto auto;
+          gap:10px;
+          align-items:end;
+        ">
+          <label style="display:grid;gap:5px;color:var(--muted2);font-size:11px;">
+            Date from
+            <input id="pbx-filter-date-from" class="inp" type="date" value="${escAttr(filters.date_from || '')}" style="height:34px;">
+          </label>
+          <label style="display:grid;gap:5px;color:var(--muted2);font-size:11px;">
+            Date to
+            <input id="pbx-filter-date-to" class="inp" type="date" value="${escAttr(filters.date_to || '')}" style="height:34px;">
+          </label>
+          <label style="display:grid;gap:5px;color:var(--muted2);font-size:11px;">
+            Time from
+            <input id="pbx-filter-time-from" class="inp" type="time" value="${escAttr(filters.time_from || '')}" style="height:34px;">
+          </label>
+          <label style="display:grid;gap:5px;color:var(--muted2);font-size:11px;">
+            Time to
+            <input id="pbx-filter-time-to" class="inp" type="time" value="${escAttr(filters.time_to || '')}" style="height:34px;">
+          </label>
+          <label style="display:grid;gap:5px;color:var(--muted2);font-size:11px;">
+            Number
+            <input id="pbx-filter-number" class="inp" type="search" value="${escAttr(filters.number || '')}" placeholder="+91 95450..." style="height:34px;">
+          </label>
+          <button class="btn btn-blue btn-sm" onclick="loadDBRecordings('${safeBackup}', '${safeExtension}', 1)">
+            <i class="fas fa-filter"></i>
+            Filter
+          </button>
+          <button class="btn btn-ghost btn-sm" onclick="clearPBXRecordingFilters('${safeBackup}', '${safeExtension}')">
+            Clear
+          </button>
+        </div>
+        <div style="color:var(--muted2);font-size:12px;margin:0 0 10px 2px;">
+          Showing ${data.total || 0} recording${(data.total || 0) === 1 ? '' : 's'} sorted by call date and time
+        </div>
         <div style="
           display:grid;
           gap:12px;
@@ -21810,13 +21894,14 @@ ${plainText}`;
                   font-weight:600;
                   margin-bottom:6px;
                 ">
-                  ${file.original_filename}
+                  ${escHtml(file.original_filename || '')}
                 </div>
                 <div style="
                   color:var(--muted);
                   font-size:12px;
                 ">
-                  ${file.recording_date || ''}
+                  ${escHtml(formatPBXRecordingDate(file.recording_date))}
+                  ${file.customer_number ? ` · ${escHtml(file.customer_number)}` : ''}
                 </div>
               </div>
               <div style="
@@ -22078,10 +22163,29 @@ ${plainText}`;
           'info'
         );
 
+        function pbxSnapshotFolderName(date) {
+          const day = String(date.getDate()).padStart(2, '0');
+          const month = date.toLocaleString('en-GB', { month: 'short' });
+          const year = date.getFullYear();
+          const hour = String(date.getHours()).padStart(2, '0');
+          const minute = String(date.getMinutes()).padStart(2, '0');
+          const second = String(date.getSeconds()).padStart(2, '0');
+          return `${day}${month}_${year}_${hour}${minute}${second}`.replace(/[^a-zA-Z0-9_-]/g, '');
+        }
+
+        const snapshotFolder =
+          pbxSnapshotFolderName(new Date());
+
         const res = await fetch(
           '/api/pbx/store-recordings',
           {
-            method: 'POST'
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+              snapshotFolder
+            })
           }
         );
 
@@ -22105,17 +22209,21 @@ ${plainText}`;
 
         syncDetails.innerHTML = `
           <div style="color:#22c55e;">
-            Inserted ${data.inserted} recordings
+            Folder ${data.snapshot_folder || 'created'} · Inserted ${data.inserted || 0} · Updated ${data.updated || 0} · Duplicates ${data.duplicates || 0}
           </div>
         `;
 
         showToast(
-          `Stored ${data.inserted} new recordings`,
+          `Stored in ${data.snapshot_folder || 'PBX recordings'}`,
           'success'
         );
 
         button.innerHTML =
-          `Stored ${data.inserted}`;
+          `Stored ${data.inserted || 0}`;
+
+        if (pbxSourceMode === 'database') {
+          await switchPBXSource('database');
+        }
 
         setTimeout(() => {
 
