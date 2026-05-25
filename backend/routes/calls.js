@@ -49,9 +49,11 @@ console.log('[REC_DIR]', REC_DIR);
 // ── Backup directory ──────────────────────────────────────────────────────
 const BACKUP_DIR = process.env.CALL_BACKUP_DIR
   || 'C:\\MatrixVMS\\Voicemail_Backup\\_BACKUPS';
+const REPO_BACKUP_DIR = path.join(__dirname, '../../call_backups');
+const BACKUP_DIRS = [...new Set([BACKUP_DIR, REPO_BACKUP_DIR])];
 
 // Ensure directories exist
-[REC_DIR, BACKUP_DIR].forEach(d => { try { fs.mkdirSync(d, { recursive: true }); } catch (_) { } });
+[REC_DIR, ...BACKUP_DIRS].forEach(d => { try { fs.mkdirSync(d, { recursive: true }); } catch (_) { } });
 
 function getSafeBackupPath(filename) {
   const name = String(filename || '').trim();
@@ -59,7 +61,32 @@ function getSafeBackupPath(filename) {
   if (name !== path.basename(name) || path.extname(name).toLowerCase() !== '.json') {
     return null;
   }
-  return path.join(BACKUP_DIR, name);
+  const existingPath = BACKUP_DIRS
+    .map(dir => path.join(dir, name))
+    .find(filepath => fs.existsSync(filepath));
+  return existingPath || path.join(BACKUP_DIR, name);
+}
+
+function listCallBackupFiles() {
+  const seen = new Set();
+  const files = [];
+  for (const dir of BACKUP_DIRS) {
+    if (!fs.existsSync(dir)) continue;
+    for (const filename of fs.readdirSync(dir)) {
+      if (!filename.endsWith('.json') || seen.has(filename)) continue;
+      const filepath = path.join(dir, filename);
+      const stat = fs.statSync(filepath);
+      seen.add(filename);
+      files.push({
+        filename,
+        size: stat.size,
+        created_at: stat.birthtime,
+        mtime: stat.mtime,
+        source: dir === REPO_BACKUP_DIR ? 'repo' : 'server',
+      });
+    }
+  }
+  return files.sort((a, b) => new Date(b.mtime || b.created_at) - new Date(a.mtime || a.created_at));
 }
 
 function formatDurationFromSeconds(seconds) {
@@ -760,14 +787,7 @@ router.post('/dial', async (req, res) => {
 /** GET /api/calls/backup/list */
 router.get('/backup/list', (req, res) => {
   try {
-    const files = fs.readdirSync(BACKUP_DIR)
-      .filter(f => f.endsWith('.json'))
-      .map(f => {
-        const stat = fs.statSync(path.join(BACKUP_DIR, f));
-        return { filename: f, size: stat.size, created_at: stat.birthtime, mtime: stat.mtime };
-      })
-      .sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
-    return res.json({ backups: files, dir: BACKUP_DIR });
+    return res.json({ backups: listCallBackupFiles(), dir: BACKUP_DIR, dirs: BACKUP_DIRS });
   } catch (err) {
     return res.status(500).json({ error: 'Could not list backups: ' + err.message });
   }
@@ -896,7 +916,13 @@ router.post('/backup/append', async (req, res) => {
       });
     }
 
-    const backupPath = path.join(BACKUP_DIR, filename);
+    const backupPath = getSafeBackupPath(filename);
+
+    if (!backupPath) {
+      return res.status(400).json({
+        error: 'Invalid backup filename'
+      });
+    }
 
     if (!fs.existsSync(backupPath)) {
       return res.status(404).json({
