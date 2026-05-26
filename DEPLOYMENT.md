@@ -543,11 +543,18 @@ if (!(Test-Path ".\certs\server.key") -or !(Test-Path ".\certs\server.crt")) {
     -subj "/CN=192.168.0.205"
 }
 
-# 7. Restart PM2
+# 7. Restart PM2 by process name
+# Tower does not currently use ecosystem.config.js; process name is `unicomm`.
 pm2 restart unicomm --update-env
 
-# 8. Verify server status
+# 8. Save PM2 process list
+pm2 save
+
+# 9. Flush old logs AFTER restart so the next log view shows only fresh health/errors
+pm2 flush unicomm
+
+# 10. Verify server status
 pm2 status
 
-# 9. View logs if needed
-pm2 logs unicomm --lines 30
+# 11. View only fresh logs
+pm2 logs unicomm --lines 80
