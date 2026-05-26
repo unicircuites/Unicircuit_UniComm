@@ -1,5 +1,6 @@
 {
   "dependencies": {
+    "acorn": "^8.16.0",
     "axios": "^1.16.1",
     "axios-cookiejar-support": "^7.0.0",
     "https": "^1.0.0",

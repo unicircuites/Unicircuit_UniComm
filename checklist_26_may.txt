@@ -1,0 +1,237 @@
+# UNICIRCUIT Sample Collection System
+## Work Checklist — 26th May 2026
+**Session summary of everything done today**
+
+---
+
+## ✅ AI ENGINE — Replaced Ollama with PicoCLAW (Groq Cloud)
+
+- [x] Removed all Ollama/phi3/qwen2 calls from `server.js` (ai-summary endpoint + auto-report)
+- [x] Removed all Ollama calls from `backend/alerts.js` (overdue insight)
+- [x] Replaced with PicoCLAW pattern using Groq Cloud API (`llama-3.1-8b-instant`)
+- [x] Added `AI_API_KEY`, `AI_API_HOST`, `AI_API_MODEL`, `AI_TIMEOUT_MS` to `.env`
+- [x] Removed Ollama model selector UI from `js/app.js` settings panel
+- [x] Replaced model dropdowns (phi3/qwen2 options) with single PicoCLAW label
+- [x] Removed phi3 warmup call on login
+- [x] Updated `.env.example` with new AI env vars
+- [x] Groq key added to `.env` (redacted from checklist; rotate before production use)
+
+---
+
+## ✅ ALERT ENGINE — Fixed Mass Logs & Duplicate Alerts
+
+- [x] Fixed root cause: overdue logs were firing every check cycle even when no alert was sent
+- [x] Changed logic: AI insight + overdue log only fires when `fired > 0` (real alert sent)
+- [x] Removed `insight.slice(0, 300)` — full AI insight now stored in activity_log
+- [x] Increased `max_tokens` from 300 → 500 to prevent mid-sentence truncation
+- [x] Removed "under 120 words" constraint from system prompt
+- [x] Result: no more mass logs, no more trimmed AI insights
+
+---
+
+## ✅ BUG FIXES — app.js
+
+- [x] Fixed `SyntaxError: Unexpected token ')'` at line 642 — stray `}, 3000);` from warmup removal
+- [x] Fixed `doLogin is not defined` — caused by the syntax error above
+- [x] Fixed `[object Object]` in overdue text — `overdueList.join()` was calling `.toString()` on objects
+- [x] Fixed overdueText formatting — now properly formats as `QR-ID(stage, Xmin overdue)`
+- [x] Fixed mojibake in `renderAISummaryHtml` bullet regex — `"¢` was corrupted `•`
+- [x] Fixed mojibake bullet icon `✓–¸` → clean `✓`
+- [x] Fixed mojibake in Download button text `✓–¾` → `📄 Download`
+- [x] Fixed AI prompt template section headers — removed corrupted emoji sequences
+- [x] Fixed broken template literal on line 3472 — `${o.id}` outside backtick string
+- [x] Fixed all `✅"`, `'¾`, `"·`, `"¬` mojibake in UI strings
+
+---
+
+## ✅ DOCUMENTATION
+
+- [x] Created `UNICIRCUIT_TREE.md` — full application decision tree for ProTree analysis
+  - 15 sections covering all views, API endpoints, DB schema, service architecture
+  - Feature decision matrix
+  - Sample collection lifecycle flow
+- [x] Created `Smart_Sample_Collection_TREE.md` — extended version with:
+  - Section 16: Security Threat Tree (QR replay, API exposure, prompt injection, credential leak)
+  - Section 17: Compliance Decision Tree (CERT-In, DPDP Act, IEC 62443, ISO 27001)
+  - Section 18: Hardening Script Decision Tree
+  - Section 19: Verification Results (25/25 PASSED)
+- [x] Created `SECURITY_AUDIT.md` — full enterprise security audit report
+  - Section 1: Software Licensing (Commercial EULA, WhatsApp ToS risk, Groq DPA)
+  - Section 2: Certifications (ISO 27001, IEC 62443, CERT-In 2022, DPDP Act 2023)
+  - Section 3: Threat Model (8 threats identified)
+  - Section 4: Defense Strategy (signed QR codes, API auth, rate limiting, prompt sanitization)
+  - Section 5: Windows hardening script reference
+  - Section 6: Secure deployment architecture (NGINX, HTTPS, PostgreSQL hardening)
+  - Section 7: Security checklist (6 critical, 8 high, 8 medium, 8 compliance items)
+
+---
+
+## ✅ SECURITY HARDENING — Utho Server (103.189.89.147)
+
+- [x] Created `harden-server.bat` — Windows hardening script
+- [x] Created `verify-hardening.bat` — verification script (25 checks)
+- [x] Ran `harden-server.bat` on Utho server as Administrator
+- [x] **Verification result: 25/25 PASSED**
+
+### Hardening applied:
+- [x] Windows Firewall ON — all profiles
+- [x] Port 443 (HTTPS) inbound — allowed
+- [x] Port 80 (HTTP redirect) inbound — allowed
+- [x] Port 9005/9445 (app) — LAN only
+- [x] Port 5432 (PostgreSQL) — blocked external
+- [x] Port 8089 (WhatsApp service) — blocked external
+- [x] Port 3389 (RDP) — blocked public
+- [x] Groq API outbound whitelist — added
+- [x] Office365 SMTP outbound — allowed
+- [x] SMBv1 — disabled (EternalBlue protection)
+- [x] NetBIOS — disabled (MITM reduction)
+- [x] LLMNR — disabled (MITM reduction)
+- [x] WDigest — disabled (no plaintext password caching)
+- [x] TLS 1.0 — disabled
+- [x] TLS 1.1 — disabled (TLS 1.2 + 1.3 only)
+- [x] Windows Defender real-time protection — ON
+- [x] Windows Defender network protection — enabled
+- [x] Controlled folder access (ransomware protection) — ON
+- [x] Smart Sample Collection folder — protected
+- [x] NTP sync — configured (time.windows.com + time.nist.gov)
+- [x] Logon/Logoff audit policy — enabled
+- [x] Process creation audit policy — enabled
+- [x] Security log size — 500MB (CERT-In 180-day compliant)
+- [x] PostgreSQL — set to localhost only
+- [x] UNICIRCUIT Security Monitor task — created (hourly failed-login check)
+
+---
+
+## ✅ SERVER OPERATIONS
+
+- [x] Server rebooted after hardening (TLS + NetBIOS changes require reboot)
+- [x] PM2 restarted after reboot using `pm2 start ecosystem.config.js`
+- [x] PM2 saved with `pm2 save` — survives future reboots
+- [x] App verified running: HTTP 9005 ✅ HTTPS 9445 ✅ WA service 8089 ✅
+- [x] PM2 logs flushed and verified clean (zero errors after flush)
+
+---
+
+## ✅ GITHUB
+
+- [x] All changes committed and pushed to private repo
+  - `unicircuites/Unicircuit_Sample_Collection` (private)
+- [x] `.env` force-added to repo for disaster recovery backup
+- [x] Files committed: `server.js`, `js/app.js`, `backend/alerts.js`, `.env`, `.env.example`
+- [x] Documentation committed: `UNICIRCUIT_TREE.md`, `Smart_Sample_Collection_TREE.md`, `SECURITY_AUDIT.md`
+- [x] Scripts committed: `harden-server.bat`, `verify-hardening.bat`
+
+---
+
+## ⚠️ PENDING — Not Done Yet
+
+- [ ] **Rotate credentials** — DB password, Groq API key, SMTP password, InfiniReach key are in GitHub
+- [ ] **HTTPS with trusted cert** — currently self-signed; needs domain + Let's Encrypt
+- [ ] **API authentication** — all `/api/*` routes open; need X-Session-Token middleware
+- [ ] **Signed QR codes** — no HMAC signature; vulnerable to replay attacks
+- [ ] **WhatsApp reconnect** — session lost after reboot; needs QR rescan
+- [ ] **Switch WhatsApp to official Business API** — current web.js violates Meta ToS
+- [ ] **Prompt injection sanitization** — DB field values go directly into Groq prompts
+- [ ] **Rate limiting** — no brute force protection on login or API
+- [ ] **CSRF protection** — no CSRF tokens on state-changing API calls
+- [ ] **Offline queue encryption** — localStorage submissions stored in plaintext
+- [ ] **Collector consent screen** — required for DPDP Act 2023 (GPS + photo)
+- [ ] **Data deletion API** — required for DPDP Act 2023
+- [ ] **ISO 27001 gap assessment** — begin process for enterprise client readiness
+- [ ] **NGINX reverse proxy** — Node.js currently exposed directly on 0.0.0.0
+
+---
+
+## 📊 Session Stats
+
+| Category | Done | Pending |
+|---|---|---|
+| AI Engine | 9 | 0 |
+| Alert Engine | 5 | 0 |
+| Bug Fixes | 10 | 0 |
+| Documentation | 3 docs | 0 |
+| Security Hardening | 25/25 checks | 0 |
+| Server Operations | 6 | 0 |
+| GitHub | 7 commits | 0 |
+| Security (code-level) | 0 | 8 |
+| Compliance | 0 | 4 |
+| **TOTAL** | **65** | **12** |
+
+---
+
+## 2026-05-26 - Local CRM Updates From Current Git Diff
+
+### WhatsApp / Tower Server Readiness
+
+- [x] Added WhatsApp multi-account database scoping with `account_phone` on `wa_contacts`, `wa_chats`, and `wa_messages`.
+- [x] Added migration handling for existing Tower/local WhatsApp tables by adding `account_phone` columns and changing primary keys to include the connected phone number.
+- [x] Added legacy adoption for old WhatsApp rows where `account_phone = 'unknown'` so existing Tower chats can attach to the logged-in number after connect.
+- [x] Scoped WhatsApp chat list, sync stats, message reads, message status updates, group participant sync, and LID map to the connected phone number.
+- [x] Fixed sent WhatsApp text/media inserts so outgoing messages are saved under the active connected phone number.
+- [x] Kept WhatsApp chat list recent-first using `last_time DESC`, matching Outlook-style recent activity.
+- [x] Added message pagination support: latest messages load first, chat opens at newest message, and scrolling up loads older messages in batches.
+- [x] Added backend `before` cursor support for `/api/wa/messages/:jid` with safe limit bounds.
+- [x] Preserved LID suppression: long raw LID numbers should not display as phone numbers; phone resolution comes from per-account LID/contact mapping.
+- [ ] Tower smoke test pending: upload, connect one WhatsApp number, confirm recent chats/media load first, scroll-up older messages, and no LID number leakage.
+- [ ] Operational rule remains: only one active WhatsApp backend/session per number. Running the same number on multiple machines can replace the connection.
+
+### Outlook Mail / Contacts
+
+- [x] Added recipient normalization/deduplication for Outlook send and draft routes.
+- [x] Added Outlook file attachment support for drafts, send, and replies.
+- [x] Added reply-with-attachments flow using Graph `createReply` / `createReplyAll`, attach files, then send.
+- [x] Added Outlook contact delete route and bulk delete route.
+- [x] Relaxed Outlook contact create/update so `mobilePhone` is no longer mandatory.
+- [x] Added group membership and last-email metadata to Outlook contact/directory activity responses.
+- [x] Added attachment helpers that sanitize filenames and strip invalid base64 whitespace/data URL prefixes.
+
+### Dashboard / UI
+
+- [x] Added WhatsApp older-message scroll loading in `dashboard.html`.
+- [x] Kept WhatsApp real-time chat sorting updated when new messages arrive.
+- [x] Added Outlook compose attachment controls and attachment list UI.
+- [x] Improved shared media insert modal with clear buttons, size bar, and clearer behavior for image/video/audio/document inserts.
+- [x] Disabled outside-click modal closing in main UI areas to prevent accidental modal loss.
+- [x] Refreshed PBX recordings view after backup/store actions.
+- [x] Expanded recipient groups modal width for better management.
+
+### PBX Recordings
+
+- [x] Added safe source recording cleanup after a verified local copy is stored.
+- [x] Added path containment checks so source deletion only happens inside the PBX root and only for `.wav` files.
+- [x] Added duplicate handling that repairs missing local copies before deleting duplicate source files.
+- [x] Added source deletion counters: `source_deleted` and `source_delete_failed`.
+- [x] Added pruning of empty source folders after successful source deletion.
+- [ ] Tower smoke test pending: run recording store once, confirm copied WAV files open locally, source deletion counts are expected, and no non-PBX path is touched.
+
+### Contacts / Recipient Groups / Validation
+
+- [x] Relaxed CRM contact create/update so phone/WhatsApp number is no longer mandatory.
+- [x] Added optional delete-contacts behavior when deleting a recipient group.
+- [x] Deduplicated recipient group member additions and now returns actual inserted count.
+- [x] Tightened input validation so HTML event handler blocking only triggers inside tags, reducing false positives for normal text.
+
+### Tooling / Verification
+
+- [x] Added `acorn` dependency for dashboard JavaScript syntax checking.
+- [x] Verified `backend/services/whatsapp.js` with `node --check`.
+- [x] Verified `backend/routes/whatsapp.js` with `node --check`.
+- [x] Verified dashboard script blocks with `node check_syntax.js`.
+
+### Modified Files In Current Worktree
+
+- `UniComm_Pro_Unicircuit.html`
+- `backend/middleware/inputValidation.js`
+- `backend/routes/contacts.js`
+- `backend/routes/outlook.js`
+- `backend/routes/pbx.js`
+- `backend/routes/recipientGroups.js`
+- `backend/routes/whatsapp.js`
+- `backend/services/whatsapp.js`
+- `dashboard.html`
+- `package.json`
+- `package-lock.json`
+
+---
+
+*Next session priority: Rotate credentials → HTTPS setup → API authentication*

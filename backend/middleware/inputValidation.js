@@ -13,7 +13,7 @@ const DANGEROUS_PATTERNS = [
   /\x00/,                        // Null byte injection
   /<script[^>]*>.*?<\/script>/i, // XSS script tags
   /javascript:/i,                // JavaScript protocol
-  /on\w+\s*=/i,                  // Event handlers (onclick, onerror, etc.)
+  /<[^>]+?\bon\w+\s*=/i,         // Event handlers inside tags (onclick, onerror, etc.)
 ];
 
 /**
@@ -70,7 +70,7 @@ function containsDangerousPattern(str, isContent = false) {
   if (isContent) {
     return /<script[^>]*>.*?<\/script>/i.test(str) ||
       /javascript:/i.test(str) ||
-      /on\w+\s*=/i.test(str);
+      /<[^>]+?\bon\w+\s*=/i.test(str);
   }
 
   // For non-content fields, check all patterns

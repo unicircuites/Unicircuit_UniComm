@@ -41,7 +41,7 @@ function resolvePicoClawModel() {
 // Helper function to store messages in database
 async function storeMessagesInDB(messages, folder) {
   await mailStore.ensureTable();
-  
+
   // Ensure outlook_emails_cache table exists
   await pool.query(`
     CREATE TABLE IF NOT EXISTS outlook_emails_cache (
@@ -63,7 +63,7 @@ async function storeMessagesInDB(messages, folder) {
       synced_at         TIMESTAMPTZ DEFAULT NOW()
     )
   `);
-  
+
   for (const msg of messages) {
     try {
       await pool.query(`
@@ -243,6 +243,61 @@ function tracePermissionDecision(label, tokenSummary, required) {
 
 function clearStorageScanCache() {
   storageScanCache = null;
+}
+
+function normalizeMailRecipientAddress(value) {
+  const raw = String(value || '').trim();
+  if (!raw) return '';
+  const bracketMatch = raw.match(/<([^<>]+)>/);
+  const looseMatch = raw.match(/[^\s<>"']+@[^\s<>"']+\.[^\s<>"',;]+/);
+  const email = String((bracketMatch && bracketMatch[1]) || (looseMatch && looseMatch[0]) || '').trim();
+  return /^[^\s@<>]+@[^\s@<>]+\.[^\s@<>]+$/.test(email) ? email : '';
+}
+
+function normalizeMailRecipients(value) {
+  const seen = new Set();
+  const values = Array.isArray(value) ? value : [value];
+  return values
+    .flatMap(item => String(item || '').split(/[,;]+/))
+    .map(normalizeMailRecipientAddress)
+    .filter(Boolean)
+    .filter(email => {
+      const key = email.toLowerCase();
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+}
+
+function buildGraphFileAttachments(attachments) {
+  const list = Array.isArray(attachments) ? attachments : [];
+  return list.map((att, index) => {
+    // Strip any accidental data-URL prefix, then remove ALL whitespace (spaces, \r, \n, \t)
+    // that some browsers/encoders may insert into base64 strings
+    const rawBytes = String(att && att.contentBytes || '').replace(/^data:[^,]+,/, '');
+    const contentBytes = rawBytes.replace(/\s/g, '');
+    const name = String(att && att.name || `attachment-${index + 1}`).replace(/[\\/:*?"<>|]+/g, '_').slice(0, 180);
+    if (!contentBytes || !/^[A-Za-z0-9+/=]+$/.test(contentBytes)) {
+      console.warn('[OUTLOOK] Skipping invalid attachment:', name, '| bytes length:', contentBytes.length);
+      return null;
+    }
+    return {
+      '@odata.type': '#microsoft.graph.fileAttachment',
+      name,
+      contentType: String(att.contentType || 'application/octet-stream'),
+      contentBytes,
+      isInline: !!att.isInline,
+      ...(att.contentId ? { contentId: String(att.contentId).replace(/^<|>$/g, '') } : {})
+    };
+  }).filter(Boolean);
+}
+
+async function addAttachmentsToMessage(messageId, attachments) {
+  const graphAttachments = buildGraphFileAttachments(attachments);
+  for (const att of graphAttachments) {
+    await graph.graphPost(`/me/messages/${encodeURIComponent(messageId)}/attachments`, att, MS_EMAIL);
+  }
+  return graphAttachments.length;
 }
 
 function sendOutlookSettingsError(res, err) {
@@ -1514,7 +1569,7 @@ router.get('/inbox', async (req, res) => {
   console.log('[Outlook] GET /inbox — top:', top, 'skip:', skip, 'filter:', JSON.stringify(filter));
 
   let endpoint;
-  
+
   if (filter) {
     // Use Graph $search for full mailbox search (server-side, searches all emails)
     // NOTE: $search cannot be combined with $orderby — results come in relevance order
@@ -1536,10 +1591,10 @@ router.get('/inbox', async (req, res) => {
     console.log('[Outlook] Calling graph.graphGet...');
     const data = await graph.graphGet(endpoint, MS_EMAIL);
     console.log('[Outlook] Graph response received — message count:', (data.value || []).length);
-    
+
     const messages = data.value || [];
     console.log('[Outlook] Returning', messages.length, 'messages');
-    
+
     // Store messages in database for fallback
     if (messages.length > 0) {
       try {
@@ -1549,7 +1604,7 @@ router.get('/inbox', async (req, res) => {
         console.warn('[Outlook] Failed to store messages in DB:', dbErr.message);
       }
     }
-    
+
     return res.json({
       messages,
       nextLink: data['@odata.nextLink'] || null,
@@ -1571,12 +1626,12 @@ router.get('/inbox', async (req, res) => {
 router.get('/inbox/fallback', async (req, res) => {
   const top = parseInt(req.query.top || '50');
   const skip = parseInt(req.query.skip || '0');
-  
+
   console.log('[Outlook] GET /inbox/fallback — loading from DB, top:', top, 'skip:', skip);
-  
+
   try {
     await mailStore.ensureTable();
-    
+
     // Ensure table exists
     await pool.query(`
       CREATE TABLE IF NOT EXISTS outlook_emails_cache (
@@ -1598,9 +1653,9 @@ router.get('/inbox/fallback', async (req, res) => {
         synced_at         TIMESTAMPTZ DEFAULT NOW()
       )
     `);
-    
+
     const result = await pool.query(`
-      SELECT 
+      SELECT
         id,
         conversation_id AS "conversationId",
         subject,
@@ -1620,7 +1675,7 @@ router.get('/inbox/fallback', async (req, res) => {
       ORDER BY received_datetime DESC NULLS LAST
       LIMIT $1 OFFSET $2
     `, [top, skip]);
-    
+
     // Transform to match API format
     const messages = result.rows.map(row => ({
       id: row.id,
@@ -1642,9 +1697,9 @@ router.get('/inbox/fallback', async (req, res) => {
       importance: row.importance,
       category: row.category || 'GENERAL'
     }));
-    
+
     console.log('[Outlook] Fallback: Loaded', messages.length, 'messages from DB');
-    
+
     return res.json({
       messages,
       nextLink: null,
@@ -1660,7 +1715,7 @@ router.get('/inbox/fallback', async (req, res) => {
 // ── GET /api/outlook/categorize ──────────────────────────────────────────
 router.get('/categorize', async (req, res) => {
   const top = parseInt(req.query.top || '50');
-  
+
   console.log('[Outlook] GET /categorize — fetching', top, 'emails for categorization');
 
   try {
@@ -1668,12 +1723,12 @@ router.get('/categorize', async (req, res) => {
     const endpoint = `/me/mailFolders/inbox/messages?$top=${top}`
       + `&$select=id,subject,from,bodyPreview,receivedDateTime,isRead,hasAttachments,importance,categories`
       + `&$orderby=receivedDateTime desc`;
-    
+
     const data = await graph.graphGet(endpoint, MS_EMAIL);
     const messages = data.value || [];
-    
+
     console.log('[Outlook] Fetched', messages.length, 'emails for categorization');
-    
+
     // Transform to categorization format
     const emails = messages.map(msg => ({
       id: msg.id,
@@ -1687,25 +1742,25 @@ router.get('/categorize', async (req, res) => {
       importance: msg.importance || 'normal',
       existing_categories: msg.categories || []
     }));
-    
+
     // Categorization logic
     const categorized = emails.map(email => {
       const subject = (email.subject || '').toLowerCase();
       const body = (email.body_summary || '').toLowerCase();
       const from = (email.from || '').toLowerCase();
       const combined = `${subject} ${body} ${from}`;
-      
+
       const now = new Date();
       const receivedDate = new Date(email.received_time);
       const hoursSinceReceived = (now - receivedDate) / (1000 * 60 * 60);
       const isRecent = hoursSinceReceived <= 48;
-      
+
       let category = 'GENERAL';
       let priority = 'LOW';
       let reason = 'Default category';
-      
+
       // Priority order: LEAD > IMPORTANT > NEEDS_REPLY > ATTACHMENT > UNREAD > GENERAL
-      
+
       // Check for LEAD / SALES
       const leadKeywords = ['indiamart', 'buyer', 'enquiry', 'inquiry', 'quotation', 'quote request', 'product inquiry', 'business opportunity', 'interested in', 'purchase', 'order'];
       if (leadKeywords.some(kw => combined.includes(kw))) {
@@ -1713,42 +1768,42 @@ router.get('/categorize', async (req, res) => {
         priority = 'HIGH';
         reason = 'Detected buyer inquiry or sales opportunity keywords';
       }
-      
+
       // Check for IMPORTANT
       else if (email.importance === 'high' || ['urgent', 'asap', 'important', 'critical', 'immediate'].some(kw => combined.includes(kw))) {
         category = 'IMPORTANT';
         priority = 'HIGH';
         reason = 'Marked as high importance or contains urgency keywords';
       }
-      
+
       // Check for NEEDS_REPLY
       else if (['quote', 'price', 'pricing', 'need', 'requirement', 'please respond', 'please reply', 'waiting for', 'can you', 'could you', 'would you'].some(kw => combined.includes(kw))) {
         category = 'NEEDS_REPLY';
         priority = 'MEDIUM';
         reason = 'Contains keywords indicating response required';
       }
-      
+
       // Check for SYSTEM / OTP
       else if (['otp', 'verification code', 'login alert', 'security code', 'authentication', 'verify your', 'no-reply', 'noreply', 'automated'].some(kw => combined.includes(kw))) {
         category = 'SYSTEM';
         priority = 'LOW';
         reason = 'Automated system message or OTP';
       }
-      
+
       // Check for ATTACHMENT
       else if (email.has_attachments) {
         category = 'ATTACHMENT';
         priority = 'MEDIUM';
         reason = 'Email contains attachments';
       }
-      
+
       // Check for UNREAD
       else if (!email.is_read) {
         category = 'UNREAD';
         priority = 'MEDIUM';
         reason = 'Email is unread';
       }
-      
+
       // Boost priority if recent
       if (isRecent && priority === 'LOW') {
         priority = 'MEDIUM';
@@ -1756,7 +1811,7 @@ router.get('/categorize', async (req, res) => {
       if (isRecent && category === 'LEAD') {
         priority = 'URGENT';
       }
-      
+
       return {
         id: email.id,
         subject: email.subject,
@@ -1770,9 +1825,9 @@ router.get('/categorize', async (req, res) => {
         has_attachments: email.has_attachments
       };
     });
-    
+
     console.log('[Outlook] Categorized', categorized.length, 'emails');
-    
+
     // Return categorized results
     return res.json({
       total: categorized.length,
@@ -1787,7 +1842,7 @@ router.get('/categorize', async (req, res) => {
         GENERAL: categorized.filter(e => e.category === 'GENERAL').length,
       }
     });
-    
+
   } catch (err) {
     console.error('[Outlook] ❌ Categorization error:', err.message);
     if (err.message === 'NOT_AUTHENTICATED') {
@@ -1887,9 +1942,9 @@ router.get('/sent', async (req, res) => {
       + `&$orderby=sentDateTime desc`,
       MS_EMAIL
     );
-    
+
     const messages = data.value || [];
-    
+
     // Store messages in database for fallback
     if (messages.length > 0) {
       try {
@@ -1899,7 +1954,7 @@ router.get('/sent', async (req, res) => {
         console.warn('[Outlook] Failed to store sent messages in DB:', dbErr.message);
       }
     }
-    
+
     return res.json({ messages, source: 'api' });
   } catch (err) {
     if (err.message === 'NOT_AUTHENTICATED') return res.status(401).json({ error: 'NOT_AUTHENTICATED' });
@@ -1911,12 +1966,12 @@ router.get('/sent', async (req, res) => {
 router.get('/sent/fallback', async (req, res) => {
   const top = parseInt(req.query.top || '25');
   const skip = parseInt(req.query.skip || '0');
-  
+
   console.log('[Outlook] GET /sent/fallback — loading from DB');
-  
+
   try {
     const result = await pool.query(`
-      SELECT 
+      SELECT
         id,
         conversation_id AS "conversationId",
         subject,
@@ -1929,7 +1984,7 @@ router.get('/sent/fallback', async (req, res) => {
       ORDER BY sent_datetime DESC NULLS LAST
       LIMIT $1 OFFSET $2
     `, [top, skip]);
-    
+
     const messages = result.rows.map(row => ({
       id: row.id,
       conversationId: row.conversationId,
@@ -1939,9 +1994,9 @@ router.get('/sent/fallback', async (req, res) => {
       bodyPreview: row.body_preview,
       hasAttachments: row.has_attachments
     }));
-    
+
     console.log('[Outlook] Fallback: Loaded', messages.length, 'sent messages from DB');
-    
+
     return res.json({ messages, source: 'database' });
   } catch (err) {
     console.error('[Outlook] ❌ Sent fallback error:', err.message);
@@ -1953,9 +2008,9 @@ router.get('/sent/fallback', async (req, res) => {
 router.get('/drafts', async (req, res) => {
   const top = parseInt(req.query.top || '25');
   const skip = parseInt(req.query.skip || '0');
-  
+
   console.log('[Outlook] GET /drafts — top:', top, 'skip:', skip);
-  
+
   try {
     const data = await graph.graphGet(
       `/me/mailFolders/drafts/messages?$top=${top}&$skip=${skip}`
@@ -1963,9 +2018,9 @@ router.get('/drafts', async (req, res) => {
       + `&$orderby=createdDateTime desc`,
       MS_EMAIL
     );
-    
+
     const messages = data.value || [];
-    
+
     // Store messages in database for fallback
     if (messages.length > 0) {
       try {
@@ -1975,7 +2030,7 @@ router.get('/drafts', async (req, res) => {
         console.warn('[Outlook] Failed to store draft messages in DB:', dbErr.message);
       }
     }
-    
+
     console.log('[Outlook] Returning', messages.length, 'draft messages');
     return res.json({ messages, source: 'api' });
   } catch (err) {
@@ -1989,12 +2044,12 @@ router.get('/drafts', async (req, res) => {
 router.get('/drafts/fallback', async (req, res) => {
   const top = parseInt(req.query.top || '25');
   const skip = parseInt(req.query.skip || '0');
-  
+
   console.log('[Outlook] GET /drafts/fallback — loading from DB');
-  
+
   try {
     const result = await pool.query(`
-      SELECT 
+      SELECT
         id,
         conversation_id AS "conversationId",
         subject,
@@ -2013,7 +2068,7 @@ router.get('/drafts/fallback', async (req, res) => {
       ORDER BY received_datetime DESC NULLS LAST, sent_datetime DESC NULLS LAST
       LIMIT $1 OFFSET $2
     `, [top, skip]);
-    
+
     const messages = result.rows.map(row => ({
       id: row.id,
       conversationId: row.conversationId,
@@ -2034,7 +2089,7 @@ router.get('/drafts/fallback', async (req, res) => {
       importance: row.importance,
       isDraft: true
     }));
-    
+
     console.log('[Outlook] Fallback: Loaded', messages.length, 'draft messages from DB');
     return res.json({ messages, source: 'database' });
   } catch (err) {
@@ -2046,27 +2101,20 @@ router.get('/drafts/fallback', async (req, res) => {
 // ── POST /api/outlook/drafts ─────────────────────────────────────────────
 // Create a draft message in Outlook Drafts folder via Microsoft Graph API
 router.post('/drafts', async (req, res) => {
-  const { to, subject, body, cc } = req.body;
+  const { to, subject, body, cc, attachments } = req.body;
 
   console.log('[Outlook] POST /drafts — subject:', subject, '| body length:', (body||'').length);
 
-  const toRecipients = to
-    ? (Array.isArray(to) ? to : [to])
-        .filter(Boolean)
-        .map(addr => ({ emailAddress: { address: addr } }))
-    : [];
-
-  const ccRecipients = cc
-    ? (Array.isArray(cc) ? cc : [cc])
-        .filter(Boolean)
-        .map(addr => ({ emailAddress: { address: addr } }))
-    : [];
+  const toRecipients = normalizeMailRecipients(to).map(addr => ({ emailAddress: { address: addr } }));
+  const ccRecipients = normalizeMailRecipients(cc).map(addr => ({ emailAddress: { address: addr } }));
+  const graphAttachments = buildGraphFileAttachments(attachments);
 
   const message = {
     subject: subject || '(No subject)',
     body: { contentType: 'HTML', content: body || '' },
     ...(toRecipients.length ? { toRecipients } : {}),
     ...(ccRecipients.length ? { ccRecipients } : {}),
+    ...(graphAttachments.length ? { attachments: graphAttachments } : {}),
   };
 
   try {
@@ -2085,9 +2133,9 @@ router.post('/drafts', async (req, res) => {
 router.get('/deleted', async (req, res) => {
   const top = parseInt(req.query.top || '25');
   const skip = parseInt(req.query.skip || '0');
-  
+
   console.log('[Outlook] GET /deleted — top:', top, 'skip:', skip);
-  
+
   try {
     const data = await graph.graphGet(
       `/me/mailFolders/deleteditems/messages?$top=${top}&$skip=${skip}`
@@ -2095,9 +2143,9 @@ router.get('/deleted', async (req, res) => {
       + `&$orderby=receivedDateTime desc`,
       MS_EMAIL
     );
-    
+
     const messages = data.value || [];
-    
+
     // Store messages in database for fallback
     if (messages.length > 0) {
       try {
@@ -2107,7 +2155,7 @@ router.get('/deleted', async (req, res) => {
         console.warn('[Outlook] Failed to store deleted messages in DB:', dbErr.message);
       }
     }
-    
+
     console.log('[Outlook] Returning', messages.length, 'deleted messages');
     return res.json({ messages, source: 'api' });
   } catch (err) {
@@ -2121,12 +2169,12 @@ router.get('/deleted', async (req, res) => {
 router.get('/deleted/fallback', async (req, res) => {
   const top = parseInt(req.query.top || '25');
   const skip = parseInt(req.query.skip || '0');
-  
+
   console.log('[Outlook] GET /deleted/fallback — loading from DB');
-  
+
   try {
     const result = await pool.query(`
-      SELECT 
+      SELECT
         id,
         conversation_id AS "conversationId",
         subject,
@@ -2145,7 +2193,7 @@ router.get('/deleted/fallback', async (req, res) => {
       ORDER BY received_datetime DESC NULLS LAST
       LIMIT $1 OFFSET $2
     `, [top, skip]);
-    
+
     const messages = result.rows.map(row => ({
       id: row.id,
       conversationId: row.conversationId,
@@ -2165,7 +2213,7 @@ router.get('/deleted/fallback', async (req, res) => {
       hasAttachments: row.has_attachments,
       importance: row.importance
     }));
-    
+
     console.log('[Outlook] Fallback: Loaded', messages.length, 'deleted messages from DB');
     return res.json({ messages, source: 'database' });
   } catch (err) {
@@ -2180,9 +2228,9 @@ router.get('/folder/:folderName', async (req, res) => {
   const folder = req.params.folderName;
   const top = parseInt(req.query.top || '25');
   const skip = parseInt(req.query.skip || '0');
-  
+
   console.log(`[Outlook] GET /folder/${folder} — top:`, top, 'skip:', skip);
-  
+
   try {
     const folderSegment = encodeURIComponent(folder);
     const data = await graph.graphGet(
@@ -2191,9 +2239,9 @@ router.get('/folder/:folderName', async (req, res) => {
       + `&$orderby=receivedDateTime desc`,
       MS_EMAIL
     );
-    
+
     const messages = data.value || [];
-    
+
     // Store in DB for fallback
     if (messages.length > 0) {
       try {
@@ -2202,7 +2250,7 @@ router.get('/folder/:folderName', async (req, res) => {
         console.warn(`[Outlook] Failed to store ${folder} messages in DB:`, dbErr.message);
       }
     }
-    
+
     return res.json({ messages, source: 'api' });
   } catch (err) {
     console.error(`[Outlook] ❌ Folder ${folder} fetch error:`, err.message);
@@ -2272,11 +2320,11 @@ router.get('/folder/:folderName/fallback', async (req, res) => {
 router.post('/update-category', async (req, res) => {
   const { id, category } = req.body;
   if (!id || !category) return res.status(400).json({ error: 'ID and category required' });
-  
+
   try {
     await pool.query(`
-      UPDATE outlook_emails_cache 
-      SET category = $1 
+      UPDATE outlook_emails_cache
+      SET category = $1
       WHERE id = $2
     `, [category, id]);
     return res.json({ success: true });
@@ -2294,11 +2342,11 @@ router.get('/folders', async (req, res) => {
       '/me/mailFolders?$top=100&$select=id,displayName,unreadItemCount,totalItemCount,childFolderCount',
       MS_EMAIL
     );
-    
+
     if (!data || !data.value) {
       return res.json([]);
     }
-    
+
     return res.json(data.value);
   } catch (err) {
     console.error('[Outlook] ❌ Folders fetch error:', err.message);
@@ -2309,17 +2357,22 @@ router.get('/folders', async (req, res) => {
 
 // ── POST /api/outlook/send ────────────────────────────────────────────────
 router.post('/send', async (req, res) => {
-  const { to, subject, body, cc, importance } = req.body;
+  const { to, subject, body, cc, importance, attachments } = req.body;
   if (!to || !subject || !body) {
     return res.status(400).json({ error: 'to, subject, and body are required.' });
   }
 
-  const toRecipients = (Array.isArray(to) ? to : [to]).map(addr => ({
+  const normalizedTo = normalizeMailRecipients(to);
+  const normalizedCc = normalizeMailRecipients(cc);
+  if (!normalizedTo.length) {
+    return res.status(400).json({ error: 'At least one valid recipient is required.' });
+  }
+
+  const toRecipients = normalizedTo.map(addr => ({
     emailAddress: { address: addr }
   }));
-  const ccRecipients = cc
-    ? (Array.isArray(cc) ? cc : [cc]).map(addr => ({ emailAddress: { address: addr } }))
-    : [];
+  const ccRecipients = normalizedCc.map(addr => ({ emailAddress: { address: addr } }));
+  const graphAttachments = buildGraphFileAttachments(attachments);
 
   const message = {
     subject,
@@ -2327,6 +2380,7 @@ router.post('/send', async (req, res) => {
     body:       { contentType: 'HTML', content: body },
     toRecipients,
     ...(ccRecipients.length ? { ccRecipients } : {}),
+    ...(graphAttachments.length ? { attachments: graphAttachments } : {}),
   };
 
   try {
@@ -2335,7 +2389,7 @@ router.post('/send', async (req, res) => {
     // Audit log
     pool.query(
       `INSERT INTO audit_log (user_id,action,entity,detail) VALUES ($1,$2,$3,$4)`,
-      [req.user.id, 'EMAIL_SENT', 'outlook', `To: ${Array.isArray(to)?to.join(','):to} | Subject: ${subject}`]
+      [req.user.id, 'EMAIL_SENT', 'outlook', `To: ${normalizedTo.join(',')} | Subject: ${subject}`]
     ).catch(() => {});
 
     // Activity log
@@ -2353,14 +2407,30 @@ router.post('/send', async (req, res) => {
 
 // ── POST /api/outlook/reply/:id ───────────────────────────────────────────
 router.post('/reply/:id', async (req, res) => {
-  const { body, replyAll } = req.body;
+  const { body, replyAll, attachments } = req.body;
   if (!body) return res.status(400).json({ error: 'Reply body is required.' });
+  const graphAttachments = buildGraphFileAttachments(attachments);
 
   const endpoint = replyAll
     ? `/me/messages/${req.params.id}/replyAll`
     : `/me/messages/${req.params.id}/reply`;
 
   try {
+    if (graphAttachments.length) {
+      const draftEndpoint = replyAll
+        ? `/me/messages/${encodeURIComponent(req.params.id)}/createReplyAll`
+        : `/me/messages/${encodeURIComponent(req.params.id)}/createReply`;
+      const draft = await graph.graphPost(draftEndpoint, {}, MS_EMAIL);
+      if (!draft || !draft.id) throw new Error('Could not create Outlook reply draft for attachments.');
+      await graph.graphPatch(`/me/messages/${encodeURIComponent(draft.id)}`, {
+        body: { contentType: 'HTML', content: body }
+      }, MS_EMAIL);
+      await addAttachmentsToMessage(draft.id, graphAttachments);
+      await graph.graphPost(`/me/messages/${encodeURIComponent(draft.id)}/send`, {}, MS_EMAIL);
+      clearStorageScanCache();
+      return res.json({ success: true, attachments: graphAttachments.length });
+    }
+
     await graph.graphPost(endpoint, {
       message: { body: { contentType: 'HTML', content: body } },
     }, MS_EMAIL);
@@ -2478,6 +2548,23 @@ router.get('/directory-activity', async (req, res) => {
 
   const broadcastCount = await countBroadcastsForEmail(email);
 
+  // Fetch group memberships
+  let groups = [];
+  try {
+    const pool = require('../db/pool');
+    const gr = await pool.query(`
+      SELECT g.name
+      FROM recipient_groups g
+      JOIN recipient_group_members m ON g.id = m.group_id
+      JOIN contacts c ON c.id = m.contact_id
+      WHERE LOWER(TRIM(c.email)) = LOWER(TRIM($1))
+      ORDER BY g.name ASC
+    `, [email]);
+    groups = gr.rows.map(r => r.name);
+  } catch(e) {
+    console.error('[directory-activity] group fetch error:', e.message);
+  }
+
   return res.json({
     lastEmailAt,
     lastContactLabel: lastEmailAt
@@ -2488,6 +2575,7 @@ router.get('/directory-activity', async (req, res) => {
     broadcastCount,
     outlookError,
     outlookHint,
+    groups,
   });
 });
 
@@ -2622,6 +2710,44 @@ router.get('/contacts', async (req, res) => {
     });
     outlookContacts.forEach(normalizeDirectoryPhoneFields);
 
+    // Bulk attach mail stats and groups
+    try {
+      const allEmails = [...new Set(outlookContacts.map(c => rawAddr(c).trim().toLowerCase()).filter(Boolean))];
+      if (allEmails.length) {
+        const pool = require('../db/pool');
+
+        const statsRes = await pool.query(`SELECT email, last_email_at FROM outlook_mail_stats WHERE email = ANY($1)`, [allEmails]);
+        const statsMap = new Map();
+        statsRes.rows.forEach(r => statsMap.set(r.email.toLowerCase(), r.last_email_at));
+
+        const grpRes = await pool.query(`
+          SELECT LOWER(TRIM(c.email)) as email, g.name
+          FROM recipient_groups g
+          JOIN recipient_group_members m ON g.id = m.group_id
+          JOIN contacts c ON c.id = m.contact_id
+          WHERE LOWER(TRIM(c.email)) = ANY($1)
+        `, [allEmails]);
+        const grpMap = new Map();
+        grpRes.rows.forEach(r => {
+          const em = r.email;
+          if (!grpMap.has(em)) grpMap.set(em, []);
+          grpMap.get(em).push(r.name);
+        });
+
+        for (const oc of outlookContacts) {
+          const e = rawAddr(oc).trim().toLowerCase();
+          if (e) {
+            oc.lastEmailAt = statsMap.get(e) || null;
+            oc.groups = grpMap.get(e) || [];
+          } else {
+            oc.groups = [];
+          }
+        }
+      }
+    } catch(e) {
+      console.error('[Outlook Contacts] Failed to bulk fetch stats/groups', e.message);
+    }
+
     traceContactSample('route-final-response', outlookContacts, 20);
     res.set('X-Outlook-Contacts-Trace', safeHeaderValue(contactsTraceHeaderSummary(lastContactsTrace)));
     contactsTraceLog('[Outlook Contacts][TRACE] Final trace summary:', JSON.stringify(lastContactsTrace, null, 2));
@@ -2652,9 +2778,6 @@ router.post('/contacts', async (req, res) => {
 
   if (!displayName || !email) {
     return res.status(400).json({ error: 'displayName and email are required' });
-  }
-  if (!String(mobilePhone || '').trim()) {
-    return res.status(400).json({ error: 'mobilePhone is required for Outlook contact sync' });
   }
 
   const body = {
@@ -2692,9 +2815,6 @@ router.patch('/contacts/:id', async (req, res) => {
   if (!displayName) {
     return res.status(400).json({ error: 'displayName is required' });
   }
-  if (!String(mobilePhone || '').trim()) {
-    return res.status(400).json({ error: 'mobilePhone is required for Outlook contact sync' });
-  }
   if (!id || id.startsWith('mail:')) {
     return res.status(400).json({ error: 'Cannot update a mail-derived contact. Use POST to create a new one.' });
   }
@@ -2719,6 +2839,49 @@ router.patch('/contacts/:id', async (req, res) => {
     }
     return res.status(502).json({ error: err.message });
   }
+});
+
+// ── DELETE /api/outlook/contacts/:id ─────────────────────────────────────
+router.delete('/contacts/:id', async (req, res) => {
+  const { id } = req.params;
+  if (!id || id.startsWith('mail:')) {
+    return res.status(400).json({ error: 'Cannot delete a mail-derived contact.' });
+  }
+  try {
+    await graph.graphDelete(`/me/contacts/${encodeURIComponent(id)}`, MS_EMAIL);
+    try {
+      activityLog.append({ type: 'info', service: 'outlook', message: `Contact deleted from Outlook: ${id}`, timestamp: new Date().toISOString() });
+    } catch(_) {}
+    return res.json({ success: true });
+  } catch (err) {
+    if (err.message === 'NOT_AUTHENTICATED') return res.status(401).json({ error: 'NOT_AUTHENTICATED' });
+    return res.status(502).json({ error: err.message });
+  }
+});
+
+// ── DELETE /api/outlook/contacts (bulk) ───────────────────────────────────
+// Body: { ids: ['id1','id2',...] }
+router.delete('/contacts', async (req, res) => {
+  const ids = Array.isArray(req.body?.ids) ? req.body.ids : [];
+  if (!ids.length) return res.status(400).json({ error: 'ids array is required' });
+
+  const results = { deleted: 0, failed: [] };
+  for (const id of ids) {
+    if (!id || String(id).startsWith('mail:')) {
+      results.failed.push({ id, reason: 'mail-derived contact' });
+      continue;
+    }
+    try {
+      await graph.graphDelete(`/me/contacts/${encodeURIComponent(id)}`, MS_EMAIL);
+      results.deleted++;
+    } catch (err) {
+      results.failed.push({ id, reason: err.message });
+    }
+  }
+  try {
+    activityLog.append({ type: 'info', service: 'outlook', message: `Bulk delete: ${results.deleted} contacts deleted`, timestamp: new Date().toISOString() });
+  } catch(_) {}
+  return res.json({ success: true, ...results });
 });
 
 // ── POST /api/outlook/contacts/sync ───────────────────────────────────────
@@ -3492,13 +3655,13 @@ router.post('/ai-assistant/analyze', authenticate, async (req, res) => {
       const errText = await aiResponse.text();
       let parsedErr = {};
       try { parsedErr = JSON.parse(errText); } catch(e) {}
-      
+
       console.error('[AI] PicoClaw API error:', aiResponse.status, errText);
 
       // Handle Rate Limits (Groq Free Tier)
       if (aiResponse.status === 429) {
-        return res.status(429).json({ 
-          error: 'AI Rate Limit Reached', 
+        return res.status(429).json({
+          error: 'AI Rate Limit Reached',
           message: 'The PicoClaw assistant is temporarily busy. Please wait 15-20 seconds and retry.',
           raw: parsedErr.error?.message || errText
         });
@@ -3508,7 +3671,7 @@ router.post('/ai-assistant/analyze', authenticate, async (req, res) => {
     }
 
     const aiData = await aiResponse.json();
-    
+
     // OpenAI/PicoClaw format extraction
     const rawText = aiData.choices?.[0]?.message?.content || aiData.response || '';
     console.log('[AI] Response received. Parsing...');

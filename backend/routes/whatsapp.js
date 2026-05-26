@@ -34,6 +34,7 @@ router.get('/lid-map', authenticate, async (req, res) => {
         FROM wa_chats
         WHERE id LIKE '%@lid'
           AND phone IS NOT NULL AND phone != ''
+          AND account_phone = $1
         UNION
         SELECT
           split_part(jid, '@', 1) AS lid_num,
@@ -43,8 +44,9 @@ router.get('/lid-map', authenticate, async (req, res) => {
         WHERE jid LIKE '%@lid'
           AND phone IS NOT NULL AND phone != ''
           AND phone ~ '^[0-9]'
+          AND account_phone = $1
       ) combined
-    `);
+    `, [wa.getConnectedPhone() || 'unknown']);
     const map = {};
     result.rows.forEach(r => {
       // Format phone for display if it's raw digits
@@ -66,7 +68,7 @@ router.get('/chats', authenticate, async (req, res) => {
   try {
     const result = await pool.query(`
       SELECT * FROM wa_chats
-      WHERE
+      WHERE account_phone = $1 AND (
         -- Groups: real WhatsApp groups only
         (is_group = true AND id LIKE '%@g.us' AND name !~ '^[0-9+]{15,}$')
         OR
@@ -87,8 +89,9 @@ router.get('/chats', authenticate, async (req, res) => {
         OR
         -- Imported chats (from WhatsApp Export)
         id LIKE 'import_%'
+      )
       ORDER BY last_time DESC NULLS LAST LIMIT 300
-    `);
+    `, [wa.getConnectedPhone() || 'unknown']);
     res.json(result.rows);
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
@@ -105,7 +108,8 @@ router.post('/sync', authenticate, async (req, res) => {
           AND split_part(id,'@',1) LIKE '91%' AND length(split_part(id,'@',1))=12), 0) AS unread_individual,
         COALESCE(SUM(unread) FILTER (WHERE is_group), 0) AS unread_groups
       FROM wa_chats
-    `);
+      WHERE account_phone = $1
+    `, [wa.getConnectedPhone() || 'unknown']);
     res.json({ success: true, stats: stats.rows[0] });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
@@ -121,25 +125,27 @@ router.get('/group/:jid', authenticate, async (req, res) => {
 
 router.get('/messages/:jid', authenticate, async (req, res) => {
   const jid   = decodeURIComponent(req.params.jid).replace(/@g\.us@g\.us$/, '@g.us').replace(/@s\.whatsapp\.net@s\.whatsapp\.net$/, '@s.whatsapp.net');
-  const limit = parseInt(req.query.limit || '100');
+  const limit = Math.min(Math.max(parseInt(req.query.limit || '100', 10) || 100, 1), 200);
+  const before = req.query.before ? new Date(String(req.query.before)) : null;
   try {
     // If this is a group chat, populate LID phone numbers from group metadata first
     if (jid.endsWith('@g.us')) {
       try {
         const groupMeta = await wa.getGroupMetadata(jid);
         let updated = 0;
+        const accPhone = wa.getConnectedPhone() || 'unknown';
         for (const p of groupMeta.participants) {
           if (p.jid && p.jid.endsWith('@lid') && p.phone) {
             const realPhone = p.phone.replace(/[^0-9]/g, '');
             if (realPhone && realPhone.length >= 7) {
               await pool.query(`
-                INSERT INTO wa_contacts (jid, name, phone)
-                VALUES ($1, $2, $3)
-                ON CONFLICT (jid) DO UPDATE SET
+                INSERT INTO wa_contacts (jid, account_phone, name, phone)
+                VALUES ($1, $2, $3, $4)
+                ON CONFLICT (jid, account_phone) DO UPDATE SET
                   phone = EXCLUDED.phone,
                   name = COALESCE(EXCLUDED.name, wa_contacts.name),
                   updated_at = NOW()
-              `, [p.jid, p.name, realPhone]);
+              `, [p.jid, accPhone, p.name, realPhone]);
               updated++;
             }
           }
@@ -153,6 +159,7 @@ router.get('/messages/:jid', authenticate, async (req, res) => {
     // For @lid JIDs, also search by the LID number as phone JID
     // e.g. 183357119950912@lid -> also try 183357119950912@s.whatsapp.net
     const lidNum = jid.endsWith('@lid') ? jid.split('@')[0] : null;
+    const beforeIsValid = before && !Number.isNaN(before.getTime());
     const result = await pool.query(
       `SELECT m.*,
         CASE
@@ -172,20 +179,24 @@ router.get('/messages/:jid', authenticate, async (req, res) => {
         END AS sender_phone
        FROM (
          SELECT * FROM wa_messages 
-         WHERE chat_id=$1
-            OR chat_id LIKE split_part($1, '@', 1) || ':%@' || split_part($1, '@', 2)
-            OR ($3::text IS NOT NULL AND (
-              chat_id = $3 || '@s.whatsapp.net'
-              OR chat_id LIKE $3 || ':%@s.whatsapp.net'
-            ))
+         WHERE account_phone=$4 AND (
+              chat_id=$1
+              OR chat_id LIKE split_part($1, '@', 1) || ':%@' || split_part($1, '@', 2)
+              OR ($3::text IS NOT NULL AND (
+                chat_id = $3 || '@s.whatsapp.net'
+                OR chat_id LIKE $3 || ':%@s.whatsapp.net'
+              ))
+            )
+            AND ($5::timestamptz IS NULL OR timestamp < $5::timestamptz)
          ORDER BY timestamp DESC LIMIT $2
        ) m
-       LEFT JOIN wa_contacts c ON c.jid = m.sender
+       LEFT JOIN wa_contacts c ON c.jid = m.sender AND c.account_phone=$4
        ORDER BY m.timestamp ASC`,
-      [jid, limit, lidNum]
+      [jid, limit, lidNum, wa.getConnectedPhone() || 'unknown', beforeIsValid ? before.toISOString() : null]
     );
-    await pool.query(`UPDATE wa_messages SET is_read=true WHERE chat_id=$1 AND from_me=false`, [jid]);
-    await pool.query(`UPDATE wa_chats SET unread=0 WHERE id=$1`, [jid]);
+    const accPhone = wa.getConnectedPhone() || 'unknown';
+    await pool.query(`UPDATE wa_messages SET is_read=true WHERE chat_id=$1 AND account_phone=$2 AND from_me=false`, [jid, accPhone]);
+    await pool.query(`UPDATE wa_chats SET unread=0 WHERE id=$1 AND account_phone=$2`, [jid, accPhone]);
     res.json(result.rows);
   } catch (err) { res.status(500).json({ error: err.message }); }
 });

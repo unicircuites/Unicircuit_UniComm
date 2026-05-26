@@ -4702,7 +4702,7 @@
                       rgba(255,255,255,0.02);
                   "></div>
 
-                  <button class="btn btn-ghost btn-sm" onclick="pbxLoadRecordings()">
+                  <button class="btn btn-ghost btn-sm" onclick="refreshPBXRecordingsView()">
                     <i class="fas fa-sync-alt"></i>
                     Refresh
                   </button>
@@ -4739,7 +4739,7 @@
 
                   </div>
 
-                  <button class="btn btn-sm" style="background:transparent;border:1.5px solid var(--gold);color:var(--gold);font-weight:600;" onclick="syncPBXRecordingsToDB(this)">
+                  <button id="pbx-store-db-btn" class="btn btn-sm" style="background:transparent;border:1.5px solid var(--gold);color:var(--gold);font-weight:600;" onclick="syncPBXRecordingsToDB(this)">
                     <i class="fas fa-database"></i>
                     Store In DB
                   </button>
@@ -4904,8 +4904,7 @@
         </div>
 
         <!-- PBX CALL DETAILS MODAL -->
-        <div class="modal-overlay" id="pbx-call-details-modal"
-          onclick="if(event.target===this)closeModal('pbx-call-details-modal')">
+        <div class="modal-overlay" id="pbx-call-details-modal">
           <div class="modal" style="max-width:720px;">
             <div class="modal-title">
               <span><i class="fas fa-phone-alt" style="color:var(--gold);margin-right:8px;"></i>Call Record Details</span>
@@ -4917,8 +4916,7 @@
         </div>
 
         <!-- ══ PBX CONTACT SAVE MODAL ══ -->
-        <div class="modal-overlay" id="pbx-save-contact-modal"
-          onclick="if(event.target===this)closeModal('pbx-save-contact-modal')">
+        <div class="modal-overlay" id="pbx-save-contact-modal">
           <div class="modal" style="max-width:440px;">
             <div class="modal-title">
               <span><i class="fas fa-user-tag" style="color:var(--gold);margin-right:8px;"></i>Save PBX Contact</span>
@@ -5176,6 +5174,9 @@
                           <button class="btn btn-ghost btn-xs"
                             onclick="forwardFromThread({id:activeMessageId,subject:activeMailMessage?.subject,fromAddr:activeMailMessage?.from?.emailAddress?.address,fromName:activeMailMessage?.from?.emailAddress?.name,toRecipients:(activeMailMessage?.toRecipients||[]).map(r=>r.emailAddress?.address).filter(Boolean),ccRecipients:(activeMailMessage?.ccRecipients||[]).map(r=>r.emailAddress?.address).filter(Boolean),receivedDateTime:activeMailMessage?.receivedDateTime,bodyPreview:activeMailMessage?.bodyPreview})"
                             title="Forward"><i class="fas fa-share"></i></button>
+                          <button class="btn btn-blue btn-xs"
+                            onclick="sendAgainFromThread({id:activeMessageId,subject:activeMailMessage?.subject,fromAddr:activeMailMessage?.from?.emailAddress?.address,fromName:activeMailMessage?.from?.emailAddress?.name,toRecipients:(activeMailMessage?.toRecipients||[]).map(r=>r.emailAddress?.address).filter(Boolean),ccRecipients:(activeMailMessage?.ccRecipients||[]).map(r=>r.emailAddress?.address).filter(Boolean),receivedDateTime:activeMailMessage?.receivedDateTime,bodyPreview:activeMailMessage?.bodyPreview})"
+                            title="Send Again"><i class="fas fa-paper-plane"></i></button>
                           <button class="btn btn-gold btn-xs" onclick="openTaskModal()" title="Assign Task"><i
                               class="fas fa-user-check"></i></button>
                           <button class="btn btn-blue btn-xs" onclick="aiDraftReply()" title="AI Draft"><i
@@ -5422,8 +5423,16 @@
               <div class="search-box" style="max-width:340px;flex:1;min-width:200px;"><i
                   class="fas fa-search"></i><input id="contact-search" placeholder="Search…"
                   oninput="handleContactsSearchInput()" /></div>
+              <select id="contact-sort" class="inp" style="padding:4px 8px;font-size:12px;border:1px solid var(--border);border-radius:6px;background:var(--card);width:auto;" onchange="handleContactsSearchInput()">
+                <option value="recent">Recent Activity</option>
+                <option value="oldest">Oldest Activity</option>
+                <option value="az">A-Z</option>
+                <option value="za">Z-A</option>
+                <option value="mobile">Mobile Number</option>
+              </select>
               <div style="display:flex;gap:8px;flex-wrap:wrap;margin-left:auto;align-items:center;"
                 id="contacts-toolbar-actions">
+                <button type="button" class="btn btn-gold btn-sm" onclick="openGroupsManager()"><i class="fas fa-users"></i> Manage Groups</button>
                 <div id="contacts-tools-outlook" style="display:none;gap:8px;flex-wrap:wrap;align-items:center;">
                   <button type="button" class="btn btn-ghost btn-sm" onclick="loadOutlookContactsDirectory()"><i
                       class="fas fa-sync-alt"></i> Refresh</button>
@@ -5457,6 +5466,15 @@
 
           <div class="contacts-directory-grid">
             <div class="contacts-list-cell">
+              <!-- Bulk action bar — shown when contacts are checked -->
+              <div id="contacts-bulk-bar" style="display:none;align-items:center;gap:8px;padding:8px 10px;margin-bottom:8px;background:rgba(245,166,35,0.08);border:1px solid rgba(245,166,35,0.25);border-radius:8px;flex-wrap:wrap;">
+                <span id="contacts-bulk-count" style="font-size:12px;font-weight:700;color:var(--gold);flex:1;min-width:120px;"></span>
+                <button class="btn btn-ghost btn-xs" onclick="contactsSelectAll()"><i class="fas fa-check-double"></i> All</button>
+                <button class="btn btn-ghost btn-xs" onclick="contactsDeselectAll()"><i class="fas fa-times"></i> None</button>
+                <button class="btn btn-gold btn-xs" onclick="bulkCreateNewGroup()"><i class="fas fa-plus"></i> Create Group</button>
+                <button class="btn btn-blue btn-xs" onclick="bulkAddToGroup()"><i class="fas fa-users"></i> Add to Group</button>
+                <button class="btn btn-red btn-xs" onclick="bulkDeleteOutlookContacts()"><i class="fas fa-trash"></i> Delete Selected</button>
+              </div>
               <div class="contacts-list-scroll" id="contacts-list-scroll">
                 <div id="contact-list" style="display:flex;flex-direction:column;gap:9px;"></div>
               </div>
@@ -6768,13 +6786,7 @@ Always write in a professional yet warm Indian B2B communication style. Use form
         setTimeout(() => initializeComposeDraft(), 100);
       }
 
-      // click-outside-to-close (attach once)
-      if (!el._modalClickBound) {
-        el._modalClickBound = true;
-        el.addEventListener('click', function (e) {
-          if (e.target === el) closeModal(id);
-        });
-      }
+      // Note: outside-click-to-close is intentionally disabled for all modals.
     }
     function closeModal(id) {
       var el = document.getElementById(id);
@@ -6782,10 +6794,7 @@ Always write in a professional yet warm Indian B2B communication style. Use form
       el.style.display = 'none';
       el.classList.remove('open');
     }
-    // Legacy: also handle pre-existing .modal-overlay elements
-    document.querySelectorAll('.modal-overlay').forEach(function (m) {
-      m.addEventListener('click', function (e) { if (e.target === m) m.classList.remove('open'); });
-    });
+    // Note: outside-click to close modals is intentionally disabled for all modals.
 
     // ──────────────────────────────────
     // CONTACTS MODULE
@@ -7926,12 +7935,18 @@ Always write in a professional yet warm Indian B2B communication style. Use form
       }
     }
 
+    // ── Outlook Contacts — checkbox multi-select (declared early so renderOutlookContactsList can use it) ──
+    var _selectedOutlookIds = new Set();
+
     function renderOutlookContactsList(list) {
       const el = document.getElementById('contact-list');
       if (!list.length) {
         el.innerHTML = '<div style="text-align:center;padding:30px;color:var(--muted);font-size:12.5px;">No Outlook contacts in this folder.</div>';
         return;
       }
+      // Clear any stale selections when list re-renders
+      if (_selectedOutlookIds) { _selectedOutlookIds.clear(); updateContactsBulkBar(); }
+
       el.innerHTML = list.map(oc => {
         const title = outlookDisplayTitle(oc);
         const email = outlookPrimaryEmail(oc);
@@ -7940,7 +7955,6 @@ Always write in a professional yet warm Indian B2B communication style. Use form
         const srcBadge = oc.source === 'mail'
           ? '<span class="badge b-blue" style="font-size:9px;opacity:0.9;">Mail</span>'
           : '<span class="badge b-blue" style="font-size:9px;">Outlook Contact</span>';
-        // Show provider badge (Gmail/Yahoo/etc.) based on email domain, not source
         const primaryEmail = email || '';
         const providerInfo = primaryEmail ? ContactResolver.getProviderCategory(primaryEmail) : null;
         const providerBadge = providerInfo && providerInfo.label !== 'Outlook'
@@ -7950,9 +7964,17 @@ Always write in a professional yet warm Indian B2B communication style. Use form
           ? `<div style="font-size:10.5px;color:var(--muted);margin-top:2px;font-style:italic;">No name saved</div>
          <button class="btn btn-xs btn-gold" style="margin-top:5px;font-size:10px;" onclick="event.stopPropagation();openQuickSaveModal('${email.replace(/'/g, "\\'")}', '${String(oc.id || '').replace(/'/g, "\\'")}', '')"><i class="fa fa-user-plus"></i> Add Name</button>`
           : '';
+        const safeId = escHtml(oc.id || '');
+        const isMail = (oc.source === 'mail' || String(oc.id || '').startsWith('mail:'));
+        const checkboxHtml = !isMail
+          ? `<input type="checkbox" class="oc-checkbox" data-id="${safeId}"
+               onclick="event.stopPropagation();toggleOutlookContactCheck(this, this.getAttribute('data-id'))"
+               style="width:15px;height:15px;cursor:pointer;accent-color:var(--gold);flex-shrink:0;">`
+          : `<span style="width:15px;display:inline-block;"></span>`;
         return `
-    <div class="contact-card" onclick='showOutlookDirectoryDetail(${JSON.stringify(oc.id)}, this)'>
+    <div class="contact-card" onclick='showOutlookDirectoryDetail(${JSON.stringify(oc.id)}, this)' style="position:relative;">
       <div style="display:flex;align-items:center;gap:11px;">
+        ${checkboxHtml}
         <div class="contact-avatar" style="background:rgba(0,120,212,0.12);color:#60a5fa;">${escHtml((title.split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2) || 'O'))}</div>
         <div style="flex:1;min-width:0;">
           <div style="font-weight:700;font-size:13.5px;color:var(--text);">${escHtml(title)}</div>
@@ -7963,6 +7985,231 @@ Always write in a professional yet warm Indian B2B communication style. Use form
       </div>
     </div>`;
       }).join('');
+    }
+
+    // ── Outlook Contacts — checkbox multi-select ──────────────────────────────
+    var _selectedOutlookIds = new Set();
+
+    function toggleOutlookContactCheck(checkbox, id) {
+      if (checkbox.checked) {
+        _selectedOutlookIds.add(id);
+      } else {
+        _selectedOutlookIds.delete(id);
+      }
+      updateContactsBulkBar();
+    }
+
+    function updateContactsBulkBar() {
+      const bar = document.getElementById('contacts-bulk-bar');
+      const countEl = document.getElementById('contacts-bulk-count');
+      if (!bar) return;
+      const n = _selectedOutlookIds.size;
+      if (n === 0) {
+        bar.style.display = 'none';
+      } else {
+        bar.style.display = 'flex';
+        countEl.textContent = `${n} contact${n > 1 ? 's' : ''} selected`;
+      }
+    }
+
+    function contactsSelectAll() {
+      document.querySelectorAll('#contact-list .oc-checkbox').forEach(cb => {
+        cb.checked = true;
+        _selectedOutlookIds.add(cb.getAttribute('data-id'));
+      });
+      updateContactsBulkBar();
+    }
+
+    function contactsDeselectAll() {
+      document.querySelectorAll('#contact-list .oc-checkbox').forEach(cb => { cb.checked = false; });
+      _selectedOutlookIds.clear();
+      updateContactsBulkBar();
+    }
+
+    async function bulkDeleteOutlookContacts() {
+      const ids = Array.from(_selectedOutlookIds);
+      if (!ids.length) return;
+      if (!confirm(`Delete ${ids.length} selected contact${ids.length > 1 ? 's' : ''} from Outlook?\n\nThis cannot be undone.`)) return;
+
+      const btn = document.querySelector('#contacts-bulk-bar .btn-red');
+      if (btn) { btn.disabled = true; btn.innerHTML = '<span class="spin-loader"></span> Deleting…'; }
+
+      try {
+        const res = await fetch(`${API_BASE}/outlook/contacts`, {
+          method: 'DELETE',
+          headers: getAuthHeaders(),
+          body: JSON.stringify({ ids })
+        });
+        const data = await res.json();
+        if (res.ok) {
+          notify(
+            `Deleted ${data.deleted} contact${data.deleted !== 1 ? 's' : ''}`,
+            data.failed?.length ? `${data.failed.length} could not be deleted` : 'Done',
+            'var(--green)', 'fas fa-trash'
+          );
+          _selectedOutlookIds.clear();
+          updateContactsBulkBar();
+          // Remove deleted cards from cache and re-render
+          outlookContactsCache = outlookContactsCache.filter(oc => !ids.includes(oc.id));
+          renderOutlookContactsList(outlookContactsCache);
+          // Clear detail panel
+          const panel = document.getElementById('contact-detail-panel');
+          if (panel) panel.innerHTML = `<div class="card" style="text-align:center;padding:40px 20px;color:var(--muted);"><i class="fas fa-address-card" style="font-size:36px;color:rgba(255,255,255,0.06);display:block;margin-bottom:12px;"></i><div style="font-size:13px;">Select an entry</div></div>`;
+        } else {
+          notify('Delete failed', data.error || 'Unknown error', 'var(--red)', 'fas fa-exclamation-circle');
+        }
+      } catch (err) {
+        notify('Error', err.message, 'var(--red)', 'fas fa-exclamation-circle');
+      }
+      if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fas fa-trash"></i> Delete Selected'; }
+    }
+
+    async function bulkCreateNewGroup() {
+      const ids = Array.from(_selectedOutlookIds);
+      if (!ids.length) return;
+
+      const emails = ids.map(id => {
+        const oc = outlookContactsCache.find(o => o.id === id);
+        return oc ? outlookPrimaryEmail(oc) : null;
+      }).filter(Boolean);
+
+      if (!emails.length) {
+        notify('No emails', 'Selected contacts have no email addresses', 'var(--gold)', 'fas fa-info-circle');
+        return;
+      }
+
+      const groupName = prompt(`Create a new group with ${emails.length} selected contacts.\n\nEnter Group Name (e.g., ADANI):`);
+      if (!groupName || !groupName.trim()) return;
+
+      try {
+        const resGroup = await fetch(`${API_BASE}/groups`, {
+          method: 'POST',
+          headers: getAuthHeaders(),
+          body: JSON.stringify({ name: groupName.trim(), description: 'Created from Outlook selection' })
+        });
+        if (!resGroup.ok) {
+          const err = await resGroup.json();
+          throw new Error(err.error || 'Failed to create group');
+        }
+        const groupData = await resGroup.json();
+
+        const resMembers = await fetch(`${API_BASE}/groups/${groupData.id}/members`, {
+          method: 'POST',
+          headers: getAuthHeaders(),
+          body: JSON.stringify({ emails })
+        });
+        if (!resMembers.ok) {
+          const err = await resMembers.json();
+          throw new Error(err.error || 'Failed to add members');
+        }
+        const memberData = await resMembers.json();
+
+        if (memberData.added === 0) {
+          notify('Group Created!', `"${groupName.trim()}" was created. However, all selected contacts were already in the group (or duplicated).`, 'var(--gold)', 'fas fa-info-circle');
+        } else {
+          notify('Group Created!', `"${groupName.trim()}" was created and ${memberData.added} contacts were added.`, 'var(--green)', 'fas fa-check-circle');
+        }
+
+        contactsDeselectAll();
+      } catch (err) {
+        notify('Error', err.message, 'var(--red)', 'fas fa-exclamation-circle');
+      }
+    }
+
+    async function bulkAddToGroup() {
+      const ids = Array.from(_selectedOutlookIds);
+      if (!ids.length) return;
+
+      // Collect emails for the selected contacts
+      const emails = ids.map(id => {
+        const oc = outlookContactsCache.find(o => o.id === id);
+        return oc ? outlookPrimaryEmail(oc) : null;
+      }).filter(Boolean);
+
+      if (!emails.length) {
+        notify('No emails', 'Selected contacts have no email addresses', 'var(--gold)', 'fas fa-info-circle');
+        return;
+      }
+
+      // Load groups and show a picker
+      try {
+        const res = await fetch(`${API_BASE}/groups`, { headers: getAuthHeaders() });
+        if (!res.ok) throw new Error('Could not load groups');
+        const groups = await res.json();
+
+        if (!groups.length) {
+          notify('No groups', 'Create a recipient group first in the Groups manager', 'var(--gold)', 'fas fa-users');
+          return;
+        }
+
+        // Build a simple inline picker modal
+        const existing = document.getElementById('bulk-group-picker-modal');
+        if (existing) existing.remove();
+
+        const modal = document.createElement('div');
+        modal.id = 'bulk-group-picker-modal';
+        modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:99999;display:flex;align-items:center;justify-content:center;';
+        modal.innerHTML = `
+          <div style="background:var(--bg3);border:1px solid var(--border2);border-radius:14px;padding:24px;min-width:320px;max-width:420px;width:90vw;">
+            <div style="font-size:14px;font-weight:700;color:var(--text);margin-bottom:14px;display:flex;align-items:center;gap:8px;">
+              <i class="fas fa-users" style="color:var(--gold);"></i> Add ${emails.length} contact${emails.length > 1 ? 's' : ''} to Group
+            </div>
+            <select id="bulk-group-picker-sel" class="inp" style="width:100%;margin-bottom:16px;font-size:13px;">
+              <option value="">— Select a group —</option>
+              ${groups.map(g => `<option value="${g.id}">${escHtml(g.name)} (${g.member_count} members)</option>`).join('')}
+            </select>
+            <div style="display:flex;gap:8px;justify-content:flex-end;">
+              <button class="btn btn-ghost btn-sm" onclick="document.getElementById('bulk-group-picker-modal').remove()">Cancel</button>
+              <button class="btn btn-gold btn-sm" id="bulk-group-confirm-btn" onclick='bulkAddToGroupConfirm(${JSON.stringify(emails).replace(/'/g, "&#39;")})'>
+                <i class="fas fa-plus"></i> Add to Group
+              </button>
+            </div>
+          </div>`;
+        document.body.appendChild(modal);
+      } catch (err) {
+        notify('Error', err.message, 'var(--red)', 'fas fa-exclamation-circle');
+      }
+    }
+
+    async function bulkAddToGroupConfirm(emails) {
+      const sel = document.getElementById('bulk-group-picker-sel');
+      const groupId = sel ? sel.value : '';
+      if (!groupId) {
+        notify('Select a group', 'Please choose a group first', 'var(--gold)', 'fas fa-info-circle');
+        return;
+      }
+      const btn = document.getElementById('bulk-group-confirm-btn');
+      if (btn) { btn.disabled = true; btn.innerHTML = '<span class="spin-loader"></span> Adding…'; }
+
+      try {
+        const res = await fetch(`${API_BASE}/groups/${groupId}/members`, {
+          method: 'POST',
+          headers: getAuthHeaders(),
+          body: JSON.stringify({ emails })
+        });
+        const data = await res.json();
+        document.getElementById('bulk-group-picker-modal')?.remove();
+        if (res.ok) {
+          if (data.added === 0) {
+            notify(
+              'No new contacts added',
+              `All selected contacts are already members of this group.`,
+              'var(--gold)', 'fas fa-info-circle'
+            );
+          } else {
+            notify(
+              `Added ${data.added} new contact${data.added > 1 ? 's' : ''}`,
+              `Group now has ${data.member_count} members`,
+              'var(--green)', 'fas fa-users'
+            );
+          }
+        } else {
+          notify('Failed', data.error || 'Unknown error', 'var(--red)', 'fas fa-exclamation-circle');
+        }
+      } catch (err) {
+        document.getElementById('bulk-group-picker-modal')?.remove();
+        notify('Error', err.message, 'var(--red)', 'fas fa-exclamation-circle');
+      }
     }
 
     function handleContactsSearchInput() {
@@ -7981,6 +8228,8 @@ Always write in a professional yet warm Indian B2B communication style. Use form
         lastEl.textContent = '—'; sentEl.textContent = '—';
         if (recvEl) recvEl.textContent = '—';
         bcEl.textContent = '—';
+        const grpEl = document.getElementById('outlook-dir-groups');
+        if (grpEl) grpEl.textContent = '—';
         if (hintEl) { hintEl.textContent = data && data.noEmail ? 'No email on this contact.' : 'Could not load activity.'; hintEl.style.display = 'block'; }
         return;
       }
@@ -7988,6 +8237,8 @@ Always write in a professional yet warm Indian B2B communication style. Use form
         lastEl.textContent = '—'; sentEl.textContent = '—';
         if (recvEl) recvEl.textContent = '—';
         bcEl.textContent = String(data.broadcastCount ?? 0);
+        const grpEl = document.getElementById('outlook-dir-groups');
+        if (grpEl) grpEl.textContent = '—';
         if (hintEl) { hintEl.innerHTML = 'Connect <strong>Email / Outlook</strong> then click <strong>Sync Mail Stats</strong>.'; hintEl.style.display = 'block'; }
         return;
       }
@@ -7995,6 +8246,10 @@ Always write in a professional yet warm Indian B2B communication style. Use form
       sentEl.textContent = String(data.outlookSentToThem ?? 0);
       if (recvEl) recvEl.textContent = String(data.outlookReceivedFromThem ?? 0);
       bcEl.textContent = String(data.broadcastCount ?? 0);
+      const grpEl = document.getElementById('outlook-dir-groups');
+      if (grpEl) {
+        grpEl.textContent = (data.groups && data.groups.length > 0) ? data.groups.join(', ') : 'None';
+      }
       if (hintEl) {
         const hint = (!data.lastContactLabel && !data.outlookSentToThem && !data.outlookReceivedFromThem)
           ? 'No emails found. Run Sync Mail Stats in Email / Outlook to scan your mailbox.'
@@ -8057,6 +8312,7 @@ Always write in a professional yet warm Indian B2B communication style. Use form
           <div class="stat-row"><div class="stat-label"><i class="fas fa-paper-plane" style="width:14px;color:var(--muted);"></i> Emails sent to them</div><div class="stat-val" id="outlook-dir-sent" style="font-size:12px;font-weight:600;"><span class="spin-loader"></span></div></div>
           <div class="stat-row"><div class="stat-label"><i class="fas fa-inbox" style="width:14px;color:var(--muted);"></i> Emails received from them</div><div class="stat-val" id="outlook-dir-received" style="font-size:12px;font-weight:600;"><span class="spin-loader"></span></div></div>
           <div class="stat-row"><div class="stat-label"><i class="fas fa-bullhorn" style="width:14px;color:var(--muted);"></i> Broadcasts sent to them</div><div class="stat-val" id="outlook-dir-broadcast" style="font-size:12px;font-weight:600;"><span class="spin-loader"></span></div></div>
+          <div class="stat-row"><div class="stat-label"><i class="fas fa-users" style="width:14px;color:var(--muted);"></i> CRM Groups</div><div class="stat-val" id="outlook-dir-groups" style="font-size:12px;font-weight:600;white-space:normal;max-width:200px;"><span class="spin-loader"></span></div></div>
           <div id="outlook-dir-stats-hint" style="display:none;font-size:10px;color:var(--muted);margin-top:6px;line-height:1.45;"></div>
         </div>
         <div style="padding:14px 20px;">
@@ -8393,7 +8649,7 @@ Always write in a professional yet warm Indian B2B communication style. Use form
           ${company ? `<div style="color:var(--muted2);font-size:12.5px;margin-top:4px;"><i class="far fa-building"></i> ${escHtml(company)}</div>` : ''}
           ${notes ? `<div title="${escAttr(notes)}" style="color:var(--muted2);font-size:12px;margin-top:8px;line-height:1.45;"><i class="fas fa-note-sticky" style="color:var(--gold);margin-right:5px;"></i>${escHtml(notes)}</div>` : ''}
         </div>
-        
+
         <div style="padding:14px 20px;border-bottom:1px solid var(--border);background:rgba(16,185,129,0.04);">
           <div class="stat-row"><div class="stat-label">Calls (this number)</div><div class="stat-val" style="font-size:12px;font-weight:600;">${n}</div></div>
           <div class="stat-row"><div class="stat-label">Last seen in logs</div><div class="stat-val" style="font-size:12px;">${escHtml(lc)}</div></div>
@@ -8432,7 +8688,7 @@ Always write in a professional yet warm Indian B2B communication style. Use form
                   <div>
                     <div style="font-size:12px;color:var(--text);font-weight:600;">${date}</div>
                     <div style="font-size:11px;color:var(--muted2);margin-top:2px;">
-                      <span class="badge ${typeClass}" style="font-size:9px;padding:1px 4px;">${h.call_type}</span> 
+                      <span class="badge ${typeClass}" style="font-size:9px;padding:1px 4px;">${h.call_type}</span>
                       · ${h.duration}
                     </div>
                   </div>
@@ -8454,15 +8710,36 @@ Always write in a professional yet warm Indian B2B communication style. Use form
 
     function filterContacts() {
       const q = (document.getElementById('contact-search').value || '').toLowerCase().trim();
+      const sortVal = document.getElementById('contact-sort') ? document.getElementById('contact-sort').value : 'recent';
+
       if (contactsSource === 'outlook') {
-        const list = !q ? outlookContactsCache : outlookContactsCache.filter(oc => {
+        let list = !q ? [...outlookContactsCache] : outlookContactsCache.filter(oc => {
           const title = outlookDisplayTitle(oc).toLowerCase();
           const em = (outlookPrimaryEmail(oc) || '').toLowerCase();
           const co = ((oc.companyName || '') + '').toLowerCase();
+          const grp = Array.isArray(oc.groups) ? oc.groups.join(' ').toLowerCase() : '';
           let ph = ((oc.resolvedPhone || oc.mobilePhone || '') + '').toLowerCase();
           if (Array.isArray(oc.businessPhones) && oc.businessPhones[0]) ph += String(oc.businessPhones[0]).toLowerCase();
-          return title.includes(q) || em.includes(q) || co.includes(q) || ph.includes(q);
+          return title.includes(q) || em.includes(q) || co.includes(q) || ph.includes(q) || grp.includes(q);
         });
+
+        if (sortVal === 'recent') {
+          list.sort((a, b) => (new Date(b.lastEmailAt || 0)) - (new Date(a.lastEmailAt || 0)));
+        } else if (sortVal === 'oldest') {
+          list.sort((a, b) => (new Date(a.lastEmailAt || 0)) - (new Date(b.lastEmailAt || 0)));
+        } else if (sortVal === 'az') {
+          list.sort((a, b) => outlookDisplayTitle(a).localeCompare(outlookDisplayTitle(b)));
+        } else if (sortVal === 'za') {
+          list.sort((a, b) => outlookDisplayTitle(b).localeCompare(outlookDisplayTitle(a)));
+        } else if (sortVal === 'mobile') {
+          list.sort((a, b) => {
+            const p1 = !!(a.resolvedPhone || a.mobilePhone);
+            const p2 = !!(b.resolvedPhone || b.mobilePhone);
+            if (p1 !== p2) return p2 - p1;
+            return outlookDisplayTitle(a).localeCompare(outlookDisplayTitle(b));
+          });
+        }
+
         renderOutlookContactsList(list);
         return;
       }
@@ -9542,7 +9819,10 @@ Keep it concise and professional.`;
       <div>
         <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;">
           <div style="flex:1;">
-            <div style="font-size:15px;font-weight:700;color:var(--text);">${escHtml(g.name)}</div>
+            <div style="font-size:15px;font-weight:700;color:var(--text); display:flex; align-items:center; gap:8px;">
+              ${escHtml(g.name)}
+              <button onclick="groupsRename(${id}, '${escHtml(g.name).replace(/'/g, "\\'")}')" class="btn btn-ghost btn-xs" style="padding:2px 6px;"><i class="fas fa-pen"></i></button>
+            </div>
             ${g.description ? '<div style="font-size:12px;color:var(--muted);margin-top:2px;">' + escHtml(g.description) + '</div>' : ''}
           </div>
           <span class="badge b-blue">${(g.members || []).length} contacts</span>        </div>
@@ -9621,6 +9901,39 @@ Keep it concise and professional.`;
         var text = row.textContent.toLowerCase();
         row.style.display = (!q || text.includes(q.toLowerCase())) ? '' : 'none';
       });
+    }
+
+    async function groupsRename(id, oldName) {
+      var newName = prompt('Enter new name for the group:', oldName);
+      if (!newName || newName.trim() === oldName || newName.trim() === '') return;
+      try {
+        var res = await fetch(API_BASE + '/groups/' + id, {
+          method: 'PUT',
+          headers: getAuthHeaders(),
+          body: JSON.stringify({ name: newName.trim() })
+        });
+        if (!res.ok) throw new Error('Failed to rename group');
+        notify('Renamed', 'Group renamed to ' + newName, 'var(--green)', 'fas fa-check');
+        groupsShowDetail(id);
+        groupsLoadList();
+        bcLoadGroupsDropdown();
+      } catch (err) { notify('Error', err.message, 'var(--red)', 'fas fa-exclamation-circle'); }
+    }
+
+    async function groupsDelete(id, name) {
+      if (!confirm('Delete group "' + name + '"?')) return;
+      var deleteContacts = false;
+      if (confirm('Do you ALSO want to permanently delete all contacts in this group from the CRM entirely?\n\nPress OK to delete the group AND its contacts.\nPress Cancel to just delete the group, keeping the contacts safe.')) {
+        deleteContacts = true;
+      }
+      try {
+        await fetch(API_BASE + '/groups/' + id + '?deleteContacts=' + deleteContacts, { method: 'DELETE', headers: getAuthHeaders() });
+        notify('Deleted', name + (deleteContacts ? ' and all its contacts' : ''), 'var(--red)', 'fas fa-trash');
+        groupsShowEmpty();
+        await groupsLoadList();
+        bcLoadGroupsDropdown();
+        if (deleteContacts && typeof filterContacts === 'function') filterContacts(); // Refresh UI if contacts died
+      } catch (err) { notify('Error', err.message, 'var(--red)', 'fas fa-exclamation-circle'); }
     }
 
     async function groupsAddManualEmail(groupId) {
@@ -10975,6 +11288,111 @@ Keep it concise and professional.`;
     }
 
     // ── renderRecipientCell (sent) ────────────────────────────────────────────
+    async function submitQuickSave(e) {
+      e.preventDefault();
+      const fname = document.getElementById('qs-fname').value.trim();
+      const lname = document.getElementById('qs-lname').value.trim();
+      const company = document.getElementById('qs-company').value.trim();
+      const job = document.getElementById('qs-job').value.trim();
+      const email = document.getElementById('qs-email').value.trim();
+      const phone = document.getElementById('qs-phone').value.trim();
+      const notes = document.getElementById('qs-notes').value.trim();
+      const status = document.getElementById('qs-status');
+
+      status.textContent = 'Saving...';
+      status.style.display = 'block';
+
+      try {
+        // 1. SAVE TO OUTLOOK
+        const outlookPayload = {
+          displayName: [fname, lname].filter(Boolean).join(' '),
+          givenName: fname || undefined,
+          surname: lname || undefined,
+          companyName: company || undefined,
+          jobTitle: job || undefined,
+          mobilePhone: phone || undefined,
+          emailAddresses: [{ address: email, name: [fname, lname].filter(Boolean).join(' ') }]
+        };
+
+        let oRes;
+        if (_qsGraphId) {
+          oRes = await fetch(`${API_BASE}/outlook/contacts/${encodeURIComponent(_qsGraphId)}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
+            body: JSON.stringify(outlookPayload)
+          });
+        } else {
+          oRes = await fetch(`${API_BASE}/outlook/contacts`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
+            body: JSON.stringify(outlookPayload)
+          });
+        }
+
+        // 2. SAVE TO CRM BACKEND (Manual Persistence)
+        const crmPayload = {
+          fname, lname, company,
+          designation: job,
+          phone: phone,
+          wa: phone, // Sync WA with phone for manual entry
+          email,
+          notes,
+          segment: 'Prospect',
+          score: 50
+        };
+
+        let cRes;
+        if (window._qsCrmId) {
+          cRes = await fetch(`${API_BASE}/contacts/${window._qsCrmId}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
+            body: JSON.stringify(crmPayload)
+          });
+        } else {
+          cRes = await fetch(`${API_BASE}/contacts`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
+            body: JSON.stringify(crmPayload)
+          });
+        }
+
+        if (!oRes.ok && !cRes.ok) {
+          let errMsg = 'Failed to save to both Outlook and CRM';
+          try {
+            const errData = await cRes.json();
+            if (errData.error) errMsg = errData.error;
+          } catch(e) {}
+          throw new Error(errMsg);
+        } else if (!cRes.ok) {
+          let errMsg = 'Failed to save to CRM';
+          try {
+            const errData = await cRes.json();
+            if (errData.error) errMsg = errData.error;
+          } catch(e) {}
+          throw new Error(errMsg);
+        } else if (!oRes.ok) {
+          let errMsg = 'Failed to save to Outlook';
+          try {
+            const errData = await oRes.json();
+            if (errData.error) errMsg = errData.error;
+          } catch(e) {}
+          throw new Error(errMsg);
+        }
+
+        closeQuickSaveModal();
+        notify('Contact saved successfully', '', 'var(--green)', 'fas fa-check');
+
+        // Refresh UI
+        loadOutlookContactsDirectory();
+        loadInbox();
+
+      } catch (err) {
+        console.error('[QuickSave] Error:', err);
+        status.textContent = 'Error: ' + err.message;
+        status.style.color = 'var(--red2)';
+      }
+    }
+
     function renderRecipientCell(toAddresses, ccAddresses) {
       const all = [...(toAddresses || []), ...(ccAddresses || [])];
       if (!all.length) return `<span style="color:var(--muted);">—</span>`;
@@ -11143,11 +11561,30 @@ Keep it concise and professional.`;
         }
 
         if (!oRes.ok && !cRes.ok) {
-          throw new Error('Failed to save to both Outlook and CRM');
+          let errMsg = 'Failed to save to both Outlook and CRM';
+          try {
+            const errData = await cRes.json();
+            if (errData.error) errMsg = errData.error;
+          } catch(e) {}
+          throw new Error(errMsg);
+        } else if (!cRes.ok) {
+          let errMsg = 'Failed to save to CRM';
+          try {
+            const errData = await cRes.json();
+            if (errData.error) errMsg = errData.error;
+          } catch(e) {}
+          throw new Error(errMsg);
+        } else if (!oRes.ok) {
+          let errMsg = 'Failed to save to Outlook';
+          try {
+            const errData = await oRes.json();
+            if (errData.error) errMsg = errData.error;
+          } catch(e) {}
+          throw new Error(errMsg);
         }
 
         closeQuickSaveModal();
-        notify('Contact saved successfully', 'success');
+        notify('Contact saved successfully', '', 'var(--green)', 'fas fa-check');
 
         // Refresh UI
         loadOutlookContactsDirectory();
@@ -13909,6 +14346,39 @@ Keep it concise and professional.`;
       };
     }
 
+    function parseComposeRecipientEmails(raw) {
+      const seen = new Set();
+      const emails = [];
+      const invalid = [];
+      const emailRe = /^[^\s@<>]+@[^\s@<>]+\.[^\s@<>]+$/;
+      String(raw || '').split(/[,;]+/).map(part => part.trim()).filter(Boolean).forEach(part => {
+        const bracketMatch = part.match(/<([^<>]+)>/);
+        const looseMatch = part.match(/[^\s<>"']+@[^\s<>"']+\.[^\s<>"',;]+/);
+        const email = String((bracketMatch && bracketMatch[1]) || (looseMatch && looseMatch[0]) || '').trim();
+        if (!emailRe.test(email)) {
+          invalid.push(part);
+          return;
+        }
+        const key = email.toLowerCase();
+        if (!seen.has(key)) {
+          seen.add(key);
+          emails.push(email);
+        }
+      });
+      return { emails, invalid };
+    }
+
+    function validateComposeRecipients(toRaw, ccRaw) {
+      const toParsed = parseComposeRecipientEmails(toRaw);
+      const ccParsed = parseComposeRecipientEmails(ccRaw);
+      const invalid = toParsed.invalid.concat(ccParsed.invalid);
+      if (invalid.length) {
+        notify('Invalid recipient', invalid.slice(0, 2).join(', '), 'var(--red)', 'fas fa-exclamation-circle');
+        return null;
+      }
+      return { to: toParsed.emails, cc: ccParsed.emails };
+    }
+
     /**
      * Save draft — saves to Outlook Drafts folder via Graph API (primary)
      * and also to localStorage as fallback.
@@ -13941,22 +14411,25 @@ Keep it concise and professional.`;
         // Get the processed body (with CSS inlined for Outlook)
         const bodyEl = document.getElementById('compose-body');
         let processedBody = draftData.body;
+        let attachments = [];
 
         console.log('[Draft] Editor body length:', processedBody.length);
         console.log('[Draft] HTML embeds in editor:', bodyEl ? bodyEl.querySelectorAll('[data-html-uid]').length : 0);
         console.log('[Draft] _htmlEmbedStore size:', _htmlEmbedStore.size);
 
         try {
-          processedBody = await getEmailBodyForSend(bodyEl);
+          const payload = await getEmailPayloadForOutlook(bodyEl);
+          processedBody = payload.body;
+          attachments = payload.attachments || [];
           console.log('[Draft] Processed body length:', processedBody.length);
         } catch (e) {
           console.warn('[Draft] CSS inlining failed, using raw body:', e.message);
         }
 
-        // Parse To/CC
-        const parseEmails = (raw) => (raw || '').split(/[,;]+/).map(e => e.trim()).filter(e => e.includes('@'));
-        const to = parseEmails(draftData.to);
-        const cc = parseEmails(draftData.cc);
+        // Parse To/CC, including saved Outlook-style "Name <email>" recipients.
+        const recipients = validateComposeRecipients(draftData.to, draftData.cc);
+        if (!recipients) throw new Error('Please fix invalid recipients before saving to Outlook Drafts.');
+        const { to, cc } = recipients;
 
         // Save to Outlook Drafts folder via Graph API
         const res = await fetch(`${API_BASE}/outlook/drafts`, {
@@ -13966,7 +14439,8 @@ Keep it concise and professional.`;
             to: to.length ? to : undefined,
             cc: cc.length ? cc : undefined,
             subject: draftData.subject || '(No subject)',
-            body: processedBody
+            body: processedBody,
+            attachments
           })
         });
 
@@ -14247,6 +14721,99 @@ Keep it concise and professional.`;
     }
 
     // ── Outlook-style conversation thread renderer ────────────────────────────
+    function dataUrlToAttachmentParts(dataUrl) {
+      const match = String(dataUrl || '').match(/^data:([^;,]+)?(?:;[^,]*)?;base64,([\s\S]+)$/i);
+      if (!match) return null;
+      return {
+        contentType: match[1] || 'application/octet-stream',
+        contentBytes: match[2]
+      };
+    }
+
+    function fileNameFromMime(contentType, fallbackBase) {
+      const map = {
+        'image/jpeg': 'jpg',
+        'image/png': 'png',
+        'image/gif': 'gif',
+        'image/webp': 'webp',
+        'video/mp4': 'mp4',
+        'video/webm': 'webm',
+        'audio/mpeg': 'mp3',
+        'audio/mp3': 'mp3',
+        'audio/wav': 'wav',
+        'audio/ogg': 'ogg',
+        'application/pdf': 'pdf'
+      };
+      const ext = map[String(contentType || '').toLowerCase()] || 'bin';
+      return (fallbackBase || 'media') + '.' + ext;
+    }
+
+    function collectOutlookComposeAttachments(editorEl) {
+      const clone = editorEl ? editorEl.cloneNode(true) : document.createElement('div');
+      const attachments = [];
+      const seenDataUrls = new Set();
+      let seq = 1;
+
+      function pushAttachment(dataUrl, opts) {
+        const parts = dataUrlToAttachmentParts(dataUrl);
+        if (!parts) return null;
+        if (seenDataUrls.has(dataUrl)) return null;
+        seenDataUrls.add(dataUrl);
+        const name = opts.name || fileNameFromMime(parts.contentType, 'media-' + seq);
+        const att = {
+          name,
+          contentType: parts.contentType,
+          contentBytes: parts.contentBytes,
+          isInline: !!opts.isInline
+        };
+        if (opts.contentId) att.contentId = opts.contentId;
+        attachments.push(att);
+        seq += 1;
+        return att;
+      }
+
+      clone.querySelectorAll('img[src^="data:"]').forEach(img => {
+        const filename = img.getAttribute('data-filename') || fileNameFromMime((dataUrlToAttachmentParts(img.getAttribute('src')) || {}).contentType, 'inline-image-' + seq);
+        const contentId = 'unicrm-inline-' + Date.now() + '-' + seq;
+        const att = pushAttachment(img.getAttribute('src'), { name: filename, isInline: true, contentId });
+        if (att) img.setAttribute('src', 'cid:' + contentId);
+      });
+
+      clone.querySelectorAll('a[href^="data:"]').forEach(link => {
+        const filename = link.getAttribute('download') || link.getAttribute('data-filename') || ('attachment-' + seq);
+        const isValidDataUrl = !!dataUrlToAttachmentParts(link.getAttribute('href'));
+        const att = pushAttachment(link.getAttribute('href'), { name: filename, isInline: false });
+        if (att || isValidDataUrl) {
+          link.removeAttribute('href');
+          link.removeAttribute('download');
+          link.textContent = (link.textContent || filename) + ' (attached)';
+        }
+      });
+
+      clone.querySelectorAll('video, audio, iframe').forEach(node => {
+        const source = node.getAttribute('src') || (node.querySelector('source') && node.querySelector('source').getAttribute('src')) || '';
+        if (!String(source).startsWith('data:')) return;
+        const filename = node.getAttribute('data-filename') || fileNameFromMime((dataUrlToAttachmentParts(source) || {}).contentType, 'media-' + seq);
+        const att = pushAttachment(source, { name: filename, isInline: false });
+        if (att) {
+          const notice = document.createElement('p');
+          notice.style.cssText = 'margin:6px 0;color:#333;font-size:13px;';
+          notice.textContent = filename + ' is attached.';
+          node.replaceWith(notice);
+        }
+      });
+
+      clone.querySelectorAll('source[src^="data:"]').forEach(source => {
+        const parent = source.parentElement;
+        if (parent && (parent.tagName === 'VIDEO' || parent.tagName === 'AUDIO')) return;
+        const filename = source.getAttribute('data-filename') || fileNameFromMime((dataUrlToAttachmentParts(source.getAttribute('src')) || {}).contentType, 'media-' + seq);
+        pushAttachment(source.getAttribute('src'), { name: filename, isInline: false });
+        source.removeAttribute('src');
+      });
+
+      return { body: clone.innerHTML.trim(), attachments };
+    }
+
     function getInitials(name) {
       if (!name) return '?';
       const parts = name.trim().split(/\s+/);
@@ -14346,6 +14913,7 @@ Keep it concise and professional.`;
             <button class="btn btn-ghost btn-xs" onclick="openReplyFromThread(${metaAttr},false)" title="Reply to this message"><i class="fas fa-reply"></i></button>
             <button class="btn btn-ghost btn-xs" onclick="openReplyFromThread(${metaAttr},true)" title="Reply All to this message"><i class="fas fa-reply-all"></i></button>
             <button class="btn btn-ghost btn-xs" onclick="forwardFromThread(${metaAttr})" title="Forward this message"><i class="fas fa-share"></i></button>
+            <button class="btn btn-blue btn-xs" onclick="sendAgainFromThread(${metaAttr})" title="Send Again"><i class="fas fa-paper-plane"></i></button>
             <button class="btn btn-gold btn-xs" onclick="activeMailMessage=${metaAttr};openTaskModal()" title="Assign Task"><i class="fas fa-user-check"></i></button>
             <button class="btn btn-ghost btn-xs" onclick="toggleMoreMenu(event,this,${metaAttr})" title="More options"><i class="fas fa-ellipsis-h"></i></button>
           </div>
@@ -14514,6 +15082,7 @@ Keep it concise and professional.`;
 
       document.getElementById('compose-title').textContent = 'Forward';
       resetComposeForm();
+      activeMessageId = null;
       openModal('compose-email-modal');
       loadComposeTemplates();
       composeLoadGroupsDropdown();
@@ -14558,6 +15127,73 @@ Keep it concise and professional.`;
       }
 
       composeApplyDefaultSignature('reply');
+    }
+
+    /**
+     * sendAgainFromThread — Send a specific thread message again.
+     * Populates compose modal exactly as the original message,
+     * including To, CC, Subject, body, and attachments.
+     */
+    async function sendAgainFromThread(meta) {
+      if (!meta || !meta.id) return;
+
+      document.getElementById('compose-title').textContent = 'Send Again';
+      resetComposeForm();
+      activeMessageId = null;
+      openModal('compose-email-modal');
+      loadComposeTemplates();
+      composeLoadGroupsDropdown();
+
+      const subjEl = document.getElementById('compose-subject');
+      if (subjEl) subjEl.value = meta.subject || '';
+
+      const toEl = document.getElementById('compose-to');
+      if (toEl) toEl.value = (meta.toRecipients || []).join(', ');
+
+      const ccEl = document.getElementById('compose-cc');
+      if (ccEl) ccEl.value = (meta.ccRecipients || []).join(', ');
+
+      const bodyEl = document.getElementById('compose-body');
+      if (bodyEl) {
+        bodyEl.innerHTML = '<div style="text-align:center;padding:20px;color:#888;">Loading message content and attachments...</div>';
+
+        let fullBody = '';
+        try {
+          const res = await fetch(`${API_BASE}/outlook/message/${meta.id}`, { headers: getAuthHeaders() });
+          const msg = await res.json();
+          if (res.ok) {
+            const bodyPick = msg.body?.content ? msg.body : (msg.uniqueBody?.content ? msg.uniqueBody : null);
+            fullBody = bodyPick?.content || msg.bodyPreview || '';
+
+            // Extract attachments
+            if (msg.attachments && msg.attachments.length > 0) {
+              msg.attachments.forEach(att => {
+                if (att['@odata.type'] === '#microsoft.graph.fileAttachment') {
+                  _composeFileAttachments.push({
+                    name: att.name,
+                    contentType: att.contentType,
+                    contentBytes: att.contentBytes,
+                    size: att.size,
+                    isInline: !!att.isInline,
+                    contentId: att.contentId || ''
+                  });
+                }
+              });
+              renderComposeAttachmentsList();
+              if (typeof updateMediaModalSizeBar === 'function') {
+                updateMediaModalSizeBar();
+              }
+            }
+          } else {
+            fullBody = meta.bodyPreview || '';
+          }
+        } catch (err) {
+          fullBody = meta.bodyPreview || '';
+        }
+
+        bodyEl.innerHTML = fullBody;
+        if (toEl) setTimeout(() => toEl.focus(), 200);
+      }
     }
 
     function smartEmailMetaFromMessage(msg) {
@@ -14934,7 +15570,7 @@ Keep it concise and professional.`;
         };
 
         overlay.addEventListener('click', e => {
-          if (e.target === overlay || e.target.closest('[data-action="cancel"]')) close(null);
+          if (e.target.closest('[data-action="cancel"]')) close(null);
         });
         overlay.addEventListener('keydown', e => {
           if (e.key === 'Escape') close(null);
@@ -14976,7 +15612,7 @@ Keep it concise and professional.`;
         };
 
         overlay.addEventListener('click', e => {
-          if (e.target === overlay || e.target.closest('[data-action="cancel"]')) close(false);
+          if (e.target.closest('[data-action="cancel"]')) close(false);
           if (e.target.closest('[data-action="confirm"]')) close(true);
         });
         overlay.addEventListener('keydown', e => {
@@ -15041,7 +15677,7 @@ Keep it concise and professional.`;
         };
 
         overlay.addEventListener('click', e => {
-          if (e.target === overlay || e.target.closest('[data-action="cancel"]')) close(null);
+          if (e.target.closest('[data-action="cancel"]')) close(null);
           if (e.target.closest('[data-action="clear"]')) close({ clear: true });
         });
         overlay.addEventListener('keydown', e => {
@@ -16119,6 +16755,9 @@ ${plainText}`;
       if (body) body.innerHTML = '';
       const s = document.getElementById('compose-status');
       if (s) s.style.display = 'none';
+      // Clear file attachments
+      _composeFileAttachments = [];
+      renderComposeAttachmentsList();
     }
 
     function focusComposeBodyEnd() {
@@ -16534,6 +17173,156 @@ ${plainText}`;
       return Promise.resolve(result);
     }
 
+    async function getEmailPayloadForOutlook(editorEl) {
+      // Step 1: Extract attachments from the LIVE editor DOM (before any serialization).
+      // This avoids data-URL truncation that can happen when large base64 strings are
+      // round-tripped through innerHTML serialization/parsing.
+      const media = collectOutlookComposeAttachments(editorEl);
+
+      // Step 2: Build the final body.
+      // collectOutlookComposeAttachments returns a modified clone body where:
+      //   - inline images have src replaced with cid: refs
+      //   - download links have href stripped
+      //   - video/audio elements replaced with text notices
+      // We use this modified body (not the live editor) so data URLs are removed.
+      // Then run it through getEmailBodyForSend for HTML embed processing.
+      let body;
+      if (media.attachments.length) {
+        // Create a temporary element with the modified body to process HTML embeds
+        const tempEl = document.createElement('div');
+        tempEl.innerHTML = media.body;
+        body = await getEmailBodyForSend(tempEl);
+      } else {
+        // No data-URL attachments — use the normal flow
+        body = await getEmailBodyForSend(editorEl);
+      }
+
+      // Step 3: Merge any separately-attached files (from the paperclip file picker)
+      const extraAttachments = getComposeFileAttachments();
+      const allAttachments = [...media.attachments, ...extraAttachments];
+
+      return { body, attachments: allAttachments };
+    }
+
+    // ── Compose file attachments (paperclip) ─────────────────────────────────
+    // Stores { name, contentType, contentBytes (base64), size } objects
+    var _composeFileAttachments = [];
+
+    function getComposeFileAttachments() {
+      return _composeFileAttachments.slice();
+    }
+
+    function clearComposeFileAttachments() {
+      _composeFileAttachments = [];
+      renderComposeAttachmentsList();
+    }
+
+    function composeHandleFileAttach(input) {
+      const files = Array.from(input.files || []);
+      if (!files.length) return;
+
+      const MAX_TOTAL_MB = 25;
+      const MAX_TOTAL_BYTES = MAX_TOTAL_MB * 1024 * 1024;
+
+      // Track running total so we can evaluate each file independently
+      let currentTotal = _composeFileAttachments.reduce((sum, a) => sum + a.size, 0);
+      const skipped = [];
+
+      files.forEach(file => {
+        // Skip duplicates
+        if (_composeFileAttachments.find(a => a.name === file.name)) {
+          notify('Duplicate', `"${file.name}" is already attached`, 'var(--gold)', 'fas fa-info-circle');
+          return;
+        }
+        // Skip this specific file if IT would exceed the limit, but keep going for others
+        if (currentTotal + file.size > MAX_TOTAL_BYTES) {
+          skipped.push(file.name);
+          return;
+        }
+        currentTotal += file.size;
+        const reader = new FileReader();
+        reader.onload = function(e) {
+          const dataUrl = e.target.result;
+          const base64 = dataUrl.replace(/^data:[^,]+,/, '').replace(/\s/g, '');
+          _composeFileAttachments.push({
+            name: file.name,
+            contentType: file.type || 'application/octet-stream',
+            contentBytes: base64,
+            size: file.size,
+            isInline: false
+          });
+          renderComposeAttachmentsList();
+        };
+        reader.readAsDataURL(file);
+      });
+
+      // Notify about any skipped files collectively
+      if (skipped.length === 1) {
+        notify('File skipped', `"${skipped[0]}" exceeds the 25 MB total limit`, 'var(--gold)', 'fas fa-exclamation-triangle');
+      } else if (skipped.length > 1) {
+        notify(`${skipped.length} files skipped`, `They would exceed the 25 MB total limit`, 'var(--gold)', 'fas fa-exclamation-triangle');
+      }
+
+      // Reset input so same file can be re-attached after removal
+      input.value = '';
+
+    }
+
+    function composeRemoveAttachment(index) {
+      _composeFileAttachments.splice(index, 1);
+      renderComposeAttachmentsList();
+    }
+
+    function renderComposeAttachmentsList() {
+      const container = document.getElementById('compose-attachments-list');
+      if (!container) return;
+      if (!_composeFileAttachments.length) {
+        container.style.display = 'none';
+        container.innerHTML = '';
+        return;
+      }
+      const MAX_TOTAL_BYTES = 25 * 1024 * 1024;
+      const totalBytes = _composeFileAttachments.reduce((s, a) => s + a.size, 0);
+      const totalMb = (totalBytes / (1024 * 1024)).toFixed(1);
+      const pct = Math.min(100, (totalBytes / MAX_TOTAL_BYTES) * 100).toFixed(0);
+      const barColor = totalBytes > MAX_TOTAL_BYTES * 0.9 ? 'var(--red)' : totalBytes > MAX_TOTAL_BYTES * 0.7 ? 'var(--gold)' : 'var(--green2)';
+
+      container.style.display = 'flex';
+      container.style.flexDirection = 'column';
+      container.style.gap = '6px';
+
+      const chips = _composeFileAttachments.map((att, i) => {
+        const sizeKb = att.size > 1024 * 1024 ? (att.size / (1024 * 1024)).toFixed(1) + ' MB' : (att.size / 1024).toFixed(1) + ' KB';
+        const ext = att.name.split('.').pop().toLowerCase();
+        const iconMap = {
+          pdf: 'fa-file-pdf', doc: 'fa-file-word', docx: 'fa-file-word',
+          xls: 'fa-file-excel', xlsx: 'fa-file-excel', ppt: 'fa-file-powerpoint',
+          pptx: 'fa-file-powerpoint', zip: 'fa-file-archive', rar: 'fa-file-archive',
+          '7z': 'fa-file-archive', txt: 'fa-file-alt', csv: 'fa-file-csv',
+          png: 'fa-file-image', jpg: 'fa-file-image', jpeg: 'fa-file-image',
+          gif: 'fa-file-image', webp: 'fa-file-image', svg: 'fa-file-image',
+          mp4: 'fa-file-video', mov: 'fa-file-video', avi: 'fa-file-video', mkv: 'fa-file-video',
+          mp3: 'fa-file-audio', wav: 'fa-file-audio', ogg: 'fa-file-audio'
+        };
+        const icon = iconMap[ext] || 'fa-file';
+        return `<div style="display:inline-flex;align-items:center;gap:5px;padding:3px 8px;background:var(--card2);border:1px solid var(--border);border-radius:6px;font-size:11.5px;color:var(--text);">
+          <i class="fas ${icon}" style="color:var(--blue2);font-size:12px;"></i>
+          <span style="max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${escHtml(att.name)}">${escHtml(att.name)}</span>
+          <span style="color:var(--muted);font-size:10.5px;">${sizeKb}</span>
+          <span onclick="composeRemoveAttachment(${i})" style="cursor:pointer;color:var(--red);margin-left:2px;" title="Remove"><i class="fas fa-times"></i></span>
+        </div>`;
+      }).join('');
+
+      container.innerHTML = `
+        <div style="display:flex;flex-wrap:wrap;gap:6px;">${chips}</div>
+        <div style="display:flex;align-items:center;gap:8px;">
+          <div style="flex:1;height:4px;background:var(--border);border-radius:4px;overflow:hidden;">
+            <div style="width:${pct}%;height:100%;background:${barColor};border-radius:4px;transition:width .3s;"></div>
+          </div>
+          <span style="font-size:10.5px;color:var(--muted);white-space:nowrap;">${totalMb} / 25 MB</span>
+        </div>`;
+    }
+
     async function sendEmail() {
       const toRaw = document.getElementById('compose-to')?.value.trim();
       const ccRaw = document.getElementById('compose-cc')?.value.trim();
@@ -16543,25 +17332,37 @@ ${plainText}`;
 
       const btn = document.getElementById('send-btn');
       if (btn && btn.disabled) return;
+      const restoreSendButton = () => {
+        if (btn) {
+          btn.disabled = false;
+          btn.innerHTML = '<i class="fas fa-paper-plane"></i> Send via Outlook';
+        }
+      };
 
       // Show processing state while CSS inlining happens
       if (btn) { btn.disabled = true; btn.innerHTML = '<span class="spin-loader"></span> Preparing…'; }
 
       // getEmailBodyForSend now returns a Promise (async CSS inlining)
       let body = '';
+      let attachments = [];
       try {
-        body = await getEmailBodyForSend(bodyEl);
+        const payload = await getEmailPayloadForOutlook(bodyEl);
+        body = payload.body;
+        attachments = payload.attachments || [];
       } catch (err) {
-        console.error('[SEND] getEmailBodyForSend failed:', err);
+        console.error('[SEND] getEmailPayloadForOutlook failed:', err);
         body = bodyEl ? bodyEl.innerHTML.trim() : '';
       }
 
       console.log('[SEND] Final body to send — length:', body.length, 'preview:', body.substring(0, 200));
 
-      // Split comma/semicolon separated emails
-      const parseEmails = (raw) => (raw || '').split(/[,;]+/).map(e => e.trim()).filter(e => e.includes('@'));
-      const to = parseEmails(toRaw);
-      const cc = parseEmails(ccRaw);
+      // Split comma/semicolon separated emails, including Outlook-style "Name <email>" recipients.
+      const recipients = validateComposeRecipients(toRaw, ccRaw);
+      if (!recipients) {
+        restoreSendButton();
+        return;
+      }
+      const { to, cc } = recipients;
 
       // Determine if this is a reply or new compose
       const isReply = !!activeMessageId;
@@ -16572,12 +17373,14 @@ ${plainText}`;
         // Reply — only body required (To/Subject pre-filled but not used by /reply endpoint)
         if (!body || body === '<br>') {
           notify('Missing fields', 'Message body is required', 'var(--red)', 'fas fa-exclamation-circle');
+          restoreSendButton();
           return;
         }
       } else {
         // New compose — To, Subject, Body all required
         if (!to.length || !subject || !body || body === '<br>') {
           notify('Missing fields', 'To, Subject and Message are required', 'var(--red)', 'fas fa-exclamation-circle');
+          restoreSendButton();
           return;
         }
       }
@@ -16592,7 +17395,7 @@ ${plainText}`;
           res = await fetch(`${API_BASE}/outlook/reply/${encodeURIComponent(activeMessageId)}`, {
             method: 'POST',
             headers: getAuthHeaders(),
-            body: JSON.stringify({ body, replyAll }),
+            body: JSON.stringify({ body, replyAll, attachments }),
           });
           data = await res.json();
         } else {
@@ -16600,7 +17403,7 @@ ${plainText}`;
           res = await fetch(`${API_BASE}/outlook/send`, {
             method: 'POST',
             headers: getAuthHeaders(),
-            body: JSON.stringify({ to, cc: cc.length ? cc : undefined, subject, body }),
+            body: JSON.stringify({ to, cc: cc.length ? cc : undefined, subject, body, attachments }),
           });
           data = await res.json();
         }
@@ -16637,7 +17440,7 @@ ${plainText}`;
       } catch (err) {
         notify('Error', err.message, 'var(--red)', 'fas fa-exclamation-circle');
       }
-      if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fas fa-paper-plane"></i> Send via Outlook'; }
+      restoreSendButton();
     }
 
     function clearCompose() {
@@ -16862,6 +17665,8 @@ ${plainText}`;
     let waActiveJid = null;
     let waAllChats = [];
     var waLidMap = {};
+    var waOlderLoading = false;
+    var waHasOlderMessages = false;
     let socketReconnectInProgress = false;
 
     function initWASocket() {
@@ -16937,6 +17742,15 @@ ${plainText}`;
           const cb = document.getElementById('wa-connect-banner');
           if (sb) sb.style.display = 'none';
           if (cb) cb.style.display = 'block';
+
+          // Clear chats from UI to prevent old chats showing for new account
+          const cl = document.getElementById('wa-chat-list');
+          if (cl) cl.innerHTML = '';
+          const ms = document.getElementById('wa-messages');
+          if (ms) ms.innerHTML = '<div class="wa-empty-state"><p>Select a chat or start a new conversation</p></div>';
+          const ch = document.getElementById('wa-chat-header-info');
+          if (ch) ch.innerHTML = 'Select a chat';
+          window.waCurrentChat = null;
         }, 5000);
       });
       waSocket.on('wa:message', function (msg) {
@@ -17428,6 +18242,8 @@ ${plainText}`;
         jid = rawJid.split(':')[0] + '@' + rawJid.split('@').slice(1).join('@');
       }
       waActiveJid = jid;
+      waOlderLoading = false;
+      waHasOlderMessages = false;
       var isGroup = jid.endsWith('@g.us');
 
       // Header title
@@ -17483,12 +18299,16 @@ ${plainText}`;
       // Load messages
       var area = document.getElementById('wa-chat-area');
       area.innerHTML = '<div style="text-align:center;padding:30px;"><div class="spin-loader" style="margin:0 auto;"></div></div>';
+      area.onscroll = function () {
+        if (area.scrollTop <= 40) waLoadOlderMessages();
+      };
       try {
         var res = await fetch(API_BASE + '/wa/messages/' + encodeURIComponent(jid) + '?limit=100', { headers: getAuthHeaders() });
         var msgs = await res.json();
+        waHasOlderMessages = Array.isArray(msgs) && msgs.length >= 100;
         area.innerHTML = '';
         msgs.forEach(function (m) {
-          waAppendMessage({ id: m.id, fromMe: m.from_me, body: m.body, ts: m.timestamp, type: m.msg_type, senderName: m.sender_name, sender: m.sender, quotedBody: m.quoted_body, mediaPath: m.media_path });
+          waAppendMessage({ id: m.id, fromMe: m.from_me, body: m.body, ts: m.timestamp, type: m.msg_type, senderName: m.sender_name, sender: m.sender, senderPhone: m.sender_phone, quotedBody: m.quoted_body, mediaPath: m.media_path });
         });
         area.scrollTop = area.scrollHeight;
         var chat = waAllChats.find(function (c) { return c.id === jid; });
@@ -17512,6 +18332,33 @@ ${plainText}`;
       }
     }
     var waReplyTo = null;
+
+    async function waLoadOlderMessages() {
+      if (waOlderLoading || !waHasOlderMessages || !waActiveJid) return;
+      var area = document.getElementById('wa-chat-area');
+      if (!area || !area.firstElementChild || !area.firstElementChild.dataset.ts) return;
+
+      waOlderLoading = true;
+      var previousHeight = area.scrollHeight;
+      var before = new Date(parseInt(area.firstElementChild.dataset.ts, 10)).toISOString();
+      try {
+        var res = await fetch(API_BASE + '/wa/messages/' + encodeURIComponent(waActiveJid) + '?limit=100&before=' + encodeURIComponent(before), { headers: getAuthHeaders() });
+        var msgs = await res.json();
+        if (!Array.isArray(msgs) || !msgs.length) {
+          waHasOlderMessages = false;
+          return;
+        }
+        for (var i = msgs.length - 1; i >= 0; i--) {
+          var m = msgs[i];
+          waAppendMessage({ id: m.id, fromMe: m.from_me, body: m.body, ts: m.timestamp, type: m.msg_type, senderName: m.sender_name, sender: m.sender, senderPhone: m.sender_phone, quotedBody: m.quoted_body, mediaPath: m.media_path }, true);
+        }
+        waHasOlderMessages = msgs.length >= 100;
+        area.scrollTop = area.scrollHeight - previousHeight;
+      } catch (_) {
+      } finally {
+        waOlderLoading = false;
+      }
+    }
 
     function waMediaHTML(type, body, msgId, mediaPath, localUrl) {
       var token = localStorage.getItem('unicomm_token') || '';
@@ -17589,7 +18436,7 @@ ${plainText}`;
       }
       return null;
     }
-    function waAppendMessage(msg) {
+    function waAppendMessage(msg, prepend) {
       var area = document.getElementById('wa-chat-area');
       if (!area) return;
       var rawTime =
@@ -17633,7 +18480,7 @@ ${plainText}`;
 
       // Ordering Check: If appending live, only append if newer than last message
       var lastMsgEl = area.lastElementChild;
-      if (lastMsgEl && lastMsgEl.dataset.ts) {
+      if (!prepend && lastMsgEl && lastMsgEl.dataset.ts) {
         var lastTs = parseInt(lastMsgEl.dataset.ts);
         var newTs = new Date(msg.ts || msg.timestamp).getTime();
         if (newTs < lastTs) {
@@ -17751,8 +18598,12 @@ ${plainText}`;
       var replyBtn = '<button onclick="waSetReply(\'' + (msg.id || '') + '\',\'' + body.replace(/'/g, "\\'").substring(0, 60) + '\')" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:10px;padding:2px 4px;opacity:0;transition:opacity 0.15s;" class="wa-reply-btn" title="Reply"><i class="fas fa-reply"></i></button>';
 
       div.innerHTML = senderLabel + '<div class="' + (fromMe ? 'wa-bubble wa-out' : 'wa-bubble wa-in') + '" style="max-width:78%;position:relative;" onmouseover="this.querySelector(\'.wa-reply-btn\').style.opacity=1" onmouseout="this.querySelector(\'.wa-reply-btn\').style.opacity=0">' + quotedBlock + bodyText + '<div class="wa-time">' + time + (fromMe ? ' ✓✓' : '') + ' ' + replyBtn + '</div></div>';
-      area.appendChild(div);
-      area.scrollTop = area.scrollHeight;
+      if (prepend && area.firstElementChild) {
+        area.insertBefore(div, area.firstElementChild);
+      } else {
+        area.appendChild(div);
+        area.scrollTop = area.scrollHeight;
+      }
     }
 
     var waSelectedMedia = null;
@@ -19340,6 +20191,14 @@ ${plainText}`;
       doc.open();
       doc.write('<!DOCTYPE html><html><head><meta charset="UTF-8"><style>body{margin:8px;padding:0;font-family:Arial,sans-serif;background:#fff;}</style></head><body>' + html + '</body></html>');
       doc.close();
+      // Auto-resize iframe to fit content
+      try {
+        frame.style.height = '0';
+        var h = doc.body ? doc.body.scrollHeight : 140;
+        frame.style.height = Math.max(h + 16, 80) + 'px';
+      } catch (_) {
+        frame.style.height = '140px';
+      }
     }
 
     // ══════════════════════════════════════════════════════════════════════════════
@@ -20001,17 +20860,21 @@ ${plainText}`;
 
     // ══════════════════════════════════════════════════════════════
     // MEDIA INSERT — shared by Compose, Template, Broadcast editors
-    // Supports: Image, Video, Audio, Document (PDF inline / others as link)
+    // Each tab stores its own data independently.
+    // Clicking Insert applies ALL tabs that have content.
     // ══════════════════════════════════════════════════════════════
-    var _mediaInsertEditorId = null;
+    var _mediaInsertEditorId  = null;
     var _mediaInsertSavedRange = null;
-    var _mediaInsertTab = 'image';
-    var _mediaInsertDataUrl = null; // base64 data URL from file upload
-    var _mediaInsertFileName = '';
+    var _mediaInsertTab       = 'image';
+    // Per-tab data: each holds the base64 data URL from a file upload (or null)
+    var _mediaData     = { image: null, video: null, audio: null, document: null };
+    var _mediaFileName = { image: '',   video: '',   audio: '',   document: ''   };
 
     function openMediaInsertModal(editorId) {
       _mediaInsertEditorId = editorId || null;
       const ed = editorId ? document.getElementById(editorId) : null;
+
+      // Focus editor and ensure a valid cursor position before saving range
       if (ed) {
         ed.focus();
         const sel0 = window.getSelection();
@@ -20024,12 +20887,15 @@ ${plainText}`;
           sel0.addRange(range0);
         }
       }
+      // Snapshot cursor NOW — before modal steals focus
       const sel = window.getSelection();
       _mediaInsertSavedRange = (sel && sel.rangeCount > 0) ? sel.getRangeAt(0).cloneRange() : null;
-      _mediaInsertDataUrl = null;
-      _mediaInsertFileName = '';
 
-      // Reset all inputs
+      // Reset per-tab state
+      _mediaData     = { image: null, video: null, audio: null, document: null };
+      _mediaFileName = { image: '',   video: '',   audio: '',   document: ''   };
+
+      // Reset all inputs and previews
       ['media-img-file', 'media-vid-file', 'media-aud-file', 'media-doc-file'].forEach(function (id) {
         var el = document.getElementById(id); if (el) el.value = '';
       });
@@ -20042,6 +20908,7 @@ ${plainText}`;
       var docLabel = document.getElementById('media-doc-label');
       if (docLabel) docLabel.value = '';
 
+      updateMediaModalSizeBar();
       switchMediaTab('image');
       var overlay = document.getElementById('media-insert-modal');
       if (overlay) overlay.classList.add('open');
@@ -20050,17 +20917,17 @@ ${plainText}`;
     function closeMediaInsertModal() {
       var overlay = document.getElementById('media-insert-modal');
       if (overlay) overlay.classList.remove('open');
-      _mediaInsertEditorId = null;
+      _mediaInsertEditorId   = null;
       _mediaInsertSavedRange = null;
-      _mediaInsertDataUrl = null;
-      _mediaInsertFileName = '';
+      _mediaData     = { image: null, video: null, audio: null, document: null };
+      _mediaFileName = { image: '',   video: '',   audio: '',   document: ''   };
     }
 
     function switchMediaTab(tab) {
       _mediaInsertTab = tab;
       ['image', 'video', 'audio', 'document'].forEach(function (t) {
         var panel = document.getElementById('mpanel-' + t);
-        var btn = document.getElementById('mtab-' + t);
+        var btn   = document.getElementById('mtab-' + t);
         if (panel) panel.style.display = (t === tab) ? '' : 'none';
         if (btn) {
           btn.style.borderBottom = (t === tab) ? '2px solid var(--blue2)' : '2px solid transparent';
@@ -20069,155 +20936,239 @@ ${plainText}`;
       });
     }
 
+    function clearMediaTab(type) {
+      _mediaData[type] = null;
+      _mediaFileName[type] = '';
+      var shortName = { image: 'img', video: 'vid', audio: 'aud', document: 'doc' }[type];
+      var input = document.getElementById('media-' + shortName + '-file');
+      if (input) input.value = '';
+      var prev = document.getElementById('media-' + shortName + '-preview');
+      if (prev) prev.style.display = 'none';
+      if (type !== 'document') {
+        var el = document.getElementById('media-' + shortName + '-preview-el');
+        if (el) el.src = '';
+      }
+      updateMediaModalSizeBar();
+    }
+
     function mediaPreviewFile(type, input) {
       var file = input.files && input.files[0];
       if (!file) return;
-      _mediaInsertFileName = file.name;
-      var label = document.getElementById('media-doc-label');
+
+      // Store filename in per-tab slot
+      _mediaFileName[type] = file.name;
 
       if (type === 'document') {
         var nameEl = document.getElementById('media-doc-name');
         var sizeEl = document.getElementById('media-doc-size');
-        var prev = document.getElementById('media-doc-preview');
+        var prev   = document.getElementById('media-doc-preview');
+        var label  = document.getElementById('media-doc-label');
         if (nameEl) nameEl.textContent = file.name;
         if (sizeEl) sizeEl.textContent = '(' + (file.size / 1024).toFixed(1) + ' KB)';
-        if (prev) prev.style.display = '';
+        if (prev)   prev.style.display = '';
         if (label && !label.value) label.value = file.name.replace(/\.[^.]+$/, '');
-        // Read as base64 for PDF embed or download link
         var reader = new FileReader();
-        reader.onload = function (e) { _mediaInsertDataUrl = e.target.result; };
+        reader.onload = function (e) {
+          _mediaData.document = e.target.result;
+          updateMediaModalSizeBar(); // refresh capacity bar for documents
+        };
         reader.readAsDataURL(file);
         return;
       }
 
       var reader = new FileReader();
       reader.onload = function (e) {
-        _mediaInsertDataUrl = e.target.result;
+        _mediaData[type] = e.target.result;   // store in per-tab slot
+        updateMediaModalSizeBar(); // refresh capacity bar
         if (type === 'image') {
-          var img = document.getElementById('media-img-preview-el');
+          var img  = document.getElementById('media-img-preview-el');
           var prev = document.getElementById('media-img-preview');
-          if (img) img.src = e.target.result;
+          if (img)  img.src = e.target.result;
           if (prev) prev.style.display = '';
         } else if (type === 'video') {
-          var vid = document.getElementById('media-vid-preview-el');
+          var vid  = document.getElementById('media-vid-preview-el');
           var prev = document.getElementById('media-vid-preview');
-          if (vid) { vid.src = e.target.result; vid.load(); }
+          if (vid)  { vid.src = e.target.result; vid.load(); }
           if (prev) prev.style.display = '';
         } else if (type === 'audio') {
-          var aud = document.getElementById('media-aud-preview-el');
+          var aud  = document.getElementById('media-aud-preview-el');
           var prev = document.getElementById('media-aud-preview');
-          if (aud) { aud.src = e.target.result; aud.load(); }
+          if (aud)  { aud.src = e.target.result; aud.load(); }
           if (prev) prev.style.display = '';
         }
       };
       reader.readAsDataURL(file);
     }
 
+    function updateMediaModalSizeBar() {
+      var currentBytes = _composeFileAttachments.reduce(function(s,a){return s+a.size;}, 0);
+      var newBytes = 0;
+      // Image is embedded inline, so it does not count towards attachment limit
+      if (_mediaData.video)    newBytes += Math.round((_mediaData.video.replace(/^data:[^,]+,/, '').replace(/\\s/g, '').length) * 0.75);
+      if (_mediaData.audio)    newBytes += Math.round((_mediaData.audio.replace(/^data:[^,]+,/, '').replace(/\\s/g, '').length) * 0.75);
+      if (_mediaData.document) newBytes += Math.round((_mediaData.document.replace(/^data:[^,]+,/, '').replace(/\\s/g, '').length) * 0.75);
+
+      var totalBytes = currentBytes + newBytes;
+      var maxBytes = 25 * 1024 * 1024;
+      var mb = (totalBytes / (1024 * 1024)).toFixed(1);
+      var pct = Math.min(100, (totalBytes / maxBytes) * 100).toFixed(0);
+
+      var textEl = document.getElementById('media-modal-size-text');
+      var barEl = document.getElementById('media-modal-size-bar');
+      var btnEl = document.getElementById('media-modal-insert-btn');
+
+      if (textEl) textEl.textContent = mb + ' MB / 25 MB';
+      if (barEl) {
+        barEl.style.width = pct + '%';
+        barEl.style.background = totalBytes > maxBytes ? 'var(--red)' : (totalBytes > maxBytes * 0.8 ? 'var(--gold)' : 'var(--green2)');
+      }
+      if (btnEl) {
+        if (totalBytes > maxBytes) {
+          btnEl.style.opacity = '0.5';
+          btnEl.style.cursor = 'not-allowed';
+          textEl.style.color = 'var(--red)';
+        } else {
+          btnEl.style.opacity = '1';
+          btnEl.style.cursor = 'pointer';
+          textEl.style.color = 'var(--muted)';
+        }
+      }
+    }
+
     function mediaPreviewUrl(type, url) {
       if (!url) return;
       if (type === 'image') {
-        var img = document.getElementById('media-img-preview-el');
+        var img  = document.getElementById('media-img-preview-el');
         var prev = document.getElementById('media-img-preview');
-        if (img) img.src = url;
+        if (img)  img.src = url;
         if (prev) prev.style.display = '';
       }
     }
 
     /** Convert a YouTube/Vimeo watch URL to an embed URL */
     function mediaToEmbedUrl(url) {
-      // YouTube: https://www.youtube.com/watch?v=ID or https://youtu.be/ID
       var ytMatch = url.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/)([A-Za-z0-9_-]{11})/);
       if (ytMatch) return 'https://www.youtube.com/embed/' + ytMatch[1];
-      // Vimeo: https://vimeo.com/ID
       var vmMatch = url.match(/vimeo\.com\/(\d+)/);
       if (vmMatch) return 'https://player.vimeo.com/video/' + vmMatch[1];
-      return null; // direct URL — use <video> tag
+      return null;
     }
 
     function applyMediaInsert() {
-      var editorId = _mediaInsertEditorId;
+      // ── Capture everything BEFORE closing the modal ────────────────────────
+      var editorId   = _mediaInsertEditorId;
       var savedRange = _mediaInsertSavedRange;
-      var tab = _mediaInsertTab;
-      var dataUrl = _mediaInsertDataUrl;
-      var fileName = _mediaInsertFileName;
 
+      // Per-tab file data (from uploads)
+      var imgData  = _mediaData.image;
+      var vidData  = _mediaData.video;
+      var audData  = _mediaData.audio;
+      var docData  = _mediaData.document;
+      var docName  = _mediaFileName.document;
+      var imgName  = _mediaFileName.image;
+      var vidName  = _mediaFileName.video;
+      var audName  = _mediaFileName.audio;
+
+      // URL fields — read while modal DOM is still live
+      var imgUrl  = ((document.getElementById('media-img-url')    || {}).value || '').trim();
+      var vidUrl  = ((document.getElementById('media-vid-url')    || {}).value || '').trim();
+      var audUrl  = ((document.getElementById('media-aud-url')    || {}).value || '').trim();
+      var imgW    = (((document.getElementById('media-img-width') || {}).value || '100%')).trim() || '100%';
+      var imgAlt  = (((document.getElementById('media-img-alt')   || {}).value || '')).trim();
+      var vidW    = (((document.getElementById('media-vid-width') || {}).value || '100%')).trim() || '100%';
+      var vidH    = (((document.getElementById('media-vid-height')|| {}).value || '360')).trim() || '360';
+
+      // ── Close modal ────────────────────────────────────────────────────────
       closeMediaInsertModal();
 
       if (!editorId) return;
       var ed = document.getElementById(editorId);
       if (!ed) return;
 
-      var html = '';
+      // ── Build HTML for ALL tabs that have content ──────────────────────────
+      var parts = [];
 
-      if (tab === 'image') {
-        var src = dataUrl || (document.getElementById('media-img-url') ? document.getElementById('media-img-url').value.trim() : '');
-        var width = (document.getElementById('media-img-width') ? document.getElementById('media-img-width').value.trim() : '100%') || '100%';
-        var alt = (document.getElementById('media-img-alt') ? document.getElementById('media-img-alt').value.trim() : '') || '';
-        if (!src) return;
-        var wStyle = /^\d+$/.test(width) ? 'width:' + width + 'px;' : 'width:' + width + ';';
-        html = '<img src="' + src + '" alt="' + escHtml(alt) + '" style="' + wStyle + 'max-width:100%;display:block;margin:6px 0;" /><br>';
+      // IMAGE
+      var imgSrc = imgData || imgUrl;
+      if (imgSrc) {
+        var iwStyle = /^\d+$/.test(imgW) ? 'width:' + imgW + 'px;' : 'width:' + imgW + ';';
+        var safeImgName = outlookEscapeAttr(imgName || '');
+        parts.push('<img src="' + imgSrc + '" data-filename="' + safeImgName + '" alt="' + escHtml(imgAlt) + '" style="' + iwStyle + 'max-width:100%;display:block;margin:6px 0;" /><br>');
+      }
 
-      } else if (tab === 'video') {
-        var vidUrl = dataUrl || (document.getElementById('media-vid-url') ? document.getElementById('media-vid-url').value.trim() : '');
-        var vidW = (document.getElementById('media-vid-width') ? document.getElementById('media-vid-width').value.trim() : '100%') || '100%';
-        var vidH = (document.getElementById('media-vid-height') ? document.getElementById('media-vid-height').value.trim() : '360') || '360';
-        if (!vidUrl) return;
+      // ── Process File Attachments (Video, Audio, Document) ──────────────────
+      var MAX_TOTAL_BYTES = 25 * 1024 * 1024;
+      var newAtts = [];
+
+      function parseAtt(dataStr, nameStr, fallbackMime) {
+        if (!dataStr || !nameStr) return null;
+        var b64 = dataStr.replace(/^data:[^,]+,/, '').replace(/\s/g, '');
+        var mimeMatch = dataStr.match(/^data:([^;]+);/);
+        var mime = mimeMatch ? mimeMatch[1] : fallbackMime;
+        var sz = Math.round(b64.length * 0.75);
+        return { name: nameStr, contentType: mime, contentBytes: b64, size: sz, isInline: false };
+      }
+
+      var vFile = parseAtt(vidData, vidName, 'video/mp4');
+      var aFile = parseAtt(audData, audName, 'audio/mpeg');
+      var dFile = parseAtt(docData, docName, 'application/octet-stream');
+
+      if (vFile && !_composeFileAttachments.find(function(a){return a.name===vFile.name;})) newAtts.push(vFile);
+      if (aFile && !_composeFileAttachments.find(function(a){return a.name===aFile.name;})) newAtts.push(aFile);
+      if (dFile && !_composeFileAttachments.find(function(a){return a.name===dFile.name;})) newAtts.push(dFile);
+
+      // Auto-prune largest new files if over capacity
+      var currentTotal = _composeFileAttachments.reduce(function(s,a){return s+a.size;},0);
+      var newTotal = newAtts.reduce(function(s,a){return s+a.size;},0);
+
+      while (newAtts.length > 0 && currentTotal + newTotal > MAX_TOTAL_BYTES) {
+        // Sort descending by size to drop the biggest one first
+        newAtts.sort(function(a,b){return b.size - a.size;});
+        var dropped = newAtts.shift(); // Remove largest
+        newTotal -= dropped.size;
+        notify('File skipped', '"' + dropped.name + '" removed to stay under 25MB limit', 'var(--gold)', 'fas fa-exclamation-triangle');
+      }
+
+      // Add surviving attachments
+      newAtts.forEach(function(att) {
+        _composeFileAttachments.push(att);
+      });
+      if (newAtts.length > 0) {
+        renderComposeAttachmentsList();
+      }
+
+      // ── Process URLs (Video, Audio) ────────────────────────────────────────
+      if (!vidData && vidUrl) {
+        var vwStyle = /^\d+$/.test(vidW) ? 'width:'+vidW+'px;' : 'width:'+vidW+';';
         var embedUrl = mediaToEmbedUrl(vidUrl);
-        var wStyle = /^\d+$/.test(vidW) ? 'width:' + vidW + 'px;' : 'width:' + vidW + ';';
         if (embedUrl) {
-          // YouTube / Vimeo — use iframe embed
-          html = '<div style="' + wStyle + 'max-width:100%;margin:8px 0;">' +
-            '<iframe src="' + embedUrl + '" width="100%" height="' + vidH + '" frameborder="0" allowfullscreen style="border-radius:6px;display:block;"></iframe>' +
-            '</div><br>';
+          var ytId = vidUrl.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/)([A-Za-z0-9_-]{11})/);
+          var thumbUrl = ytId ? 'https://img.youtube.com/vi/'+ytId[1]+'/hqdefault.jpg' : '';
+          if (thumbUrl) {
+            parts.push('<a href="'+escHtml(vidUrl)+'" target="_blank" style="display:block;'+vwStyle+'max-width:100%;margin:8px 0;position:relative;text-decoration:none;">'+
+              '<img src="'+thumbUrl+'" style="width:100%;border-radius:6px;display:block;" alt="Video thumbnail">'+
+              '<div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);background:rgba(0,0,0,0.7);border-radius:50%;width:54px;height:54px;display:flex;align-items:center;justify-content:center;">'+
+              '<div style="width:0;height:0;border-top:14px solid transparent;border-bottom:14px solid transparent;border-left:22px solid #fff;margin-left:5px;"></div></div>'+
+              '</a><br>');
+          } else {
+            parts.push('<div style="'+vwStyle+'max-width:100%;margin:8px 0;"><a href="'+escHtml(vidUrl)+'" target="_blank" style="color:var(--blue2);">▶ Watch Video</a></div><br>');
+          }
         } else {
-          // Direct video file
-          html = '<video controls style="' + wStyle + 'max-width:100%;height:' + vidH + 'px;display:block;margin:6px 0;border-radius:6px;">' +
-            '<source src="' + vidUrl + '">' +
-            'Your email client does not support embedded video.</video><br>';
-        }
-
-      } else if (tab === 'audio') {
-        var audUrl = dataUrl || (document.getElementById('media-aud-url') ? document.getElementById('media-aud-url').value.trim() : '');
-        if (!audUrl) return;
-        html = '<audio controls style="width:100%;max-width:480px;display:block;margin:6px 0;">' +
-          '<source src="' + audUrl + '">' +
-          'Your email client does not support embedded audio.</audio><br>';
-
-      } else if (tab === 'document') {
-        if (!dataUrl || !fileName) return;
-        var docLabel = (document.getElementById('media-doc-label') ? document.getElementById('media-doc-label').value.trim() : '') || fileName;
-        var isPdf = /\.pdf$/i.test(fileName);
-        if (isPdf) {
-          // Embed PDF inline
-          html = '<div style="width:100%;margin:8px 0;border:1px solid #ddd;border-radius:6px;overflow:hidden;">' +
-            '<div style="background:#f0f4f8;padding:6px 12px;font-size:12px;color:#555;border-bottom:1px solid #ddd;">' +
-            '<i class="fas fa-file-pdf" style="color:#e53e3e;margin-right:6px;"></i>' + escHtml(fileName) + '</div>' +
-            '<iframe src="' + dataUrl + '" style="width:100%;height:500px;border:none;display:block;"></iframe>' +
-            '</div>' +
-            '<p style="margin:4px 0 8px;font-size:12px;"><a href="' + dataUrl + '" download="' + escHtml(fileName) + '" style="color:#0078d4;">⬇ Download ' + escHtml(docLabel) + '</a></p><br>';
-        } else {
-          // Non-PDF: download link with icon
-          var ext = fileName.split('.').pop().toLowerCase();
-          var icon = {
-            doc: 'fa-file-word', docx: 'fa-file-word', xls: 'fa-file-excel', xlsx: 'fa-file-excel',
-            ppt: 'fa-file-powerpoint', pptx: 'fa-file-powerpoint', pdf: 'fa-file-pdf',
-            zip: 'fa-file-archive', rar: 'fa-file-archive', txt: 'fa-file-alt', csv: 'fa-file-csv'
-          }[ext] || 'fa-file';
-          var color = {
-            doc: '#2b579a', docx: '#2b579a', xls: '#217346', xlsx: '#217346',
-            ppt: '#d24726', pptx: '#d24726', pdf: '#e53e3e', zip: '#805ad5', rar: '#805ad5'
-          }[ext] || '#555';
-          html = '<div style="display:inline-flex;align-items:center;gap:10px;padding:10px 16px;background:#f8fafd;border:1px solid #dde3ed;border-radius:8px;margin:6px 0;text-decoration:none;">' +
-            '<i class="fas ' + icon + '" style="font-size:22px;color:' + color + ';flex-shrink:0;"></i>' +
-            '<div><a href="' + dataUrl + '" download="' + escHtml(fileName) + '" style="color:#0a2942;font-weight:600;font-size:13px;text-decoration:none;">' + escHtml(docLabel) + '</a>' +
-            '<div style="font-size:11px;color:#888;margin-top:2px;">' + ext.toUpperCase() + ' file · click to download</div></div>' +
-            '</div><br>';
+          parts.push('<video controls style="'+vwStyle+'max-width:100%;height:'+vidH+'px;display:block;margin:6px 0;border-radius:6px;"><source src="'+escHtml(vidUrl)+'">Your email client does not support embedded video.</video><br>');
         }
       }
 
-      if (!html) return;
+      if (!audData && audUrl) {
+        var safeAudName = outlookEscapeAttr(audName || '');
+        parts.push('<audio controls data-filename="'+safeAudName+'" style="width:100%;max-width:480px;display:block;margin:6px 0;"><source src="'+audUrl+'" data-filename="'+safeAudName+'">Your email client does not support embedded audio.</audio><br>');
+      }
 
-      // Insert into editor
+      // ── Nothing to insert into editor? ────────────────────────────────────
+      if (!parts.length) return;
+
+      var html = parts.join('');
+
+      // ── Restore focus + cursor, then insert ───────────────────────────────
       ed.focus();
       var inserted = false;
       if (savedRange) {
@@ -20230,6 +21181,7 @@ ${plainText}`;
         } catch (_) { }
       }
       if (!inserted) {
+        // Fallback: append to end
         var tmp = document.createElement('div');
         tmp.innerHTML = html;
         while (tmp.firstChild) ed.appendChild(tmp.firstChild);
@@ -20515,7 +21467,7 @@ ${plainText}`;
 
       // Load data
       if (tab === 'logs') loadCallLogs();
-      if (tab === 'recordings') pbxLoadRecordings();
+      if (tab === 'recordings') refreshPBXRecordingsView();
       if (tab === 'backup') pbxListBackups();
     }
 
@@ -21046,7 +21998,75 @@ ${plainText}`;
     let pbxRecordingLimit = 10;
     let pbxCurrentFolder = '';
     let pbxBackupInterval = null;
-    async function pbxLoadRecordings() {
+    let pbxSelectedDbFolder = null;
+    let pbxRecordingsViewToken = 0;
+    let pbxNetworkHasRecordings = false;
+
+    function setPBXStoreButtonEnabled(enabled) {
+      const button = document.getElementById('pbx-store-db-btn');
+      if (!button) return;
+
+      button.disabled = !enabled;
+      button.style.opacity = enabled ? '1' : '0.55';
+      button.style.cursor = enabled ? 'pointer' : 'not-allowed';
+      button.title = enabled ? 'Store network-drive recordings in DB' : 'No network-drive recordings to store';
+    }
+
+    function resetPBXSyncStatus() {
+      if (pbxProgressInterval) {
+        clearInterval(pbxProgressInterval);
+        pbxProgressInterval = null;
+      }
+
+      const syncStatus = document.getElementById('pbx-db-sync-status');
+      const syncDetails = document.getElementById('pbx-db-sync-details');
+      const syncFill = document.getElementById('pbx-db-sync-progress-fill');
+      const syncText = document.getElementById('pbx-db-sync-progress-text');
+      const legacyBar = document.getElementById('pbx-sync-progress-bar');
+      const legacyStatus = document.getElementById('pbx-sync-status');
+
+      if (syncStatus) syncStatus.style.display = 'none';
+      if (syncDetails) {
+        syncDetails.style.display = 'none';
+        syncDetails.innerHTML = '';
+      }
+      if (syncFill) syncFill.style.width = '0%';
+      if (syncText) syncText.innerText = '0%';
+      if (legacyBar) legacyBar.style.width = '0%';
+      if (legacyStatus) legacyStatus.innerText = 'Preparing scan...';
+    }
+
+    function setPBXRecordingEmptyState(message) {
+      const breadcrumb = document.getElementById('pbx-breadcrumb');
+      const panel = document.getElementById('pbx-right-panel');
+
+      if (breadcrumb) breadcrumb.innerText = 'Select Folder';
+      if (panel) {
+        panel.innerHTML = `
+          <div style="
+            text-align:center;
+            color:#777;
+            padding-top:80px;
+          ">
+            <i class="fas fa-folder-open" style="
+              font-size:46px;
+              margin-bottom:18px;
+              opacity:0.3;
+              display:block;
+            "></i>
+            ${escHtml(message || 'Select a folder from left sidebar')}
+          </div>
+        `;
+      }
+    }
+
+    function refreshPBXRecordingsView() {
+      const select = document.getElementById('pbx-storage-mode');
+      const mode = select?.value || pbxSourceMode || 'network';
+      return switchPBXSource(mode);
+    }
+
+    async function pbxLoadRecordings(viewToken = pbxRecordingsViewToken) {
 
       const list = document.getElementById('pbx-recordings-list');
 
@@ -21066,16 +22086,28 @@ ${plainText}`;
 
         const data = await res.json();
 
+        if (viewToken !== pbxRecordingsViewToken || pbxSourceMode !== 'network') {
+          return;
+        }
+
         if (!data.tree || !data.tree.length) {
+          pbxNetworkHasRecordings = false;
+          setPBXStoreButtonEnabled(false);
+          resetPBXSyncStatus();
 
           list.innerHTML = `
             <div style="padding:20px;color:var(--muted);">
               No recordings found.
             </div>
           `;
+          pbxCurrentFolder = '';
+          setPBXRecordingEmptyState('No network-drive recordings found.');
 
           return;
         }
+
+        pbxNetworkHasRecordings = true;
+        setPBXStoreButtonEnabled(true);
 
         function renderSidebarTree(nodes, level = 0) {
 
@@ -21155,8 +22187,17 @@ ${plainText}`;
             ${renderSidebarTree(data.tree)}
           </div>
         `;
+        setPBXRecordingEmptyState('Select a network-drive folder from left sidebar.');
 
       } catch (err) {
+
+        if (viewToken !== pbxRecordingsViewToken || pbxSourceMode !== 'network') {
+          return;
+        }
+
+        pbxNetworkHasRecordings = false;
+        setPBXStoreButtonEnabled(false);
+        resetPBXSyncStatus();
 
         list.innerHTML = `
           <div style="padding:20px;color:red;">
@@ -21180,6 +22221,11 @@ ${plainText}`;
 
 
     async function openPBXFolder(folderPath, page = 1) {
+      if (pbxSourceMode !== 'network') {
+        return;
+      }
+
+      const viewToken = pbxRecordingsViewToken;
 
       pbxCurrentFolder = folderPath;
 
@@ -21222,6 +22268,10 @@ ${plainText}`;
         );
 
         const data = await res.json();
+
+        if (viewToken !== pbxRecordingsViewToken || pbxSourceMode !== 'network') {
+          return;
+        }
 
         panel.innerHTML = `
 
@@ -21380,6 +22430,10 @@ ${plainText}`;
 
       } catch (err) {
 
+        if (viewToken !== pbxRecordingsViewToken || pbxSourceMode !== 'network') {
+          return;
+        }
+
         console.error(err);
 
         panel.innerHTML = `
@@ -21398,7 +22452,7 @@ ${plainText}`;
 
       currentRecordingPage = page;
 
-      pbxLoadRecordings();
+      refreshPBXRecordingsView();
     }
 
     async function startPBXBackup() {
@@ -21571,7 +22625,16 @@ ${plainText}`;
     async function switchPBXSource(mode) {
 
       pbxSourceMode = mode;
+      const viewToken = ++pbxRecordingsViewToken;
 
+        const storageMode =
+          document.getElementById(
+            'pbx-storage-mode'
+          );
+
+        if (storageMode && storageMode.value !== mode) {
+          storageMode.value = mode;
+        }
 
         const pathText =
           document.getElementById(
@@ -21604,7 +22667,12 @@ ${plainText}`;
             pathText.innerText =
               'C:\\MatrixVMS\\Voicemail_Backup';
 
-            await pbxLoadRecordings();
+            pbxSelectedDbFolder = null;
+            pbxNetworkHasRecordings = false;
+            setPBXStoreButtonEnabled(false);
+            resetPBXSyncStatus();
+            setPBXRecordingEmptyState('Loading network-drive recordings...');
+            await pbxLoadRecordings(viewToken);
 
           }
 
@@ -21617,17 +22685,28 @@ ${plainText}`;
             pathText.innerText =
               'Database Stored Recordings';
 
+            setPBXStoreButtonEnabled(false);
+            resetPBXSyncStatus();
+
             const res = await fetch(
               '/api/pbx/db-folders'
             );
 
             const data = await res.json();
 
+            if (viewToken !== pbxRecordingsViewToken || pbxSourceMode !== 'database') {
+              return;
+            }
+
             renderPBXDatabaseTree(data);
 
           }
 
         } catch (err) {
+
+          if (viewToken !== pbxRecordingsViewToken) {
+            return;
+          }
 
           console.error(err);
 
@@ -21654,7 +22733,22 @@ ${plainText}`;
 
       container.innerHTML = '';
 
-      Object.keys(tree).forEach(
+      const backupFolders = Object.keys(tree || {});
+
+      if (!backupFolders.length) {
+        container.innerHTML = `
+          <div style="padding:20px;color:var(--muted);">
+            No database recordings found.
+          </div>
+        `;
+        pbxSelectedDbFolder = null;
+        setPBXRecordingEmptyState('No database recordings found.');
+        return;
+      }
+
+      let selectedStillExists = false;
+
+      backupFolders.forEach(
         backupFolder => {
 
           const backupDiv =
@@ -21680,6 +22774,14 @@ ${plainText}`;
 
           Object.keys(extensions)
           .forEach(extension => {
+
+            if (
+              pbxSelectedDbFolder &&
+              pbxSelectedDbFolder.backupFolder === backupFolder &&
+              pbxSelectedDbFolder.extension === extension
+            ) {
+              selectedStillExists = true;
+            }
 
             const extDiv =
               document.createElement(
@@ -21719,6 +22821,16 @@ ${plainText}`;
         }
       );
 
+      if (pbxSelectedDbFolder && selectedStillExists) {
+        loadDBRecordings(
+          pbxSelectedDbFolder.backupFolder,
+          pbxSelectedDbFolder.extension
+        );
+      } else {
+        pbxSelectedDbFolder = null;
+        setPBXRecordingEmptyState('Select a database folder from left sidebar.');
+      }
+
     }
 
     async function loadDBRecordings(
@@ -21727,6 +22839,15 @@ ${plainText}`;
       page = 1
     ) {
       try {
+        if (pbxSourceMode !== 'database') {
+          return;
+        }
+
+        const viewToken = pbxRecordingsViewToken;
+        pbxSelectedDbFolder = {
+          backupFolder,
+          extension: extensionFolder
+        };
         const filters = getPBXRecordingFilters();
         const query = new URLSearchParams({
           backup: backupFolder,
@@ -21739,6 +22860,11 @@ ${plainText}`;
           `/api/pbx/db-recordings?${query.toString()}`
         );
         const data = await res.json();
+
+        if (viewToken !== pbxRecordingsViewToken || pbxSourceMode !== 'database') {
+          return;
+        }
+
         renderPBXFiles(data, backupFolder, extensionFolder);
 
         document.getElementById(
@@ -22033,7 +23159,9 @@ ${plainText}`;
           `File: ${data.currentFile}
         | Processed: ${data.processed}/${data.total}
         | Inserted: ${data.inserted}
-        | Duplicates: ${data.duplicates}`;
+        | Duplicates: ${data.duplicates}
+        | Deleted: ${data.sourceDeleted || 0}
+        | Delete Failed: ${data.sourceDeleteFailed || 0}`;
 
         const percent = data.percent || 0;
 
@@ -22068,6 +23196,12 @@ ${plainText}`;
 
             | Duplicates:
             ${data.duplicates}
+
+            | Deleted:
+            ${data.sourceDeleted || 0}
+
+            | Delete Failed:
+            ${data.sourceDeleteFailed || 0}
           </div>
         `;
 
@@ -22109,6 +23243,15 @@ ${plainText}`;
     async function syncPBXRecordingsToDB(button) {
 
       try {
+        if (pbxSourceMode === 'network' && !pbxNetworkHasRecordings) {
+          resetPBXSyncStatus();
+          setPBXRecordingEmptyState('No network-drive recordings found.');
+          showToast(
+            'No network-drive recordings to store.',
+            'info'
+          );
+          return;
+        }
 
         const syncStatus =
           document.getElementById(
@@ -22209,7 +23352,7 @@ ${plainText}`;
 
         syncDetails.innerHTML = `
           <div style="color:#22c55e;">
-            Folder ${data.snapshot_folder || 'created'} · Inserted ${data.inserted || 0} · Updated ${data.updated || 0} · Duplicates ${data.duplicates || 0}
+            Folder ${data.snapshot_folder || 'created'} · Inserted ${data.inserted || 0} · Updated ${data.updated || 0} · Duplicates ${data.duplicates || 0} · Deleted ${data.source_deleted || 0} · Delete Failed ${data.source_delete_failed || 0}
           </div>
         `;
 
@@ -22223,6 +23366,8 @@ ${plainText}`;
 
         if (pbxSourceMode === 'database') {
           await switchPBXSource('database');
+        } else {
+          await refreshPBXRecordingsView();
         }
 
         setTimeout(() => {
@@ -22332,7 +23477,7 @@ ${plainText}`;
               Backup Complete
             `;
 
-            pbxLoadRecordings();
+            refreshPBXRecordingsView();
           }
 
         } catch (err) {
@@ -22437,9 +23582,7 @@ ${plainText}`;
           overlay = document.createElement('div');
           overlay.className = 'modal-overlay';
           overlay.id = 'pbx-backup-preview-modal';
-          overlay.onclick = function (event) {
-            if (event.target === this) closeModal('pbx-backup-preview-modal');
-          };
+
           overlay.innerHTML = `
             <div class="modal" style="max-width:900px;width:94vw;max-height:86vh;display:flex;flex-direction:column;">
               <div class="modal-title">
@@ -23051,7 +24194,7 @@ ${plainText}`;
   </div>
 
   <!-- Compose Email (Outlook) — modal so read pane can use full height -->
-  <div class="modal-overlay" id="compose-email-modal">
+  <div class="modal-overlay" id="compose-email-modal" data-disable-outside-close="1">
     <div class="compose-modal-box">
       <!-- Header -->
       <div class="compose-modal-header">
@@ -23385,19 +24528,28 @@ ${plainText}`;
           onkeyup="composeSaveSelection();composeUpdateToolbarState()" onfocus="composeUpdateToolbarState()"></div>
       </div>
       <!-- Footer -->
-      <div class="compose-modal-footer">
-        <div style="display:flex;align-items:center;gap:8px;">
-          <div id="compose-status" style="font-size:12px;display:none;"></div>
-          <div id="compose-draft-status" style="font-size:11px;color:var(--muted);display:none;"><i
-              class="fas fa-check-circle" style="color:var(--green2);"></i> Draft saved</div>
-          <button type="button" class="btn btn-ghost btn-xs" onclick="resetComposeForm()"><i class="fas fa-eraser"></i>
-            Clear</button>
-          <button type="button" class="btn btn-ghost btn-xs" onclick="saveComposeDraft(true)"><i
-              class="fas fa-save"></i> Save Draft</button>
+      <div class="compose-modal-footer" style="flex-direction:column;align-items:stretch;gap:6px;">
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;">
+          <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+            <div id="compose-status" style="font-size:12px;display:none;"></div>
+            <div id="compose-draft-status" style="font-size:11px;color:var(--muted);display:none;"><i
+                class="fas fa-check-circle" style="color:var(--green2);"></i> Draft saved</div>
+            <button type="button" class="btn btn-ghost btn-xs" onclick="resetComposeForm()"><i class="fas fa-eraser"></i>
+              Clear</button>
+            <button type="button" class="btn btn-ghost btn-xs" onclick="saveComposeDraft(true)"><i
+                class="fas fa-save"></i> Save Draft</button>
+            <label class="btn btn-ghost btn-xs" style="cursor:pointer;margin:0;" title="Attach files (max 25 MB total, like Outlook)">
+              <i class="fas fa-paperclip"></i> Attach
+              <input type="file" id="compose-file-input" multiple accept="*/*" style="display:none;"
+                onchange="composeHandleFileAttach(this)">
+            </label>
+          </div>
+          <button type="button" class="btn btn-gold" id="send-btn" onclick="sendEmail()">
+            <i class="fas fa-paper-plane"></i> Send via Outlook
+          </button>
         </div>
-        <button type="button" class="btn btn-gold" id="send-btn" onclick="sendEmail()">
-          <i class="fas fa-paper-plane"></i> Send via Outlook
-        </button>
+        <!-- Attached files list — shown only when files are attached -->
+        <div id="compose-attachments-list" style="display:none;flex-wrap:wrap;gap:6px;"></div>
       </div>
     </div>
   </div>
@@ -23934,24 +25086,23 @@ Nagpur, Maharashtra, 440017, India<br>
         <input class="inp" id="csig-extra-text-link" placeholder="https://calendly.com/…" style="font-size:12px;"
           oninput="etRefreshSigPreview()">
       </div>
-    </div>
 
-    <!-- Live preview -->
-    <div
-      style="margin:12px 0 4px;font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:0.5px;">
-      Live Preview</div>
-    <div style="background:#fff;border-radius:8px;padding:10px;border:1px solid var(--border2);">
-      <iframe id="sig-preview-frame" style="width:100%;border:none;height:120px;"></iframe>
-    </div>
+      <!-- Live preview -->
+      <div
+        style="margin:12px 0 4px;font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:0.5px;">
+        Live Preview</div>
+      <div style="background:#fff;border-radius:8px;padding:10px;border:1px solid var(--border2);">
+        <iframe id="sig-preview-frame" style="width:100%;border:none;min-height:140px;height:auto;display:block;"></iframe>
+      </div>
 
-    <div style="display:flex;gap:8px;margin-top:16px;justify-content:flex-end;">
-      <button class="btn btn-green btn-sm" onclick="sigSaveTemplate()"><i class="fas fa-save"></i> Save
-        Template</button>
-      <button class="btn btn-gold" onclick="etApplySignature()"><i class="fas fa-check"></i> Insert Signature</button>
-      <button class="btn btn-ghost"
-        onclick="oaRestoreSignatureBuilderButton();closeModal('et-sig-modal')">Cancel</button>
+      <div style="display:flex;gap:8px;margin-top:16px;justify-content:flex-end;">
+        <button class="btn btn-green btn-sm" onclick="sigSaveTemplate()"><i class="fas fa-save"></i> Save
+          Template</button>
+        <button class="btn btn-gold" onclick="etApplySignature()"><i class="fas fa-check"></i> Insert Signature</button>
+        <button class="btn btn-ghost"
+          onclick="oaRestoreSignatureBuilderButton();closeModal('et-sig-modal')">Cancel</button>
+      </div>
     </div>
-  </div>
   </div>
 
   <!-- ██████ MARQUEE INSERT MODAL ██████ -->
@@ -24022,7 +25173,7 @@ Nagpur, Maharashtra, 440017, India<br>
 
   <!-- ██████ RECIPIENT GROUPS MANAGER MODAL ██████ -->
   <div class="modal-overlay" id="groups-modal">
-    <div class="modal" style="max-width:860px;width:96vw;max-height:90vh;overflow-y:auto;">
+    <div class="modal" style="max-width:1100px;width:96vw;max-height:90vh;overflow-y:auto;">
       <div class="modal-title">
         <span><i class="fas fa-users" style="color:var(--gold);margin-right:8px;"></i>Recipient Groups</span>
         <span class="modal-close" onclick="closeModal('groups-modal')"><i class="fas fa-times"></i></span>
@@ -24227,7 +25378,7 @@ Nagpur, Maharashtra, 440017, India<br>
   </div>
 
   <!-- ── MEDIA INSERT MODAL (shared by all editors) ── -->
-  <div class="modal-overlay" id="media-insert-modal" onclick="if(event.target===this)closeMediaInsertModal()"
+  <div class="modal-overlay" id="media-insert-modal"
     style="z-index:10002;">
     <div class="modal" style="max-width:560px;width:94vw;">
       <div class="modal-title">
@@ -24251,8 +25402,10 @@ Nagpur, Maharashtra, 440017, India<br>
 
       <!-- IMAGE tab -->
       <div id="mpanel-image">
-        <div style="font-size:11.5px;color:var(--muted);margin-bottom:10px;">Upload an image file or paste a URL. It
-          will be embedded inline in the email.</div>
+        <div style="font-size:11.5px;color:var(--muted);margin-bottom:10px;">
+          <b style="color:var(--text);">File upload</b> — embeds image inline (keep under 2 MB).<br>
+          <b style="color:var(--text);">URL</b> — paste a public image link; Outlook renders it inline. ✅
+        </div>
         <div style="display:flex;gap:8px;margin-bottom:10px;">
           <label class="btn btn-blue btn-sm" style="cursor:pointer;"><i class="fas fa-upload"></i> Upload Image
             <input type="file" id="media-img-file" accept="image/*" style="display:none;"
@@ -24263,7 +25416,8 @@ Nagpur, Maharashtra, 440017, India<br>
             style="flex:1;font-size:12px;" oninput="mediaPreviewUrl('image',this.value)">
         </div>
         <div id="media-img-preview"
-          style="display:none;margin-bottom:10px;text-align:center;background:#f8fafd;border:1px solid var(--border);border-radius:8px;padding:8px;">
+          style="display:none;position:relative;margin-bottom:10px;text-align:center;background:#f8fafd;border:1px solid var(--border);border-radius:8px;padding:8px;">
+          <button class="btn btn-red btn-xs" onclick="clearMediaTab('image')" style="position:absolute;top:6px;right:6px;padding:4px 8px;z-index:2;" title="Remove this file"><i class="fas fa-times"></i> Clear</button>
           <img id="media-img-preview-el" src="" style="max-width:100%;max-height:200px;border-radius:6px;"
             alt="preview">
         </div>
@@ -24281,8 +25435,11 @@ Nagpur, Maharashtra, 440017, India<br>
 
       <!-- VIDEO tab -->
       <div id="mpanel-video" style="display:none;">
-        <div style="font-size:11.5px;color:var(--muted);margin-bottom:10px;">Upload a video file (MP4/WebM) or paste a
-          YouTube/Vimeo URL.</div>
+        <div style="font-size:11.5px;color:var(--muted);margin-bottom:10px;">
+          <b style="color:var(--text);">File upload</b> — added as <b style="color:var(--gold);">attachment</b> (Outlook can't play embedded video). 📎<br>
+          <b style="color:var(--text);">YouTube / Vimeo URL</b> — inserts a clickable thumbnail into the email body. ✅<br>
+          <b style="color:var(--text);">Direct .mp4 URL</b> — inserts a &lt;video&gt; tag (plays in Gmail, Apple Mail).
+        </div>
         <div style="display:flex;gap:8px;margin-bottom:10px;">
           <label class="btn btn-blue btn-sm" style="cursor:pointer;"><i class="fas fa-upload"></i> Upload Video
             <input type="file" id="media-vid-file" accept="video/*" style="display:none;"
@@ -24293,7 +25450,8 @@ Nagpur, Maharashtra, 440017, India<br>
             style="flex:1;font-size:12px;">
         </div>
         <div id="media-vid-preview"
-          style="display:none;margin-bottom:10px;text-align:center;background:#f8fafd;border:1px solid var(--border);border-radius:8px;padding:8px;">
+          style="display:none;position:relative;margin-bottom:10px;text-align:center;background:#f8fafd;border:1px solid var(--border);border-radius:8px;padding:8px;padding-top:36px;">
+          <button class="btn btn-red btn-xs" onclick="clearMediaTab('video')" style="position:absolute;top:6px;right:6px;padding:4px 8px;z-index:2;" title="Remove this file"><i class="fas fa-times"></i> Clear</button>
           <video id="media-vid-preview-el" controls style="max-width:100%;max-height:180px;border-radius:6px;"></video>
         </div>
         <div style="display:flex;gap:10px;align-items:center;">
@@ -24310,8 +25468,10 @@ Nagpur, Maharashtra, 440017, India<br>
 
       <!-- AUDIO tab -->
       <div id="mpanel-audio" style="display:none;">
-        <div style="font-size:11.5px;color:var(--muted);margin-bottom:10px;">Upload an audio file (MP3/WAV/OGG) or paste
-          a direct URL.</div>
+        <div style="font-size:11.5px;color:var(--muted);margin-bottom:10px;">
+          <b style="color:var(--text);">File upload</b> — added as <b style="color:var(--gold);">attachment</b> (Outlook can't play embedded audio). 📎<br>
+          <b style="color:var(--text);">Direct URL</b> — inserts an &lt;audio&gt; player (plays in Gmail, Apple Mail).
+        </div>
         <div style="display:flex;gap:8px;margin-bottom:10px;">
           <label class="btn btn-blue btn-sm" style="cursor:pointer;"><i class="fas fa-upload"></i> Upload Audio
             <input type="file" id="media-aud-file" accept="audio/*" style="display:none;"
@@ -24322,15 +25482,15 @@ Nagpur, Maharashtra, 440017, India<br>
             style="flex:1;font-size:12px;">
         </div>
         <div id="media-aud-preview"
-          style="display:none;margin-bottom:10px;background:#f8fafd;border:1px solid var(--border);border-radius:8px;padding:8px;">
+          style="display:none;position:relative;margin-bottom:10px;background:#f8fafd;border:1px solid var(--border);border-radius:8px;padding:8px;padding-top:36px;">
+          <button class="btn btn-red btn-xs" onclick="clearMediaTab('audio')" style="position:absolute;top:6px;right:6px;padding:4px 8px;z-index:2;" title="Remove this file"><i class="fas fa-times"></i> Clear</button>
           <audio id="media-aud-preview-el" controls style="width:100%;"></audio>
         </div>
       </div>
 
       <!-- DOCUMENT tab -->
       <div id="mpanel-document" style="display:none;">
-        <div style="font-size:11.5px;color:var(--muted);margin-bottom:10px;">Upload a document. PDFs will be embedded
-          inline; other files (Word, Excel, ZIP, etc.) will be inserted as a download link.</div>
+        <div style="font-size:11.5px;color:var(--muted);margin-bottom:10px;">Upload any document (PDF, Word, Excel, PPT, ZIP, etc.). It will be added as a <b style="color:var(--text);">file attachment</b> — visible as a paperclip chip below the editor, just like Outlook.</div>
         <div style="display:flex;gap:8px;margin-bottom:10px;">
           <label class="btn btn-blue btn-sm" style="cursor:pointer;"><i class="fas fa-upload"></i> Upload Document
             <input type="file" id="media-doc-file" accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.csv,.zip,.rar"
@@ -24338,7 +25498,8 @@ Nagpur, Maharashtra, 440017, India<br>
           </label>
         </div>
         <div id="media-doc-preview"
-          style="display:none;margin-bottom:10px;background:#f8fafd;border:1px solid var(--border);border-radius:8px;padding:10px;font-size:12.5px;color:var(--text);">
+          style="display:none;position:relative;margin-bottom:10px;background:#f8fafd;border:1px solid var(--border);border-radius:8px;padding:10px;font-size:12.5px;color:var(--text);padding-right:70px;">
+          <button class="btn btn-red btn-xs" onclick="clearMediaTab('document')" style="position:absolute;top:6px;right:6px;padding:4px 8px;z-index:2;" title="Remove this file"><i class="fas fa-times"></i> Clear</button>
           <i class="fas fa-file-alt" style="color:var(--blue2);margin-right:6px;"></i>
           <span id="media-doc-name"></span>
           <span id="media-doc-size" style="color:var(--muted);margin-left:8px;font-size:11px;"></span>
@@ -24349,16 +25510,25 @@ Nagpur, Maharashtra, 440017, India<br>
         </div>
       </div>
 
-      <!-- Footer -->
-      <div style="display:flex;gap:8px;margin-top:18px;justify-content:flex-end;">
-        <button class="btn btn-ghost" onclick="closeMediaInsertModal()">Cancel</button>
-        <button class="btn btn-gold" onclick="applyMediaInsert()"><i class="fas fa-check"></i> Insert</button>
+      <!-- Footer with Size Bar -->
+      <div style="border-top:1px solid var(--border);padding-top:12px;margin-top:18px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+          <span style="font-size:11.5px;color:var(--text);font-weight:600;">Total Attachment Size</span>
+          <span id="media-modal-size-text" style="font-size:11.5px;color:var(--muted);">0.0 MB / 25 MB</span>
+        </div>
+        <div style="width:100%;height:6px;background:var(--border2);border-radius:3px;overflow:hidden;margin-bottom:12px;">
+          <div id="media-modal-size-bar" style="height:100%;background:var(--green2);width:0%;transition:0.3s;"></div>
+        </div>
+        <div style="display:flex;gap:8px;justify-content:flex-end;">
+          <button class="btn btn-ghost" onclick="closeMediaInsertModal()">Cancel</button>
+          <button class="btn btn-gold" id="media-modal-insert-btn" onmousedown="event.preventDefault()" onclick="applyMediaInsert()"><i class="fas fa-check"></i> Insert</button>
+        </div>
       </div>
     </div>
   </div>
 
   <!-- ── INSERT HTML CODE MODAL (shared by all editors) ── -->
-  <div class="modal-overlay" id="insert-html-modal" onclick="if(event.target===this)closeInsertHtmlModal()">
+  <div class="modal-overlay" id="insert-html-modal">
     <div class="modal" style="max-width:600px;width:94vw;">
       <div class="modal-title">
         <span><i class="fas fa-code" style="color:var(--blue2);margin-right:8px;"></i>Insert HTML Code</span>
@@ -24380,7 +25550,7 @@ Nagpur, Maharashtra, 440017, India<br>
   </div>
 
   <!-- ── HTML PREVIEW MODAL (full-screen iframe) ── -->
-  <div class="modal-overlay" id="html-preview-modal" onclick="if(event.target===this)closeHtmlPreview()"
+  <div class="modal-overlay" id="html-preview-modal"
     style="z-index:10001;">
     <div class="modal"
       style="max-width:96vw;width:96vw;max-height:96vh;height:96vh;padding:0;border-radius:12px;overflow:hidden;display:flex;flex-direction:column;">
@@ -24394,8 +25564,7 @@ Nagpur, Maharashtra, 440017, India<br>
   </div>
 
   <!-- Outlook Signature Editor Modal -->
-  <div class="modal-overlay" id="oa-signature-editor-modal"
-    onclick="if(event.target===this)closeModal('oa-signature-editor-modal')">
+  <div class="modal-overlay" id="oa-signature-editor-modal">
     <div class="modal" style="max-width:720px;width:92vw;">
       <div class="modal-title">
         <span id="oa-signature-editor-title"><i class="fas fa-signature"
@@ -24428,8 +25597,7 @@ Nagpur, Maharashtra, 440017, India<br>
   </div>
 
   <!-- ██████ OUTLOOK ACCOUNT INFO MODAL ██████ -->
-  <div class="modal-overlay" id="outlook-account-modal"
-    onclick="if(event.target===this)closeModal('outlook-account-modal')">
+  <div class="modal-overlay" id="outlook-account-modal">
     <div class="modal"
       style="max-width:900px;width:95vw;padding:0;overflow:hidden;display:flex;flex-direction:column;max-height:90vh;">
       <!-- Title bar -->
@@ -24631,7 +25799,7 @@ Nagpur, Maharashtra, 440017, India<br>
   </div>
 
   <!-- ██████ AI EMAIL ASSISTANT MODAL ██████ -->
-  <div class="modal-overlay" id="ai-assistant-modal" onclick="if(event.target===this)closeAIAssistant()"
+  <div class="modal-overlay" id="ai-assistant-modal"
     style="display:none;position:fixed;inset:0;z-index:9999;background:transparent;align-items:stretch;justify-content:flex-end;backdrop-filter:none;">
     <div class="modal"
       style="width:min(520px,96vw);height:100vh;max-height:100vh;border-radius:0;display:flex;flex-direction:column;margin-left:auto;border-right:0;box-shadow:-10px 0 32px rgba(0,0,0,0.38);">
@@ -25100,7 +26268,7 @@ Nagpur, Maharashtra, 440017, India<br>
     align-items:center;
     justify-content:center;
     padding:20px;
-  " onclick="if(event.target===this)document.getElementById('pbx-section-summary-modal').style.display='none'">
+  ">
     <div style="
       width:min(700px,96vw);
       max-height:88vh;
@@ -25134,8 +26302,7 @@ Nagpur, Maharashtra, 440017, India<br>
     z-index:9998;
     background:transparent;
     align-items:stretch;
-    justify-content:flex-end;
-  " onclick="if(event.target===this)closePbxCallSidebar()">
+  ">
     <div style="
       width:min(480px,96vw);
       height:100vh;

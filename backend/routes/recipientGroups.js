@@ -111,6 +111,13 @@ router.put('/:id', async (req, res) => {
 // ── DELETE /api/groups/:id ────────────────────────────────────────────────
 router.delete('/:id', async (req, res) => {
   try {
+    if (req.query.deleteContacts === 'true') {
+      const members = await pool.query(`SELECT contact_id FROM recipient_group_members WHERE group_id=$1`, [req.params.id]);
+      const cids = members.rows.map(r => r.contact_id);
+      if (cids.length > 0) {
+        await pool.query(`DELETE FROM contacts WHERE id = ANY($1)`, [cids]);
+      }
+    }
     await pool.query(`DELETE FROM recipient_groups WHERE id=$1`, [req.params.id]);
     res.json({ success: true });
   } catch(e) { res.status(500).json({ error: e.message }); }
@@ -159,15 +166,19 @@ router.post('/:id/members', async (req, res) => {
 
     if (!allContactIds.length) return res.status(400).json({ error: 'No valid contacts or emails provided' });
 
+    // Deduplicate
+    allContactIds = [...new Set(allContactIds)];
+
     const vals = allContactIds.map((cid, i) => `($1, $${i+2})`).join(',');
-    await pool.query(
+    const insertRes = await pool.query(
       `INSERT INTO recipient_group_members (group_id, contact_id) VALUES ${vals} ON CONFLICT DO NOTHING`,
       [req.params.id, ...allContactIds]
     );
+
     const count = await pool.query(
       `SELECT COUNT(*)::int AS n FROM recipient_group_members WHERE group_id=$1`, [req.params.id]
     );
-    res.json({ success: true, member_count: count.rows[0].n, added: allContactIds.length });
+    res.json({ success: true, member_count: count.rows[0].n, added: insertRes.rowCount, total_submitted: allContactIds.length });
   } catch(e) { res.status(500).json({ error: e.message }); }
 });
 

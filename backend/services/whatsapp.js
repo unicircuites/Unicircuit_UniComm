@@ -225,16 +225,19 @@ async function ensureTables(retries = 3) {
     try {
       await pool.query(`
         CREATE TABLE IF NOT EXISTS wa_contacts (
-          jid          VARCHAR(100) PRIMARY KEY,
+          jid          VARCHAR(100),
+          account_phone VARCHAR(50),
           name         VARCHAR(200),
           notify       VARCHAR(200),
           phone        VARCHAR(50),
-          updated_at   TIMESTAMPTZ DEFAULT NOW()
+          updated_at   TIMESTAMPTZ DEFAULT NOW(),
+          PRIMARY KEY (jid, account_phone)
         )
       `);
       await pool.query(`
         CREATE TABLE IF NOT EXISTS wa_chats (
-          id           VARCHAR(100) PRIMARY KEY,
+          id           VARCHAR(100),
+          account_phone VARCHAR(50),
           name         VARCHAR(200),
           phone        VARCHAR(50),
           is_group     BOOLEAN DEFAULT FALSE,
@@ -242,13 +245,15 @@ async function ensureTables(retries = 3) {
           last_time    TIMESTAMPTZ,
           unread       INT DEFAULT 0,
           updated_at   TIMESTAMPTZ DEFAULT NOW(),
-          imported_last_ts TIMESTAMPTZ
+          imported_last_ts TIMESTAMPTZ,
+          PRIMARY KEY (id, account_phone)
         )
       `);
       await pool.query(`
         CREATE TABLE IF NOT EXISTS wa_messages (
           id           VARCHAR(200),
           chat_id      VARCHAR(100) NOT NULL,
+          account_phone VARCHAR(50),
           from_me      BOOLEAN DEFAULT FALSE,
           sender       VARCHAR(100),
           sender_name  VARCHAR(200),
@@ -262,7 +267,7 @@ async function ensureTables(retries = 3) {
           is_reply     BOOLEAN DEFAULT FALSE,
           reply_to_msg_id VARCHAR(200),
           media_path   TEXT,
-          PRIMARY KEY (id, chat_id)
+          PRIMARY KEY (id, chat_id, account_phone)
         )
       `);
       await pool.query(`ALTER TABLE wa_messages ADD COLUMN IF NOT EXISTS quoted_body TEXT`).catch(() => { });
@@ -270,6 +275,26 @@ async function ensureTables(retries = 3) {
       await pool.query(`ALTER TABLE wa_messages ADD COLUMN IF NOT EXISTS reply_to_msg_id VARCHAR(200)`).catch(() => { });
       await pool.query(`ALTER TABLE wa_messages ADD COLUMN IF NOT EXISTS media_path TEXT`).catch(() => { });
       await pool.query(`ALTER TABLE wa_chats ADD COLUMN IF NOT EXISTS imported_last_ts TIMESTAMPTZ`).catch(() => { });
+
+      // Handle migrations for multi-account support on existing databases (e.g. Tower Server)
+      await pool.query(`ALTER TABLE wa_contacts ADD COLUMN IF NOT EXISTS account_phone VARCHAR(50) DEFAULT 'unknown'`).catch(() => { });
+      await pool.query(`ALTER TABLE wa_chats ADD COLUMN IF NOT EXISTS account_phone VARCHAR(50) DEFAULT 'unknown'`).catch(() => { });
+      await pool.query(`ALTER TABLE wa_messages ADD COLUMN IF NOT EXISTS account_phone VARCHAR(50) DEFAULT 'unknown'`).catch(() => { });
+
+      try {
+        await pool.query(`ALTER TABLE wa_contacts DROP CONSTRAINT IF EXISTS wa_contacts_pkey CASCADE`);
+        await pool.query(`ALTER TABLE wa_contacts ADD PRIMARY KEY (jid, account_phone)`);
+      } catch(e) {}
+
+      try {
+        await pool.query(`ALTER TABLE wa_chats DROP CONSTRAINT IF EXISTS wa_chats_pkey CASCADE`);
+        await pool.query(`ALTER TABLE wa_chats ADD PRIMARY KEY (id, account_phone)`);
+      } catch(e) {}
+
+      try {
+        await pool.query(`ALTER TABLE wa_messages DROP CONSTRAINT IF EXISTS wa_messages_pkey CASCADE`);
+        await pool.query(`ALTER TABLE wa_messages ADD PRIMARY KEY (id, chat_id, account_phone)`);
+      } catch(e) {}
 
       // Load imported checkpoints into memory
       try {
@@ -303,16 +328,17 @@ async function saveChat(rawJid, name, lastMsg, lastTime, unread, isGroup) {
   }
   const ts = lastTime instanceof Date ? lastTime : toDate(lastTime);
   try {
+    const accPhone = phoneNumber || 'unknown';
     await pool.query(`
-      INSERT INTO wa_chats (id, name, phone, is_group, last_message, last_time, unread)
-      VALUES ($1,$2,$3,$4,$5,$6,$7)
-      ON CONFLICT (id) DO UPDATE SET
+      INSERT INTO wa_chats (id, account_phone, name, phone, is_group, last_message, last_time, unread)
+      VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
+      ON CONFLICT (id, account_phone) DO UPDATE SET
         name         = COALESCE(EXCLUDED.name, wa_chats.name),
         last_message = CASE WHEN EXCLUDED.last_message != '' THEN EXCLUDED.last_message ELSE wa_chats.last_message END,
         last_time    = GREATEST(EXCLUDED.last_time, wa_chats.last_time),
         unread       = CASE WHEN EXCLUDED.unread = 0 THEN 0 ELSE wa_chats.unread + EXCLUDED.unread END,
         updated_at   = NOW()
-    `, [jid, name || displayPhone, displayPhone, isGroup || false, lastMsg || '', ts, unread || 0]);
+    `, [jid, accPhone, name || displayPhone, displayPhone, isGroup || false, lastMsg || '', ts, unread || 0]);
   } catch (err) {
     console.error(`[WA-DB] saveChat error ${jid}:`, err.message);
   }
@@ -339,15 +365,16 @@ async function saveContact(contact) {
   }
 
   try {
+    const accPhone = phoneNumber || 'unknown';
     await pool.query(`
-      INSERT INTO wa_contacts (jid, name, notify, phone)
-      VALUES ($1,$2,$3,$4)
-      ON CONFLICT (jid) DO UPDATE SET
+      INSERT INTO wa_contacts (jid, account_phone, name, notify, phone)
+      VALUES ($1,$2,$3,$4,$5)
+      ON CONFLICT (jid, account_phone) DO UPDATE SET
         name   = COALESCE(EXCLUDED.name,   wa_contacts.name),
         notify = COALESCE(EXCLUDED.notify, wa_contacts.notify),
         phone  = COALESCE(EXCLUDED.phone,  wa_contacts.phone),
         updated_at = NOW()
-    `, [jid, name, notify, phone]);
+    `, [jid, accPhone, name, notify, phone]);
   } catch (_) { }
 }
 
@@ -438,11 +465,12 @@ async function saveMessage(msg) {
                 '[Media]');
       }
     } catch (e) { }
+    const accPhone = phoneNumber || 'unknown';
     await pool.query(`
-      INSERT INTO wa_messages (id, chat_id, from_me, sender, sender_name, body, msg_type, timestamp, is_read, quoted_body, is_reply, reply_to_msg_id, media_path)
-      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)
-      ON CONFLICT (id, chat_id) DO NOTHING
-    `, [id, jid, fromMe, senderJid, senderName, body, type, ts, fromMe, quotedBody, replyInfo.isReply, replyInfo.replyToMsgId, mediaPath]);
+      INSERT INTO wa_messages (id, chat_id, account_phone, from_me, sender, sender_name, body, msg_type, timestamp, is_read, quoted_body, is_reply, reply_to_msg_id, media_path)
+      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)
+      ON CONFLICT (id, chat_id, account_phone) DO NOTHING
+    `, [id, jid, accPhone, fromMe, senderJid, senderName, body, type, ts, fromMe, quotedBody, replyInfo.isReply, replyInfo.replyToMsgId, mediaPath]);
 
     return { id, jid, fromMe, sender: senderJid, senderName, body, type, ts, quotedBody, isReply: replyInfo.isReply, replyToMsgId: replyInfo.replyToMsgId, mediaPath };
   } catch (err) {
@@ -521,8 +549,8 @@ async function startWA(options = {}) {
     logger: require('pino')({ level: 'info' }), // Enabled info level to see Baileys internal logs
     getMessage: async (key) => {
       const res = await pool.query(
-        `SELECT body FROM wa_messages WHERE id=$1 AND chat_id=$2`,
-        [key.id, key.remoteJid]
+        `SELECT body FROM wa_messages WHERE id=$1 AND chat_id=$2 AND account_phone=$3`,
+        [key.id, key.remoteJid, phoneNumber || 'unknown']
       );
       return res.rows[0] ? { conversation: res.rows[0].body } : { conversation: '' };
     },
@@ -576,6 +604,7 @@ async function startWA(options = {}) {
       const idPart = rawId.split('@')[0].split(':')[0];
       phoneNumber = idPart || rawId;
       console.log('[WA] Connected as', phoneNumber, '| raw id:', rawId);
+      await adoptUnknownAccountRows(phoneNumber);
       emit('wa:connected', { phone: phoneNumber, name: sock.user?.name });
 
       // After connect: scan ALL groups and populate LID→phone in wa_contacts
@@ -810,9 +839,10 @@ async function startWA(options = {}) {
       if (update.status) {
         const statusMap = { 1: 'sent', 2: 'delivered', 3: 'read', 4: 'played' };
         const status = statusMap[update.status] || 'sent';
+        const accPhone = phoneNumber || 'unknown';
         await pool.query(
-          `UPDATE wa_messages SET status=$1 WHERE id=$2 AND chat_id=$3`,
-          [status, key.id, key.remoteJid]
+          `UPDATE wa_messages SET status=$1 WHERE id=$2 AND chat_id=$3 AND account_phone=$4`,
+          [status, key.id, key.remoteJid, accPhone]
         );
         emit('wa:status', { id: key.id, status });
       }
@@ -822,9 +852,10 @@ async function startWA(options = {}) {
   // ── GROUP METADATA ──────────────────────────────────────────────────────────────────
   sock.ev.on('groups.upsert', async (groups) => {
     for (const g of groups) {
+      const accPhone = phoneNumber || 'unknown';
       await pool.query(
-        `UPDATE wa_chats SET name=$1 WHERE id=$2`,
-        [g.subject || g.id, g.id]
+        `UPDATE wa_chats SET name=$1 WHERE id=$2 AND account_phone=$3`,
+        [g.subject || g.id, g.id, accPhone]
       );
       contactsStore[g.id] = { name: g.subject };
     }
@@ -833,7 +864,8 @@ async function startWA(options = {}) {
   sock.ev.on('groups.update', async (updates) => {
     for (const g of updates) {
       if (g.subject) {
-        await pool.query(`UPDATE wa_chats SET name=$1 WHERE id=$2`, [g.subject, g.id]);
+        const accPhone = phoneNumber || 'unknown';
+        await pool.query(`UPDATE wa_chats SET name=$1 WHERE id=$2 AND account_phone=$3`, [g.subject, g.id, accPhone]);
         contactsStore[g.id] = { name: g.subject };
       }
     }
@@ -846,7 +878,8 @@ async function startWA(options = {}) {
 async function updateChatNames() {
   try {
     // Step 1: Update names from contactsStore (in-memory)
-    const chats = await pool.query(`SELECT id, phone, name, is_group FROM wa_chats`);
+    const accPhone = phoneNumber || 'unknown';
+    const chats = await pool.query(`SELECT id, phone, name, is_group FROM wa_chats WHERE account_phone=$1`, [accPhone]);
     let updated = 0;
     for (const chat of chats.rows) {
       if (chat.is_group) continue;
@@ -856,10 +889,10 @@ async function updateChatNames() {
         ? '+91 ' + rawPhone.slice(2, 7) + ' ' + rawPhone.slice(7)
         : '+' + rawPhone;
       if (resolvedName && resolvedName !== ('+' + rawPhone) && resolvedName !== rawPhone) {
-        await pool.query(`UPDATE wa_chats SET name=$1, phone=$2 WHERE id=$3`, [resolvedName, displayPhone, chat.id]);
+        await pool.query(`UPDATE wa_chats SET name=$1, phone=$2 WHERE id=$3 AND account_phone=$4`, [resolvedName, displayPhone, chat.id, accPhone]);
         updated++;
       } else if (!chat.phone || chat.phone !== displayPhone) {
-        await pool.query(`UPDATE wa_chats SET phone=$1 WHERE id=$2`, [displayPhone, chat.id]);
+        await pool.query(`UPDATE wa_chats SET phone=$1 WHERE id=$2 AND account_phone=$3`, [displayPhone, chat.id, accPhone]);
       }
     }
 
@@ -882,10 +915,12 @@ async function updateChatNames() {
       END
       FROM wa_contacts wc
       WHERE wa_chats.id = wc.jid
+        AND wa_chats.account_phone = $1
+        AND wc.account_phone = $1
         AND wa_chats.id LIKE '%@lid'
         AND wc.phone IS NOT NULL
         AND wc.phone != ''
-    `);
+    `, [accPhone]);
 
     console.log('[WA] Updated ' + updated + ' chat names');
   } catch (err) {
@@ -907,7 +942,8 @@ async function syncAllGroupParticipants() {
   }
   groupParticipantSyncing = true;
   try {
-    const groups = await pool.query(`SELECT id FROM wa_chats WHERE is_group = true`);
+    const accPhone = phoneNumber || 'unknown';
+    const groups = await pool.query(`SELECT id FROM wa_chats WHERE is_group = true AND account_phone=$1`, [accPhone]);
     if (groups.rows.length === 0) return;
     console.log(`[WA] Syncing participants for ${groups.rows.length} groups...`);
     let total = 0;
@@ -923,13 +959,13 @@ async function syncAllGroupParticipants() {
           const rawPhone = pNum.replace(/\D/g, '');
           if (!rawPhone || rawPhone.length < 7) continue;
           await pool.query(`
-            INSERT INTO wa_contacts (jid, name, phone)
-            VALUES ($1, $2, $3)
-            ON CONFLICT (jid) DO UPDATE SET
+            INSERT INTO wa_contacts (jid, account_phone, name, phone)
+            VALUES ($1, $2, $3, $4)
+            ON CONFLICT (jid, account_phone) DO UPDATE SET
               phone = EXCLUDED.phone,
               name  = COALESCE(EXCLUDED.name, wa_contacts.name),
               updated_at = NOW()
-          `, [p.id, null, rawPhone]);
+          `, [p.id, accPhone, null, rawPhone]);
           total++;
         }
       } catch (_) { }
@@ -955,17 +991,58 @@ function clearSession() {
 }
 
 // ── SEND MESSAGE ─────────────────────────────────────────────────────────────────────
+async function adoptUnknownAccountRows(accPhone) {
+  if (!accPhone || accPhone === 'unknown') return;
+  try {
+    await pool.query(`
+      UPDATE wa_contacts old
+      SET account_phone = $1
+      WHERE old.account_phone = 'unknown'
+        AND NOT EXISTS (
+          SELECT 1 FROM wa_contacts existing
+          WHERE existing.jid = old.jid
+            AND existing.account_phone = $1
+        )
+    `, [accPhone]);
+    await pool.query(`
+      UPDATE wa_chats old
+      SET account_phone = $1
+      WHERE old.account_phone = 'unknown'
+        AND NOT EXISTS (
+          SELECT 1 FROM wa_chats existing
+          WHERE existing.id = old.id
+            AND existing.account_phone = $1
+        )
+    `, [accPhone]);
+    await pool.query(`
+      UPDATE wa_messages old
+      SET account_phone = $1
+      WHERE old.account_phone = 'unknown'
+        AND NOT EXISTS (
+          SELECT 1 FROM wa_messages existing
+          WHERE existing.id = old.id
+            AND existing.chat_id = old.chat_id
+            AND existing.account_phone = $1
+        )
+    `, [accPhone]);
+    console.log('[WA] Adopted legacy unknown WhatsApp rows for account', accPhone);
+  } catch (e) {
+    console.warn('[WA] Legacy account adoption skipped:', e.message);
+  }
+}
+
 async function sendMessage(jid, text, quotedMsgId) {
   if (!sock || !isConnected) throw new Error('WhatsApp not connected');
   const formattedJid = formatJid(jid);
+  const accPhone = phoneNumber || 'unknown';
 
   let sendOptions = { text };
 
   if (quotedMsgId) {
     try {
       const res = await pool.query(
-        `SELECT body, from_me, sender FROM wa_messages WHERE id=$1 AND chat_id=$2`,
-        [quotedMsgId, formattedJid]
+        `SELECT body, from_me, sender FROM wa_messages WHERE id=$1 AND chat_id=$2 AND account_phone=$3`,
+        [quotedMsgId, formattedJid, accPhone]
       );
       if (res.rows[0]) {
         sendOptions.quoted = {
@@ -998,10 +1075,10 @@ async function sendMessage(jid, text, quotedMsgId) {
   };
 
   await pool.query(
-    `INSERT INTO wa_messages (id, chat_id, from_me, sender_name, body, msg_type, timestamp, is_read, status, quoted_body)
-     VALUES ($1,$2,true,'You',$3,'text',$4,true,'sent',$5)
-     ON CONFLICT (id, chat_id) DO NOTHING`,
-    [savedMsg.id, formattedJid, text, ts, savedMsg.quotedBody]
+    `INSERT INTO wa_messages (id, chat_id, account_phone, from_me, sender_name, body, msg_type, timestamp, is_read, status, quoted_body)
+     VALUES ($1,$2,$3,true,'You',$4,'text',$5,true,'sent',$6)
+     ON CONFLICT (id, chat_id, account_phone) DO NOTHING`,
+    [savedMsg.id, formattedJid, accPhone, text, ts, savedMsg.quotedBody]
   );
   await saveChat(formattedJid, null, text, ts, 0, formattedJid.endsWith('@g.us'));
 
@@ -1047,6 +1124,7 @@ async function sendPreparedMedia(formattedJid, msgType, buffer, mimetype, filena
 async function sendMediaMessage(jid, media, quotedMsgId) {
   if (!sock || !isConnected) throw new Error('WhatsApp not connected');
   const formattedJid = formatJid(jid);
+  const accPhone = phoneNumber || 'unknown';
   const buffer = Buffer.isBuffer(media?.buffer) ? media.buffer : Buffer.from(media?.buffer || '');
   if (!buffer.length) throw new Error('Media file is empty');
 
@@ -1059,8 +1137,8 @@ async function sendMediaMessage(jid, media, quotedMsgId) {
   if (quotedMsgId) {
     try {
       const res = await pool.query(
-        `SELECT body, from_me, sender FROM wa_messages WHERE id=$1 AND chat_id=$2`,
-        [quotedMsgId, formattedJid]
+        `SELECT body, from_me, sender FROM wa_messages WHERE id=$1 AND chat_id=$2 AND account_phone=$3`,
+        [quotedMsgId, formattedJid, accPhone]
       );
       if (res.rows[0]) {
         quoted = {
@@ -1119,8 +1197,8 @@ async function sendMediaMessage(jid, media, quotedMsgId) {
   if (quotedMsgId) {
     try {
       const q = await pool.query(
-        `SELECT body, media_path FROM wa_messages WHERE id=$1 AND chat_id=$2`,
-        [quotedMsgId, formattedJid]
+        `SELECT body, media_path FROM wa_messages WHERE id=$1 AND chat_id=$2 AND account_phone=$3`,
+        [quotedMsgId, formattedJid, accPhone]
       );
 
       if (q.rows[0]) {
@@ -1150,10 +1228,10 @@ async function sendMediaMessage(jid, media, quotedMsgId) {
   };
 
   await pool.query(
-    `INSERT INTO wa_messages (id, chat_id, from_me, sender_name, body, msg_type, timestamp, is_read, status, quoted_body, media_path)
-     VALUES ($1,$2,true,'You',$3,$4,$5,true,'sent',$6,$7)
-     ON CONFLICT (id, chat_id) DO NOTHING`,
-    [id, formattedJid, body, finalType, ts, savedMsg.quotedBody, savedName]
+    `INSERT INTO wa_messages (id, chat_id, account_phone, from_me, sender_name, body, msg_type, timestamp, is_read, status, quoted_body, media_path)
+     VALUES ($1,$2,$3,true,'You',$4,$5,$6,true,'sent',$7,$8)
+     ON CONFLICT (id, chat_id, account_phone) DO NOTHING`,
+    [id, formattedJid, accPhone, body, finalType, ts, savedMsg.quotedBody, savedName]
   );
   await saveChat(formattedJid, null, body, ts, 0, formattedJid.endsWith('@g.us'));
 
@@ -1282,11 +1360,12 @@ function getConnectedPhone() {
 async function importExportedChat(chatText, chatJid, mediaFiles, clearOld) {
   if (!chatJid) throw new Error("A valid chat must be selected.");
   await ensureTables();
-  const existing = await pool.query(`SELECT id, name FROM wa_chats WHERE id=$1`, [chatJid]);
+  const accPhone = phoneNumber || 'unknown';
+  const existing = await pool.query(`SELECT id, name FROM wa_chats WHERE id=$1 AND account_phone=$2`, [chatJid, accPhone]);
   if (existing.rows.length === 0) throw new Error("Chat not found.");
   const displayChatName = existing.rows[0].name;
 
-  if (clearOld) await pool.query(`DELETE FROM wa_messages WHERE chat_id=$1`, [chatJid]);
+  if (clearOld) await pool.query(`DELETE FROM wa_messages WHERE chat_id=$1 AND account_phone=$2`, [chatJid, accPhone]);
 
   const mediaDir = path.join(__dirname, '../wa_media');
   if (!fs.existsSync(mediaDir)) fs.mkdirSync(mediaDir, { recursive: true });
@@ -1321,10 +1400,10 @@ async function importExportedChat(chatText, chatJid, mediaFiles, clearOld) {
     const isFromMe = (senderName === 'You');
 
     await pool.query(`
-      INSERT INTO wa_messages (id, chat_id, from_me, sender_name, body, msg_type, timestamp, is_read, status, media_path)
-      VALUES ($1,$2,$3,$4,$5,$6,$7,true,'read',$8)
-      ON CONFLICT (id, chat_id) DO NOTHING
-    `, [msgId, chatJid, isFromMe, isFromMe ? 'You' : senderName, cleanBody, msgType, ts, linkedMediaPath]);
+      INSERT INTO wa_messages (id, chat_id, account_phone, from_me, sender_name, body, msg_type, timestamp, is_read, status, media_path)
+      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,true,'read',$9)
+      ON CONFLICT (id, chat_id, account_phone) DO NOTHING
+    `, [msgId, chatJid, accPhone, isFromMe, isFromMe ? 'You' : senderName, cleanBody, msgType, ts, linkedMediaPath]);
     imported++;
     lastTs = ts;
     pendingMsg = null;
@@ -1358,7 +1437,7 @@ async function importExportedChat(chatText, chatJid, mediaFiles, clearOld) {
     }
   }
   await flush();
-  await pool.query(`UPDATE wa_chats SET last_time=$1, imported_last_ts=GREATEST(imported_last_ts, $1) WHERE id=$2`, [lastTs, chatJid]);
+  await pool.query(`UPDATE wa_chats SET last_time=$1, imported_last_ts=GREATEST(imported_last_ts, $1) WHERE id=$2 AND account_phone=$3`, [lastTs, chatJid, accPhone]);
   importedLastTsMap[chatJid] = new Date(lastTs).getTime();
   return { imported, chatJid, chatName: displayChatName };
 }

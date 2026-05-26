@@ -214,9 +214,6 @@ router.post('/', async (req, res) => {
   if (!fname || !lname || !company) {
     return res.status(400).json({ error: 'First name, last name, and company are required.' });
   }
-  if (!String(phone || wa || '').trim()) {
-    return res.status(400).json({ error: 'Mobile number is required for contact tracking.' });
-  }
 
   const initials = `${fname[0]}${lname[0]}`.toUpperCase();
   const palettes = [
@@ -267,9 +264,6 @@ router.post('/', async (req, res) => {
 router.put('/:id', async (req, res) => {
   const { fname, lname, company, designation, dept, phone, wa, email,
           segment, score, products, city, notes } = req.body;
-  if (!String(phone || wa || '').trim()) {
-    return res.status(400).json({ error: 'Mobile number is required for contact tracking.' });
-  }
   try {
     const result = await pool.query(`
       UPDATE contacts SET
