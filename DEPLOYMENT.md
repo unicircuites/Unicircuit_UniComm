@@ -505,56 +505,110 @@ Logs mein `[Graph]` aur `[MSAL]` lines dekho — exact error wahan hoga.
 2. git add -A
 3. git commit -m "message"
 4. git push origin main
-5. Tower pe: powershell -ExecutionPolicy Bypass -File C:\update-unicomm.ps1
+5. Tower pe: neeche wale commands run karo
 ```
 
-TOWER SERVER — SAFE UPDATE COMMANDS (Recommended)
-# 1. Go to project root
+---
+
+## 🚀 Tower Server — Git Pull & Deploy (Run These Commands)
+
+> **Copy-paste these commands directly into Tower server PowerShell (as Administrator).**
+> `.env` aur `certs/` kabhi delete nahi honge — yeh commands unhe touch nahi karte.
+
+### Step 1 — Project folder pe jao
+```powershell
 cd C:\UniComm\Unicircuit_UniComm-main
+```
 
-# 2. Stash ONLY tracked changes
-# (does NOT touch .env or certs folder)
+### Step 2 — Tracked local changes stash karo (safe)
+```powershell
 git stash push -m "tower tracked changes before deploy"
+```
 
-# 3. Pull latest code safely
+### Step 3 — Latest code GitHub se pull karo
+```powershell
 git checkout main
 git fetch origin
 git reset --hard origin/main
+```
 
-# 4. Install/update backend packages
+### Step 4 — Backend dependencies update karo
+```powershell
 cd backend
 npm install --prefer-offline
+```
 
-# 5. Ensure certs folder exists
+### Step 5 — SSL certs check karo (auto-generate if missing)
+```powershell
 mkdir certs -ErrorAction SilentlyContinue
-
-# 6. Auto-generate SSL certs ONLY if missing
 if (!(Test-Path ".\certs\server.key") -or !(Test-Path ".\certs\server.crt")) {
-
-  Write-Host "SSL certs missing. Generating new OpenSSL certs..." -ForegroundColor Yellow
-
-  & "C:\Program Files\Git\usr\bin\openssl.exe" req `
-    -x509 `
-    -nodes `
-    -days 3650 `
-    -newkey rsa:2048 `
-    -keyout ".\certs\server.key" `
-    -out ".\certs\server.crt" `
-    -subj "/CN=192.168.0.205"
+  Write-Host "SSL certs missing — generating..." -ForegroundColor Yellow
+  & "C:\Program Files\Git\usr\bin\openssl.exe" req -x509 -nodes -days 3650 -newkey rsa:2048 `
+    -keyout ".\certs\server.key" -out ".\certs\server.crt" -subj "/CN=192.168.0.205"
+} else {
+  Write-Host "SSL certs OK" -ForegroundColor Green
 }
+```
 
-# 7. Restart PM2 by process name
-# Tower does not currently use ecosystem.config.js; process name is `unicomm`.
+### Step 6 — Server restart karo
+```powershell
 pm2 restart unicomm --update-env
-
-# 8. Save PM2 process list
 pm2 save
+```
 
-# 9. Flush old logs AFTER restart so the next log view shows only fresh health/errors
+### Step 7 — Logs flush karo aur verify karo
+```powershell
 pm2 flush unicomm
-
-# 10. Verify server status
 pm2 status
-
-# 11. View only fresh logs
 pm2 logs unicomm --lines 80
+```
+
+---
+
+### ⚡ One-liner (sab ek saath — copy-paste ready)
+
+```powershell
+cd C:\UniComm\Unicircuit_UniComm-main; git stash push -m "tower deploy stash"; git checkout main; git fetch origin; git reset --hard origin/main; cd backend; npm install --prefer-offline; pm2 restart unicomm --update-env; pm2 save; pm2 flush unicomm; pm2 status
+```
+
+---
+
+### ✅ Deploy Checklist
+
+```
+[ ] cd C:\UniComm\Unicircuit_UniComm-main
+[ ] git stash push -m "tower tracked changes before deploy"
+[ ] git fetch origin
+[ ] git reset --hard origin/main
+[ ] cd backend && npm install --prefer-offline
+[ ] certs\ folder mein server.crt aur server.key exist karte hain
+[ ] pm2 restart unicomm --update-env
+[ ] pm2 status → "online" dikha
+[ ] pm2 logs unicomm --lines 80 → koi crash nahi
+[ ] Browser: https://192.168.0.205:8088 → dashboard load hua
+```
+
+---
+
+### ⚠️ Agar git reset ke baad certs chali gayi
+
+```powershell
+# certs/ gitignore mein hai isliye reset se delete nahi honi chahiye.
+# Agar phir bhi missing ho:
+cd C:\UniComm\Unicircuit_UniComm-main\backend
+mkdir certs -ErrorAction SilentlyContinue
+& "C:\Program Files\Git\usr\bin\openssl.exe" req -x509 -nodes -days 3650 -newkey rsa:2048 `
+  -keyout ".\certs\server.key" -out ".\certs\server.crt" -subj "/CN=192.168.0.205"
+pm2 restart unicomm --update-env
+```
+
+---
+
+### ⚠️ Agar git stash se kuch restore karna ho
+
+```powershell
+git stash list                          # stash list dekho
+git stash pop                           # latest stash restore karo
+# ya specific stash:
+git stash apply "stash@{0}"
+```
