@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="en">
 
 <head>
@@ -4158,6 +4158,31 @@
           <button class="btn btn-gold btn-sm" onclick="openModal('contact-modal')"><i class="fas fa-user-plus"></i> Add
             Contact</button>
           <button class="btn btn-ghost btn-sm" onclick="nav('ai',null)"><i class="fas fa-robot"></i> Ask AI</button>
+          <!-- Marketing quick-actions dropdown -->
+          <div style="position:relative;display:inline-block;" id="mkt-quick-wrap">
+            <button class="btn btn-gold btn-sm" id="mkt-quick-btn"
+              onclick="toggleMktQuickMenu()"
+              title="Marketing actions">
+              <i class="fas fa-bullhorn"></i> Marketing
+              <i class="fas fa-chevron-down" style="font-size:9px;margin-left:3px;"></i>
+            </button>
+            <div id="mkt-quick-menu" style="display:none;position:absolute;top:calc(100% + 6px);right:0;z-index:9999;
+              background:var(--bg3);border:1px solid var(--border2);border-radius:10px;
+              box-shadow:0 8px 28px rgba(0,0,0,0.45);min-width:190px;padding:6px;overflow:hidden;">
+              <button class="btn btn-ghost btn-sm" style="width:100%;justify-content:flex-start;gap:9px;padding:8px 12px;border-radius:7px;"
+                onclick="closeMktQuickMenu();openModal('broadcast-modal');bcLoadTemplates();bcLoadGroupsDropdown();">
+                <i class="fas fa-paper-plane" style="color:var(--blue2);width:14px;"></i> Send Broadcast
+              </button>
+              <button class="btn btn-ghost btn-sm" style="width:100%;justify-content:flex-start;gap:9px;padding:8px 12px;border-radius:7px;"
+                onclick="closeMktQuickMenu();openModal('campaign-modal');">
+                <i class="fas fa-rocket" style="color:var(--cyan);width:14px;"></i> Launch Campaign
+              </button>
+              <button class="btn btn-ghost btn-sm" style="width:100%;justify-content:flex-start;gap:9px;padding:8px 12px;border-radius:7px;"
+                onclick="closeMktQuickMenu();openEmailTemplates();">
+                <i class="fas fa-file-alt" style="color:var(--gold);width:14px;"></i> Create Template
+              </button>
+            </div>
+          </div>
           <button class="theme-btn" id="themeToggle" onclick="toggleTheme()" title="Toggle light/dark mode"><i
               class="fas fa-moon" id="themeIcon"></i></button>
         </div>
@@ -4526,12 +4551,13 @@
                       <th>Duration</th>
                       <th>Type</th>
                       <th>Trunk</th>
+                      <th>Recording</th>
                       <th>AI Action</th>
                     </tr>
                   </thead>
                   <tbody id="calls-tbody">
                     <tr>
-                      <td colspan="7" style="text-align:center;padding:30px;color:var(--muted);">
+                      <td colspan="8" style="text-align:center;padding:30px;color:var(--muted);">
                         <div class="spin-loader" style="margin:0 auto 10px;"></div>Loading call logs...
                       </td>
                     </tr>
@@ -5030,6 +5056,31 @@
                   class="fas fa-sync-alt"></i> Sync</button>
               <button class="btn btn-gold btn-xs" onclick="openAIAssistant()" title="AI Email Intelligence Assistant"
                 style="white-space:nowrap;"><i class="fas fa-brain"></i> AI Assistant</button>
+              <!-- Marketing quick-actions -->
+              <div style="position:relative;display:inline-block;" id="oa-mkt-wrap">
+                <button class="btn btn-ghost btn-xs" id="oa-mkt-btn" onclick="toggleOaMktMenu()" style="white-space:nowrap;color:var(--gold);border-color:rgba(245,166,35,0.35);">
+                  <i class="fas fa-bullhorn"></i> Marketing <i class="fas fa-chevron-down" style="font-size:8px;margin-left:2px;"></i>
+                </button>
+                <div id="oa-mkt-menu" style="display:none;position:absolute;top:calc(100% + 5px);right:0;z-index:9999;
+                  background:var(--bg3);border:1px solid var(--border2);border-radius:10px;
+                  box-shadow:0 8px 28px rgba(0,0,0,0.5);min-width:185px;padding:5px;white-space:nowrap;">
+                  <div onclick="closeOaMktMenu();openModal('broadcast-modal');bcLoadTemplates();bcLoadGroupsDropdown();"
+                    style="display:flex;align-items:center;gap:9px;padding:8px 12px;border-radius:7px;cursor:pointer;font-size:12.5px;color:var(--text);"
+                    onmouseover="this.style.background='rgba(255,255,255,0.06)'" onmouseout="this.style.background=''">
+                    <i class="fas fa-paper-plane" style="color:var(--blue2);width:14px;"></i> Send Broadcast
+                  </div>
+                  <div onclick="closeOaMktMenu();openModal('campaign-modal');"
+                    style="display:flex;align-items:center;gap:9px;padding:8px 12px;border-radius:7px;cursor:pointer;font-size:12.5px;color:var(--text);"
+                    onmouseover="this.style.background='rgba(255,255,255,0.06)'" onmouseout="this.style.background=''">
+                    <i class="fas fa-rocket" style="color:var(--cyan);width:14px;"></i> Launch Campaign
+                  </div>
+                  <div onclick="closeOaMktMenu();openEmailTemplates();"
+                    style="display:flex;align-items:center;gap:9px;padding:8px 12px;border-radius:7px;cursor:pointer;font-size:12.5px;color:var(--text);"
+                    onmouseover="this.style.background='rgba(255,255,255,0.06)'" onmouseout="this.style.background=''">
+                    <i class="fas fa-file-alt" style="color:var(--gold);width:14px;"></i> Create Template
+                  </div>
+                </div>
+              </div>
               <button class="btn btn-ghost btn-xs" id="sync-stats-btn" onclick="syncOutlookStats()"
                 title="Scan all mail and update contact counts" style="white-space:nowrap;"><i
                   class="fas fa-database"></i> Sync Mail Stats</button>
@@ -5345,14 +5396,22 @@
                     style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:12px;"><i
                       class="fas fa-times"></i></button>
                 </div>
-                <div style="display:flex;gap:8px;align-items:center;">
+                <div id="wa-compose-suggestions"
+                  style="display:none;align-items:center;gap:6px;flex-wrap:wrap;padding:0 44px 2px 44px;"></div>
+                <div style="display:flex;gap:8px;align-items:flex-end;position:relative;">
                   <input type="file" id="wa-media-input" style="display:none;" onchange="waHandleFileSelect(event)" />
                   <button class="btn btn-ghost btn-sm" onclick="document.getElementById('wa-media-input').click()"
                     title="Attach Media">
                     <i class="fas fa-paperclip"></i>
                   </button>
-                  <input class="inp" id="wa-msg-input" placeholder="Type a message..."
-                    onkeydown="if(event.key==='Enter')waSendMsg()" style="font-size:13px;" />
+                  <button class="btn btn-ghost btn-sm" onclick="waToggleEmojiPicker()" title="Choose Emoji">
+                    <i class="far fa-smile"></i>
+                  </button>
+                  <div id="wa-emoji-picker" class="emoji-picker-popup"
+                    style="display:none;position:absolute;left:42px;bottom:42px;top:auto;z-index:50;width:292px;"></div>
+                  <textarea class="inp" id="wa-msg-input" rows="1" placeholder="Type a message..."
+                    onkeydown="waHandleComposerKey(event)" oninput="waComposerInput()"
+                    style="font-size:13px;resize:none;min-height:32px;max-height:110px;line-height:18px;padding-top:7px;padding-bottom:7px;overflow-y:auto;"></textarea>
                   <button class="btn btn-green btn-sm" onclick="waSendMsg()"><i class="fas fa-paper-plane"></i></button>
                   <button class="btn btn-ghost btn-sm" onclick="aiWADraft()"><i class="fas fa-robot"></i></button>
                 </div>
@@ -5706,304 +5765,6 @@
                   </tbody>
                 </table>
               </div>
-            </div>
-          </div>
-
-          <!-- Broadcast Modal -->
-          <div class="modal-overlay" id="broadcast-modal">
-            <div class="modal" style="max-width:760px;">
-              <div class="modal-title">
-                <span><i class="fas fa-paper-plane" style="color:var(--blue2);margin-right:8px;"></i>Create Email
-                  Broadcast</span>
-                <span class="modal-close" onclick="closeModal('broadcast-modal')"><i class="fas fa-times"></i></span>
-              </div>
-
-              <!-- Template picker -->
-              <div
-                style="display:flex;gap:8px;align-items:center;padding:8px 10px;background:rgba(59,130,246,0.06);border:1px solid rgba(59,130,246,0.15);border-radius:8px;margin-bottom:10px;">
-                <i class="fas fa-file-alt" style="color:var(--blue2);font-size:12px;flex-shrink:0;"></i>
-                <select class="inp" id="bc-template-select"
-                  style="font-size:12px;padding:5px 8px;flex:1;background:transparent;border:none;outline:none;">
-                  <option value="">— Use a saved template —</option>
-                </select>
-                <button type="button" class="btn btn-blue btn-xs" onclick="bcApplyTemplate()"><i
-                    class="fas fa-check"></i> Apply</button>
-              </div>
-
-              <div class="form-group">
-                <label class="form-label">Subject *</label>
-                <input class="inp" id="bc-subject" placeholder="e.g. New Product Launch — MCB Distribution Boards" />
-              </div>
-
-              <div class="form-group">
-                <label class="form-label" style="display:flex;justify-content:space-between;align-items:center;">
-                  <span>Email Body *</span>
-                  <button class="btn btn-ghost btn-xs" onmousedown="bcToolbarMousedown(event)"
-                    onclick="bcGenerateAI()"><i class="fas fa-robot"></i> AI Generate</button>
-                </label>
-                <!-- Rich editor toolbar -->
-                <div
-                  style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;padding:6px 10px;background:var(--card2);border:1px solid var(--border2);border-radius:8px 8px 0 0;border-bottom:none;">
-                  <select id="bc-font-select" onmousedown="bcSaveSelection()"
-                    onchange="bcSetFont(this.value);this.value=''"
-                    style="font-size:11px;padding:3px 4px;background:var(--card2);border:1px solid var(--border);border-radius:5px;color:var(--text);cursor:pointer;max-width:120px;"
-                    title="Font family — select text first">
-                    <option value="">Font</option>
-                    <optgroup label="── Word Defaults ──">
-                      <option value="Calibri">Calibri</option>
-                      <option value="Calibri Light">Calibri Light</option>
-                      <option value="Cambria">Cambria</option>
-                      <option value="Aptos">Aptos</option>
-                      <option value="Segoe UI">Segoe UI</option>
-                      <option value="Times New Roman">Times New Roman</option>
-                      <option value="Arial">Arial</option>
-                      <option value="Verdana">Verdana</option>
-                      <option value="Tahoma">Tahoma</option>
-                      <option value="Georgia">Georgia</option>
-                      <option value="Garamond">Garamond</option>
-                      <option value="Helvetica">Helvetica</option>
-                    </optgroup>
-                    <optgroup label="── Monospace ──">
-                      <option value="Courier New">Courier New</option>
-                      <option value="Consolas">Consolas</option>
-                    </optgroup>
-                  </select>
-                  <select id="bc-size-select" onmousedown="bcSaveSelection()"
-                    onchange="bcSetSize(this.value);this.value=''"
-                    style="font-size:11px;padding:3px 4px;background:var(--card2);border:1px solid var(--border);border-radius:5px;color:var(--text);cursor:pointer;"
-                    title="Font size — select text first">
-                    <option value="">Size</option>
-                    <option value="10px">10</option>
-                    <option value="11px">11</option>
-                    <option value="12px">12</option>
-                    <option value="13px">13</option>
-                    <option value="14px">14</option>
-                    <option value="16px">16</option>
-                    <option value="18px">18</option>
-                    <option value="20px">20</option>
-                    <option value="24px">24</option>
-                    <option value="28px">28</option>
-                    <option value="32px">32</option>
-                    <option value="36px">36</option>
-                    <option value="48px">48</option>
-                    <option value="72px">72</option>
-                  </select>
-                  <button type="button" id="bc-btn-bold" class="btn btn-ghost btn-xs"
-                    onmousedown="bcToolbarMousedown(event)" onclick="bcExecCmd('bold');bcUpdateActiveButtons()"
-                    title="Bold"><b>B</b></button>
-                  <button type="button" id="bc-btn-italic" class="btn btn-ghost btn-xs"
-                    onmousedown="bcToolbarMousedown(event)" onclick="bcExecCmd('italic');bcUpdateActiveButtons()"
-                    title="Italic"><i>I</i></button>
-                  <button type="button" id="bc-btn-underline" class="btn btn-ghost btn-xs"
-                    onmousedown="bcToolbarMousedown(event)" onclick="bcExecCmd('underline');bcUpdateActiveButtons()"
-                    title="Underline"><u>U</u></button>
-                  <button type="button" id="bc-btn-strike" class="btn btn-ghost btn-xs"
-                    onmousedown="bcToolbarMousedown(event)" onclick="bcExecCmd('strikeThrough');bcUpdateActiveButtons()"
-                    title="Strike"><s>S</s></button>
-                  <!-- Text color -->
-                  <div style="position:relative;display:inline-block;">
-                    <button type="button" id="bc-fgcolor-btn" onmousedown="bcToolbarMousedown(event)"
-                      onclick="bcToggleColorPicker('fg')" title="Text color"
-                      style="display:flex;align-items:center;gap:3px;padding:3px 7px;font-size:11px;background:var(--card2);border:1px solid var(--border);border-radius:5px;cursor:pointer;color:var(--text);">
-                      <span style="font-size:10px;font-weight:700;">A</span>
-                      <span id="bc-fgcolor-swatch"
-                        style="display:inline-block;width:14px;height:4px;border-radius:2px;background:#000000;"></span>
-                    </button>
-                    <div id="bc-fgcolor-popup"
-                      style="display:none;position:absolute;top:34px;left:0;z-index:999;background:var(--card);border:1px solid var(--border2);border-radius:8px;padding:10px;box-shadow:0 4px 20px rgba(0,0,0,0.4);min-width:160px;">
-                      <div style="font-size:10px;color:var(--muted);margin-bottom:6px;font-weight:600;">TEXT COLOR
-                      </div>
-                      <div style="display:flex;flex-wrap:wrap;gap:5px;margin-bottom:8px;">
-                        <span onclick="bcPickColor('fg','#000000')"
-                          style="width:20px;height:20px;border-radius:4px;background:#000000;cursor:pointer;border:2px solid transparent;"></span>
-                        <span onclick="bcPickColor('fg','#ffffff')"
-                          style="width:20px;height:20px;border-radius:4px;background:#ffffff;cursor:pointer;border:1px solid #ccc;"></span>
-                        <span onclick="bcPickColor('fg','#e8820a')"
-                          style="width:20px;height:20px;border-radius:4px;background:#e8820a;cursor:pointer;"></span>
-                        <span onclick="bcPickColor('fg','#dc2626')"
-                          style="width:20px;height:20px;border-radius:4px;background:#dc2626;cursor:pointer;"></span>
-                        <span onclick="bcPickColor('fg','#16a34a')"
-                          style="width:20px;height:20px;border-radius:4px;background:#16a34a;cursor:pointer;"></span>
-                        <span onclick="bcPickColor('fg','#2563eb')"
-                          style="width:20px;height:20px;border-radius:4px;background:#2563eb;cursor:pointer;"></span>
-                        <span onclick="bcPickColor('fg','#7c3aed')"
-                          style="width:20px;height:20px;border-radius:4px;background:#7c3aed;cursor:pointer;"></span>
-                        <span onclick="bcPickColor('fg','#374151')"
-                          style="width:20px;height:20px;border-radius:4px;background:#374151;cursor:pointer;"></span>
-                      </div>
-                      <div style="display:flex;gap:6px;align-items:center;">
-                        <input type="color" id="bc-fgcolor-custom" value="#000000"
-                          style="width:32px;height:28px;padding:1px;border:1px solid var(--border);border-radius:4px;cursor:pointer;flex-shrink:0;">
-                        <span style="font-size:10px;color:var(--muted);">Custom</span>
-                        <button type="button" class="btn btn-gold btn-xs" style="margin-left:auto;"
-                          onclick="bcPickColor('fg',document.getElementById('bc-fgcolor-custom').value)">Apply</button>
-                      </div>
-                    </div>
-                  </div>
-                  <!-- Highlight color -->
-                  <div style="position:relative;display:inline-block;">
-                    <button type="button" id="bc-bgcolor-btn" onmousedown="bcToolbarMousedown(event)"
-                      onclick="bcToggleColorPicker('bg')" title="Highlight color"
-                      style="display:flex;align-items:center;gap:3px;padding:3px 7px;font-size:11px;background:var(--card2);border:1px solid var(--border);border-radius:5px;cursor:pointer;color:var(--text);">
-                      <span style="font-size:10px;">BG</span>
-                      <span id="bc-bgcolor-swatch"
-                        style="display:inline-block;width:14px;height:4px;border-radius:2px;background:#ffff00;"></span>
-                    </button>
-                    <div id="bc-bgcolor-popup"
-                      style="display:none;position:absolute;top:34px;left:0;z-index:999;background:var(--card);border:1px solid var(--border2);border-radius:8px;padding:10px;box-shadow:0 4px 20px rgba(0,0,0,0.4);min-width:160px;">
-                      <div style="font-size:10px;color:var(--muted);margin-bottom:6px;font-weight:600;">HIGHLIGHT
-                        COLOR
-                      </div>
-                      <div style="display:flex;flex-wrap:wrap;gap:5px;margin-bottom:8px;">
-                        <span onclick="bcPickColor('bg','transparent')"
-                          style="width:20px;height:20px;border-radius:4px;background:transparent;cursor:pointer;border:1px solid #ccc;font-size:9px;display:flex;align-items:center;justify-content:center;color:#999;">✕</span>
-                        <span onclick="bcPickColor('bg','#fef08a')"
-                          style="width:20px;height:20px;border-radius:4px;background:#fef08a;cursor:pointer;"></span>
-                        <span onclick="bcPickColor('bg','#bbf7d0')"
-                          style="width:20px;height:20px;border-radius:4px;background:#bbf7d0;cursor:pointer;"></span>
-                        <span onclick="bcPickColor('bg','#bfdbfe')"
-                          style="width:20px;height:20px;border-radius:4px;background:#bfdbfe;cursor:pointer;"></span>
-                        <span onclick="bcPickColor('bg','#fecaca')"
-                          style="width:20px;height:20px;border-radius:4px;background:#fecaca;cursor:pointer;"></span>
-                        <span onclick="bcPickColor('bg','#e9d5ff')"
-                          style="width:20px;height:20px;border-radius:4px;background:#e9d5ff;cursor:pointer;"></span>
-                        <span onclick="bcPickColor('bg','#fed7aa')"
-                          style="width:20px;height:20px;border-radius:4px;background:#fed7aa;cursor:pointer;"></span>
-                      </div>
-                      <div style="display:flex;gap:6px;align-items:center;">
-                        <input type="color" id="bc-bgcolor-custom" value="#ffff00"
-                          style="width:32px;height:28px;padding:1px;border:1px solid var(--border);border-radius:4px;cursor:pointer;flex-shrink:0;">
-                        <span style="font-size:10px;color:var(--muted);">Custom</span>
-                        <button type="button" class="btn btn-gold btn-xs" style="margin-left:auto;"
-                          onclick="bcPickColor('bg',document.getElementById('bc-bgcolor-custom').value)">Apply</button>
-                      </div>
-                    </div>
-                  </div>
-                  <div style="width:1px;height:18px;background:var(--border);margin:0 2px;"></div>
-                  <button type="button" class="btn btn-ghost btn-xs" onmousedown="bcToolbarMousedown(event)"
-                    onclick="bcExecCmd('justifyLeft')" title="Left"><i class="fas fa-align-left"></i></button>
-                  <button type="button" class="btn btn-ghost btn-xs" onmousedown="bcToolbarMousedown(event)"
-                    onclick="bcExecCmd('justifyCenter')" title="Center"><i class="fas fa-align-center"></i></button>
-                  <button type="button" class="btn btn-ghost btn-xs" onmousedown="bcToolbarMousedown(event)"
-                    onclick="bcExecCmd('justifyRight')" title="Right"><i class="fas fa-align-right"></i></button>
-                  <button type="button" class="btn btn-ghost btn-xs" onmousedown="bcToolbarMousedown(event)"
-                    onclick="bcExecCmd('insertOrderedList')" title="Numbered list"><i
-                      class="fas fa-list-ol"></i></button>
-                  <button type="button" class="btn btn-ghost btn-xs" onmousedown="bcToolbarMousedown(event)"
-                    onclick="bcExecCmd('insertUnorderedList')" title="Bullet list"><i
-                      class="fas fa-list-ul"></i></button>
-                  <div style="width:1px;height:18px;background:var(--border);margin:0 2px;"></div>
-                  <button type="button" class="btn btn-ghost btn-xs" onmousedown="bcToolbarMousedown(event)"
-                    onclick="bcInsertHR()" title="HR"><i class="fas fa-minus"></i> HR</button>
-                  <button type="button" class="btn btn-ghost btn-xs" onmousedown="bcToolbarMousedown(event)"
-                    onclick="bcInsertMarquee()" title="Scrolling text"><i class="fas fa-arrows-alt-h"></i>
-                    Marquee</button>
-                  <button type="button" class="btn btn-ghost btn-xs" onmousedown="bcToolbarMousedown(event)"
-                    onclick="bcInsertTable()" title="Table"><i class="fas fa-table"></i> Table</button>
-                  <button type="button" class="btn btn-ghost btn-xs" onmousedown="bcToolbarMousedown(event)"
-                    onclick="bcInsertButton()" title="CTA Button"><i class="fas fa-hand-pointer"></i> Button</button>
-                  <button type="button" class="btn btn-ghost btn-xs"
-                    onmousedown="bcToolbarMousedown(event);_bcSavedSel=window.getSelection()&&window.getSelection().rangeCount>0?window.getSelection().getRangeAt(0).cloneRange():null"
-                    onclick="openMediaInsertModal('bc-html')" title="Insert image, video, audio or document"><i
-                      class="fas fa-photo-video"></i> Media</button>
-                  <div style="position:relative;display:inline-block;">
-                    <button type="button" class="btn btn-ghost btn-xs" onmousedown="bcToolbarMousedown(event)"
-                      onclick="bcToggleEmoji(this)" title="Emoji"><i class="fas fa-smile"></i> Emoji</button>
-                    <div id="bc-emoji-picker" class="emoji-picker-popup" style="display:none;top:32px;left:0;">
-                      <div class="emoji-tabs" id="bc-emoji-tabs">
-                        <button class="emoji-tab active" onclick="bcShowEmojiCat('smileys',this)">😀</button>
-                        <button class="emoji-tab" onclick="bcShowEmojiCat('people',this)">👋</button>
-                        <button class="emoji-tab" onclick="bcShowEmojiCat('nature',this)">🌿</button>
-                        <button class="emoji-tab" onclick="bcShowEmojiCat('food',this)">ðŸ•</button>
-                        <button class="emoji-tab" onclick="bcShowEmojiCat('travel',this)">✈️</button>
-                        <button class="emoji-tab" onclick="bcShowEmojiCat('objects',this)">💡</button>
-                        <button class="emoji-tab" onclick="bcShowEmojiCat('symbols',this)">â¤️</button>
-                        <button class="emoji-tab" onclick="bcShowEmojiCat('business',this)">💼</button>
-                      </div>
-                      <div class="emoji-search"><input id="bc-emoji-search" placeholder="Search emoji..."
-                          oninput="bcSearchEmoji(this.value)" /></div>
-                      <div class="emoji-grid" id="bc-emoji-grid"></div>
-                    </div>
-                  </div>
-                  <button type="button" class="btn btn-ghost btn-xs" onmousedown="bcToolbarMousedown(event)"
-                    onclick="bcInsertSignature()" title="Signature"><i class="fas fa-signature"></i>
-                    Signature</button>
-                  <button type="button" class="btn btn-ghost btn-xs"
-                    onmousedown="bcToolbarMousedown(event);_bcSavedSel=window.getSelection()&&window.getSelection().rangeCount>0?window.getSelection().getRangeAt(0).cloneRange():null"
-                    onclick="openInsertHtmlModal('bc-html')" title="Insert HTML (Auto-transforms for Outlook)
-✓ Inlines CSS, resolves CSS variables
-✗ Removes: box-shadow, border-radius, animations, transforms, filters, grid/flex properties
-⚠️ Note: Grid/flex layouts preserved but properties removed - use tables for Outlook"><i class="fas fa-code"></i>
-                    HTML</button>
-                  <button type="button" class="btn btn-ghost btn-xs" onmousedown="event.preventDefault()"
-                    onclick="previewEditorContent('bc-html')" title="Preview email full-screen"><i
-                      class="fas fa-eye"></i> Preview</button>
-                </div>
-                <div id="bc-html" contenteditable="true"
-                  style="min-height:180px;max-height:520px;overflow-y:auto;background:#fff;color:#222;font-family:Calibri,Arial,sans-serif;font-size:14px;line-height:1.6;padding:10px 12px 10px 28px;border:1px solid var(--border2);border-radius:0 0 8px 8px;outline:none;"
-                  placeholder="Write your email here… Use {{name}} for personalization."
-                  onmouseup="bcSaveSelection();bcUpdateActiveButtons()"
-                  onkeyup="bcSaveSelection();bcUpdateActiveButtons()">
-                </div>
-              </div>
-
-              <div class="form-group">
-                <label class="form-label" style="display:flex;justify-content:space-between;">
-                  <span>Recipients *</span>
-                  <span style="font-size:10.5px;color:var(--muted);">One per line: email or Name &lt;email&gt;</span>
-                </label>
-                <!-- Group picker -->
-                <div style="display:flex;gap:6px;align-items:center;margin-bottom:8px;flex-wrap:wrap;">
-                  <select id="bc-group-select" class="inp"
-                    style="font-size:12px;padding:5px 8px;flex:1;min-width:160px;">
-                    <option value="">— Load from a group —</option>
-                  </select>
-                  <button type="button" class="btn btn-blue btn-xs" onclick="bcLoadFromGroup()"><i
-                      class="fas fa-users"></i> Load Group</button>
-                  <button type="button" class="btn btn-ghost btn-xs" onclick="openGroupsManager()"><i
-                      class="fas fa-cog"></i> Manage Groups</button>
-                </div>
-                <textarea class="inp" id="bc-recipients" rows="5"
-                  placeholder="john@company.com&#10;Jane Doe &lt;jane@company.com&gt;&#10;sales@client.in"></textarea>
-                <div style="margin-top:5px;display:flex;gap:8px;align-items:center;">
-                  <span id="bc-recipient-count" style="font-size:11px;color:var(--muted);">0 recipients</span>
-                  <button class="btn btn-ghost btn-xs" onclick="bcLoadFromContacts()"><i
-                      class="fas fa-address-book"></i> Load from Contacts DB</button>
-                </div>
-              </div>
-
-              <div class="form-row">
-                <div>
-                  <label class="form-label">Send Interval — Delay between emails</label>
-                  <div style="display:flex;gap:6px;align-items:center;">
-                    <input class="inp" id="bc-delay-val" type="number" value="3" min="1" max="999"
-                      style="width:80px;flex-shrink:0;" oninput="bcUpdateIntervalPreview()" />
-                    <select class="inp" id="bc-delay-unit" style="width:auto;" onchange="bcUpdateIntervalPreview()">
-                      <option value="1000">seconds</option>
-                      <option value="60000" selected>minutes</option>
-                      <option value="3600000">hours</option>
-                    </select>
-                    <span id="bc-delay-preview" style="font-size:11px;color:var(--muted);white-space:nowrap;">= 3
-                      min</span>
-                  </div>
-                </div>
-                <div>
-                  <label class="form-label">Test email (send preview first)</label>
-                  <div style="display:flex;gap:6px;">
-                    <input class="inp" id="bc-test-email" placeholder="your@email.com" style="flex:1;" />
-                    <button class="btn btn-ghost btn-sm" onclick="bcSendTest()"><i class="fas fa-vial"></i>
-                      Test</button>
-                  </div>
-                </div>
-              </div>
-
-              <div style="display:flex;gap:8px;margin-top:4px;">
-                <button class="btn btn-gold" style="flex:1;justify-content:center;" onclick="bcSendBroadcast()">
-                  <i class="fas fa-paper-plane"></i> Send Broadcast
-                </button>
-                <button class="btn btn-ghost" onclick="closeModal('broadcast-modal')">Cancel</button>
-              </div>
-              <div id="bc-status" style="margin-top:10px;font-size:12px;text-align:center;"></div>
             </div>
           </div>
 
@@ -6590,6 +6351,304 @@
   </div>
 
   <!-- ────── CAMPAIGN MODAL ────── -->
+<!-- Broadcast Modal -->
+<div class="modal-overlay" id="broadcast-modal">
+  <div class="modal" style="max-width:760px;">
+    <div class="modal-title">
+      <span><i class="fas fa-paper-plane" style="color:var(--blue2);margin-right:8px;"></i>Create Email
+        Broadcast</span>
+      <span class="modal-close" onclick="closeModal('broadcast-modal')"><i class="fas fa-times"></i></span>
+    </div>
+
+    <!-- Template picker -->
+    <div
+      style="display:flex;gap:8px;align-items:center;padding:8px 10px;background:rgba(59,130,246,0.06);border:1px solid rgba(59,130,246,0.15);border-radius:8px;margin-bottom:10px;">
+      <i class="fas fa-file-alt" style="color:var(--blue2);font-size:12px;flex-shrink:0;"></i>
+      <select class="inp" id="bc-template-select"
+        style="font-size:12px;padding:5px 8px;flex:1;background:transparent;border:none;outline:none;">
+        <option value="">— Use a saved template —</option>
+      </select>
+      <button type="button" class="btn btn-blue btn-xs" onclick="bcApplyTemplate()"><i
+          class="fas fa-check"></i> Apply</button>
+    </div>
+
+    <div class="form-group">
+      <label class="form-label">Subject *</label>
+      <input class="inp" id="bc-subject" placeholder="e.g. New Product Launch — MCB Distribution Boards" />
+    </div>
+
+    <div class="form-group">
+      <label class="form-label" style="display:flex;justify-content:space-between;align-items:center;">
+        <span>Email Body *</span>
+        <button class="btn btn-ghost btn-xs" onmousedown="bcToolbarMousedown(event)"
+          onclick="bcGenerateAI()"><i class="fas fa-robot"></i> AI Generate</button>
+      </label>
+      <!-- Rich editor toolbar -->
+      <div
+        style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;padding:6px 10px;background:var(--card2);border:1px solid var(--border2);border-radius:8px 8px 0 0;border-bottom:none;">
+        <select id="bc-font-select" onmousedown="bcSaveSelection()"
+          onchange="bcSetFont(this.value);this.value=''"
+          style="font-size:11px;padding:3px 4px;background:var(--card2);border:1px solid var(--border);border-radius:5px;color:var(--text);cursor:pointer;max-width:120px;"
+          title="Font family — select text first">
+          <option value="">Font</option>
+          <optgroup label="── Word Defaults ──">
+            <option value="Calibri">Calibri</option>
+            <option value="Calibri Light">Calibri Light</option>
+            <option value="Cambria">Cambria</option>
+            <option value="Aptos">Aptos</option>
+            <option value="Segoe UI">Segoe UI</option>
+            <option value="Times New Roman">Times New Roman</option>
+            <option value="Arial">Arial</option>
+            <option value="Verdana">Verdana</option>
+            <option value="Tahoma">Tahoma</option>
+            <option value="Georgia">Georgia</option>
+            <option value="Garamond">Garamond</option>
+            <option value="Helvetica">Helvetica</option>
+          </optgroup>
+          <optgroup label="── Monospace ──">
+            <option value="Courier New">Courier New</option>
+            <option value="Consolas">Consolas</option>
+          </optgroup>
+        </select>
+        <select id="bc-size-select" onmousedown="bcSaveSelection()"
+          onchange="bcSetSize(this.value);this.value=''"
+          style="font-size:11px;padding:3px 4px;background:var(--card2);border:1px solid var(--border);border-radius:5px;color:var(--text);cursor:pointer;"
+          title="Font size — select text first">
+          <option value="">Size</option>
+          <option value="10px">10</option>
+          <option value="11px">11</option>
+          <option value="12px">12</option>
+          <option value="13px">13</option>
+          <option value="14px">14</option>
+          <option value="16px">16</option>
+          <option value="18px">18</option>
+          <option value="20px">20</option>
+          <option value="24px">24</option>
+          <option value="28px">28</option>
+          <option value="32px">32</option>
+          <option value="36px">36</option>
+          <option value="48px">48</option>
+          <option value="72px">72</option>
+        </select>
+        <button type="button" id="bc-btn-bold" class="btn btn-ghost btn-xs"
+          onmousedown="bcToolbarMousedown(event)" onclick="bcExecCmd('bold');bcUpdateActiveButtons()"
+          title="Bold"><b>B</b></button>
+        <button type="button" id="bc-btn-italic" class="btn btn-ghost btn-xs"
+          onmousedown="bcToolbarMousedown(event)" onclick="bcExecCmd('italic');bcUpdateActiveButtons()"
+          title="Italic"><i>I</i></button>
+        <button type="button" id="bc-btn-underline" class="btn btn-ghost btn-xs"
+          onmousedown="bcToolbarMousedown(event)" onclick="bcExecCmd('underline');bcUpdateActiveButtons()"
+          title="Underline"><u>U</u></button>
+        <button type="button" id="bc-btn-strike" class="btn btn-ghost btn-xs"
+          onmousedown="bcToolbarMousedown(event)" onclick="bcExecCmd('strikeThrough');bcUpdateActiveButtons()"
+          title="Strike"><s>S</s></button>
+        <!-- Text color -->
+        <div style="position:relative;display:inline-block;">
+          <button type="button" id="bc-fgcolor-btn" onmousedown="bcToolbarMousedown(event)"
+            onclick="bcToggleColorPicker('fg')" title="Text color"
+            style="display:flex;align-items:center;gap:3px;padding:3px 7px;font-size:11px;background:var(--card2);border:1px solid var(--border);border-radius:5px;cursor:pointer;color:var(--text);">
+            <span style="font-size:10px;font-weight:700;">A</span>
+            <span id="bc-fgcolor-swatch"
+              style="display:inline-block;width:14px;height:4px;border-radius:2px;background:#000000;"></span>
+          </button>
+          <div id="bc-fgcolor-popup"
+            style="display:none;position:absolute;top:34px;left:0;z-index:999;background:var(--card);border:1px solid var(--border2);border-radius:8px;padding:10px;box-shadow:0 4px 20px rgba(0,0,0,0.4);min-width:160px;">
+            <div style="font-size:10px;color:var(--muted);margin-bottom:6px;font-weight:600;">TEXT COLOR
+            </div>
+            <div style="display:flex;flex-wrap:wrap;gap:5px;margin-bottom:8px;">
+              <span onclick="bcPickColor('fg','#000000')"
+                style="width:20px;height:20px;border-radius:4px;background:#000000;cursor:pointer;border:2px solid transparent;"></span>
+              <span onclick="bcPickColor('fg','#ffffff')"
+                style="width:20px;height:20px;border-radius:4px;background:#ffffff;cursor:pointer;border:1px solid #ccc;"></span>
+              <span onclick="bcPickColor('fg','#e8820a')"
+                style="width:20px;height:20px;border-radius:4px;background:#e8820a;cursor:pointer;"></span>
+              <span onclick="bcPickColor('fg','#dc2626')"
+                style="width:20px;height:20px;border-radius:4px;background:#dc2626;cursor:pointer;"></span>
+              <span onclick="bcPickColor('fg','#16a34a')"
+                style="width:20px;height:20px;border-radius:4px;background:#16a34a;cursor:pointer;"></span>
+              <span onclick="bcPickColor('fg','#2563eb')"
+                style="width:20px;height:20px;border-radius:4px;background:#2563eb;cursor:pointer;"></span>
+              <span onclick="bcPickColor('fg','#7c3aed')"
+                style="width:20px;height:20px;border-radius:4px;background:#7c3aed;cursor:pointer;"></span>
+              <span onclick="bcPickColor('fg','#374151')"
+                style="width:20px;height:20px;border-radius:4px;background:#374151;cursor:pointer;"></span>
+            </div>
+            <div style="display:flex;gap:6px;align-items:center;">
+              <input type="color" id="bc-fgcolor-custom" value="#000000"
+                style="width:32px;height:28px;padding:1px;border:1px solid var(--border);border-radius:4px;cursor:pointer;flex-shrink:0;">
+              <span style="font-size:10px;color:var(--muted);">Custom</span>
+              <button type="button" class="btn btn-gold btn-xs" style="margin-left:auto;"
+                onclick="bcPickColor('fg',document.getElementById('bc-fgcolor-custom').value)">Apply</button>
+            </div>
+          </div>
+        </div>
+        <!-- Highlight color -->
+        <div style="position:relative;display:inline-block;">
+          <button type="button" id="bc-bgcolor-btn" onmousedown="bcToolbarMousedown(event)"
+            onclick="bcToggleColorPicker('bg')" title="Highlight color"
+            style="display:flex;align-items:center;gap:3px;padding:3px 7px;font-size:11px;background:var(--card2);border:1px solid var(--border);border-radius:5px;cursor:pointer;color:var(--text);">
+            <span style="font-size:10px;">BG</span>
+            <span id="bc-bgcolor-swatch"
+              style="display:inline-block;width:14px;height:4px;border-radius:2px;background:#ffff00;"></span>
+          </button>
+          <div id="bc-bgcolor-popup"
+            style="display:none;position:absolute;top:34px;left:0;z-index:999;background:var(--card);border:1px solid var(--border2);border-radius:8px;padding:10px;box-shadow:0 4px 20px rgba(0,0,0,0.4);min-width:160px;">
+            <div style="font-size:10px;color:var(--muted);margin-bottom:6px;font-weight:600;">HIGHLIGHT
+              COLOR
+            </div>
+            <div style="display:flex;flex-wrap:wrap;gap:5px;margin-bottom:8px;">
+              <span onclick="bcPickColor('bg','transparent')"
+                style="width:20px;height:20px;border-radius:4px;background:transparent;cursor:pointer;border:1px solid #ccc;font-size:9px;display:flex;align-items:center;justify-content:center;color:#999;">✕</span>
+              <span onclick="bcPickColor('bg','#fef08a')"
+                style="width:20px;height:20px;border-radius:4px;background:#fef08a;cursor:pointer;"></span>
+              <span onclick="bcPickColor('bg','#bbf7d0')"
+                style="width:20px;height:20px;border-radius:4px;background:#bbf7d0;cursor:pointer;"></span>
+              <span onclick="bcPickColor('bg','#bfdbfe')"
+                style="width:20px;height:20px;border-radius:4px;background:#bfdbfe;cursor:pointer;"></span>
+              <span onclick="bcPickColor('bg','#fecaca')"
+                style="width:20px;height:20px;border-radius:4px;background:#fecaca;cursor:pointer;"></span>
+              <span onclick="bcPickColor('bg','#e9d5ff')"
+                style="width:20px;height:20px;border-radius:4px;background:#e9d5ff;cursor:pointer;"></span>
+              <span onclick="bcPickColor('bg','#fed7aa')"
+                style="width:20px;height:20px;border-radius:4px;background:#fed7aa;cursor:pointer;"></span>
+            </div>
+            <div style="display:flex;gap:6px;align-items:center;">
+              <input type="color" id="bc-bgcolor-custom" value="#ffff00"
+                style="width:32px;height:28px;padding:1px;border:1px solid var(--border);border-radius:4px;cursor:pointer;flex-shrink:0;">
+              <span style="font-size:10px;color:var(--muted);">Custom</span>
+              <button type="button" class="btn btn-gold btn-xs" style="margin-left:auto;"
+                onclick="bcPickColor('bg',document.getElementById('bc-bgcolor-custom').value)">Apply</button>
+            </div>
+          </div>
+        </div>
+        <div style="width:1px;height:18px;background:var(--border);margin:0 2px;"></div>
+        <button type="button" class="btn btn-ghost btn-xs" onmousedown="bcToolbarMousedown(event)"
+          onclick="bcExecCmd('justifyLeft')" title="Left"><i class="fas fa-align-left"></i></button>
+        <button type="button" class="btn btn-ghost btn-xs" onmousedown="bcToolbarMousedown(event)"
+          onclick="bcExecCmd('justifyCenter')" title="Center"><i class="fas fa-align-center"></i></button>
+        <button type="button" class="btn btn-ghost btn-xs" onmousedown="bcToolbarMousedown(event)"
+          onclick="bcExecCmd('justifyRight')" title="Right"><i class="fas fa-align-right"></i></button>
+        <button type="button" class="btn btn-ghost btn-xs" onmousedown="bcToolbarMousedown(event)"
+          onclick="bcExecCmd('insertOrderedList')" title="Numbered list"><i
+            class="fas fa-list-ol"></i></button>
+        <button type="button" class="btn btn-ghost btn-xs" onmousedown="bcToolbarMousedown(event)"
+          onclick="bcExecCmd('insertUnorderedList')" title="Bullet list"><i
+            class="fas fa-list-ul"></i></button>
+        <div style="width:1px;height:18px;background:var(--border);margin:0 2px;"></div>
+        <button type="button" class="btn btn-ghost btn-xs" onmousedown="bcToolbarMousedown(event)"
+          onclick="bcInsertHR()" title="HR"><i class="fas fa-minus"></i> HR</button>
+        <button type="button" class="btn btn-ghost btn-xs" onmousedown="bcToolbarMousedown(event)"
+          onclick="bcInsertMarquee()" title="Scrolling text"><i class="fas fa-arrows-alt-h"></i>
+          Marquee</button>
+        <button type="button" class="btn btn-ghost btn-xs" onmousedown="bcToolbarMousedown(event)"
+          onclick="bcInsertTable()" title="Table"><i class="fas fa-table"></i> Table</button>
+        <button type="button" class="btn btn-ghost btn-xs" onmousedown="bcToolbarMousedown(event)"
+          onclick="bcInsertButton()" title="CTA Button"><i class="fas fa-hand-pointer"></i> Button</button>
+        <button type="button" class="btn btn-ghost btn-xs"
+          onmousedown="bcToolbarMousedown(event);_bcSavedSel=window.getSelection()&&window.getSelection().rangeCount>0?window.getSelection().getRangeAt(0).cloneRange():null"
+          onclick="openMediaInsertModal('bc-html')" title="Insert image, video, audio or document"><i
+            class="fas fa-photo-video"></i> Media</button>
+        <div style="position:relative;display:inline-block;">
+          <button type="button" class="btn btn-ghost btn-xs" onmousedown="bcToolbarMousedown(event)"
+            onclick="bcToggleEmoji(this)" title="Emoji"><i class="fas fa-smile"></i> Emoji</button>
+          <div id="bc-emoji-picker" class="emoji-picker-popup" style="display:none;top:32px;left:0;">
+            <div class="emoji-tabs" id="bc-emoji-tabs">
+              <button class="emoji-tab active" onclick="bcShowEmojiCat('smileys',this)">😀</button>
+              <button class="emoji-tab" onclick="bcShowEmojiCat('people',this)">👋</button>
+              <button class="emoji-tab" onclick="bcShowEmojiCat('nature',this)">🌿</button>
+              <button class="emoji-tab" onclick="bcShowEmojiCat('food',this)">🍕</button>
+              <button class="emoji-tab" onclick="bcShowEmojiCat('travel',this)">✈️</button>
+              <button class="emoji-tab" onclick="bcShowEmojiCat('objects',this)">💡</button>
+              <button class="emoji-tab" onclick="bcShowEmojiCat('symbols',this)">❤️</button>
+              <button class="emoji-tab" onclick="bcShowEmojiCat('business',this)">💼</button>
+            </div>
+            <div class="emoji-search"><input id="bc-emoji-search" placeholder="Search emoji..."
+                oninput="bcSearchEmoji(this.value)" /></div>
+            <div class="emoji-grid" id="bc-emoji-grid"></div>
+          </div>
+        </div>
+        <button type="button" class="btn btn-ghost btn-xs" onmousedown="bcToolbarMousedown(event)"
+          onclick="bcInsertSignature()" title="Signature"><i class="fas fa-signature"></i>
+          Signature</button>
+        <button type="button" class="btn btn-ghost btn-xs"
+          onmousedown="bcToolbarMousedown(event);_bcSavedSel=window.getSelection()&&window.getSelection().rangeCount>0?window.getSelection().getRangeAt(0).cloneRange():null"
+          onclick="openInsertHtmlModal('bc-html')" title="Insert HTML (Auto-transforms for Outlook)
+✓ Inlines CSS, resolves CSS variables
+✗ Removes: box-shadow, border-radius, animations, transforms, filters, grid/flex properties
+⚠️ Note: Grid/flex layouts preserved but properties removed - use tables for Outlook"><i class="fas fa-code"></i>
+          HTML</button>
+        <button type="button" class="btn btn-ghost btn-xs" onmousedown="event.preventDefault()"
+          onclick="previewEditorContent('bc-html')" title="Preview email full-screen"><i
+            class="fas fa-eye"></i> Preview</button>
+      </div>
+      <div id="bc-html" contenteditable="true"
+        style="min-height:180px;max-height:520px;overflow-y:auto;background:#fff;color:#222;font-family:Calibri,Arial,sans-serif;font-size:14px;line-height:1.6;padding:10px 12px 10px 28px;border:1px solid var(--border2);border-radius:0 0 8px 8px;outline:none;"
+        placeholder="Write your email here… Use {{name}} for personalization."
+        onmouseup="bcSaveSelection();bcUpdateActiveButtons()"
+        onkeyup="bcSaveSelection();bcUpdateActiveButtons()">
+      </div>
+    </div>
+
+    <div class="form-group">
+      <label class="form-label" style="display:flex;justify-content:space-between;">
+        <span>Recipients *</span>
+        <span style="font-size:10.5px;color:var(--muted);">One per line: email or Name &lt;email&gt;</span>
+      </label>
+      <!-- Group picker -->
+      <div style="display:flex;gap:6px;align-items:center;margin-bottom:8px;flex-wrap:wrap;">
+        <select id="bc-group-select" class="inp"
+          style="font-size:12px;padding:5px 8px;flex:1;min-width:160px;">
+          <option value="">— Load from a group —</option>
+        </select>
+        <button type="button" class="btn btn-blue btn-xs" onclick="bcLoadFromGroup()"><i
+            class="fas fa-users"></i> Load Group</button>
+        <button type="button" class="btn btn-ghost btn-xs" onclick="openGroupsManager()"><i
+            class="fas fa-cog"></i> Manage Groups</button>
+      </div>
+      <textarea class="inp" id="bc-recipients" rows="5"
+        placeholder="john@company.com&#10;Jane Doe &lt;jane@company.com&gt;&#10;sales@client.in"></textarea>
+      <div style="margin-top:5px;display:flex;gap:8px;align-items:center;">
+        <span id="bc-recipient-count" style="font-size:11px;color:var(--muted);">0 recipients</span>
+        <button class="btn btn-ghost btn-xs" onclick="bcLoadFromContacts()"><i
+            class="fas fa-address-book"></i> Load from Contacts DB</button>
+      </div>
+    </div>
+
+    <div class="form-row">
+      <div>
+        <label class="form-label">Send Interval — Delay between emails</label>
+        <div style="display:flex;gap:6px;align-items:center;">
+          <input class="inp" id="bc-delay-val" type="number" value="3" min="1" max="999"
+            style="width:80px;flex-shrink:0;" oninput="bcUpdateIntervalPreview()" />
+          <select class="inp" id="bc-delay-unit" style="width:auto;" onchange="bcUpdateIntervalPreview()">
+            <option value="1000">seconds</option>
+            <option value="60000" selected>minutes</option>
+            <option value="3600000">hours</option>
+          </select>
+          <span id="bc-delay-preview" style="font-size:11px;color:var(--muted);white-space:nowrap;">= 3
+            min</span>
+        </div>
+      </div>
+      <div>
+        <label class="form-label">Test email (send preview first)</label>
+        <div style="display:flex;gap:6px;">
+          <input class="inp" id="bc-test-email" placeholder="your@email.com" style="flex:1;" />
+          <button class="btn btn-ghost btn-sm" onclick="bcSendTest()"><i class="fas fa-vial"></i>
+            Test</button>
+        </div>
+      </div>
+    </div>
+
+    <div style="display:flex;gap:8px;margin-top:4px;">
+      <button class="btn btn-gold" style="flex:1;justify-content:center;" onclick="bcSendBroadcast()">
+        <i class="fas fa-paper-plane"></i> Send Broadcast
+      </button>
+      <button class="btn btn-ghost" onclick="closeModal('broadcast-modal')">Cancel</button>
+    </div>
+    <div id="bc-status" style="margin-top:10px;font-size:12px;text-align:center;"></div>
+  </div>
+</div>
+
   <div class="modal-overlay" id="campaign-modal">
     <div class="modal">
       <div class="modal-title">
@@ -7139,7 +7198,7 @@ Always write in a professional yet warm Indian B2B communication style. Use form
         const trace = rawData && rawData.trace ? rawData.trace : decodeTraceHeader(res.headers.get('X-Outlook-Contacts-Trace'));
         logOutlookContactsDevtoolsTrace(rawData, data, trace, res);
         console.log('Trace header decoded:', trace);
-        console.group('ðŸ” [PHONE PERMISSION TRACE] Microsoft Graph permissions used');
+        console.group('[PHONE PERMISSION TRACE] Microsoft Graph permissions used');
         const contactsTrace = outlookTraceSection(trace, 'contacts');
         const peopleTrace = outlookTraceSection(trace, 'people');
         const contactsToken = outlookTraceValue(trace, 'contactsToken', 'contacts', 'token');
@@ -7179,13 +7238,13 @@ Always write in a professional yet warm Indian B2B communication style. Use form
           peopleError: outlookTraceValue(trace, 'peopleError', 'people', 'error')
         });
         if (orgContactsToken && !(orgContactsToken.roles || []).includes('OrgContact.Read.All')) {
-          console.warn('[PHONE PERMISSION TRACE] Missing Application permission: OrgContact.Read.All');
+        console.group('[PHONE PERMISSION TRACE] Microsoft Graph permissions used');
         }
         if (trace && orgContactsTotalFetched === 0) {
-          console.warn('[PHONE PERMISSION TRACE] OrgContact.Read.All is working, but Graph /contacts returned 0 org contacts in this tenant.');
+        console.group('[PHONE PERMISSION TRACE] Microsoft Graph permissions used');
         }
         if (trace && (!peopleToken || !((peopleToken.roles || []).includes('People.Read.All') || (peopleToken.scopes || []).includes('People.Read')))) {
-          console.warn('[PHONE PERMISSION TRACE] People endpoint has no usable token. For background app mode add Application permission: People.Read.All, then grant admin consent.');
+        console.group('[PHONE PERMISSION TRACE] Microsoft Graph permissions used');
         }
         console.groupEnd();
         console.log('Total contacts received:', Array.isArray(data) ? data.length : 'NOT AN ARRAY');
@@ -8267,9 +8326,9 @@ Always write in a professional yet warm Indian B2B communication style. Use form
       const oc = outlookContactsCache.find(o => o.id === graphId);
       if (!oc) return;
 
-      console.group('ðŸ” [Outlook Contact Detail] showOutlookDirectoryDetail');
+      console.group('[Outlook Contact Detail] showOutlookDirectoryDetail');
       console.log('graphId:', graphId);
-      console.log('Full contact object:', JSON.parse(JSON.stringify(oc)));
+
       console.log('mobilePhone:', oc.mobilePhone);
       console.log('businessPhones:', oc.businessPhones);
       console.log('homePhones:', oc.homePhones);
@@ -10026,7 +10085,10 @@ Keep it concise and professional.`;
       if (!to || !subject || !html) { if (statusEl) statusEl.innerHTML = '<span style="color:var(--red2);">Fill subject, body and test email first</span>'; return; }
       if (statusEl) statusEl.innerHTML = '<span class="spin-loader"></span> Sending test...';
       try {
-        var res = await fetch(API_BASE + '/broadcast/test', { method: 'POST', headers: getAuthHeaders(), body: JSON.stringify({ to, subject, html }) });
+        var payload = await getEmailPayloadWithMediaAttachments(bcEl, true);
+        html = payload.body;
+        var attachments = payload.attachments || [];
+        var res = await fetch(API_BASE + '/broadcast/test', { method: 'POST', headers: getAuthHeaders(), body: JSON.stringify({ to, subject, html, attachments }) });
         var data = await res.json();
         if (statusEl) statusEl.innerHTML = res.ok ? '<span style="color:var(--green2);"><i class="fas fa-check"></i> Test sent to ' + to + '</span>' : '<span style="color:var(--red2);">' + (data.error || 'Failed') + '</span>';
       } catch (err) { if (statusEl) statusEl.innerHTML = '<span style="color:var(--red2);">' + err.message + '</span>'; }
@@ -10047,7 +10109,10 @@ Keep it concise and professional.`;
       if (!confirm('Send broadcast to ' + recipients.length + ' recipients?')) return;
       if (statusEl) statusEl.innerHTML = '<span class="spin-loader"></span> Queuing ' + recipients.length + ' emails...';
       try {
-        var res = await fetch(API_BASE + '/broadcast/send', { method: 'POST', headers: getAuthHeaders(), body: JSON.stringify({ subject, html: htmlBody, recipients, delay_ms: delay }) });
+        var payload = await getEmailPayloadWithMediaAttachments(bcEl, true);
+        htmlBody = payload.body;
+        var attachments = payload.attachments || [];
+        var res = await fetch(API_BASE + '/broadcast/send', { method: 'POST', headers: getAuthHeaders(), body: JSON.stringify({ subject, html: htmlBody, recipients, delay_ms: delay, attachments }) });
         var data = await res.json();
         if (res.ok) {
           if (statusEl) statusEl.innerHTML = '<span style="color:var(--green2);"><i class="fas fa-check"></i> Broadcast started! #' + data.broadcast_id + ' — ' + data.total + ' emails queued</span>';
@@ -10057,6 +10122,51 @@ Keep it concise and professional.`;
           if (statusEl) statusEl.innerHTML = '<span style="color:var(--red2);">' + (data.error || 'Failed') + '</span>';
         }
       } catch (err) { if (statusEl) statusEl.innerHTML = '<span style="color:var(--red2);">' + err.message + '</span>'; }
+    }
+
+    function bcNormalizeStoredAttachments(value) {
+      if (!value) return [];
+      if (Array.isArray(value)) return value;
+      if (typeof value === 'string') {
+        try {
+          const parsed = JSON.parse(value);
+          return Array.isArray(parsed) ? parsed : [];
+        } catch (_) {
+          return [];
+        }
+      }
+      return [];
+    }
+
+    function bcPreviewHtmlWithAttachments(html, attachments) {
+      let out = String(html || '');
+      const list = bcNormalizeStoredAttachments(attachments);
+      const inlineImages = [];
+
+      list.forEach(function(att) {
+        const bytes = String(att && att.contentBytes || '').replace(/^data:[^,]+,/, '').replace(/\s/g, '');
+        if (!bytes) return;
+        const contentType = String(att.contentType || 'application/octet-stream');
+        const dataUrl = 'data:' + contentType + ';base64,' + bytes;
+        const contentId = String(att.contentId || '').replace(/^<|>$/g, '');
+        if (contentId) {
+          const escaped = contentId.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+          out = out.replace(new RegExp('cid:\\s*<?' + escaped + '>?', 'gi'), dataUrl);
+        }
+        if (/^image\//i.test(contentType) && (att.isInline || contentId)) {
+          inlineImages.push({ name: att.name || 'image', dataUrl });
+        }
+      });
+
+      const hasVisibleImage = /<img\b[^>]*\bsrc\s*=/i.test(out);
+      const textOnly = out.replace(/<[^>]*>/g, '').replace(/&nbsp;/g, '').trim();
+      if (!hasVisibleImage && !textOnly && inlineImages.length) {
+        out = inlineImages.map(function(img) {
+          return '<img src="' + img.dataUrl + '" alt="' + escHtml(img.name) + '" style="max-width:100%;height:auto;display:block;margin:0 0 12px 0;">';
+        }).join('');
+      }
+
+      return out;
     }
 
     async function openBroadcastPreview(id) {
@@ -10123,9 +10233,10 @@ Keep it concise and professional.`;
         // Email HTML preview in iframe (safe rendering with white background)
         var iframeEl = document.getElementById('bp-iframe');
         if (iframeEl && b.html_body) {
+          var previewHtml = bcPreviewHtmlWithAttachments(b.html_body, b.attachments);
           var doc = iframeEl.contentDocument || iframeEl.contentWindow.document;
           doc.open();
-          doc.write('<!DOCTYPE html><html><head><meta charset="UTF-8"><style>html,body{background:#ffffff !important;color:#222222 !important;font-family:Arial,sans-serif;padding:16px;margin:0;font-size:14px;line-height:1.6;}a{color:#0066cc;}*{box-sizing:border-box;}</style></head><body>' + (b.html_body || '<p style="color:#999;">No email body</p>') + '</body></html>');
+          doc.write('<!DOCTYPE html><html><head><meta charset="UTF-8"><style>html,body{background:#ffffff !important;color:#222222 !important;font-family:Arial,sans-serif;padding:16px;margin:0;font-size:14px;line-height:1.6;}a{color:#0066cc;}img,video,audio{max-width:100%;}*{box-sizing:border-box;}</style></head><body>' + (previewHtml || '<p style="color:#999;">No email body</p>') + '</body></html>');
           doc.close();
           setTimeout(function () {
             try { iframeEl.style.height = Math.max(200, iframeEl.contentDocument.body.scrollHeight + 20) + 'px'; } catch (_) { }
@@ -10159,14 +10270,24 @@ Keep it concise and professional.`;
     }
 
     async function bcGenerateAI() {
-      var subject = (document.getElementById('bc-subject') || {}).value || '';
+      var subject = (document.getElementById('bc-subject') || {}).value.trim();
       var el = document.getElementById('bc-html');
       if (!el) return;
-      el.innerHTML = 'Generating...';
+      var origContent = el.innerHTML;
+      el.innerHTML = '<div style="padding:12px;color:#888;font-size:13px;"><span class="spin-loader"></span> AI is writing your email…</div>';
       try {
-        var text = await callPicoClaw('Write a professional HTML email for Unicircuit Engineering Services LLP' + (subject ? ' about: ' + subject : '') + '. Use {{name}} for personalization. Under 200 words. Return only HTML body content.');
-        el.innerHTML = text.trim();
-      } catch (err) { el.innerHTML = ''; }
+        var prompt = 'Write a professional HTML email body for Unicircuit Engineering Services LLP'
+          + (subject ? ' with subject: "' + subject + '"' : '')
+          + '. Use {{name}} for recipient personalization. Under 200 words. Include a clear CTA. Return ONLY the HTML body content (no <html>/<head>/<body> tags). Use inline styles for formatting.';
+        var text = await callPicoClaw(prompt);
+        // Strip any accidental outer tags
+        var clean = text.trim().replace(/^```html\s*/i,'').replace(/```\s*$/,'').trim();
+        el.innerHTML = clean || origContent;
+        notify('AI email generated', 'Review and edit before sending', 'var(--blue2)', 'fas fa-robot');
+      } catch (err) {
+        el.innerHTML = origContent;
+        notify('AI error', err.message, 'var(--red)', 'fas fa-exclamation-circle');
+      }
     }
 
     // ── BROADCAST RICH EDITOR HELPERS ─────────────────────────────────────────
@@ -10368,40 +10489,93 @@ Keep it concise and professional.`;
 
     // MARKETING MODULE
 
-    // ──────────────────────────────────
+    // ── Store last AI-generated campaign copy so action buttons can use it ──
+    var _lastAiCampaignCopy = { text: '', emailSubject: '', emailBody: '', waMessage: '', product: '', audience: '', goal: '' };
+
     async function generateCampaign() {
-      const product = document.getElementById('mkt-product').value;
-      const audience = document.getElementById('mkt-audience').value;
-      const goal = document.getElementById('mkt-goal').value;
+      const product = (document.getElementById('mkt-product') || {}).value || '';
+      const audience = (document.getElementById('mkt-audience') || {}).value || '';
+      const goal = (document.getElementById('mkt-goal') || {}).value || '';
       const channels = [];
-      if (document.getElementById('ch-em').checked) channels.push('Email');
-      if (document.getElementById('ch-wa').checked) channels.push('WhatsApp');
-      if (document.getElementById('ch-sm').checked) channels.push('SMS');
+      if (document.getElementById('ch-em') && document.getElementById('ch-em').checked) channels.push('Email');
+      if (document.getElementById('ch-wa') && document.getElementById('ch-wa').checked) channels.push('WhatsApp');
+      if (document.getElementById('ch-sm') && document.getElementById('ch-sm').checked) channels.push('SMS');
       const el = document.getElementById('mkt-result');
       el.innerHTML = '<div style="font-size:12px;color:var(--muted);"><span class="spin-loader"></span> PicoClaw is crafting your campaign copy…</div>';
       try {
-        const text = await callPicoClaw(`You are a B2B marketing specialist for Unicircuit Engineering Services LLP (Indian electrical engineering company). Generate campaign copy for:\n\nProduct: ${product}\nTarget audience: ${audience}\nGoal: ${goal}\nChannels: ${channels.join(', ')}\n\nGenerate:\n${channels.includes('Email') ? '1) EMAIL: Subject line + 80-word body\n' : ''}${channels.includes('WhatsApp') ? '2) WHATSAPP: 40-word broadcast message\n' : ''}${channels.includes('SMS') ? '3) SMS: 160-character message\n' : ''}\nUse Indian B2B engineering industry context. Professional, compelling, clear CTA.`);
-        el.innerHTML = `<div style="background:rgba(245,166,35,0.05);border:1px solid rgba(245,166,35,0.12);border-radius:10px;padding:14px 16px;margin-top:4px;">
-      <div style="font-size:9.5px;font-weight:700;color:var(--gold);margin-bottom:10px;"><i class="fas fa-robot"></i> AI-GENERATED CAMPAIGN COPY</div>
-      <pre style="font-size:12.5px;line-height:1.65;white-space:pre-wrap;font-family:'Outfit';color:var(--text);">${text}</pre>
-      <div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap;">
-        <button class="btn btn-gold btn-sm" onclick="createCampaignFromWizard()"><i class="fas fa-rocket"></i> Launch Campaign</button>
-        <button class="btn btn-ghost btn-sm" onclick="copyText(\`${text.replace(/`/g, "'")}\`)"><i class="fas fa-copy"></i> Copy All</button>
-      </div>
-    </div>`;
+        const prompt = 'You are a B2B marketing specialist for Unicircuit Engineering Services LLP (Indian electrical engineering company).\n\nGenerate campaign copy for:\nProduct: ' + product + '\nTarget audience: ' + audience + '\nGoal: ' + goal + '\nChannels: ' + channels.join(', ') + '\n\nGenerate:\n'
+          + (channels.includes('Email') ? '1) EMAIL SUBJECT: (one line)\n   EMAIL BODY: (80-word professional body with {{name}} personalization)\n' : '')
+          + (channels.includes('WhatsApp') ? '2) WHATSAPP: (40-word broadcast message)\n' : '')
+          + (channels.includes('SMS') ? '3) SMS: (160-character message)\n' : '')
+          + '\nUse Indian B2B engineering industry context. Professional, compelling, clear CTA.';
+
+        const text = await callPicoClaw(prompt);
+
+        // Parse email subject and body from the AI response
+        let emailSubject = product ? 'New Offer: ' + product : 'Special Offer from Unicircuit';
+        let emailBody = '';
+        let waMessage = '';
+
+        const subjectMatch = text.match(/EMAIL SUBJECT[:\s]+(.+)/i);
+        if (subjectMatch) emailSubject = subjectMatch[1].trim().replace(/^["\'"]|["\'"]$/g, '');
+
+        const bodyMatch = text.match(/EMAIL BODY[:\s]+([\s\S]+?)(?=\n\d\)|WHATSAPP|SMS|$)/i);
+        if (bodyMatch) emailBody = bodyMatch[1].trim();
+
+        const waMatch = text.match(/WHATSAPP[:\s]+([\s\S]+?)(?=\n\d\)|SMS|$)/i);
+        if (waMatch) waMessage = waMatch[1].trim();
+
+        _lastAiCampaignCopy = { text, emailSubject, emailBody: emailBody || text, waMessage, product, audience, goal };
+
+        const safeText = escHtml(text);
+        el.innerHTML = '<div style="background:rgba(245,166,35,0.05);border:1px solid rgba(245,166,35,0.12);border-radius:10px;padding:14px 16px;margin-top:4px;">'
+          + '<div style="font-size:9.5px;font-weight:700;color:var(--gold);margin-bottom:10px;"><i class="fas fa-robot"></i> AI-GENERATED CAMPAIGN COPY</div>'
+          + '<pre style="font-size:12.5px;line-height:1.65;white-space:pre-wrap;font-family:\'Outfit\';color:var(--text);max-height:260px;overflow-y:auto;">' + safeText + '</pre>'
+          + '<div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap;">'
+          + '<button class="btn btn-gold btn-sm" onclick="createCampaignFromWizard()"><i class="fas fa-rocket"></i> Save as Campaign</button>'
+          + (channels.includes('Email') ? '<button class="btn btn-blue btn-sm" onclick="openBroadcastFromAI()"><i class="fas fa-paper-plane"></i> Send as Broadcast</button>' : '')
+          + '<button class="btn btn-ghost btn-sm" onclick="navigator.clipboard&&navigator.clipboard.writeText(_lastAiCampaignCopy.text).then(function(){notify(\'Copied\',\'AI copy copied\',\'var(--green)\',\'fas fa-check\')})"><i class="fas fa-copy"></i> Copy All</button>'
+          + '</div></div>';
       } catch (e) {
-        el.innerHTML = '<div style="color:var(--red2);font-size:12px;">API error – check connection.</div>';
+        el.innerHTML = '<div style="color:var(--red2);font-size:12px;">API error — check connection.</div>';
       }
     }
 
-    function createCampaignFromWizard() {
-      notify('Campaign launched!', '1,240 contacts · AI copy deployed', 'var(--green)', 'fas fa-rocket');
+    // Pre-fill campaign modal from AI wizard and open it
+    async function createCampaignFromWizard() {
+      const d = _lastAiCampaignCopy;
+      const nameEl = document.getElementById('nc-name');
+      const productEl = document.getElementById('nc-product');
+      const channelEl = document.getElementById('nc-channel');
+      if (nameEl) nameEl.value = d.product ? (d.goal || 'Campaign') + ' — ' + d.product : 'AI Campaign';
+      if (productEl) productEl.value = d.product || '';
+      if (channelEl) {
+        const hasEmail = d.text.toLowerCase().includes('email');
+        const hasWA = d.text.toLowerCase().includes('whatsapp');
+        channelEl.value = hasEmail && hasWA ? 'Both' : hasWA ? 'WhatsApp' : 'Email';
+      }
+      openModal('campaign-modal');
     }
 
-    function createCampaign() {
-      const name = document.getElementById('nc-name').value || 'New Campaign';
-      closeModal('campaign-modal');
-      notify('Campaign created', name + ' is now active', 'var(--gold)', 'fas fa-bullhorn');
+    // Pre-fill broadcast modal from AI wizard and open it
+    function openBroadcastFromAI() {
+      const d = _lastAiCampaignCopy;
+      openModal('broadcast-modal');
+      bcLoadTemplates();
+      bcLoadGroupsDropdown();
+      setTimeout(function() {
+        const subjEl = document.getElementById('bc-subject');
+        const bodyEl = document.getElementById('bc-html');
+        if (subjEl && d.emailSubject) subjEl.value = d.emailSubject;
+        if (bodyEl && d.emailBody) {
+          const isHtml = /<[a-z][\s\S]*>/i.test(d.emailBody);
+          bodyEl.innerHTML = isHtml ? d.emailBody
+            : '<p style="font-family:Calibri,Arial,sans-serif;font-size:14px;line-height:1.6;color:#222;">'
+              + d.emailBody.replace(/\n\n/g, '</p><p style="font-family:Calibri,Arial,sans-serif;font-size:14px;line-height:1.6;color:#222;">').replace(/\n/g, '<br>')
+              + '</p>';
+        }
+        notify('AI copy loaded', 'Review and add recipients before sending', 'var(--blue2)', 'fas fa-paper-plane');
+      }, 200);
     }
 
     // ──────────────────────────────────
@@ -13551,6 +13725,33 @@ Keep it concise and professional.`;
         }
       });
     }
+
+    // ── Marketing quick-action dropdowns (topbar + outlook toolbar) ───────────
+    function toggleMktQuickMenu() {
+      const m = document.getElementById('mkt-quick-menu');
+      if (!m) return;
+      const open = m.style.display !== 'none';
+      m.style.display = open ? 'none' : 'block';
+    }
+    function closeMktQuickMenu() {
+      const m = document.getElementById('mkt-quick-menu');
+      if (m) m.style.display = 'none';
+    }
+    function toggleOaMktMenu() {
+      const m = document.getElementById('oa-mkt-menu');
+      if (!m) return;
+      const open = m.style.display !== 'none';
+      m.style.display = open ? 'none' : 'block';
+    }
+    function closeOaMktMenu() {
+      const m = document.getElementById('oa-mkt-menu');
+      if (m) m.style.display = 'none';
+    }
+    // Close both dropdowns when clicking outside
+    document.addEventListener('click', function(e) {
+      if (!e.target.closest('#mkt-quick-wrap')) closeMktQuickMenu();
+      if (!e.target.closest('#oa-mkt-wrap')) closeOaMktMenu();
+    });
     // Close menus when clicking outside
     document.addEventListener('click', function (e) {
       if (!e.target.closest('.outlook-menu-item')) {
@@ -17204,6 +17405,20 @@ ${plainText}`;
       return { body, attachments: allAttachments };
     }
 
+    async function getEmailPayloadWithMediaAttachments(editorEl, includeQueuedFiles) {
+      const media = collectOutlookComposeAttachments(editorEl);
+      let body;
+      if (media.attachments.length) {
+        const tempEl = document.createElement('div');
+        tempEl.innerHTML = media.body;
+        body = await getEmailBodyForSend(tempEl);
+      } else {
+        body = await getEmailBodyForSend(editorEl);
+      }
+      const queuedFiles = includeQueuedFiles ? getComposeFileAttachments() : [];
+      return { body, attachments: [...media.attachments, ...queuedFiles] };
+    }
+
     // ── Compose file attachments (paperclip) ─────────────────────────────────
     // Stores { name, contentType, contentBytes (base64), size } objects
     var _composeFileAttachments = [];
@@ -17669,6 +17884,84 @@ ${plainText}`;
     var waHasOlderMessages = false;
     let socketReconnectInProgress = false;
 
+    function waNormalizeJid(rawJid) {
+      var jid = String(rawJid || '');
+      return jid.includes('@') ? (jid.split(':')[0] + '@' + jid.split('@').slice(1).join('@')) : jid;
+    }
+
+    function waIsLikelyLidNumber(value) {
+      var digits = String(value || '').replace(/\D/g, '');
+      return digits.length >= 15;
+    }
+
+    function waFormatPhoneForDisplay(value) {
+      var digits = String(value || '').replace(/\D/g, '');
+      if (!digits || waIsLikelyLidNumber(digits)) return '';
+      if (digits.startsWith('91') && digits.length === 12) {
+        return '+91 ' + digits.slice(2, 7) + ' ' + digits.slice(7);
+      }
+      return '+' + digits;
+    }
+
+    function waResolveJidDisplay(jid, fallbackName) {
+      jid = waNormalizeJid(jid);
+      var raw = jid.split('@')[0];
+      var chat = waAllChats.find(function (c) { return waNormalizeJid(c.id) === jid; });
+      var mapped = jid.endsWith('@lid') ? waLidMap[raw] : null;
+      var phone = (mapped && mapped.phone) || (chat && chat.phone) || '';
+      var formattedPhone = waFormatPhoneForDisplay(phone || (!jid.endsWith('@lid') ? raw : ''));
+      var name = fallbackName || (mapped && mapped.name) || (chat && chat.name) || '';
+
+      if (name && !/^(unknown|unknown whatsapp contact)$/i.test(String(name).trim()) && !waIsLikelyLidNumber(name) && !String(name).includes('@lid')) return name;
+      return formattedPhone || (jid.endsWith('@lid') ? 'Unknown WhatsApp contact' : raw);
+    }
+
+    function waLooksSameChat(jidA, jidB) {
+      jidA = waNormalizeJid(jidA);
+      jidB = waNormalizeJid(jidB);
+      if (!jidA || !jidB) return false;
+      if (jidA === jidB) return true;
+      var aLocal = jidA.split('@')[0];
+      var bLocal = jidB.split('@')[0];
+      return !!aLocal && aLocal === bLocal;
+    }
+
+    function waIsActiveSocketChat(cleanJid, msg) {
+      if (waLooksSameChat(cleanJid, waActiveJid)) return true;
+      var active = waAllChats.find(function (c) { return waLooksSameChat(c.id, waActiveJid); });
+      if (!active) return false;
+      var msgName = String(msg.chatName || msg.contactName || '').trim().toLowerCase();
+      var activeName = String(active.name || '').trim().toLowerCase();
+      var activePhone = String(active.phone || '').replace(/\D/g, '');
+      var msgPhone = String(msg.senderPhone || msg.sender_phone || cleanJid.split('@')[0] || '').replace(/\D/g, '');
+      return (!!msgName && !!activeName && msgName === activeName)
+        || (!!msgPhone && !!activePhone && msgPhone === activePhone);
+    }
+
+    function waCleanMessagePreview(text) {
+      text = String(text || '').replace(/\s+/g, ' ').trim();
+      if (!text) return '';
+      text = text.replace(/@\+?(\d{7,25})/g, function (match, num) {
+        var entry = waLidMap[num];
+        if (entry && entry.name && !waIsLikelyLidNumber(entry.name)) return '@' + entry.name;
+        if (entry && entry.phone) return '@' + entry.phone;
+        return waIsLikelyLidNumber(num) ? '' : match;
+      }).trim();
+      return text;
+    }
+
+    function waPreviewForChat(chat) {
+      var msg = waCleanMessagePreview(
+        chat.last_message || chat.latest_message || chat.body || chat.message || ''
+      );
+      if (!msg) return '';
+      if (chat.is_group && chat.last_sender && !msg.startsWith('~')) {
+        var sender = waResolveJidDisplay(chat.last_sender, chat.last_sender_name || '');
+        if (sender && sender !== 'Unknown WhatsApp contact') msg = '~ ' + sender + ': ' + msg;
+      }
+      return msg;
+    }
+
     function initWASocket() {
 
       // Prevent duplicate initialization
@@ -17758,12 +18051,12 @@ ${plainText}`;
         var rawJid = msg.chatId || (msg.key ? msg.key.remoteJid : null);
         if (!rawJid) return;
 
-        var cleanJid = rawJid.includes('@') ? (rawJid.split(':')[0] + '@' + rawJid.split('@')[1]) : rawJid;
+        var cleanJid = waNormalizeJid(rawJid);
 
         // Update local chat info for immediate sorting and preview (mobile-like behavior)
         var chat = waAllChats.find(function (c) { return c.id === cleanJid; });
         if (chat) {
-          chat.last_message = msg.body;
+          chat.last_message = waCleanMessagePreview(msg.body);
           chat.last_time = msg.ts || new Date().toISOString();
           if (cleanJid !== waActiveJid) {
             chat.unread = (chat.unread || 0) + 1;
@@ -17771,13 +18064,17 @@ ${plainText}`;
           waRenderChats(waAllChats);
         }
 
-        if (cleanJid === waActiveJid) {
+        if (waIsActiveSocketChat(cleanJid, msg)) {
           waAppendMessage(msg);
           var area = document.getElementById('wa-chat-area');
           if (area) area.scrollTop = area.scrollHeight;
         } else {
-          var sender = msg.senderName || msg.pushName || cleanJid.split('@')[0];
-          notify("New WhatsApp from " + sender, "", "var(--green)", "fab fa-whatsapp");
+          var senderJid = msg.sender || (!cleanJid.endsWith('@g.us') ? cleanJid : '');
+          var sender = waResolveJidDisplay(senderJid, msg.chatName || msg.contactName || msg.senderName || msg.pushName || '');
+          var senderPhone = waFormatPhoneForDisplay(msg.senderPhone || msg.sender_phone || '');
+          if (senderPhone) sender = senderPhone;
+          var sub = waCleanMessagePreview(msg.body || '');
+          notify("New WhatsApp from " + sender, sub, "var(--green)", "fab fa-whatsapp");
         }
         waLoadChats(); // Sync with database in background
       });
@@ -18160,18 +18457,73 @@ ${plainText}`;
       } catch (_) { }
     }
 
-    async function waLoadChats() {
+    // Debounce + in-flight guard for waLoadChats.
+    // Multiple events (wa:connected, wa:chats_updated, wa:message, wa:sync_complete) all fire
+    // within seconds of each other on reconnect. Without this guard they cause concurrent fetches
+    // that resolve out of order, making the chat list appear to show duplicates or flash.
+    let _waLoadChatsTimer = null;
+    let _waLoadChatsInFlight = false;
+    let _waLoadChatsQueued = false;
+    let _waLoadChatsSeq = 0;
+
+    function waLoadChats(opts) {
+      opts = opts || {};
+      clearTimeout(_waLoadChatsTimer);
+      if (opts.force) return _waDoLoadChats(opts);
+      return new Promise(function (resolve) {
+        _waLoadChatsTimer = setTimeout(function () {
+          resolve(_waDoLoadChats(opts));
+        }, 400);
+      });
+    }
+
+    function waDedupeChats(chats) {
+      var byId = {};
+      (Array.isArray(chats) ? chats : []).forEach(function (chat) {
+        if (!chat || !chat.id) return;
+        var existing = byId[chat.id];
+        if (!existing) {
+          byId[chat.id] = chat;
+          return;
+        }
+        var currentTime = chat.last_time ? new Date(chat.last_time).getTime() : 0;
+        var existingTime = existing.last_time ? new Date(existing.last_time).getTime() : 0;
+        if (currentTime >= existingTime) {
+          byId[chat.id] = Object.assign({}, existing, chat, { unread: Math.max(existing.unread || 0, chat.unread || 0) });
+        }
+      });
+      return Object.keys(byId).map(function (id) { return byId[id]; });
+    }
+
+    async function _waDoLoadChats(opts) {
+      opts = opts || {};
+      if (_waLoadChatsInFlight) {
+        // A fetch is already in progress — re-schedule once it finishes
+        _waLoadChatsQueued = true;
+        if (opts.force) _waLoadChatsSeq++;
+        return;
+      }
+      _waLoadChatsInFlight = true;
+      _waLoadChatsQueued = false;
+      var seq = ++_waLoadChatsSeq;
       try {
-        const res = await fetch(API_BASE + '/wa/chats', { headers: getAuthHeaders() });
+        const res = await fetch(API_BASE + '/wa/chats?_=' + Date.now(), { headers: getAuthHeaders(), cache: 'no-store' });
         if (res.status === 401) {
           // Token expired — redirect to login
           localStorage.clear(); sessionStorage.clear();
           window.location.href = 'login.html';
           return;
         }
-        waAllChats = await res.json();
+        if (seq !== _waLoadChatsSeq) return;
+        waAllChats = waDedupeChats(await res.json());
         waRenderChats(waAllChats);
-      } catch (_) { }
+      } catch (_) { } finally {
+        _waLoadChatsInFlight = false;
+        if (_waLoadChatsQueued) {
+          _waLoadChatsQueued = false;
+          _waDoLoadChats(opts);
+        }
+      }
     }
 
     function waRenderChats(chats) {
@@ -18193,7 +18545,7 @@ ${plainText}`;
       if (!chats.length) { el.innerHTML = '<div style="text-align:center;padding:30px;color:var(--muted);font-size:12.5px;">No chats yet.</div>'; return; }
       el.innerHTML = chats.map(function (c) {
         var rawId = c.id.split('@')[0].split(':')[0];
-        var displayName = c.name || c.phone || rawId;
+        var displayName = waResolveJidDisplay(c.id, c.name || c.phone || rawId);
         // Format Indian numbers: 91XXXXXXXXXX -> +91 XXXXX XXXXX
         if (displayName && /^\+?91\d{10}$/.test(displayName)) {
           var d = displayName.replace(/^\+/, '');
@@ -18203,12 +18555,28 @@ ${plainText}`;
         }
         var name = displayName;
         var initials = name.split(' ').map(function (w) { return w[0] || ''; }).join('').toUpperCase().slice(0, 2) || '?';
-        var time = c.last_time ? new Date(c.last_time).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }) : '';
+        var time = '';
+        if (c.last_time) {
+          var d = new Date(c.last_time);
+          var now = new Date();
+          var today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+          var yesterday = new Date(today);
+          yesterday.setDate(yesterday.getDate() - 1);
+          var targetDate = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+          
+          if (targetDate.getTime() === today.getTime()) {
+            time = d.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
+          } else if (targetDate.getTime() === yesterday.getTime()) {
+            time = 'Yesterday';
+          } else {
+            time = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+          }
+        }
         var unread = c.unread > 0 ? '<span style="min-width:18px;height:18px;border-radius:9px;background:#25D366;color:#fff;font-size:10px;font-weight:700;display:flex;align-items:center;justify-content:center;padding:0 4px;">' + c.unread + '</span>' : '';
         var isActive = waActiveJid === c.id;
         var bg = isActive ? 'background:rgba(37,211,102,0.06);border-left:3px solid #25D366;' : '';
         // Last message preview — WhatsApp style: "~ SenderName: message" for groups
-        var lastMsg = c.last_message || '';
+        var lastMsg = waPreviewForChat(c);
         var lastMsgDisplay = lastMsg;
         // Truncate
         if (lastMsgDisplay.length > 45) lastMsgDisplay = lastMsgDisplay.substring(0, 45) + '...';
@@ -18223,7 +18591,7 @@ ${plainText}`;
           '<span style="font-size:10.5px;color:var(--muted);flex-shrink:0;">' + time + '</span>' +
           '</div>' +
           '<div style="display:flex;justify-content:space-between;align-items:center;margin-top:2px;">' +
-          '<span style="font-size:11.5px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:170px;">' + lastMsgDisplay + '</span>' +
+          '<span style="font-size:11.5px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:170px;">' + escHtml(lastMsgDisplay) + '</span>' +
           unread +
           '</div>' +
           '</div></div>';
@@ -18232,6 +18600,57 @@ ${plainText}`;
     function waFilterChats(q) {
       if (!q) { waRenderChats(waAllChats); return; }
       waRenderChats(waAllChats.filter(function (c) { return (c.name || '').toLowerCase().includes(q.toLowerCase()) || (c.phone || '').includes(q); }));
+    }
+
+    let _waLoadMessagesSeq = 0;
+
+    function waMessageFromRow(m) {
+      return {
+        id: m.id,
+        fromMe: m.from_me,
+        body: m.body,
+        ts: m.timestamp,
+        type: m.msg_type,
+        senderName: m.sender_name,
+        sender: m.sender,
+        senderPhone: m.sender_phone,
+        quotedBody: m.quoted_body,
+        replyToMsgId: m.reply_to_msg_id,
+        mediaPath: m.media_path
+      };
+    }
+
+    async function waLoadActiveMessages(opts) {
+      opts = opts || {};
+      if (!waActiveJid) return;
+      var area = document.getElementById('wa-chat-area');
+      if (!area) return;
+      var seq = ++_waLoadMessagesSeq;
+      if (opts.showLoader !== false) {
+        area.innerHTML = '<div style="text-align:center;padding:30px;"><div class="spin-loader" style="margin:0 auto;"></div></div>';
+      }
+      try {
+        var res = await fetch(API_BASE + '/wa/messages/' + encodeURIComponent(waActiveJid) + '?limit=100&_=' + Date.now(), { headers: getAuthHeaders(), cache: 'no-store' });
+        if (seq !== _waLoadMessagesSeq) return;
+        var msgs = await res.json();
+        waHasOlderMessages = Array.isArray(msgs) && msgs.length >= 100;
+        area.innerHTML = '';
+        waRenderedMessages = {};
+        (Array.isArray(msgs) ? msgs : []).forEach(function (m) {
+          waAppendMessage(waMessageFromRow(m));
+        });
+        if (opts.preserveScroll) {
+          area.scrollTop = Math.min(area.scrollTop, area.scrollHeight);
+        } else {
+          area.scrollTop = area.scrollHeight;
+        }
+        var chat = waAllChats.find(function (c) { return c.id === waActiveJid; });
+        if (chat) { chat.unread = 0; waRenderChats(waAllChats); }
+      } catch (err) {
+        if (seq === _waLoadMessagesSeq) {
+          area.innerHTML = '<div style="color:var(--red2);padding:16px;font-size:12.5px;">' + err.message + '</div>';
+        }
+      }
     }
 
     async function waOpenChat(rawJid, name, phone) {
@@ -18298,24 +18717,10 @@ ${plainText}`;
 
       // Load messages
       var area = document.getElementById('wa-chat-area');
-      area.innerHTML = '<div style="text-align:center;padding:30px;"><div class="spin-loader" style="margin:0 auto;"></div></div>';
       area.onscroll = function () {
         if (area.scrollTop <= 40) waLoadOlderMessages();
       };
-      try {
-        var res = await fetch(API_BASE + '/wa/messages/' + encodeURIComponent(jid) + '?limit=100', { headers: getAuthHeaders() });
-        var msgs = await res.json();
-        waHasOlderMessages = Array.isArray(msgs) && msgs.length >= 100;
-        area.innerHTML = '';
-        msgs.forEach(function (m) {
-          waAppendMessage({ id: m.id, fromMe: m.from_me, body: m.body, ts: m.timestamp, type: m.msg_type, senderName: m.sender_name, sender: m.sender, senderPhone: m.sender_phone, quotedBody: m.quoted_body, mediaPath: m.media_path });
-        });
-        area.scrollTop = area.scrollHeight;
-        var chat = waAllChats.find(function (c) { return c.id === jid; });
-        if (chat) { chat.unread = 0; waRenderChats(waAllChats); }
-      } catch (err) {
-        area.innerHTML = '<div style="color:var(--red2);padding:16px;font-size:12.5px;">' + err.message + '</div>';
-      }
+      await waLoadActiveMessages({ showLoader: true });
 
       // Load group info in background
       if (isGroup) {
@@ -18332,6 +18737,7 @@ ${plainText}`;
       }
     }
     var waReplyTo = null;
+    var waRenderedMessages = {};
 
     async function waLoadOlderMessages() {
       if (waOlderLoading || !waHasOlderMessages || !waActiveJid) return;
@@ -18345,13 +18751,12 @@ ${plainText}`;
         var res = await fetch(API_BASE + '/wa/messages/' + encodeURIComponent(waActiveJid) + '?limit=100&before=' + encodeURIComponent(before), { headers: getAuthHeaders() });
         var msgs = await res.json();
         if (!Array.isArray(msgs) || !msgs.length) {
-          waHasOlderMessages = false;
-          return;
-        }
-        for (var i = msgs.length - 1; i >= 0; i--) {
-          var m = msgs[i];
-          waAppendMessage({ id: m.id, fromMe: m.from_me, body: m.body, ts: m.timestamp, type: m.msg_type, senderName: m.sender_name, sender: m.sender, senderPhone: m.sender_phone, quotedBody: m.quoted_body, mediaPath: m.media_path }, true);
-        }
+        waHasOlderMessages = false;
+        return;
+      }
+      for (var i = msgs.length - 1; i >= 0; i--) {
+          waAppendMessage(waMessageFromRow(msgs[i]), true);
+      }
         waHasOlderMessages = msgs.length >= 100;
         area.scrollTop = area.scrollHeight - previousHeight;
       } catch (_) {
@@ -18361,11 +18766,11 @@ ${plainText}`;
     }
 
     function waMediaHTML(type, body, msgId, mediaPath, localUrl) {
-      var token = localStorage.getItem('unicomm_token') || '';
+      var token = localStorage.getItem('uc_token') || sessionStorage.getItem('uc_token') || localStorage.getItem('unicomm_token') || sessionStorage.getItem('unicomm_token') || '';
       var tokenParam = token ? '?token=' + encodeURIComponent(token) : '';
       var dlUrl = msgId ? (API_BASE + '/wa/media/' + msgId + tokenParam) : null;
       var previewUrl = dlUrl || localUrl || null;
-      var cleanBody = (body || '').replace(/^📷\s*|^📄\s*/, '').trim();
+      var cleanBody = (body || '').replace(/^\uD83D\uDCF7\s*|^\uD83D\uDCC4\s*/, '').trim();
       var mediaFilename = mediaPath && mediaPath.includes('_') ? mediaPath.split('_').slice(1).join('_') : '';
       if ((type === 'imageMessage' || type === 'videoMessage') && mediaFilename && cleanBody === mediaFilename) cleanBody = '';
 
@@ -18376,12 +18781,12 @@ ${plainText}`;
             '<div onclick="openImageViewer(\'' + previewUrl + '\')" style="display:inline-block;cursor:zoom-in;">' +
             '<img src="' + previewUrl + '" loading="lazy" alt="Photo" ' +
             'style="max-width:240px;max-height:200px;border-radius:8px;display:block;object-fit:cover;" ' +
-            'onerror="this.parentElement.innerHTML=\'<div style=&quot;background:rgba(255,255,255,0.06);border-radius:8px;padding:10px;font-size:13px;&quot;>📷 ' + (cleanBody || 'Photo') + ' <a href=&quot;' + dlUrl + '&quot; target=&quot;_blank&quot; style=&quot;font-size:11px;color:var(--blue2);&quot;>Download</a></div>\'" />' +
+            'onerror="this.parentElement.innerHTML=\'<div style=&quot;background:rgba(255,255,255,0.06);border-radius:8px;padding:10px;font-size:13px;&quot;>&#128247; ' + (cleanBody || 'Photo') + ' <a href=&quot;' + dlUrl + '&quot; target=&quot;_blank&quot; style=&quot;font-size:11px;color:var(--blue2);&quot;>Download</a></div>\'" />' +
             '</div>' +
             (cleanBody ? '<div style="font-size:11.5px;color:var(--muted);margin-top:4px;">' + cleanBody + '</div>' : '') +
             '</div>';
         }
-        return '<div style="background:rgba(255,255,255,0.06);border-radius:8px;padding:10px;font-size:13px;">📷 ' + (cleanBody || 'Photo') + '</div>';
+        return '<div style="background:rgba(255,255,255,0.06);border-radius:8px;padding:10px;font-size:13px;">&#128247; ' + (cleanBody || 'Photo') + '</div>';
       }
 
       if (type === 'videoMessage') {
@@ -18394,7 +18799,7 @@ ${plainText}`;
             (cleanBody ? '<div style="font-size:11.5px;color:var(--muted);padding:4px 8px 6px;">' + cleanBody + '</div>' : '') +
             '</div>';
         }
-        return '<div style="background:rgba(255,255,255,0.06);border-radius:8px;padding:10px;font-size:13px;">🎥 ' + (cleanBody || 'Video') + '</div>';
+        return '<div style="background:rgba(255,255,255,0.06);border-radius:8px;padding:10px;font-size:13px;">&#127909; ' + (cleanBody || 'Video') + '</div>';
       }
 
       if (type === 'audioMessage') {
@@ -18407,7 +18812,7 @@ ${plainText}`;
             '</audio>' +
             '</div>';
         }
-        return '<div style="background:rgba(255,255,255,0.06);border-radius:8px;padding:10px;font-size:13px;">🎵 Voice message</div>';
+        return '<div style="background:rgba(255,255,255,0.06);border-radius:8px;padding:10px;font-size:13px;">&#127925; Voice message</div>';
       }
 
       if (type === 'documentMessage') {
@@ -18422,15 +18827,24 @@ ${plainText}`;
           ? '<a href="' + dlUrl + '" download="' + filename + '" style="display:inline-flex;align-items:center;gap:6px;margin-top:8px;background:rgba(59,130,246,0.15);border:1px solid rgba(59,130,246,0.3);border-radius:6px;padding:5px 10px;font-size:11.5px;color:var(--blue2);text-decoration:none;cursor:pointer;"><i class="fas fa-download"></i> Download</a>'
           : '';
         return '<div style="background:rgba(255,255,255,0.06);border-radius:8px;padding:10px;margin-bottom:4px;">' +
-          '<div style="display:flex;align-items:center;gap:8px;font-size:13px;">📄 <span style="word-break:break-all;">' + filename + '</span></div>' +
+          '<div style="display:flex;align-items:center;gap:8px;font-size:13px;">&#128196; <span style="word-break:break-all;">' + filename + '</span></div>' +
           dlLink + '</div>';
       }
 
-      if (type === 'stickerMessage') return '<div style="font-size:28px;padding:4px;">🎬</div>';
+      if (type === 'stickerMessage') {
+        if (previewUrl) {
+          return '<div style="margin-bottom:4px;">' +
+            '<img src="' + previewUrl + '" loading="lazy" alt="Sticker" ' +
+            'style="max-width:160px;max-height:160px;border-radius:8px;display:block;object-fit:contain;background:transparent;" ' +
+            'onerror="this.outerHTML=\'<div style=&quot;font-size:28px;padding:4px;&quot;>&#127916;</div>\'" />' +
+            '</div>';
+        }
+        return '<div style="font-size:28px;padding:4px;">&#127916;</div>';
+      }
       if (type === 'locationMessage') {
         var coords = (cleanBody || '').split(',');
         var mapLink = coords.length === 2 ? 'https://maps.google.com/?q=' + coords[0].trim() + ',' + coords[1].trim() : null;
-        return '<div style="background:rgba(255,255,255,0.06);border-radius:8px;padding:10px;font-size:13px;">📍 ' +
+        return '<div style="background:rgba(255,255,255,0.06);border-radius:8px;padding:10px;font-size:13px;">&#128205; ' +
           (mapLink ? '<a href="' + mapLink + '" target="_blank" style="color:var(--blue2);">View on Maps</a>' : (cleanBody || 'Location')) +
           '</div>';
       }
@@ -18452,6 +18866,7 @@ ${plainText}`;
       });
       var fromMe = msg.fromMe || msg.from_me;
       var body = msg.body || '';
+      var msgId = msg.id || msg.key_id || '';
       function replaceLidMentions(text) {
         if (!text || !text.includes('@')) return text;
         return text.replace(/@\+?(\d{7,25})/g, function (match, num) {
@@ -18476,7 +18891,7 @@ ${plainText}`;
       var senderName = msg.contactName || msg.contact_name || msg.senderName || msg.sender_name || '';
 
       // Deduplication: Don't append if message ID already exists on screen
-      if (document.getElementById('msg-' + msg.id)) return;
+      if (document.getElementById('msg-' + msgId)) return;
 
       // Ordering Check: If appending live, only append if newer than last message
       var lastMsgEl = area.lastElementChild;
@@ -18499,6 +18914,7 @@ ${plainText}`;
         msg.contextText ||
         ''
       );
+      var quotedMsgId = msg.replyToMsgId || msg.reply_to_msg_id || msg.quotedMsgId || msg.quoted_msg_id || '';
       var isReply = msg.isReply || msg.is_reply || false;
       var isGroup = waActiveJid && waActiveJid.endsWith('@g.us');
 
@@ -18532,9 +18948,44 @@ ${plainText}`;
       }
 
       var div = document.createElement('div');
-      div.id = 'msg-' + msg.id;
+      div.id = 'msg-' + msgId;
       div.dataset.ts = new Date(msg.ts || msg.timestamp).getTime();
-      div.style.cssText = 'display:flex;flex-direction:column;align-items:' + (fromMe ? 'flex-end' : 'flex-start') + ';margin-bottom:3px;';
+      div.dataset.msgId = msgId;
+      div.dataset.replyBody = body || '';
+      div.style.cssText = 'display:flex;flex-direction:column;align-items:' + (fromMe ? 'flex-end' : 'flex-start') + ';margin-bottom:3px;width:100%;';
+      
+      // Date Divider Logic (only for downward appending, not prepending old history)
+      if (!prepend) {
+        var msgDateObj = new Date(parseInt(div.dataset.ts));
+        var msgDateStr = msgDateObj.toLocaleDateString();
+        var lastTsAttr = area.lastElementChild ? area.lastElementChild.dataset.ts : null;
+        var needsDivider = false;
+        
+        if (!lastTsAttr) {
+          needsDivider = true;
+        } else {
+          var lastDateStr = new Date(parseInt(lastTsAttr)).toLocaleDateString();
+          if (lastDateStr !== msgDateStr) needsDivider = true;
+        }
+
+        if (needsDivider) {
+          var today = new Date();
+          var yesterday = new Date(today);
+          yesterday.setDate(yesterday.getDate() - 1);
+          
+          var displayDate = "";
+          if (msgDateStr === today.toLocaleDateString()) displayDate = "Today";
+          else if (msgDateStr === yesterday.toLocaleDateString()) displayDate = "Yesterday";
+          else displayDate = msgDateObj.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+          
+          var divider = document.createElement('div');
+          divider.style.cssText = 'text-align:center; margin: 12px 0 8px 0; font-size: 11px; font-weight: 500; color: rgba(255,255,255,0.6); background: rgba(255,255,255,0.06); padding: 4px 12px; border-radius: 12px; align-self: center; max-width: fit-content; margin-left: auto; margin-right: auto;';
+          // Use dataset.ts so it doesn't break the lastTsAttr check for the next message (it inherits the date of the message)
+          divider.dataset.ts = div.dataset.ts;
+          divider.textContent = displayDate;
+          area.appendChild(divider);
+        }
+      }
 
       // Sender label (group only, incoming) — "~ Name  +91 XXXXX XXXXX"
       var senderLabel = '';
@@ -18547,21 +18998,26 @@ ${plainText}`;
       let mediaUrl = '';
       // Quoted reply block with reply indicator
       var replyIndicator = isReply ? '<i class="fas fa-reply" style="color:var(--green2);font-size:10px;margin-right:4px;"></i>' : '';
-      console.log('[RENDER]', {
+      waRenderedMessages[msgId] = {
+        id: msgId,
         body: body,
-        quotedBody: quotedBody,
-        mediaUrl: mediaUrl
-      });
+        sender: fromMe ? 'You' : (senderDisplay || senderName || 'Contact'),
+        type: type
+      };
+      if (quotedMsgId && (!quotedBody || quotedBody === 'Reply' || /^(↩|↪)?\s*Reply$/i.test(quotedBody))) {
+        var quotedMsg = waRenderedMessages[quotedMsgId];
+        if (quotedMsg && quotedMsg.body) quotedBody = quotedMsg.body;
+      }
 
       var quotedBlock = quotedBody
-        ? '<div style="background:rgba(255,255,255,0.06);border-left:3px solid var(--green2);padding:5px 8px;border-radius:4px;font-size:11px;color:var(--muted2);margin-bottom:4px;max-width:100%;overflow:hidden;">' +
+        ? '<button type="button" onclick="waJumpToMessage(\'' + escAttr(quotedMsgId || '') + '\')" title="Jump to replied message" style="display:block;width:100%;text-align:left;background:rgba(255,255,255,0.06);border:0;border-left:3px solid var(--green2);padding:5px 8px;border-radius:4px;font-size:11px;color:var(--muted2);margin:0 0 4px 0;max-width:100%;overflow:hidden;cursor:' + (quotedMsgId ? 'pointer' : 'default') + ';">' +
         '<div style="font-weight:600;color:var(--green2);margin-bottom:2px;">' +
         replyIndicator + 'Reply' +
         '</div>' +
         '<div style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' +
-        quotedBody +
+        escHtml(quotedBody) +
         '</div>' +
-        '</div>'
+        '</button>'
         : '';
 
       if (msg.localUrl) {
@@ -18570,7 +19026,7 @@ ${plainText}`;
         mediaUrl = '/api/wa/media/' + (msg.mediaPath || msg.media_path);
       }
       // Media block
-      var mediaBlock = waMediaHTML(type, body, msg.id || msg.key_id || '', msg.mediaPath || msg.media_path || '', msg.localUrl || '');
+      var mediaBlock = waMediaHTML(type, body, msgId, msg.mediaPath || msg.media_path || '', msg.localUrl || '');
 
       // Message body — preserve newlines
       var bodyHtml = body.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\n/g, '<br>');
@@ -18586,8 +19042,8 @@ ${plainText}`;
         }
 
         // If the body is identical to the filename (clean or raw), don't show it as a caption
-        var cleanInferred = inferredFilename.replace(/^📷\s*|^📄\s*/, '').trim();
-        var cleanBody = (body || '').replace(/^📷\s*|^📄\s*/, '').trim();
+        var cleanInferred = inferredFilename.replace(/^\uD83D\uDCF7\s*|^\uD83D\uDCC4\s*/, '').trim();
+        var cleanBody = (body || '').replace(/^\uD83D\uDCF7\s*|^\uD83D\uDCC4\s*/, '').trim();
         if (cleanBody === cleanInferred || body === inferredFilename) {
           showCaption = false;
         }
@@ -18595,7 +19051,7 @@ ${plainText}`;
       var bodyText = mediaBlock ? (mediaBlock + (showCaption ? '<div style="font-size:13px;margin-top:2px;">' + bodyHtml + '</div>' : '')) : '<div style="font-size:13px;">' + bodyHtml + '</div>';
 
       // Reply button
-      var replyBtn = '<button onclick="waSetReply(\'' + (msg.id || '') + '\',\'' + body.replace(/'/g, "\\'").substring(0, 60) + '\')" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:10px;padding:2px 4px;opacity:0;transition:opacity 0.15s;" class="wa-reply-btn" title="Reply"><i class="fas fa-reply"></i></button>';
+      var replyBtn = '<button onclick="waSetReplyFromMessage(\'' + escAttr(msgId) + '\')" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:10px;padding:2px 4px;opacity:0;transition:opacity 0.15s;" class="wa-reply-btn" title="Reply"><i class="fas fa-reply"></i></button>';
 
       div.innerHTML = senderLabel + '<div class="' + (fromMe ? 'wa-bubble wa-out' : 'wa-bubble wa-in') + '" style="max-width:78%;position:relative;" onmouseover="this.querySelector(\'.wa-reply-btn\').style.opacity=1" onmouseout="this.querySelector(\'.wa-reply-btn\').style.opacity=0">' + quotedBlock + bodyText + '<div class="wa-time">' + time + (fromMe ? ' ✓✓' : '') + ' ' + replyBtn + '</div></div>';
       if (prepend && area.firstElementChild) {
@@ -18611,6 +19067,7 @@ ${plainText}`;
     function waHandleFileSelect(event) {
       const file = event.target.files[0];
       if (!file) return;
+      const isStickerFile = file.type === 'image/webp' || file.type === 'image/gif' || /\.(webp|gif)$/i.test(file.name);
 
       const maxSize = 64 * 1024 * 1024;
       if (file.size > maxSize) {
@@ -18636,7 +19093,7 @@ ${plainText}`;
       const bar = document.getElementById('wa-media-bar');
       const txt = document.getElementById('wa-media-text');
       if (bar) bar.style.display = 'flex';
-      if (txt) txt.textContent = 'Attached: ' + file.name + ' (' + (file.size / (1024 * 1024)).toFixed(2) + ' MB)';
+      if (txt) txt.textContent = (isStickerFile ? 'Sticker: ' : 'Attached: ') + file.name + ' (' + (file.size / (1024 * 1024)).toFixed(2) + ' MB)';
     }
 
     function waCancelMedia() {
@@ -18647,12 +19104,51 @@ ${plainText}`;
       if (bar) bar.style.display = 'none';
     }
 
+    async function waJumpToMessage(msgId) {
+      if (!msgId) return;
+      var area = document.getElementById('wa-chat-area');
+      if (!area) return;
+      var target = document.getElementById('msg-' + msgId);
+      var attempts = 0;
+      while (!target && waHasOlderMessages && attempts < 6) {
+        await waLoadOlderMessages();
+        target = document.getElementById('msg-' + msgId);
+        attempts++;
+      }
+      if (!target) {
+        notify('Original message not loaded', 'Scroll up to load older chat history.', 'var(--gold)', 'fas fa-reply');
+        return;
+      }
+      target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      var bubble = target.querySelector('.wa-bubble');
+      if (!bubble) return;
+      var oldBoxShadow = bubble.style.boxShadow;
+      var oldBorderColor = bubble.style.borderColor;
+      bubble.style.boxShadow = '0 0 0 2px rgba(37,211,102,0.85), 0 0 22px rgba(37,211,102,0.35)';
+      bubble.style.borderColor = 'rgba(37,211,102,0.7)';
+      setTimeout(function () {
+        bubble.style.boxShadow = oldBoxShadow;
+        bubble.style.borderColor = oldBorderColor;
+      }, 1800);
+    }
+
+    function waSetReplyFromMessage(msgId) {
+      var cached = waRenderedMessages[msgId] || {};
+      var el = document.getElementById('msg-' + msgId);
+      var body = cached.body || (el ? (el.dataset.replyBody || '') : '');
+      if (!body && cached.type && cached.type !== 'conversation') body = '[' + cached.type.replace('Message', '') + ']';
+      waSetReply(msgId, body || 'Message');
+    }
+
     function waSetReply(msgId, body) {
-      waReplyTo = { id: msgId, body: body };
+      var exactBody = String(body || '').trim();
+      waReplyTo = { id: msgId, body: exactBody };
       var bar = document.getElementById('wa-reply-bar');
       var txt = document.getElementById('wa-reply-text');
       if (bar) bar.style.display = 'flex';
-      if (txt) txt.textContent = body;
+      if (txt) txt.textContent = exactBody;
+      var input = document.getElementById('wa-msg-input');
+      if (input) input.focus();
     }
 
     function waCancelReply() {
@@ -18660,6 +19156,228 @@ ${plainText}`;
       var bar = document.getElementById('wa-reply-bar');
       if (bar) bar.style.display = 'none';
     }
+
+    var waComposerSuggestTimer = null;
+    var waComposerAiTimer = null;
+    var waComposerAiBusy = false;
+    var waComposerLastAiText = '';
+    var waComposerAiSuggestion = '';
+    var waComposerSuggestionText = '';
+    var waManualEmojis = [
+      0x1F600, 0x1F604, 0x1F60A, 0x1F642, 0x1F609, 0x1F60D, 0x1F929, 0x1F973,
+      0x1F44D, 0x1F44F, 0x1F64F, 0x1F91D, 0x2705, 0x2728, 0x1F389, 0x1F381,
+      0x1F4DE, 0x1F4C5, 0x23F0, 0x1F4CC, 0x1F4E6, 0x1F69A, 0x1F9FE, 0x1F4B3,
+      0x26A0, 0x1F525, 0x1F4A1, 0x1F4AC, 0x1F4C4, 0x1F4BC, 0x1F527, 0x1F44B
+    ];
+
+    var waEmojiRules = [
+      { re: /\b(happy birthday|birthday|bday|many many happy returns)\b/i, emojis: ['\uD83C\uDF82', '\uD83E\uDD73', '\uD83C\uDF89', '\uD83C\uDF81', '\uD83C\uDF88'] },
+      { re: /\b(congratulations|congrats|well done|great job)\b/i, emojis: ['\uD83C\uDF89', '\uD83D\uDC4F', '\uD83E\uDD73', '\uD83C\uDFC6', '\u2728'] },
+      { re: /\b(thank you|thanks|thx|appreciate)\b/i, emojis: ['\uD83D\uDE4F', '\uD83D\uDE0A', '\uD83D\uDC4D', '\u2728'] },
+      { re: /\b(good morning|morning)\b/i, emojis: ['\u2600\uFE0F', '\uD83C\uDF1E', '\uD83D\uDE0A'] },
+      { re: /\b(good night|night)\b/i, emojis: ['\uD83C\uDF19', '\u2728', '\uD83D\uDE34'] },
+      { re: /\b(urgent|important|priority)\b/i, emojis: ['\u26A0\uFE0F', '\u23F0', '\uD83D\uDCCC'] },
+      { re: /\b(payment|invoice|bill|paid)\b/i, emojis: ['\uD83E\uDDFE', '\uD83D\uDCB3', '\u2705'] },
+      { re: /\b(delivery|dispatch|shipped|courier)\b/i, emojis: ['\uD83D\uDCE6', '\uD83D\uDE9A', '\u2705'] },
+      { re: /\b(meeting|call|schedule)\b/i, emojis: ['\uD83D\uDCC5', '\uD83D\uDCDE', '\u23F0'] },
+      { re: /\b(quote|quotation|price|offer)\b/i, emojis: ['\uD83D\uDCAC', '\uD83D\uDCC4', '\uD83D\uDCBC'] }
+    ];
+
+    function waHandleComposerKey(event) {
+      if (event.key !== 'Enter' || event.isComposing) return;
+      if (event.shiftKey) return;
+      event.preventDefault();
+      waSendMsg();
+    }
+
+    function waComposerInput() {
+      var input = document.getElementById('wa-msg-input');
+      if (!input) return;
+      input.style.height = 'auto';
+      input.style.height = Math.min(input.scrollHeight, 110) + 'px';
+      if ((input.value || '').trim() !== waComposerSuggestionText) {
+        waComposerAiSuggestion = '';
+        waComposerSuggestionText = '';
+      }
+      clearTimeout(waComposerSuggestTimer);
+      waComposerSuggestTimer = setTimeout(waUpdateComposerSuggestions, 120);
+      clearTimeout(waComposerAiTimer);
+      waComposerAiTimer = setTimeout(waRequestComposerAiSuggestion, 1200);
+    }
+
+    function waInsertAtCursor(el, text) {
+      if (!el) return;
+      var start = el.selectionStart || 0;
+      var end = el.selectionEnd || 0;
+      var before = el.value.slice(0, start);
+      var after = el.value.slice(end);
+      el.value = before + text + after;
+      var pos = start + text.length;
+      el.selectionStart = pos;
+      el.selectionEnd = pos;
+      el.focus();
+      waComposerInput();
+    }
+
+    function waInsertEmoji(emoji) {
+      var input = document.getElementById('wa-msg-input');
+      if (!input) return;
+      var prefix = input.value && !/\s$/.test(input.value.slice(0, input.selectionStart || input.value.length)) ? ' ' : '';
+      waInsertAtCursor(input, prefix + emoji);
+    }
+
+    var waCurrentEmojiCat = 'smileys';
+    var waEmojiTabs = [
+      ['smileys', '\uD83D\uDE00', 'Smileys'],
+      ['people', '\uD83D\uDC4B', 'People'],
+      ['nature', '\uD83C\uDF3F', 'Nature'],
+      ['food', '\uD83C\uDF55', 'Food'],
+      ['travel', '\u2708\uFE0F', 'Travel'],
+      ['objects', '\uD83D\uDCA1', 'Objects'],
+      ['symbols', '\u2764\uFE0F', 'Symbols'],
+      ['business', '\uD83D\uDCBC', 'Business'],
+      ['flags', '\uD83C\uDFF3\uFE0F', 'Flags']
+    ];
+
+    function waEmojiCatalog() {
+      return (typeof etEmojiData !== 'undefined' && etEmojiData) ? etEmojiData : {};
+    }
+
+    function waRenderEmojiPickerShell() {
+      var picker = document.getElementById('wa-emoji-picker');
+      if (!picker || picker.dataset.ready === '1') return;
+      picker.innerHTML =
+        '<div class="emoji-tabs" id="wa-emoji-tabs">' +
+        waEmojiTabs.map(function (tab, idx) {
+          return '<button type="button" class="emoji-tab' + (idx === 0 ? ' active' : '') + '" data-cat="' + escAttr(tab[0]) + '" title="' + escAttr(tab[2]) + '">' + tab[1] + '</button>';
+        }).join('') +
+        '</div>' +
+        '<div class="emoji-search"><input id="wa-emoji-search" placeholder="Search emoji..." autocomplete="off"></div>' +
+        '<div class="emoji-grid" id="wa-emoji-grid"></div>';
+      picker.addEventListener('click', function (event) {
+        var tab = event.target.closest('.emoji-tab');
+        if (tab) {
+          waShowEmojiCat(tab.dataset.cat, tab);
+          return;
+        }
+        var item = event.target.closest('.emoji-item');
+        if (item) waPickEmoji(item.dataset.emoji || item.textContent);
+      });
+      var search = picker.querySelector('#wa-emoji-search');
+      if (search) search.addEventListener('input', function () { waSearchEmoji(this.value); });
+      picker.dataset.ready = '1';
+      waShowEmojiCat(waCurrentEmojiCat, picker.querySelector('.emoji-tab'));
+    }
+
+    function waRenderEmojiGrid(emojis) {
+      var grid = document.getElementById('wa-emoji-grid');
+      if (!grid) return;
+      grid.innerHTML = emojis.map(function (emoji) {
+        return '<span class="emoji-item" data-emoji="' + escAttr(emoji) + '" title="' + escAttr(emoji) + '">' + emoji + '</span>';
+      }).join('');
+    }
+
+    function waShowEmojiCat(cat, tabEl) {
+      waCurrentEmojiCat = cat || 'smileys';
+      document.querySelectorAll('#wa-emoji-tabs .emoji-tab').forEach(function (tab) { tab.classList.remove('active'); });
+      if (tabEl) tabEl.classList.add('active');
+      waRenderEmojiGrid(waEmojiCatalog()[waCurrentEmojiCat] || []);
+    }
+
+    function waSearchEmoji(query) {
+      if (!query) { waShowEmojiCat(waCurrentEmojiCat, document.querySelector('#wa-emoji-tabs .emoji-tab[data-cat="' + waCurrentEmojiCat + '"]')); return; }
+      var all = [];
+      Object.values(waEmojiCatalog()).forEach(function (arr) { all = all.concat(arr); });
+      waRenderEmojiGrid(all.filter(function (emoji) { return emoji.indexOf(query) !== -1; }).slice(0, 160));
+    }
+
+    function waToggleEmojiPicker() {
+      var picker = document.getElementById('wa-emoji-picker');
+      if (!picker) return;
+      waRenderEmojiPickerShell();
+      picker.style.display = picker.style.display === 'flex' ? 'none' : 'flex';
+    }
+
+    function waPickEmoji(emoji) {
+      waInsertEmoji(emoji);
+      var picker = document.getElementById('wa-emoji-picker');
+      if (picker) picker.style.display = 'none';
+    }
+
+    function waApplyComposerSuggestion() {
+      var input = document.getElementById('wa-msg-input');
+      if (!input || !waComposerAiSuggestion) return;
+      input.value = waComposerAiSuggestion;
+      input.focus();
+      waComposerInput();
+    }
+
+    function waLocalGrammarSuggestion(text) {
+      var t = String(text || '').trim();
+      if (!t) return '';
+      var s = t.replace(/\s+/g, ' ');
+      s = s.charAt(0).toUpperCase() + s.slice(1);
+      if (!/[.!?]$/.test(s) && s.length > 18) s += '.';
+      return s !== t ? s : '';
+    }
+
+    function waEmojiMatches(text) {
+      var out = [];
+      waEmojiRules.forEach(function (rule) {
+        if (rule.re.test(text || '')) {
+          rule.emojis.forEach(function (emoji) {
+            if (!out.includes(emoji)) out.push(emoji);
+          });
+        }
+      });
+      return out.slice(0, 8);
+    }
+
+    function waUpdateComposerSuggestions() {
+      var input = document.getElementById('wa-msg-input');
+      var panel = document.getElementById('wa-compose-suggestions');
+      if (!input || !panel) return;
+      var text = input.value || '';
+      var emojis = waEmojiMatches(text);
+      var localSuggestion = waComposerAiSuggestion || waLocalGrammarSuggestion(text);
+      var html = '';
+      emojis.forEach(function (emoji) {
+        html += '<button type="button" onclick="waInsertEmoji(\'' + emoji + '\')" title="Add emoji" style="border:1px solid var(--border);background:rgba(255,255,255,0.04);color:var(--text);border-radius:7px;padding:3px 7px;font-size:14px;cursor:pointer;">' + emoji + '</button>';
+      });
+      if (localSuggestion && localSuggestion !== text.trim()) {
+        html += '<button type="button" onclick="waApplyComposerSuggestion()" title="Apply PicoClaw suggestion" style="border:1px solid rgba(59,130,246,0.28);background:rgba(59,130,246,0.08);color:var(--blue2);border-radius:7px;padding:4px 8px;font-size:11px;cursor:pointer;max-width:360px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;"><i class="fas fa-wand-magic-sparkles"></i> ' + escHtml(localSuggestion) + '</button>';
+        if (!waComposerAiSuggestion) {
+          waComposerAiSuggestion = localSuggestion;
+          waComposerSuggestionText = text.trim();
+        }
+      }
+      panel.innerHTML = html;
+      panel.style.display = html ? 'flex' : 'none';
+    }
+
+    async function waRequestComposerAiSuggestion() {
+      var input = document.getElementById('wa-msg-input');
+      if (!input || waComposerAiBusy) return;
+      var text = (input.value || '').trim();
+      if (text.length < 8 || text === waComposerLastAiText) return;
+      waComposerAiBusy = true;
+      waComposerLastAiText = text;
+      try {
+        var prompt = 'Improve this WhatsApp message for grammar and tone. Keep the same meaning, keep it concise, and return only one improved message. If the text mentions an occasion like birthday, congratulations, thanks, delivery, invoice, or meeting, include 1-3 suitable emojis at the end. Text: "' + text.replace(/"/g, '\\"') + '"';
+        var suggestion = await callPicoClaw(prompt);
+        suggestion = String(suggestion || '').trim().replace(/^["']|["']$/g, '');
+        if (((input.value || '').trim()) !== text) return;
+        if (suggestion && suggestion.length <= 500 && suggestion.toLowerCase() !== text.toLowerCase()) {
+          waComposerAiSuggestion = suggestion;
+          waComposerSuggestionText = text;
+          waUpdateComposerSuggestions();
+        }
+      } catch (_) {
+      } finally {
+        waComposerAiBusy = false;
+      }
+    }
+
     async function waSendMsg() {
       var input = document.getElementById('wa-msg-input');
       var text = input.value.trim();
@@ -18673,8 +19391,9 @@ ${plainText}`;
       var selectedMediaName = waSelectedMedia ? waSelectedMedia.name : '';
 
       if (waSelectedMedia) {
+        var isStickerMedia = waSelectedMedia.type === 'image/webp' || waSelectedMedia.type === 'image/gif' || /\.(webp|gif)$/i.test(waSelectedMedia.name);
         var tempMsgId = 'temp-' + Date.now();
-        var tempLocalUrl = waSelectedMedia.type.startsWith('image/')
+        var tempLocalUrl = (waSelectedMedia.type.startsWith('image/') || isStickerMedia)
           ? URL.createObjectURL(waSelectedMedia)
           : '';
 
@@ -18691,25 +19410,36 @@ ${plainText}`;
 
           ts: new Date(),
 
-          type: waSelectedMedia.type.startsWith('image/')
+          type: isStickerMedia
+            ? 'stickerMessage'
+            : (waSelectedMedia.type.startsWith('image/')
             ? 'imageMessage'
             : (waSelectedMedia.type.startsWith('video/')
               ? 'videoMessage'
-              : 'documentMessage'),
+              : 'documentMessage')),
 
-          quotedBody: quotedBody
+          quotedBody: quotedBody,
+          replyToMsgId: quotedId,
+          isReply: !!quotedId
         });
 
       } else {
         waAppendMessage({
+          id: 'temp-' + Date.now(),
           fromMe: true,
           body: text,
           ts: new Date(),
-          quotedBody: quotedBody
+          quotedBody: quotedBody,
+          replyToMsgId: quotedId,
+          isReply: !!quotedId
         });
       }
 
       input.value = '';
+      waComposerAiSuggestion = '';
+      waComposerSuggestionText = '';
+      waComposerLastAiText = '';
+      waComposerInput();
       waCancelReply();
 
       try {
@@ -18722,7 +19452,8 @@ ${plainText}`;
           reader.onload = async function (e) {
             const base64 = e.target.result;
             let mediaType = 'document';
-            if (fileToUpload.type.startsWith('image/')) mediaType = 'image';
+            if (fileToUpload.type === 'image/webp' || fileToUpload.type === 'image/gif' || /\.(webp|gif)$/i.test(fileToUpload.name)) mediaType = 'sticker';
+            else if (fileToUpload.type.startsWith('image/')) mediaType = 'image';
             else if (fileToUpload.type.startsWith('video/')) mediaType = 'video';
 
             const payload = {
@@ -18765,7 +19496,15 @@ ${plainText}`;
       }
     }
 
-    function waRefreshChats() { waLoadChats(); }
+    async function waRefreshChats() {
+      try {
+        await waLoadChats({ force: true });
+        if (waActiveJid) {
+          await waLoadActiveMessages({ showLoader: false });
+        }
+        waLoadLidMap();
+      } catch (_) { }
+    }
 
     async function waToggleGroupInfo() {
       var panel = document.getElementById('wa-group-info-panel');
@@ -18936,6 +19675,7 @@ ${plainText}`;
         var draft = await callPicoClaw('Draft a brief professional WhatsApp reply from Unicircuit Engineering Services LLP to: "' + lastMsg + '". Under 30 words, friendly B2B tone.');
         input.value = draft.trim();
       } catch (_) { input.value = ''; }
+      waComposerInput();
       input.disabled = false; input.focus();
     }
 
@@ -19905,15 +20645,15 @@ ${plainText}`;
     }
 
     var etEmojiData = {
-      smileys: ['😀', '😃', '😄', 'ðŸ˜', '😆', '😅', '😂', '🤣', '😊', '😇', '🙂', '🙃', '😉', '😌', 'ðŸ˜', '🥰', '😘', '😗', '😙', '😚', '😋', '😛', 'ðŸ˜', '😜', '🤪', '🤨', 'ðŸ§', '🤓', '😎', '🥸', '🤩', '🥳', '😏', '😒', '😞', '😔', '😟', '😕', 'ðŸ™', '☹️', '😣', '😖', '😫', '😩', '🥺', '😢', '😭', '😤', '😠', '😡', '🤬', '🤯', '😳', '🥵', '🥶', '😱', '😨', '😰', '😥', '😓', '🤗', '🤔', '🤭', '🤫', '🤥', '😶', 'ðŸ˜', '😑', '😬', '🙄', '😯', '😦', '😧', '😮', '😲', '🥱', '😴', '🤤', '😪', '😵', 'ðŸ¤', '🥴', '🤢', '🤮', '🤧', '😷', '🤒', '🤕', '🤑', '🤠', '😈', '👿', '👹', '👺', '🤡', '💩', '👻', '💀', '☠️', '👽', '👾', '🤖', '🎃', '😺', '😸', '😹', '😻', '😼', '😽', '🙀', '😿', '😾'],
-      people: ['👋', '🤚', 'ðŸ–', '✋', '🖖', '👌', '🤌', '🤏', '✌️', '🤞', '🤟', '🤘', '🤙', '👈', '👉', '👆', '🖕', '👇', 'â˜️', 'ðŸ‘', '👎', '✊', '👊', '🤛', '🤜', '👏', '🙌', 'ðŸ‘', '🤲', 'ðŸ¤', '🙏', 'âœ️', '💅', '🤳', '💪', '🦾', '🦿', '🦵', '🦶', '👂', '🦻', '👃', '🫀', 'ðŸ«', '🧠', '🦷', '🦴', '👀', 'ðŸ‘', '👅', '👄', '💋', '🩸', '👶', '🧒', '👦', '👧', '🧑', '👱', '👨', '🧔', '👩', '🧓', '👴', '👵', 'ðŸ™', '🙎', '🙅', '🙆', 'ðŸ’', '🙋', '🧏', '🙇', '🤦', '🤷'],
-      nature: ['🌱', '🌿', 'ðŸ€', 'ðŸ', 'ðŸ‚', 'ðŸƒ', '🌾', '🌵', '🌴', '🌳', '🌲', '🎋', 'ðŸŽ', '🪴', '🌺', '🌸', '🌼', '🌻', '🌹', '🥀', '🌷', '🌱', '🪷', 'ðŸ„', '🌰', '🦔', 'ðŸ¾', 'ðŸŒ', '🌎', '🌏', '🌑', '🌒', '🌓', '🌔', '🌕', '🌖', '🌗', '🌘', '🌙', '🌚', '🌛', '🌜', 'ðŸŒ', '🌞', '⭐', '🌟', '💫', '✨', '⚡', '🌈', '☀️', '🌤', '⛅', '🌥', 'â˜️', '🌦', '🌧', '⛈', '🌩', '🌨', 'â„️', '☃️', '⛄', '🌬', '💨', '🌀', '🌊', '🌫', 'ðŸ¶', 'ðŸ±', 'ðŸ­', 'ðŸ¹', 'ðŸ°', '🦊', 'ðŸ»', 'ðŸ¼', 'ðŸ¨', 'ðŸ¯', 'ðŸ¦', 'ðŸ®', 'ðŸ·', 'ðŸ¸', 'ðŸµ', 'ðŸ”', 'ðŸ§', 'ðŸ¦', '🦆', '🦅', '🦉', '🦇', 'ðŸº', 'ðŸ—', 'ðŸ´', '🦄'],
-      food: ['ðŸŽ', 'ðŸŠ', 'ðŸ‹', 'ðŸ‡', 'ðŸ“', 'ðŸ«', 'ðŸˆ', 'ðŸ’', 'ðŸ‘', '🥭', 'ðŸ', '🥥', 'ðŸ¥', 'ðŸ…', 'ðŸ†', '🥑', '🥦', '🥬', '🥒', '🌶', '🫑', '🧄', '🧅', '🥔', 'ðŸ ', 'ðŸ¥', '🥯', 'ðŸž', '🥖', '🥨', '🧀', '🥚', 'ðŸ³', '🧈', '🥞', '🧇', '🥓', '🥩', 'ðŸ—', 'ðŸ–', '🌭', 'ðŸ”', 'ðŸŸ', 'ðŸ•', '🫓', '🥪', '🥙', '🧆', '🌮', '🌯', '🫔', '🥗', '🥘', '🫕', 'ðŸ', 'ðŸœ', 'ðŸ²', 'ðŸ›', 'ðŸ£', 'ðŸ±', '🥟', '🦪', 'ðŸ¤', 'ðŸ™', 'ðŸš', 'ðŸ˜', 'ðŸ¥', '🥮', 'ðŸ¢', 'ðŸ§', 'ðŸ°', '🎂', 'ðŸ®', 'ðŸ­', 'ðŸ¬', 'ðŸ«', 'ðŸ¿', 'ðŸ©', 'ðŸª', '🌰', '🥜', 'ðŸ¯', '🧃', '🥤', '🧋', '☕', 'ðŸµ', '🫖', 'ðŸº', 'ðŸ»', '🥂', 'ðŸ·', '🥃', 'ðŸ¸', 'ðŸ¹', '🧉', 'ðŸ¾'],
-      travel: ['✈️', '🚀', '🛸', 'ðŸš', '🛶', '⛵', '🚤', '🛥', '🛳', '⛴', '🚢', '🚂', '🚃', '🚄', '🚅', '🚆', '🚇', '🚈', '🚉', '🚊', 'ðŸš', '🚞', '🚋', '🚌', 'ðŸš', '🚎', 'ðŸš', '🚑', '🚒', '🚓', '🚔', '🚕', '🚖', '🚗', '🚘', '🚙', '🛻', '🚚', '🚛', '🚜', '🏎', 'ðŸ', '🛵', '🛺', '🚲', '🛴', '🛹', '🛼', '🚏', '🛣', '🛤', '⛽', '🚧', '⚓', '🗺', '🧭', '🏔', '⛰', '🌋', '🗻', '🏕', '🏖', '🏜', 'ðŸ', '🏞', '🏟', '🏛', '🏗', '🧱', '🏘', '🏚', '🏠', '🏡', '🏢', '🏣', '🏤', '🏥', '🏦', '🏨', '🏩', '🏪', '🏫', '🏬', '🏭', '🏯', '🏰', '💒', '🗼', '🗽', '⛪', '🕌', '🛕', 'ðŸ•', '⛩', '🕋', '⛲', '⛺', 'ðŸŒ', '🌃', '🏙', '🌄', '🌅', '🌆', '🌇', '🌉', '🌌', '🌠', '🎇', '🎆', '🗾'],
-      objects: ['💡', '🔦', '🕯', '🪔', '🧯', '🛢', '💰', '💴', '💵', '💶', '💷', '💸', '💳', '🪙', '💹', '📈', '📉', '📊', '📋', '📌', 'ðŸ“', '📎', '🖇', '📏', 'ðŸ“', '✂️', '🗃', '🗄', '🗑', '🔒', '🔓', '🔏', 'ðŸ”', '🔑', 'ðŸ—', '🔨', '🪓', '⛏', '⚒', '🛠', '🗡', '⚔️', '🔫', '🪃', '🏹', '🛡', '🪚', '🔧', '🪛', '🔩', '⚙️', '🗜', '⚖️', '🦯', '🔗', '⛓', 'ðŸª', '🧲', '🪜', '⚗️', '🧪', '🧫', '🧬', '🔬', '🔭', '📡', '💉', '🩸', '💊', '🩹', '🩺', '🩻', '🚪', '🛗', '🪞', '🪟', '🛏', '🛋', '🪑', '🚽', '🪠', '🚿', 'ðŸ›', '🪤', '🪒', '🧴', '🧷', '🧹', '🧺', '🧻', '🪣', '🧼', '🫧', '🪥', '🧽', '🧯', '🛒', '🚬', '⚰️', '🪦', '⚱️', '🗿', '🪆', '🪅', '🎬', '🎨', '🖼', '🎰', '🎲', '🧩', '🪀', 'ðŸª', '🎯', '🎳', '🎮', '🎸', '🎹', 'ðŸ¥', '🎷', '🎺', '🎻', '🪕', '🎤', '🎧', '📻', '📺', '📷', '📸', '📹', '🎥', '📽', '🎞', '📞', '☎️', '📟', '📠', '📺', '📻', '🧭', '⏱', '⏲', '⏰', '🕰', '⌛', '⏳', '📡', '🔋', '🔌', '💻', '🖥', '🖨', '⌨️', '🖱', '🖲', '💾', '💿', '📀', '🧮', '🎥', '📱', '☎️', '📞', '📟', '📠'],
-      symbols: ['â¤️', '🧡', '💛', '💚', '💙', '💜', '🖤', 'ðŸ¤', '🤎', '💔', 'â£️', '💕', '💞', '💓', '💗', '💖', '💘', 'ðŸ’', '💟', '☮️', 'âœ️', '☪️', '🕉', '☸️', '✡️', '🔯', '🕎', '☯️', '☦️', 'ðŸ›', '⛎', '♈', '♉', '♊', '♋', '♌', '♍', '♎', '♏', '♐', '♑', '♒', '♓', '🆔', '⚛️', '🉑', '☢️', '☣️', '📴', '📳', '🈶', '🈚', '🈸', '🈺', '🈷️', '✴️', '🆚', '💮', 'ðŸ‰', '㊙️', '㊗️', '🈴', '🈵', '🈹', '🈲', '🅰️', '🅱️', '🆎', '🆑', '🅾️', '🆘', '❌', '⭕', '🛑', '⛔', '📛', '🚫', '💯', '💢', '♨️', '🚷', '🚯', '🚳', '🚱', '🔞', '📵', '🚭', '❗', '❕', '❓', '❔', '‼️', 'â‰️', '🔅', '🔆', '〽️', '⚠️️', '🚸', '🔱', '⚜️', '🔰', '♻️', '✅', '🈯', '💹', 'â‡️', '✳️', 'âŽ', 'ðŸŒ', '💠', 'Ⓜ️', '🌀', '💤', '🏧', '🚾', '♿', '🅿️', '🛗', '🈳', '🈹', '🚺', '🚹', '🚼', '⚧', '🚻', '🚮', '🎦', '📶', 'ðŸˆ', '🔣', 'ℹ️', '🔤', '🔡', '🔠', '🆖', '🆗', '🆙', '🆒', '🆕', '🆓', '0️⃣', '1️⃣', '2️⃣', '3️⃣', '4️⃣', '5️⃣', '6️⃣', '7️⃣', '8️⃣', '9️⃣', '🔟', '🔢', '▶️', '⏸', '⏹', '⏺', '⏭', '⏮', '⏩', '⏪', '⏫', '⏬', '◀️', '🔼', '🔽', '➡️', '⬅️', '⬆️', '⬇️', '↗️', '↘️', '↙️', '↖️', '↕️', '↔️', '↪️', '↩️', '⤴️', '⤵️', '🔀', 'ðŸ”', '🔂', '🔄', '🔃', '🎵', '🎶', '➕', '➖', '➗', '✖️', '♾', '💲', '💱', '™️', '©️', '®️', '〰️', '➰', '➿', '🔚', '🔙', '🔛', 'ðŸ”', '🔜', '✔️', '☑️', '🔘', '🔴', '🟠', '🟡', '🟢', '🔵', '🟣', '⚫', '⚪', '🟤', '🔺', '🔻', '🔷', '🔶', '🔹', '🔸', '🔲', '🔳', '▪️', '▫️', '◾', '◽', '◼️', '◻️', '🟥', '🟧', '🟨', '🟩', '🟦', '🟪', '⬛', '⬜', '🟫', '🔈', '🔇', '🔉', '🔊', '📢', '📣', '📯', '🔔', '🔕'],
-      business: ['💼', '📊', '📈', '📉', '💹', '💰', '💴', '💵', '💶', '💷', '💸', '💳', '🪙', '🏦', '🏢', '🏭', 'ðŸ¤', '📋', '📌', 'ðŸ“', '📎', '🖇', '📏', 'ðŸ“', '✂️', '🗂', 'ðŸ“', '📂', '🗃', '🗄', '📊', '📋', 'ðŸ“', '📄', '📃', '📑', '🗒', '🗓', '📅', '📆', '🗑', '📇', '📈', '📉', '📊', '📋', '📌', 'ðŸ“', '📎', '🖇', '📏', 'ðŸ“', '✂️', '🗃', '🗄', '🗑', '🔒', '🔓', '🔏', 'ðŸ”', '🔑', 'ðŸ—', '📧', '📨', '📩', '📤', '📥', '📦', '📫', '📪', '📬', '📭', '📮', '🗳', '✏️', '✒️', '🖊', '🖋', 'ðŸ“', '💼', 'ðŸ“', '📂', '🗂', '📅', '📆', '🗒', '🗓', '📇', '📈', '📉', '📊', '📋', '📌', 'ðŸ“', '📎', '🖇', '📏', 'ðŸ“', '✂️', '🗃', '🗄', '🗑', '🔒', '🔓', '🔏', 'ðŸ”', '🔑', 'ðŸ—', '🔨', '🪓', '⛏', '⚒', '🛠', '🔧', '🪛', '🔩', '⚙️', '🗜', '⚖️', '🔗', '⛓', 'ðŸª', '🧲', '🪜', '📡', '💻', '🖥', '🖨', '⌨️', '🖱', '📱', '☎️', '📞', '📟', '📠', '🔋', '🔌', '💡', '🔦', '🕯', '🪔'],
-      flags: ['🏳️', '🏴', 'ðŸ', '🚩', '🏳️‍🌈', '🏳️‍⚧️', '🏴‍☠️']
+      smileys: ['\uD83D\uDE00','\uD83D\uDE03','\uD83D\uDE04','\uD83D\uDE01','\uD83D\uDE06','\uD83D\uDE05','\uD83D\uDE02','\uD83E\uDD23','\uD83D\uDE0A','\uD83D\uDE07','\uD83D\uDE42','\uD83D\uDE43','\uD83D\uDE09','\uD83D\uDE0C','\uD83D\uDE0D','\uD83E\uDD70','\uD83D\uDE18','\uD83D\uDE17','\uD83D\uDE19','\uD83D\uDE1A','\uD83D\uDE0B','\uD83D\uDE1B','\uD83D\uDE1D','\uD83D\uDE1C','\uD83E\uDD2A','\uD83E\uDD28','\uD83E\uDDD0','\uD83E\uDD13','\uD83D\uDE0E','\uD83E\uDD78','\uD83E\uDD29','\uD83E\uDD73','\uD83D\uDE0F','\uD83D\uDE12','\uD83D\uDE1E','\uD83D\uDE14','\uD83D\uDE1F','\uD83D\uDE15','\uD83D\uDE41','\u2639\uFE0F','\uD83D\uDE23','\uD83D\uDE16','\uD83D\uDE2B','\uD83D\uDE29','\uD83E\uDD7A','\uD83D\uDE22','\uD83D\uDE2D','\uD83D\uDE24','\uD83D\uDE20','\uD83D\uDE21','\uD83E\uDD2C','\uD83E\uDD2F','\uD83D\uDE33','\uD83E\uDD75','\uD83E\uDD76','\uD83D\uDE31','\uD83D\uDE28','\uD83D\uDE30','\uD83D\uDE25','\uD83D\uDE13','\uD83E\uDD17','\uD83E\uDD14','\uD83E\uDD2D','\uD83E\uDD2B','\uD83E\uDD25','\uD83D\uDE36','\uD83D\uDE10','\uD83D\uDE11','\uD83D\uDE2C','\uD83D\uDE44','\uD83D\uDE2F','\uD83D\uDE26','\uD83D\uDE27','\uD83D\uDE2E','\uD83D\uDE32','\uD83E\uDD71','\uD83D\uDE34','\uD83E\uDD24','\uD83D\uDE2A','\uD83D\uDE35','\uD83E\uDD10','\uD83E\uDD74','\uD83E\uDD22','\uD83E\uDD2E','\uD83E\uDD27','\uD83D\uDE37','\uD83E\uDD12','\uD83E\uDD15','\uD83E\uDD11','\uD83E\uDD20','\uD83D\uDE08','\uD83D\uDC7F','\uD83D\uDC79','\uD83D\uDC7A','\uD83E\uDD21','\uD83D\uDCA9','\uD83D\uDC7B','\uD83D\uDC80','\u2620\uFE0F','\uD83D\uDC7D','\uD83D\uDC7E','\uD83E\uDD16','\uD83C\uDF83'],
+      people: ['\uD83D\uDC4B','\uD83E\uDD1A','\uD83D\uDD90','\u270B','\uD83D\uDD96','\uD83D\uDC4C','\uD83E\uDD0C','\uD83E\uDD0F','\u270C\uFE0F','\uD83E\uDD1E','\uD83E\uDD1F','\uD83E\uDD18','\uD83E\uDD19','\uD83D\uDC48','\uD83D\uDC49','\uD83D\uDC46','\uD83D\uDD95','\uD83D\uDC47','\u261D\uFE0F','\uD83D\uDC4D','\uD83D\uDC4E','\u270A','\uD83D\uDC4A','\uD83E\uDD1B','\uD83E\uDD1C','\uD83D\uDC4F','\uD83D\uDE4C','\uD83D\uDC50','\uD83E\uDD32','\uD83E\uDD1D','\uD83D\uDE4F','\u270D\uFE0F','\uD83D\uDC85','\uD83E\uDD33','\uD83D\uDCAA','\uD83E\uDDBE','\uD83E\uDDBF','\uD83E\uDDB5','\uD83E\uDDB6','\uD83D\uDC42','\uD83E\uDDBB','\uD83D\uDC43','\uD83E\uDEC0','\uD83E\uDEC1','\uD83E\uDDE0','\uD83E\uDDB7','\uD83E\uDDB4','\uD83D\uDC40','\uD83D\uDC41','\uD83D\uDC45','\uD83D\uDC44','\uD83D\uDC8B','\uD83E\uDE78','\uD83D\uDC76','\uD83E\uDDD2','\uD83D\uDC66','\uD83D\uDC67','\uD83E\uDDD1','\uD83D\uDC71','\uD83D\uDC68','\uD83E\uDDD4','\uD83D\uDC69','\uD83E\uDDD3','\uD83D\uDC74','\uD83D\uDC75','\uD83D\uDE4D','\uD83D\uDE4E','\uD83D\uDE45','\uD83D\uDE46','\uD83D\uDC81','\uD83D\uDE4B','\uD83E\uDDCF','\uD83D\uDE47','\uD83E\uDD26','\uD83E\uDD37'],
+      nature: ['\uD83C\uDF31','\uD83C\uDF3F','\uD83C\uDF40','\uD83C\uDF41','\uD83C\uDF42','\uD83C\uDF43','\uD83C\uDF3E','\uD83C\uDF35','\uD83C\uDF34','\uD83C\uDF33','\uD83C\uDF32','\uD83C\uDF8B','\uD83C\uDF8D','\uD83E\uDEB4','\uD83C\uDF3A','\uD83C\uDF38','\uD83C\uDF3C','\uD83C\uDF3B','\uD83C\uDF39','\uD83E\uDD40','\uD83C\uDF37','\uD83E\uDEB7','\uD83C\uDF44','\uD83C\uDF30','\uD83E\uDD94','\uD83D\uDC3E','\uD83C\uDF0D','\uD83C\uDF0E','\uD83C\uDF0F','\uD83C\uDF11','\uD83C\uDF12','\uD83C\uDF13','\uD83C\uDF14','\uD83C\uDF15','\uD83C\uDF16','\uD83C\uDF17','\uD83C\uDF18','\uD83C\uDF19','\uD83C\uDF1A','\uD83C\uDF1B','\uD83C\uDF1C','\uD83C\uDF1D','\uD83C\uDF1E','\u2B50','\uD83C\uDF1F','\uD83D\uDCAB','\u2728','\u26A1','\uD83C\uDF08','\u2600\uFE0F','\uD83C\uDF24','\u26C5','\uD83C\uDF25','\u2601\uFE0F','\uD83C\uDF26','\uD83C\uDF27','\u26C8','\uD83C\uDF29','\uD83C\uDF28','\u2744\uFE0F','\u2603\uFE0F','\u26C4','\uD83C\uDF2C','\uD83D\uDCA8','\uD83C\uDF00','\uD83C\uDF0A','\uD83C\uDF2B'],
+      food: ['\uD83C\uDF4E','\uD83C\uDF4A','\uD83C\uDF4B','\uD83C\uDF47','\uD83C\uDF53','\uD83E\uDED0','\uD83C\uDF48','\uD83C\uDF52','\uD83C\uDF51','\uD83E\uDD6D','\uD83C\uDF4D','\uD83E\uDD65','\uD83E\uDD5D','\uD83C\uDF45','\uD83C\uDF46','\uD83E\uDD51','\uD83E\uDD66','\uD83E\uDD6C','\uD83E\uDD52','\uD83C\uDF36','\uD83E\uDED1','\uD83E\uDDC4','\uD83E\uDDC5','\uD83E\uDD54','\uD83C\uDF60','\uD83E\uDD50','\uD83E\uDD6F','\uD83C\uDF5E','\uD83E\uDD56','\uD83E\uDD68','\uD83E\uDDC0','\uD83E\uDD5A','\uD83C\uDF73','\uD83E\uDDC8','\uD83E\uDD5E','\uD83E\uDDC7','\uD83E\uDD53','\uD83E\uDD69','\uD83C\uDF57','\uD83C\uDF56','\uD83C\uDF2D','\uD83C\uDF54','\uD83C\uDF5F','\uD83C\uDF55','\uD83E\uDED3','\uD83E\uDD6A','\uD83E\uDD59','\uD83E\uDDC6','\uD83C\uDF2E','\uD83C\uDF2F','\uD83E\uDED4','\uD83E\uDD57','\uD83E\uDD58','\uD83E\uDED5','\uD83C\uDF5D','\uD83C\uDF5C','\uD83C\uDF72','\uD83C\uDF5B','\uD83C\uDF63','\uD83C\uDF71','\uD83E\uDD5F','\uD83E\uDDAA','\uD83C\uDF64','\uD83C\uDF59','\uD83C\uDF5A','\uD83C\uDF58','\uD83C\uDF65','\uD83E\uDD6E','\uD83C\uDF62','\uD83E\uDDC1','\uD83C\uDF70','\uD83C\uDF82','\uD83C\uDF6E','\uD83C\uDF6D','\uD83C\uDF6C','\uD83C\uDF6B','\uD83C\uDF7F','\uD83C\uDF69','\uD83C\uDF6A','\u2615','\uD83C\uDF75','\uD83C\uDF7A','\uD83C\uDF7B','\uD83E\uDD42','\uD83C\uDF77','\uD83E\uDD43','\uD83C\uDF78','\uD83C\uDF79','\uD83E\uDDC9','\uD83C\uDF7E'],
+      travel: ['\u2708\uFE0F','\uD83D\uDE80','\uD83D\uDEF8','\uD83D\uDE81','\uD83D\uDEF6','\u26F5','\uD83D\uDEA4','\uD83D\uDEE5','\uD83D\uDEF3','\u26F4','\uD83D\uDEA2','\uD83D\uDE82','\uD83D\uDE83','\uD83D\uDE84','\uD83D\uDE85','\uD83D\uDE86','\uD83D\uDE87','\uD83D\uDE88','\uD83D\uDE89','\uD83D\uDE8A','\uD83D\uDE9D','\uD83D\uDE9E','\uD83D\uDE8B','\uD83D\uDE8C','\uD83D\uDE8D','\uD83D\uDE8E','\uD83D\uDE90','\uD83D\uDE91','\uD83D\uDE92','\uD83D\uDE93','\uD83D\uDE94','\uD83D\uDE95','\uD83D\uDE96','\uD83D\uDE97','\uD83D\uDE98','\uD83D\uDE99','\uD83D\uDEFB','\uD83D\uDE9A','\uD83D\uDE9B','\uD83D\uDE9C','\uD83C\uDFCE','\uD83C\uDFCD','\uD83D\uDEF5','\uD83D\uDEFA','\uD83D\uDEB2','\uD83D\uDEF4','\uD83D\uDEF9','\uD83D\uDEFC','\uD83D\uDE8F','\uD83D\uDEE3','\uD83D\uDEE4','\u26FD','\uD83D\uDEA7','\u2693','\uD83D\uDDFA','\uD83E\uDDED','\uD83C\uDFD4','\u26F0','\uD83C\uDF0B','\uD83D\uDDFB','\uD83C\uDFD5','\uD83C\uDFD6','\uD83C\uDFDC','\uD83C\uDFDD','\uD83C\uDFDE','\uD83C\uDFDF','\uD83C\uDFDB','\uD83C\uDFD7','\uD83E\uDDF1','\uD83C\uDFD8','\uD83C\uDFDA','\uD83C\uDFE0','\uD83C\uDFE1','\uD83C\uDFE2','\uD83C\uDFE3','\uD83C\uDFE4','\uD83C\uDFE5','\uD83C\uDFE6','\uD83C\uDFE8','\uD83C\uDFE9','\uD83C\uDFEA','\uD83C\uDFEB','\uD83C\uDFEC','\uD83C\uDFED','\uD83C\uDFF0'],
+      objects: ['\uD83D\uDCA1','\uD83D\uDD26','\uD83D\uDD6F','\uD83E\uDE94','\uD83E\uDDEF','\uD83D\uDEE2','\uD83D\uDCB0','\uD83D\uDCB4','\uD83D\uDCB5','\uD83D\uDCB6','\uD83D\uDCB7','\uD83D\uDCB8','\uD83D\uDCB3','\uD83E\uDE99','\uD83D\uDCB9','\uD83D\uDCC8','\uD83D\uDCC9','\uD83D\uDCCA','\uD83D\uDCCB','\uD83D\uDCCC','\uD83D\uDCCD','\uD83D\uDCCE','\uD83D\uDD87','\uD83D\uDCCF','\uD83D\uDCD0','\u2702\uFE0F','\uD83D\uDDC3','\uD83D\uDDC4','\uD83D\uDDD1','\uD83D\uDD12','\uD83D\uDD13','\uD83D\uDD0F','\uD83D\uDD10','\uD83D\uDD11','\uD83D\uDDE1','\uD83D\uDD28','\uD83E\uDE93','\u26CF','\u2692','\uD83D\uDEE0','\uD83D\uDDE1','\u2694\uFE0F','\uD83D\uDD2B','\uD83E\uDE83','\uD83C\uDFF9','\uD83D\uDEE1','\uD83E\uDE9A','\uD83D\uDD27','\uD83E\uDE9B','\uD83D\uDD29','\u2699\uFE0F','\uD83D\uDDDC','\u2696\uFE0F','\uD83D\uDD17','\u26D3','\uD83E\uDE9D','\uD83E\uDDF2','\uD83E\uDE9C','\uD83D\uDCBB','\uD83D\uDDA5','\uD83D\uDDA8','\u2328\uFE0F','\uD83D\uDDB1','\uD83D\uDDB2','\uD83D\uDCBE','\uD83D\uDCBF','\uD83D\uDCC0','\uD83D\uDCF1','\u260E\uFE0F','\uD83D\uDCDE','\uD83D\uDCDF','\uD83D\uDCE0','\uD83D\uDCF7','\uD83D\uDCF8','\uD83D\uDCF9','\uD83C\uDFA5','\uD83D\uDCFA','\uD83D\uDCFB','\uD83C\uDFA4','\uD83C\uDFA7','\uD83C\uDFA8','\uD83C\uDFB2','\uD83C\uDFAE','\uD83C\uDFB8','\uD83C\uDFB9'],
+      symbols: ['\u2764\uFE0F','\uD83E\uDDE1','\uD83D\uDC9B','\uD83D\uDC9A','\uD83D\uDC99','\uD83D\uDC9C','\uD83D\uDDA4','\uD83E\uDD0D','\uD83E\uDD0E','\uD83D\uDC94','\u2763\uFE0F','\uD83D\uDC95','\uD83D\uDC9E','\uD83D\uDC93','\uD83D\uDC97','\uD83D\uDC96','\uD83D\uDC98','\uD83D\uDC9D','\uD83D\uDC9F','\u262E\uFE0F','\u271D\uFE0F','\u262A\uFE0F','\uD83D\uDD49','\u2638\uFE0F','\u2721\uFE0F','\uD83D\uDD2F','\uD83D\uDD4E','\u262F\uFE0F','\u2626\uFE0F','\uD83D\uDED0','\u26CE','\u2648','\u2649','\u264A','\u264B','\u264C','\u264D','\u264E','\u264F','\u2650','\u2651','\u2652','\u2653','\uD83C\uDD94','\u269B\uFE0F','\uD83C\uDE51','\u2622\uFE0F','\u2623\uFE0F','\uD83D\uDCF4','\uD83D\uDCF3','\u274C','\u2B55','\uD83D\uDED1','\u26D4','\uD83D\uDCDB','\uD83D\uDEAB','\uD83D\uDCAF','\uD83D\uDCA2','\u267B\uFE0F','\u2705','\u2757','\u2755','\u2753','\u2754','\u203C\uFE0F','\u2049\uFE0F','\u26A0\uFE0F','\uD83D\uDD31','\uD83D\uDD30','\uD83D\uDD22','\u25B6\uFE0F','\u23F8','\u23F9','\u23FA','\u23ED','\u23EE','\u23E9','\u23EA','\u2B05\uFE0F','\u27A1\uFE0F','\u2B06\uFE0F','\u2B07\uFE0F','\u2714\uFE0F','\u2611\uFE0F'],
+      business: ['\uD83D\uDCBC','\uD83D\uDCCA','\uD83D\uDCC8','\uD83D\uDCC9','\uD83D\uDCB9','\uD83D\uDCB0','\uD83D\uDCB4','\uD83D\uDCB5','\uD83D\uDCB6','\uD83D\uDCB7','\uD83D\uDCB8','\uD83D\uDCB3','\uD83E\uDE99','\uD83C\uDFE6','\uD83C\uDFE2','\uD83C\uDFED','\uD83E\uDD1D','\uD83D\uDCCB','\uD83D\uDCCC','\uD83D\uDCCD','\uD83D\uDCCE','\uD83D\uDD87','\uD83D\uDCCF','\uD83D\uDCD0','\u2702\uFE0F','\uD83D\uDDC2','\uD83D\uDCC1','\uD83D\uDCC2','\uD83D\uDCC4','\uD83D\uDCC3','\uD83D\uDCD1','\uD83D\uDCC5','\uD83D\uDCC6','\uD83D\uDDD1','\uD83D\uDCC7','\uD83D\uDCE7','\uD83D\uDCE8','\uD83D\uDCE9','\uD83D\uDCE4','\uD83D\uDCE5','\uD83D\uDCE6','\uD83D\uDCBB','\uD83D\uDDA5','\uD83D\uDDA8','\u2328\uFE0F','\uD83D\uDDB1','\uD83D\uDCF1','\u260E\uFE0F','\uD83D\uDCDE','\uD83D\uDCDF','\uD83D\uDCE0','\uD83D\uDD0B','\uD83D\uDD0C','\uD83D\uDCA1','\uD83D\uDD26'],
+      flags: ['\uD83C\uDFF3\uFE0F','\uD83C\uDFF4','\uD83C\uDFC1','\uD83D\uDEA9','\uD83C\uDFF3\uFE0F\u200D\uD83C\uDF08','\uD83C\uDFF3\uFE0F\u200D\u26A7\uFE0F','\uD83C\uDFF4\u200D\u2620\uFE0F']
     };
     var etCurrentEmojiCat = 'smileys';
 
@@ -20039,13 +20779,13 @@ ${plainText}`;
         ? '<img src="' + imgUrl + '" width="70" style="display:block;border-radius:6px;" alt="Logo">'
         : '<div style="width:52px;height:52px;background:linear-gradient(135deg,' + color + ',#c96a00);border-radius:10px;text-align:center;line-height:52px;font-size:20px;font-weight:900;color:#fff;font-family:Arial,sans-serif;">U</div>';
 
-      var phoneRow = phone ? '<br>📞 <span style="color:#555;">' + phone + '</span>' : '';
+      var phoneRow = phone ? '<br>&#128222; <span style="color:#555;">' + phone + '</span>' : '';
       var titleRow = title ? '<div style="font-size:12px;color:#777;margin-top:1px;">' + title + '</div>' : '';
       var tagRow = tagline ? '<div style="margin-top:5px;font-size:10.5px;color:#999;font-style:italic;">' + tagline + '</div>' : '';
       var contactBlock = '<div style="margin-top:6px;font-size:12px;color:#555;">'
-        + '✉️ <a href="mailto:' + email + '" style="color:#0066cc;text-decoration:none;">' + email + '</a>'
+        + '\u2709\uFE0F <a href="mailto:' + email + '" style="color:#0066cc;text-decoration:none;">' + email + '</a>'
         + phoneRow
-        + '<br>ðŸŒ <a href="https://' + web + '" style="color:#0066cc;text-decoration:none;">' + web + '</a>'
+        + '<br>\uD83C\uDF10 <a href="https://' + web + '" style="color:#0066cc;text-decoration:none;">' + web + '</a>'
         + '</div>';
 
       if (style === 'minimal') {
@@ -20771,9 +21511,9 @@ ${plainText}`;
         console.table({
           '📤 JS send overhead': { ms: p.js_send_overhead_ms },
           '💾 Model load (disk→RAM)': { ms: p.model_load_from_disk_ms },
-          'ðŸ“ Prompt processing': { ms: p.prompt_processing_ms },
+          'Prompt processing': { ms: p.prompt_processing_ms },
           '🤖 Response generation': { ms: p.response_generation_ms },
-          'ðŸŒ Network transfer': { ms: p.network_transfer_ms },
+          'Network transfer': { ms: p.network_transfer_ms },
           '⚙️  JSON parse': { ms: p.json_parse_ms },
         });
         console.log(`%c[AI-TEST] Totals → PicoClaw: ${t.totals.ollama_total_ms}ms | Wall: ${t.totals.wall_clock_ms}ms | Status: ${t.status.toUpperCase()}`, 'color:#f5a623;font-weight:bold;');
@@ -20793,9 +21533,9 @@ ${plainText}`;
         const rows = [
           ['📤', 'JS send overhead', p.js_send_overhead_ms, 'Time to build & send the HTTP request'],
           ['💾', 'Model load (disk→RAM)', p.model_load_from_disk_ms, 'How long to load model weights (0ms = already warm)'],
-          ['ðŸ“', 'Prompt processing', p.prompt_processing_ms, `Tokenize & process input (${t.model.tokens_in} tokens)`],
+          ['📝', 'Prompt processing', p.prompt_processing_ms, `Tokenize & process input (${t.model.tokens_in} tokens)`],
           ['🤖', 'Response generation', p.response_generation_ms, `Generate output tokens (${t.model.tokens_out} tokens @ ${t.model.tokens_per_sec} tok/s)`],
-          ['ðŸŒ', 'Network transfer', p.network_transfer_ms, 'Data flight time between PicoClaw and Node.js'],
+          ['🌐', 'Network transfer', p.network_transfer_ms, 'Data flight time between PicoClaw and Node.js'],
           ['⚙️', 'JSON parse', p.json_parse_ms, 'Parse the full response body'],
         ];
 
@@ -21479,6 +22219,45 @@ ${plainText}`;
 
 
 
+    function pbxDigits(value) {
+      return String(value || '').replace(/\D/g, '');
+    }
+
+    function pbxCallDateParts(log) {
+      const date = String(log && log.call_date ? String(log.call_date).split('T')[0] : '').replace(/-/g, '');
+      const time = String(log && log.call_time ? log.call_time : '').replace(/:/g, '').slice(0, 6);
+      if (date && time) return { date, time };
+      const fallback = log && log.created_at ? new Date(log.created_at) : null;
+      if (fallback && !isNaN(fallback.getTime())) {
+        const pad = n => String(n).padStart(2, '0');
+        return {
+          date: `${fallback.getFullYear()}${pad(fallback.getMonth() + 1)}${pad(fallback.getDate())}`,
+          time: `${pad(fallback.getHours())}${pad(fallback.getMinutes())}${pad(fallback.getSeconds())}`,
+        };
+      }
+      return { date: 'unknown-date', time: 'unknown-time' };
+    }
+
+    function pbxRecordingLookupKey(log) {
+      const parts = pbxCallDateParts(log || {});
+      const caller = pbxDigits(log && (log.caller || log.caller_ext)) || 'unknown-caller';
+      const dest = pbxDigits(log && log.destination) || 'unknown-dest';
+      const trunk = String(log && log.trunk || 'no-trunk').replace(/[^A-Za-z0-9_-]/g, '').toLowerCase();
+      return `pbxrec:${parts.date}:${parts.time}:${trunk}:${caller}:${dest}`;
+    }
+
+    function pbxCopyRecordingKey(id) {
+      const log = pbxCallLogCache.get(String(id));
+      if (!log) return;
+      const key = pbxRecordingLookupKey(log);
+      const done = () => notify('Recording key copied', key, 'var(--green)', 'fas fa-microphone');
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(key).then(done).catch(() => prompt('Recording lookup key', key));
+      } else {
+        prompt('Recording lookup key', key);
+      }
+    }
+
     function debouncedLoadCallLogs() {
 
       clearTimeout(_callSearchDebounce);
@@ -21536,7 +22315,7 @@ ${plainText}`;
         if (!data.calls.length) {
           pbxConsoleStep(traceId, 'no call records found for current filters');
           pbxCallLogCache = new Map();
-          tbody.innerHTML = `<tr><td colspan="7" style="text-align:center;padding:40px;color:var(--muted);">No call records found.</td></tr>`;
+          tbody.innerHTML = `<tr><td colspan="8" style="text-align:center;padding:40px;color:var(--muted);">No call records found.</td></tr>`;
         } else {
           pbxConsoleStep(traceId, 'rendering call records', { count: data.calls.length, total: data.total });
           pbxCallLogCache = new Map(data.calls.map(log => [String(log.id), log]));
@@ -21565,6 +22344,11 @@ ${plainText}`;
             const callerDisplay = contactName
               ? `<div><b>${escHtml(contactName)}</b>${notesIcon}</div><div style="font-size:11px;color:var(--muted);">${escHtml(callerPhone)}</div>`
               : escHtml(callerPhone || '-');
+            const recordingKey = pbxRecordingLookupKey(log);
+            const hasRecording = !!(log.recording_file && String(log.recording_file).trim());
+            const recordingCell = hasRecording
+              ? `<button class="btn btn-green btn-xs" onclick="event.stopPropagation();pbxCopyRecordingKey(${log.id})" title="Recording linked. Copy lookup key: ${escAttr(recordingKey)}"><i class="fas fa-microphone"></i> Linked</button>`
+              : `<button class="btn btn-ghost btn-xs" onclick="event.stopPropagation();pbxCopyRecordingKey(${log.id})" title="Copy future recording lookup key: ${escAttr(recordingKey)}"><i class="fas fa-microphone-lines"></i> Key</button>`;
 
             return `
           <tr onclick="selectCallRecord(this, ${log.id})">
@@ -21574,6 +22358,7 @@ ${plainText}`;
             <td>${escHtml(log.duration)}</td>
             <td><span class="badge ${typeClass}">${log.call_type}</span></td>
             <td style="font-size:11px;color:var(--muted2);">${escHtml(log.trunk || '-')}</td>
+            <td>${recordingCell}</td>
             <td>
               <div style="display:flex;gap:4px;">
                 ${!contactName && callerPhone ? `<button class="btn btn-ghost btn-xs" onclick="event.stopPropagation();pbxSaveContactModal(${jsArg(callerPhone)})" title="Save Contact"><i class="fas fa-user-plus"></i></button>` : ''}
@@ -21641,6 +22426,7 @@ ${plainText}`;
       const savedCompany = log.saved_company || log.contact_company || '';
       const savedNotes = log.saved_notes || log.contact_notes || '';
       const createdAt = log.created_at ? new Date(log.created_at).toLocaleString('en-IN') : '';
+      const recordingKey = pbxRecordingLookupKey(log);
       const body = document.getElementById('pbx-call-details-body');
       if (!body) return;
 
@@ -21660,6 +22446,7 @@ ${plainText}`;
         ${pbxDetailRow('Destination', log.destination)}
         ${pbxDetailRow('Duration', log.duration)}
         ${pbxDetailRow('Trunk', log.trunk)}
+        ${pbxDetailRow('Recording Lookup Key', recordingKey)}
         ${pbxDetailRow('Saved Name', contactName)}
         ${pbxDetailRow('Company', savedCompany)}
         ${pbxDetailRow('Contact Notes', savedNotes)}
@@ -21670,6 +22457,7 @@ ${plainText}`;
 
         <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:14px;flex-wrap:wrap;">
           ${caller ? `<button class="btn btn-ghost btn-sm" onclick="pbxSaveContactModal(${jsArg(caller)});closeModal('pbx-call-details-modal')"><i class="fas fa-user-plus"></i> Save Contact</button>` : ''}
+          <button class="btn btn-ghost btn-sm" onclick="pbxCopyRecordingKey(${log.id})"><i class="fas fa-microphone-lines"></i> Copy Recording Key</button>
           <button class="btn btn-gold btn-sm" onclick="doSummarizeCall(${log.id});closeModal('pbx-call-details-modal')"><i class="fas fa-magic"></i> AI Summarize</button>
           <button class="btn btn-red btn-sm" onclick="deleteCallLog(${log.id});closeModal('pbx-call-details-modal')"><i class="fas fa-trash"></i> Delete</button>
         </div>
@@ -21817,15 +22605,17 @@ ${plainText}`;
       const dot = document.getElementById('pbx-dot');
       const txt = document.getElementById('pbx-status-text');
       const info = document.getElementById('pbx-listener-info');
+      const badge = document.getElementById('pbx-live-badge');
       pbxConsoleStep(traceId, 'DOM nodes resolved', { hasDot: !!dot, hasText: !!txt, hasInfo: !!info });
-      if (dot) dot.style.background = 'var(--green)';
+      if (dot) dot.style.background = 'var(--gold)';
       if (txt) {
-        txt.textContent = `Matrix PBX · Connected`;
-        txt.style.color = 'var(--green2)';
+        txt.textContent = `Matrix PBX · Listening`;
+        txt.style.color = 'var(--gold)';
       }
+      if (badge) badge.style.display = 'none';
       if (info) info.textContent = `SMDR ready on port ${data.port || 5001}`;
       updateServiceIndicator('pbx', true);
-      pbxConsoleEnd(traceId, 'CONNECTED UI transition finished');
+      pbxConsoleEnd(traceId, 'LISTENING UI transition finished');
     }
 
     function pbxOnConnected(data) {
@@ -21869,10 +22659,10 @@ ${plainText}`;
         updateServiceIndicator('pbx', false);
       } else {
         // Non-fatal SMDR socket close; PBX reachability is determined by /system/status probe.
-        if (dot) dot.style.background = 'var(--green)';
+        if (dot) dot.style.background = 'var(--gold)';
         if (txt) {
-          txt.textContent = 'Matrix PBX · Connected';
-          txt.style.color = 'var(--green2)';
+          txt.textContent = 'Matrix PBX · Listening (Disconnected)';
+          txt.style.color = 'var(--gold)';
         }
         updateServiceIndicator('pbx', true);
       }
@@ -23242,6 +24032,10 @@ ${plainText}`;
 
     async function syncPBXRecordingsToDB(button) {
 
+      if (!confirm("Are you sure you want to store these recordings into the database?")) {
+        return;
+      }
+
       try {
         if (pbxSourceMode === 'network' && !pbxNetworkHasRecordings) {
           resetPBXSyncStatus();
@@ -24491,19 +25285,15 @@ ${plainText}`;
               onclick="composeToggleEmoji(this)" title="Emoji"><i class="fas fa-smile"></i> Emoji</button>
             <div id="compose-emoji-picker" class="emoji-picker-popup" style="display:none;top:32px;left:0;">
               <div class="emoji-tabs" id="compose-emoji-tabs">
-                <button class="emoji-tab active" onclick="composeShowEmojiCat('smileys',this)"
-                  title="Smileys">😀</button>
-                <button class="emoji-tab" onclick="composeShowEmojiCat('people',this)" title="People">👋</button>
-                <button class="emoji-tab" onclick="composeShowEmojiCat('nature',this)" title="Nature">🌿</button>
-                <button class="emoji-tab" onclick="composeShowEmojiCat('food',this)" title="Food">ðŸ•</button>
-                <button class="emoji-tab" onclick="composeShowEmojiCat('travel',this)"
-                  title="Travel">✈️</button>
-                <button class="emoji-tab" onclick="composeShowEmojiCat('objects',this)" title="Objects">💡</button>
-                <button class="emoji-tab" onclick="composeShowEmojiCat('symbols',this)"
-                  title="Symbols">â¤️</button>
-                <button class="emoji-tab" onclick="composeShowEmojiCat('business',this)" title="Business">💼</button>
-                <button class="emoji-tab" onclick="composeShowEmojiCat('flags',this)"
-                  title="Flags">🏳️</button>
+                <button class="emoji-tab active" onclick="composeShowEmojiCat('smileys',this)" title="Smileys">&#128512;</button>
+                <button class="emoji-tab" onclick="composeShowEmojiCat('people',this)" title="People">&#128075;</button>
+                <button class="emoji-tab" onclick="composeShowEmojiCat('nature',this)" title="Nature">&#127807;</button>
+                <button class="emoji-tab" onclick="composeShowEmojiCat('food',this)" title="Food">&#127829;</button>
+                <button class="emoji-tab" onclick="composeShowEmojiCat('travel',this)" title="Travel">&#9992;&#65039;</button>
+                <button class="emoji-tab" onclick="composeShowEmojiCat('objects',this)" title="Objects">&#128161;</button>
+                <button class="emoji-tab" onclick="composeShowEmojiCat('symbols',this)" title="Symbols">&#10084;&#65039;</button>
+                <button class="emoji-tab" onclick="composeShowEmojiCat('business',this)" title="Business">&#128188;</button>
+                <button class="emoji-tab" onclick="composeShowEmojiCat('flags',this)" title="Flags">&#127987;&#65039;</button>
               </div>
               <div class="emoji-search"><input id="compose-emoji-search" placeholder="Search emoji..."
                   oninput="composeSearchEmoji(this.value)" /></div>
@@ -24811,11 +25601,10 @@ ${plainText}`;
                   <button class="emoji-tab active" onclick="etShowEmojiCat('smileys',this)" title="Smileys">😀</button>
                   <button class="emoji-tab" onclick="etShowEmojiCat('people',this)" title="People">👋</button>
                   <button class="emoji-tab" onclick="etShowEmojiCat('nature',this)" title="Nature">🌿</button>
-                  <button class="emoji-tab" onclick="etShowEmojiCat('food',this)" title="Food">ðŸ•</button>
+                  <button class="emoji-tab" onclick="etShowEmojiCat('food',this)" title="Food">🍕</button>
                   <button class="emoji-tab" onclick="etShowEmojiCat('travel',this)" title="Travel">✈️</button>
                   <button class="emoji-tab" onclick="etShowEmojiCat('objects',this)" title="Objects">💡</button>
-                  <button class="emoji-tab" onclick="etShowEmojiCat('symbols',this)"
-                    title="Symbols">â¤️</button>
+                  <button class="emoji-tab" onclick="etShowEmojiCat('symbols',this)" title="Symbols">❤️</button>
                   <button class="emoji-tab" onclick="etShowEmojiCat('business',this)" title="Business">💼</button>
                   <button class="emoji-tab" onclick="etShowEmojiCat('flags',this)" title="Flags">🏳️</button>
                 </div>

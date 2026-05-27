@@ -57,7 +57,7 @@ console.log('[SMDR-DEBUG] ──────────────────
 // Validate PBX_HOST
 if (!PBX_HOST || PBX_HOST.trim() === '') {
   console.error('[SMDR-DEBUG] ❌ CRITICAL: PBX_HOST is empty or undefined!');
-} else if (PBX_HOST === '192.168.0.205') {
+} else if (false && PBX_HOST === '192.168.0.205') {
   console.error('[SMDR-DEBUG] ❌ CRITICAL: PBX_HOST is set to Tower Server IP (192.168.0.205)');
   console.error('[SMDR-DEBUG]    This is WRONG. PBX_HOST must be the PBX hardware IP (192.168.0.81)');
 } else if (!/^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(PBX_HOST)) {
@@ -103,6 +103,27 @@ console.log('[SMDR-DEBUG] ══════════════════
 let io = null;
 let isConnected = false;
 let buffer = '';
+let lastSavedCallTime = null;
+let lastRawDataTime = null;
+let savedCallCount = 0;
+let parseFailureCount = 0;
+
+const MATRIX_ENQ = 0x00;
+const MATRIX_ACK = 0x06;
+const MATRIX_STX = 0x02;
+const MATRIX_ETX = 0x03;
+
+function safelyAckMatrixPacket(socket, reason) {
+  if (!socket || socket.destroyed || !socket.writable) return false;
+  try {
+    socket.write(Buffer.from([MATRIX_ACK]));
+    console.log(`[SMDR-DEBUG] ✅ ACK (0x06) sent for ${reason}`);
+    return true;
+  } catch (err) {
+    console.warn(`[SMDR-DEBUG] ⚠️  Failed to send ACK for ${reason}: ${err.message}`);
+    return false;
+  }
+}
 
 function setIO(socketIO) { io = socketIO; }
 
@@ -124,7 +145,7 @@ function formatDurationFromSeconds(seconds) {
 }
 
 function isMatrixDate(value) {
-  return /^\d{1,2}-\d{2}-\d{2,4}$/.test(String(value || '').trim());
+  return /^\d{1,2}[-/\.]\d{2}[-/\.]\d{2,4}$/.test(String(value || '').trim());
 }
 
 function isMatrixTime(value) {
@@ -132,10 +153,27 @@ function isMatrixTime(value) {
 }
 
 function parseMatrixDate(rawDate) {
-  const dp = String(rawDate || '').trim().split('-');
+  const dp = String(rawDate || '').trim().split(/[-/\.]/);
   if (dp.length !== 3) return null;
   const yr = dp[2].length === 2 ? '20' + dp[2] : dp[2];
   return `${yr}-${dp[1].padStart(2, '0')}-${dp[0].padStart(2, '0')}`;
+}
+
+function looksLikeMatrixCallRecord(rawLine) {
+  const line = String(rawLine || '').trim();
+  if (!line) return false;
+
+  // Sarvam/Matrix call rows start with a sequence number followed by an
+  // extension/external number. System/debug records can contain dates and
+  // times, but should never be inserted into call_logs as calls.
+  if (/^\d{1,6}\s+(?:\+?\d{2,}|[A-Z]\d{3,})\b/.test(line)) return true;
+
+  const parts = line.split(/\s+/);
+  if (parts.length >= 6 && isMatrixDate(parts[1]) && isMatrixTime(parts[2])) {
+    return /^(In|Out|Internal|Missed)$/i.test(parts[4] || '');
+  }
+
+  return false;
 }
 
 function normaliseSmdrLineForDedupe(rawLine) {
@@ -273,6 +311,11 @@ function parseSMDR(line) {
 
   console.log('\n[SMDR-DEBUG] 📋 STEP 2: Format Detection');
   console.log('[SMDR-DEBUG] ─────────────────────────────────────────────────');
+
+  if (!looksLikeMatrixCallRecord(trimmedLine)) {
+    console.log('[SMDR-DEBUG] Skipped: not a Matrix call record');
+    return null;
+  }
 
   // Matrix Eternity SMDR lines can be fixed-width (70+ chars) or space-delimited
   const parts = trimmedLine.split(/\s+/);
@@ -547,6 +590,7 @@ async function saveCallLog(record) {
         ]);
         
         const row = updateResult.rows[0];
+        lastSavedCallTime = new Date();
         // Emit event to update UI without duplicating Contact calls count
         emit('pbx:call', row);
         return row;
@@ -568,6 +612,8 @@ async function saveCallLog(record) {
       cleanNullableText(record.recording_file)
     ]);
     const row = result.rows[0];
+    lastSavedCallTime = new Date();
+    savedCallCount++;
     console.log(`[SMDR] Saved to call_logs: ${record.call_type} | ${record.caller} → ${record.destination}`);
 
     // ── SYNC WITH CRM CONTACTS ──────────────────────────────────────────
@@ -914,13 +960,12 @@ function startServer() {
           console.log('[SMDR-DEBUG] Handshake status: NOT COMPLETE');
           
           // Check if this is ENQ (0x00) character
-          if (data.length > 0 && data[0] === 0x00) {
+          if (data.length > 0 && data[0] === MATRIX_ENQ) {
             console.log('[SMDR-DEBUG] ✅ ENQ (0x00) DETECTED — Handshake initiated!');
             
             // Send ACK (0x06) to acknowledge
             console.log('[SMDR-DEBUG] 📤 Sending ACK (0x06) response...');
-            socket.write(Buffer.from([0x06]));
-            console.log('[SMDR-DEBUG] ✅ ACK sent successfully');
+            safelyAckMatrixPacket(socket, 'ENQ handshake');
             
             handshakeComplete = true;
             clearTimeout(handshakeTimeout);
@@ -974,6 +1019,7 @@ function startServer() {
         console.log('[SMDR-DEBUG] Handshake status: COMPLETE');
         console.log('[SMDR-DEBUG] Processing SMDR records...');
 
+        const hasPacketFrame = data.includes(MATRIX_STX) || data.includes(MATRIX_ETX);
         let raw = data.toString('utf8')
           .replace(/\x02/g, '')
           .replace(/\x03/g, '')
@@ -993,6 +1039,9 @@ function startServer() {
         console.log(`[SMDR-DEBUG]   Buffer size: ${buffer.length} bytes`);
 
         processBuffer();
+        if (hasPacketFrame) {
+          safelyAckMatrixPacket(socket, 'SMDR data packet');
+        }
       });
 
       socket.on('close', (hadError) => {
@@ -1123,6 +1172,14 @@ function startServer() {
 }
 
 function getStatus() {
+  const now = Date.now();
+  const lastActivityAgeSeconds = lastActivityTime
+    ? Math.round((now - lastActivityTime.getTime()) / 1000)
+    : null;
+  const streamFreshSeconds = parseInt(process.env.SMDR_STALE_AFTER_SECONDS || '300', 10);
+  const dataStreamHealthy = isConnected &&
+    lastActivityAgeSeconds !== null &&
+    lastActivityAgeSeconds <= streamFreshSeconds;
   const status = {
     connected: isConnected,
     host: PBX_HOST,
@@ -1132,6 +1189,11 @@ function getStatus() {
     listening: isListening(),
     mode: 'server',
     lastActivity: lastActivityTime ? lastActivityTime.toISOString() : null,
+    lastActivityAgeSeconds,
+    dataStreamHealthy,
+    staleAfterSeconds: streamFreshSeconds,
+    savedCallCount,
+    parseFailureCount,
     activeSocket: !!global.activePbxSocket && !global.activePbxSocket.destroyed,
     activeSocketRemote: global.activePbxSocket && !global.activePbxSocket.destroyed
       ? `${global.activePbxSocket.remoteAddress}:${global.activePbxSocket.remotePort}`

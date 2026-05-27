@@ -26,7 +26,30 @@ async function verifyConnection() {
 }
 
 // ── SEND SINGLE EMAIL ─────────────────────────────────────────────────────
-async function sendOne(to, subject, html, text) {
+function normalizeAttachments(attachments) {
+  const list = Array.isArray(attachments) ? attachments : [];
+  return list.map((att, index) => {
+    const rawBytes = String(att && att.contentBytes || '').replace(/^data:[^,]+,/, '').replace(/\s/g, '');
+    const filename = String(att && att.name || `attachment-${index + 1}`)
+      .replace(/[\\/:*?"<>|]+/g, '_')
+      .slice(0, 180);
+    if (!rawBytes || !/^[A-Za-z0-9+/=]+$/.test(rawBytes)) {
+      console.warn('[Broadcast] Skipping invalid attachment:', filename);
+      return null;
+    }
+    const mailAttachment = {
+      filename,
+      contentType: String(att.contentType || 'application/octet-stream'),
+      content: Buffer.from(rawBytes, 'base64'),
+    };
+    if (att.isInline && att.contentId) {
+      mailAttachment.cid = String(att.contentId).replace(/^<|>$/g, '');
+    }
+    return mailAttachment;
+  }).filter(Boolean);
+}
+
+async function sendOne(to, subject, html, text, attachments) {
   const t = createTransporter();
   const info = await t.sendMail({
     from:    `"${process.env.SMTP_FROM_NAME || 'Unicircuit'}" <${process.env.SMTP_FROM || process.env.SMTP_USER}>`,
@@ -34,6 +57,7 @@ async function sendOne(to, subject, html, text) {
     subject,
     html,
     text: text || html.replace(/<[^>]+>/g, ''),
+    attachments: normalizeAttachments(attachments),
   });
   return info;
 }
@@ -41,7 +65,7 @@ async function sendOne(to, subject, html, text) {
 // ── SEND BROADCAST ────────────────────────────────────────────────────────
 // recipients: [{email, name}] or ['email1', 'email2']
 // onProgress: callback(sent, failed, current) for real-time updates
-async function sendBroadcast(recipients, subject, html, onProgress, delayMs = 2000) {
+async function sendBroadcast(recipients, subject, html, onProgress, delayMs = 2000, attachments = []) {
   const results = { sent: 0, failed: 0, errors: [], deliveries: [] };
 
   for (let i = 0; i < recipients.length; i++) {
@@ -62,7 +86,7 @@ async function sendBroadcast(recipients, subject, html, onProgress, delayMs = 20
 
     const sentAt = new Date().toISOString();
     try {
-      await sendOne(email, subject, personalHtml);
+      await sendOne(email, subject, personalHtml, null, attachments);
       results.sent++;
       results.deliveries.push({ email, name, status: 'sent', sent_at: sentAt });
       console.log(`[Broadcast] Sent ${i+1}/${recipients.length} → ${email} @ ${sentAt}`);
@@ -84,4 +108,4 @@ async function sendBroadcast(recipients, subject, html, onProgress, delayMs = 20
   return results;
 }
 
-module.exports = { sendOne, sendBroadcast, verifyConnection };
+module.exports = { sendOne, sendBroadcast, verifyConnection, normalizeAttachments };

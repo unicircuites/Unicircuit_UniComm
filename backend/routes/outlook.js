@@ -292,12 +292,87 @@ function buildGraphFileAttachments(attachments) {
   }).filter(Boolean);
 }
 
+function graphAttachmentBytes(att) {
+  return Buffer.from(String(att.contentBytes || '').replace(/^data:[^,]+,/, '').replace(/\s/g, ''), 'base64');
+}
+
+async function graphFetchRaw(endpoint, options = {}) {
+  const token = await graph.getAccessToken(MS_EMAIL);
+  if (!token) throw new Error('NOT_AUTHENTICATED');
+  const resolved = endpoint.replace(/^\/me(\/|$)/, `/users/${encodeURIComponent(MS_EMAIL)}$1`);
+  const response = await fetch(`${GRAPH_ROOT}${resolved}`, {
+    ...options,
+    headers: {
+      Authorization: `Bearer ${token}`,
+      ...(options.headers || {}),
+    },
+  });
+  if (!response.ok) {
+    const err = await response.json().catch(() => ({}));
+    const graphErr = new Error(err.error?.message || `Graph API error ${response.status}`);
+    graphErr.status = response.status;
+    graphErr.code = err.error?.code;
+    throw graphErr;
+  }
+  if (response.status === 202 || response.status === 204) return { success: true };
+  return response.json().catch(() => ({ success: true }));
+}
+
+async function uploadLargeAttachmentToMessage(messageId, att) {
+  const bytes = graphAttachmentBytes(att);
+  const session = await graphFetchRaw(`/me/messages/${encodeURIComponent(messageId)}/attachments/createUploadSession`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      AttachmentItem: {
+        attachmentType: 'file',
+        name: att.name,
+        size: bytes.length,
+        contentType: att.contentType || 'application/octet-stream',
+      },
+    }),
+  });
+  if (!session || !session.uploadUrl) throw new Error(`Could not create upload session for ${att.name}`);
+
+  const chunkSize = 327680 * 10; // 3.125 MB, must be a multiple of 320 KiB.
+  for (let start = 0; start < bytes.length; start += chunkSize) {
+    const end = Math.min(start + chunkSize, bytes.length) - 1;
+    const chunk = bytes.subarray(start, end + 1);
+    const uploadRes = await fetch(session.uploadUrl, {
+      method: 'PUT',
+      headers: {
+        'Content-Length': String(chunk.length),
+        'Content-Range': `bytes ${start}-${end}/${bytes.length}`,
+      },
+      body: chunk,
+    });
+    if (![200, 201, 202].includes(uploadRes.status)) {
+      const txt = await uploadRes.text().catch(() => '');
+      throw new Error(`Large attachment upload failed for ${att.name}: ${txt || uploadRes.status}`);
+    }
+  }
+}
+
 async function addAttachmentsToMessage(messageId, attachments) {
   const graphAttachments = buildGraphFileAttachments(attachments);
+  const smallLimit = 3 * 1024 * 1024;
   for (const att of graphAttachments) {
+    const byteLength = graphAttachmentBytes(att).length;
+    if (byteLength > smallLimit) {
+      await uploadLargeAttachmentToMessage(messageId, att);
+      continue;
+    }
     await graph.graphPost(`/me/messages/${encodeURIComponent(messageId)}/attachments`, att, MS_EMAIL);
   }
   return graphAttachments.length;
+}
+
+async function sendDraftMessage(message, attachments) {
+  const draft = await graph.graphPost('/me/messages', message, MS_EMAIL);
+  if (!draft || !draft.id) throw new Error('Could not create Outlook draft for attachments.');
+  const count = await addAttachmentsToMessage(draft.id, attachments);
+  await graph.graphPost(`/me/messages/${encodeURIComponent(draft.id)}/send`, {}, MS_EMAIL);
+  return { draftId: draft.id, attachments: count };
 }
 
 function sendOutlookSettingsError(res, err) {
@@ -2114,14 +2189,16 @@ router.post('/drafts', async (req, res) => {
     body: { contentType: 'HTML', content: body || '' },
     ...(toRecipients.length ? { toRecipients } : {}),
     ...(ccRecipients.length ? { ccRecipients } : {}),
-    ...(graphAttachments.length ? { attachments: graphAttachments } : {}),
   };
 
   try {
     // POST to /me/messages creates a draft in the Drafts folder
     const draft = await graph.graphPost('/me/messages', message, MS_EMAIL);
+    if (graphAttachments.length) {
+      await addAttachmentsToMessage(draft.id, graphAttachments);
+    }
     console.log('[Outlook] ✓ Draft created, id:', draft.id);
-    return res.json({ success: true, draftId: draft.id });
+    return res.json({ success: true, draftId: draft.id, attachments: graphAttachments.length });
   } catch (err) {
     console.error('[Outlook] ❌ Create draft error:', err.message);
     if (err.message === 'NOT_AUTHENTICATED') return res.status(401).json({ error: 'NOT_AUTHENTICATED' });
@@ -2380,11 +2457,14 @@ router.post('/send', async (req, res) => {
     body:       { contentType: 'HTML', content: body },
     toRecipients,
     ...(ccRecipients.length ? { ccRecipients } : {}),
-    ...(graphAttachments.length ? { attachments: graphAttachments } : {}),
   };
 
   try {
-    await graph.graphPost('/me/sendMail', { message, saveToSentItems: true }, MS_EMAIL);
+    if (graphAttachments.length) {
+      await sendDraftMessage(message, graphAttachments);
+    } else {
+      await graph.graphPost('/me/sendMail', { message, saveToSentItems: true }, MS_EMAIL);
+    }
 
     // Audit log
     pool.query(

@@ -30,6 +30,7 @@ async function ensureTable() {
   `);
   await pool.query(`ALTER TABLE email_broadcasts ADD COLUMN IF NOT EXISTS from_email VARCHAR(200)`);
   await pool.query(`ALTER TABLE email_broadcasts ADD COLUMN IF NOT EXISTS deliveries JSONB DEFAULT '[]'`);
+  await pool.query(`ALTER TABLE email_broadcasts ADD COLUMN IF NOT EXISTS attachments JSONB DEFAULT '[]'`);
 }
 ensureTable().catch(e => console.error('[Broadcast] Table init error:', e.message));
 
@@ -57,12 +58,12 @@ router.get('/:id', async (req, res) => {
 
 // ── POST /api/broadcast/test — send test email ────────────────────────────
 router.post('/test', async (req, res) => {
-  const { to, subject, html } = req.body;
+  const { to, subject, html, attachments } = req.body;
   if (!to || !subject || !html)
     return res.status(400).json({ error: 'to, subject, html required' });
   try {
-    await eb.sendOne(to, subject, html);
-    res.json({ success: true, message: `Test email sent to ${to}` });
+    await eb.sendOne(to, subject, html, null, attachments);
+    res.json({ success: true, message: `Test email sent to ${to}`, attachments: Array.isArray(attachments) ? attachments.length : 0 });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
@@ -77,7 +78,7 @@ router.post('/verify', async (req, res) => {
 // ── POST /api/broadcast/send — create + send broadcast ───────────────────
 // Body: { subject, html, recipients: [{email,name}] or ['email'], delay_ms }
 router.post('/send', async (req, res) => {
-  const { subject, html, recipients, delay_ms } = req.body;
+  const { subject, html, recipients, delay_ms, attachments } = req.body;
   if (!subject || !html || !Array.isArray(recipients) || !recipients.length)
     return res.status(400).json({ error: 'subject, html, recipients[] required' });
 
@@ -86,9 +87,9 @@ router.post('/send', async (req, res) => {
   try {
     const fromEmail = process.env.SMTP_FROM || process.env.SMTP_USER;
     const result = await pool.query(
-      `INSERT INTO email_broadcasts (subject, html_body, recipients, from_email, total, status)
-       VALUES ($1,$2,$3,$4,$5,'sending') RETURNING id`,
-      [subject, html, JSON.stringify(recipients), fromEmail, recipients.length]
+      `INSERT INTO email_broadcasts (subject, html_body, recipients, from_email, total, status, attachments)
+       VALUES ($1,$2,$3,$4,$5,'sending',$6) RETURNING id`,
+      [subject, html, JSON.stringify(recipients), fromEmail, recipients.length, JSON.stringify(Array.isArray(attachments) ? attachments : [])]
     );
     broadcastId = result.rows[0].id;
   } catch (err) {
@@ -100,7 +101,7 @@ router.post('/send', async (req, res) => {
 
   // Send in background
   const delay = parseInt(delay_ms || 2000);
-  eb.sendBroadcast(recipients, subject, html, null, delay)
+  eb.sendBroadcast(recipients, subject, html, null, delay, attachments)
     .then(async (results) => {
       await pool.query(
         `UPDATE email_broadcasts SET sent=$1, failed=$2, status='sent', sent_at=NOW(), errors=$3, deliveries=$4 WHERE id=$5`,

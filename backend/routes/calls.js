@@ -98,7 +98,7 @@ function formatDurationFromSeconds(seconds) {
 }
 
 function isMatrixDate(value) {
-  return /^\d{1,2}-\d{2}-\d{2,4}$/.test(String(value || '').trim());
+  return /^\d{1,2}[-/\.]\d{2}[-/\.]\d{2,4}$/.test(String(value || '').trim());
 }
 
 function isMatrixTime(value) {

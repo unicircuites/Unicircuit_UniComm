@@ -22,7 +22,7 @@ router.post('/logout', authenticate, async (req, res) => {
 router.get('/lid-map', authenticate, async (req, res) => {
   try {
     // Merge wa_chats + wa_contacts to cover ALL LID contacts:
-    // - wa_chats: LIDs that have a direct chat (2388 entries)
+    // - wa_chats: LIDs that have a direct chat
     // - wa_contacts: LIDs that are group-only members, never had a direct chat
     // UNION gives full coverage for any group size, any number of members
     const result = await pool.query(`
@@ -67,28 +67,56 @@ router.get('/lid-map', authenticate, async (req, res) => {
 router.get('/chats', authenticate, async (req, res) => {
   try {
     const result = await pool.query(`
-      SELECT * FROM wa_chats
-      WHERE account_phone = $1 AND (
+      SELECT
+        c.id,
+        c.account_phone,
+        c.name,
+        c.phone,
+        c.is_group,
+        COALESCE(NULLIF(latest.body, ''), NULLIF(c.last_message, ''), c.last_message) AS last_message,
+        COALESCE(latest.timestamp, c.last_time) AS last_time,
+        c.unread,
+        c.updated_at,
+        c.imported_last_ts
+      FROM wa_chats c
+      LEFT JOIN LATERAL (
+        SELECT body, timestamp
+        FROM wa_messages m
+        WHERE m.chat_id = c.id AND m.account_phone = c.account_phone
+        ORDER BY m.timestamp DESC NULLS LAST
+        LIMIT 1
+      ) latest ON true
+      WHERE c.account_phone = $1 AND (
         -- Groups: real WhatsApp groups only
-        (is_group = true AND id LIKE '%@g.us' AND name !~ '^[0-9+]{15,}$')
+        (c.id LIKE '%@g.us')
         OR
         -- Individual: only Indian +91 numbers on real WhatsApp
         (
-          id LIKE '%@s.whatsapp.net'
-          AND split_part(id,'@',1) LIKE '91%'
-          AND length(split_part(id,'@',1)) = 12
+          c.id LIKE '%@s.whatsapp.net'
+          AND split_part(c.id,'@',1) LIKE '91%'
+          AND length(split_part(c.id,'@',1)) = 12
         )
         OR
-        -- LID (Linked Identity) chats - only show if they have a real name (not own device)
+        -- LID chats: only show if named AND no matching @s.whatsapp.net chat exists
+        -- This prevents duplicates when mobile (s.whatsapp.net) and web (LID) show same contact
         (
-          id LIKE '%@lid'
-          AND name IS NOT NULL
-          AND name NOT LIKE '+%'
-          AND length(name) > 0
+          c.id LIKE '%@lid'
+          AND c.name IS NOT NULL
+          AND c.name NOT LIKE '+%'
+          AND length(c.name) > 0
+          AND NOT EXISTS (
+            SELECT 1 FROM wa_chats c2
+            WHERE c2.account_phone = $1
+              AND c2.id LIKE '%@s.whatsapp.net'
+              AND (
+                c2.name = c.name
+                OR (c.phone IS NOT NULL AND c2.phone = c.phone)
+              )
+          )
         )
         OR
         -- Imported chats (from WhatsApp Export)
-        id LIKE 'import_%'
+        c.id LIKE 'import_%'
       )
       ORDER BY last_time DESC NULLS LAST LIMIT 300
     `, [wa.getConnectedPhone() || 'unknown']);
@@ -216,9 +244,9 @@ router.post('/send-media', authenticate, async (req, res) => {
     return res.status(400).json({ error: 'jid, fileName, mimeType, and data are required' });
   }
 
-  const allowed = ['image', 'video', 'document'];
+  const allowed = ['image', 'video', 'document', 'sticker'];
   if (mediaType && !allowed.includes(String(mediaType).toLowerCase())) {
-    return res.status(400).json({ error: 'mediaType must be image, video, or document' });
+    return res.status(400).json({ error: 'mediaType must be image, video, document, or sticker' });
   }
 
   try {

@@ -21,6 +21,12 @@ const os = require('os');
 const fs = require('fs');
 const pool = require('../db/pool');
 
+let sharp = null;
+function getSharp() {
+  if (!sharp) sharp = require('sharp');
+  return sharp;
+}
+
 // ── STATE ───────────────────────────────────────────────────────────────────────────
 let sock = null;
 let qrString = null;
@@ -36,6 +42,10 @@ let socketGeneration = 0;
 let allowQrGeneration = false;
 let groupParticipantSyncing = false;
 let lastGroupParticipantSyncAt = 0;
+// Reconnect detection: first connect uses sync_complete for UI refresh;
+// on reconnect Baileys replays chats.upsert — emit wa:chats_updated once after settle.
+let hasConnectedBefore = false;
+let isReconnect = false;
 const MAX_RECONNECT_ATTEMPTS = 10;
 const RECONNECT_DELAYS = [2000, 5000, 10000, 15000, 30000]; // Progressive delays
 const GROUP_PARTICIPANT_SYNC_INTERVAL_MS = 30 * 60 * 1000;
@@ -110,7 +120,7 @@ function scheduleReconnect(reason) {
 
 // ── SAFE TIMESTAMP ────────────────────────────────────────────────────────────────
 function toDate(ts) {
-  if (!ts) return new Date();
+  if (!ts) return null;
   try {
     let secs;
     if (typeof ts === 'object' && ts !== null && typeof ts.toNumber === 'function') {
@@ -120,9 +130,9 @@ function toDate(ts) {
     } else {
       secs = Number(ts);
     }
-    if (!secs || isNaN(secs) || secs < 1000000 || secs > 9999999999) return new Date();
+    if (!secs || isNaN(secs) || secs < 1000000 || secs > 9999999999) return null;
     return new Date(secs * 1000);
-  } catch (_) { return new Date(); }
+  } catch (_) { return null; }
 }
 
 // ── CONTACT NAME RESOLUTION ───────────────────────────────────────────────────────
@@ -168,12 +178,31 @@ function getBody(msg) {
     case 'videoMessage': return msg.message.videoMessage?.caption || '';
     case 'audioMessage': return '';
     case 'documentMessage': return msg.message.documentMessage?.caption || msg.message.documentMessage?.fileName || 'Document';
-    case 'stickerMessage': return '';
+    case 'stickerMessage': return 'Sticker';
     case 'locationMessage': return `${msg.message.locationMessage?.degreesLatitude},${msg.message.locationMessage?.degreesLongitude}`;
     case 'contactMessage': return msg.message.contactMessage?.displayName || 'Contact';
     case 'contactsArrayMessage': return 'Contacts';
     case 'buttonsMessage': return msg.message.buttonsMessage?.contentText || '';
     case 'listMessage': return msg.message.listMessage?.description || '';
+    case 'buttonsResponseMessage':
+      return msg.message.buttonsResponseMessage?.selectedDisplayText
+        || msg.message.buttonsResponseMessage?.selectedButtonId
+        || '';
+    case 'listResponseMessage':
+      return msg.message.listResponseMessage?.title
+        || msg.message.listResponseMessage?.singleSelectReply?.selectedRowId
+        || '';
+    case 'templateButtonReplyMessage':
+      return msg.message.templateButtonReplyMessage?.selectedDisplayText
+        || msg.message.templateButtonReplyMessage?.selectedId
+        || '';
+    case 'interactiveResponseMessage': {
+      const response = msg.message.interactiveResponseMessage;
+      return response?.body?.text
+        || response?.nativeFlowResponseMessage?.name
+        || response?.nativeFlowResponseMessage?.paramsJson
+        || '';
+    }
     default: return '';
   }
 }
@@ -193,6 +222,7 @@ function getQuotedBody(msg) {
       || msg.message?.imageMessage?.contextInfo
       || msg.message?.videoMessage?.contextInfo
       || msg.message?.documentMessage?.contextInfo
+      || msg.message?.stickerMessage?.contextInfo
       || msg.message?.audioMessage?.contextInfo;
     if (!ctx?.quotedMessage) return null;
     const qtype = getContentType(ctx.quotedMessage);
@@ -209,6 +239,7 @@ function getReplyInfo(msg) {
       || msg.message?.imageMessage?.contextInfo
       || msg.message?.videoMessage?.contextInfo
       || msg.message?.documentMessage?.contextInfo
+      || msg.message?.stickerMessage?.contextInfo
       || msg.message?.audioMessage?.contextInfo;
     if (!ctx?.quotedMessage || !ctx?.stanzaId) {
       return { isReply: false, replyToMsgId: null };
@@ -315,17 +346,34 @@ async function ensureTables(retries = 3) {
 
 // ── SAVE CHAT ────────────────────────────────────────────────────────────────────────
 async function saveChat(rawJid, name, lastMsg, lastTime, unread, isGroup) {
-  // Normalize JID: remove device suffixes like :48
-  const jid = rawJid.includes('@') ? (rawJid.split(':')[0] + '@' + rawJid.split('@')[1]) : rawJid;
+  // Normalize JID: strip device suffix (colon before @) e.g. '9195:42@s.whatsapp.net' -> '9195@s.whatsapp.net'
+  // For LIDs like '18064@lid' there is no colon so the local part stays unchanged
+  let jid = rawJid;
+  if (rawJid.includes('@')) {
+    const atIdx = rawJid.indexOf('@');
+    const localPart = rawJid.substring(0, atIdx);
+    const fullDomain = rawJid.substring(atIdx + 1);
+    const domain = fullDomain.split('@')[0]; // Strip double suffixes like @g.us@g.us
+    const cleanLocal = localPart.includes(':') ? localPart.split(':')[0] : localPart;
+    jid = cleanLocal + '@' + domain;
+  }
 
   const phone = jid.split('@')[0].split(':')[0];
+  const isGroupChat = !!isGroup || jid.endsWith('@g.us');
   // Format Indian number properly
   let displayPhone;
-  if (phone.startsWith('91') && phone.length === 12) {
+  if (isGroupChat) {
+    displayPhone = null;
+  } else if (phone.startsWith('91') && phone.length === 12) {
     displayPhone = '+91 ' + phone.slice(2, 7) + ' ' + phone.slice(7);
   } else {
     displayPhone = '+' + phone;
   }
+  const cleanName = String(name || '').trim();
+  const groupIdLocal = jid.split('@')[0].split(':')[0];
+  const safeName = isGroupChat && (cleanName === groupIdLocal || cleanName === ('+' + groupIdLocal))
+    ? null
+    : (cleanName || null);
   const ts = lastTime instanceof Date ? lastTime : toDate(lastTime);
   try {
     const accPhone = phoneNumber || 'unknown';
@@ -334,11 +382,13 @@ async function saveChat(rawJid, name, lastMsg, lastTime, unread, isGroup) {
       VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
       ON CONFLICT (id, account_phone) DO UPDATE SET
         name         = COALESCE(EXCLUDED.name, wa_chats.name),
+        phone        = COALESCE(EXCLUDED.phone, wa_chats.phone),
+        is_group     = wa_chats.is_group OR EXCLUDED.is_group,
         last_message = CASE WHEN EXCLUDED.last_message != '' THEN EXCLUDED.last_message ELSE wa_chats.last_message END,
-        last_time    = GREATEST(EXCLUDED.last_time, wa_chats.last_time),
+        last_time    = GREATEST(COALESCE(EXCLUDED.last_time, wa_chats.last_time), COALESCE(wa_chats.last_time, EXCLUDED.last_time)),
         unread       = CASE WHEN EXCLUDED.unread = 0 THEN 0 ELSE wa_chats.unread + EXCLUDED.unread END,
         updated_at   = NOW()
-    `, [jid, accPhone, name || displayPhone, displayPhone, isGroup || false, lastMsg || '', ts, unread || 0]);
+    `, [jid, accPhone, safeName || displayPhone, displayPhone, isGroupChat, lastMsg || '', ts, unread || 0]);
   } catch (err) {
     console.error(`[WA-DB] saveChat error ${jid}:`, err.message);
   }
@@ -444,6 +494,7 @@ async function saveMessage(msg) {
         msg.message?.imageMessage?.contextInfo ||
         msg.message?.videoMessage?.contextInfo ||
         msg.message?.documentMessage?.contextInfo ||
+        msg.message?.stickerMessage?.contextInfo ||
         msg.message?.audioMessage?.contextInfo;
 
       if (ctx?.stanzaId) {
@@ -459,6 +510,7 @@ async function saveMessage(msg) {
           quotedMsg.imageMessage?.caption ||
           quotedMsg.videoMessage?.caption ||
           quotedMsg.documentMessage?.fileName ||
+          (quotedMsg.stickerMessage ? '[Sticker]' : null) ||
           (quotedMsg.imageMessage ? '[Image]' :
             quotedMsg.videoMessage ? '[Video]' :
               quotedMsg.documentMessage ? '[Document]' :
@@ -482,17 +534,47 @@ async function saveMessage(msg) {
 // ── LOAD CONTACTS FROM DB INTO MEMORY ──────────────────────────────────────────────────
 async function loadContactsFromDB() {
   try {
-    const res = await pool.query(`SELECT jid, name, notify FROM wa_contacts`);
+    const accPhone = phoneNumber || 'unknown';
+    // Include phone so LID entries get their phoneJid pre-populated for group msg rendering
+    const res = await pool.query(`SELECT jid, name, notify, phone FROM wa_contacts WHERE account_phone=$1`, [accPhone]);
     res.rows.forEach(r => {
-      contactsStore[r.jid] = { name: r.name, notify: r.notify };
+      const entry = { name: r.name, notify: r.notify };
+      // Pre-populate phoneJid for @lid contacts so saveMessage can resolve senders immediately
+      if (r.jid.endsWith('@lid') && r.phone) {
+        entry.phoneJid = r.phone + '@s.whatsapp.net';
+      }
+      contactsStore[r.jid] = entry;
       // Also index by phone number for cross-format lookup
       const phone = r.jid.split('@')[0].split(':')[0];
       if (phone && !contactsStore[phone]) {
         contactsStore[phone] = { name: r.name, notify: r.notify };
       }
     });
-    console.log(`[WA] Loaded ${res.rows.length} contacts from DB`);
+    const lidCount = res.rows.filter(r => r.jid.endsWith('@lid') && r.phone).length;
+    console.log(`[WA] Loaded ${res.rows.length} contacts from DB (${lidCount} LID→phone mappings)`);
   } catch (_) { }
+}
+
+// ── LOAD LID→PHONE MAP FROM DB AFTER CONNECT ──────────────────────────────────────────
+// Called immediately after wa:connected so group message senders resolve without waiting
+// for live Baileys contact events (which may not fire on reconnect).
+async function loadLidPhoneMapFromDB() {
+  try {
+    const accPhone = phoneNumber || 'unknown';
+    const res = await pool.query(
+      `SELECT jid, phone FROM wa_contacts WHERE account_phone=$1 AND jid LIKE '%@lid' AND phone IS NOT NULL AND phone != ''`,
+      [accPhone]
+    );
+    let mapped = 0;
+    for (const r of res.rows) {
+      if (!contactsStore[r.jid]) contactsStore[r.jid] = {};
+      contactsStore[r.jid].phoneJid = r.phone + '@s.whatsapp.net';
+      mapped++;
+    }
+    console.log(`[WA] LID→phone map refreshed: ${mapped} entries`);
+  } catch (err) {
+    console.error('[WA] loadLidPhoneMapFromDB error:', err.message);
+  }
 }
 
 // ── START WHATSAPP ────────────────────────────────────────────────────────────────────
@@ -545,7 +627,7 @@ async function startWA(options = {}) {
     auth: state,
     printQRInTerminal: false,
     browser: ['UniComm Pro', 'Chrome', '120.0'],
-    syncFullHistory: false,  // false = only recent messages (faster, prevents sync stuck)
+    syncFullHistory: true,  // true = ensures full history is downloaded (faster, prevents sync stuck)
     logger: require('pino')({ level: 'info' }), // Enabled info level to see Baileys internal logs
     getMessage: async (key) => {
       const res = await pool.query(
@@ -589,6 +671,10 @@ async function startWA(options = {}) {
     }
 
     if (connection === 'open') {
+      // Detect reconnect BEFORE updating state
+      isReconnect = hasConnectedBefore;
+      hasConnectedBefore = true;
+
       isConnected = true;
       currentState = 'CONNECTED';
       reconnectAttempts = 0;
@@ -598,14 +684,17 @@ async function startWA(options = {}) {
       }
       qrString = null;
       const rawId = sock.user?.id || '';
-      console.log('[WA] sock.user:', JSON.stringify(sock.user));
+
       // sock.user.id can be "919545073545:48@s.whatsapp.net" or LID "49868...@lid"
       // Extract real phone: take part before ':' or '@'
       const idPart = rawId.split('@')[0].split(':')[0];
       phoneNumber = idPart || rawId;
-      console.log('[WA] Connected as', phoneNumber, '| raw id:', rawId);
+      console.log(`[WA] Connected as ${phoneNumber} | raw id: ${rawId} | reconnect: ${isReconnect}`);
       await adoptUnknownAccountRows(phoneNumber);
       emit('wa:connected', { phone: phoneNumber, name: sock.user?.name });
+
+      // Immediately refresh LID→phone map so group msg senders resolve on reconnect
+      await loadLidPhoneMapFromDB();
 
       // After connect: scan ALL groups and populate LID→phone in wa_contacts
       // Delay 60s to let WhatsApp settle before making group metadata requests
@@ -689,7 +778,7 @@ async function startWA(options = {}) {
     for (const chat of chats) {
       const isGroup = chat.id.endsWith('@g.us');
       const name = isGroup
-        ? (chat.name || chat.id.split('@')[0])
+        ? (chat.name || null)
         : getContactName(chat.id, chat.name);
       const ts = toDate(chat.conversationTimestamp);
       await saveChat(chat.id, name, '', ts, 0, isGroup);
@@ -709,7 +798,7 @@ async function startWA(options = {}) {
       if (result) {
         saved++;
         const isGroup = jid.endsWith('@g.us');
-        const name = isGroup ? getContactName(jid, null) : getContactName(jid, msg.pushName);
+        const name = isGroup ? getContactName(jid, null) : getContactName(jid, msg.key.fromMe ? null : msg.pushName);
         await saveChat(jid, name, result.body, result.ts, 0, isGroup);
       }
     }
@@ -725,15 +814,33 @@ async function startWA(options = {}) {
   });
 
   // ── CHAT LIST UPDATES ──────────────────────────────────────────────────────────────────
+  // Track whether we already have data so reconnect chats.upsert doesn't cause duplicate renders
+  let chatsUpsertDebounce = null;
+  let chatsBatchCount = 0;
   sock.ev.on('chats.upsert', async (chats) => {
+    chatsBatchCount++;
     for (const chat of chats) {
       const isGroup = chat.id.endsWith('@g.us');
       const name = isGroup
-        ? (chat.name || chat.id.split('@')[0])
+        ? (chat.name || null)
         : getContactName(chat.id, chat.name);
       await saveChat(chat.id, name, '', toDate(chat.conversationTimestamp), 0, isGroup);
     }
-    emit('wa:chats_updated', {});
+    // Debounce: wait 3s after the last batch before refreshing the UI.
+    // On FIRST connect: suppress — messaging-history.set isLatest=true fires wa:sync_complete instead.
+    // On RECONNECT: Baileys replays chats, data already in DB → emit once after batch settles.
+    if (chatsUpsertDebounce) clearTimeout(chatsUpsertDebounce);
+    chatsUpsertDebounce = setTimeout(() => {
+      const batches = chatsBatchCount;
+      chatsBatchCount = 0;
+      chatsUpsertDebounce = null;
+      if (isReconnect) {
+        console.log(`[WA] chats.upsert settled (${batches} batches, reconnect) — emitting wa:chats_updated`);
+        emit('wa:chats_updated', {});
+      } else {
+        console.log(`[WA] chats.upsert settled (${batches} batches, first connect) — skipping wa:chats_updated (wa:sync_complete handles UI refresh)`);
+      }
+    }, 3000);
   });
 
   // ── REAL-TIME MESSAGES ───────────────────────────────────────────────────────────────
@@ -746,12 +853,12 @@ async function startWA(options = {}) {
 
         // Auto-save media to disk so it's available even after cache expires
         const mtype = getContentType(msg.message);
-        if (['imageMessage', 'videoMessage', 'audioMessage', 'documentMessage'].includes(mtype)) {
+        if (['imageMessage', 'videoMessage', 'audioMessage', 'documentMessage', 'stickerMessage'].includes(mtype)) {
           try {
             const buf = await downloadMediaMessage(msg, 'buffer', {});
             const mediaDir = path.join(__dirname, '../wa_media');
             if (!fs.existsSync(mediaDir)) fs.mkdirSync(mediaDir, { recursive: true });
-            const ext = mtype === 'imageMessage' ? 'jpg' : mtype === 'videoMessage' ? 'mp4' : mtype === 'audioMessage' ? 'ogg' : 'bin';
+            const ext = mtype === 'imageMessage' ? 'jpg' : mtype === 'videoMessage' ? 'mp4' : mtype === 'audioMessage' ? 'ogg' : mtype === 'stickerMessage' ? 'webp' : 'bin';
             const docMsg = msg.message.documentMessage;
             const fname = docMsg?.fileName || `${msg.key.id}.${ext}`;
             const savedName = msg.key.id + '_' + fname;
@@ -775,7 +882,7 @@ async function startWA(options = {}) {
       const isGroup = jid.endsWith('@g.us');
       const chatName = isGroup
         ? getContactName(jid, null)
-        : getContactName(jid, msg.pushName);
+        : getContactName(jid, msg.key.fromMe ? null : msg.pushName);
 
       await saveChat(jid, chatName, saved.body, saved.ts, msg.key.fromMe ? 0 : 1, isGroup);
 
@@ -790,6 +897,7 @@ async function startWA(options = {}) {
             msg.message?.imageMessage?.contextInfo ||
             msg.message?.videoMessage?.contextInfo ||
             msg.message?.documentMessage?.contextInfo ||
+            msg.message?.stickerMessage?.contextInfo ||
             msg.message?.audioMessage?.contextInfo;
 
           if (ctx?.stanzaId) {
@@ -805,6 +913,7 @@ async function startWA(options = {}) {
               quotedMsg.imageMessage?.caption ||
               quotedMsg.videoMessage?.caption ||
               quotedMsg.documentMessage?.fileName ||
+              (quotedMsg.stickerMessage ? '[Sticker]' : null) ||
               quotedMsg.audioMessage?.caption ||
               '[Media]';
           }
@@ -854,8 +963,8 @@ async function startWA(options = {}) {
     for (const g of groups) {
       const accPhone = phoneNumber || 'unknown';
       await pool.query(
-        `UPDATE wa_chats SET name=$1 WHERE id=$2 AND account_phone=$3`,
-        [g.subject || g.id, g.id, accPhone]
+        `UPDATE wa_chats SET name=COALESCE($1, name) WHERE id=$2 AND account_phone=$3`,
+        [g.subject || null, g.id, accPhone]
       );
       contactsStore[g.id] = { name: g.subject };
     }
@@ -1036,15 +1145,22 @@ async function sendMessage(jid, text, quotedMsgId) {
   const formattedJid = formatJid(jid);
   const accPhone = phoneNumber || 'unknown';
 
-  let sendOptions = { text };
+  let sendContent = { text };
+  let sendOptions = {};
+  let quotedBody = null;
 
   if (quotedMsgId) {
     try {
       const res = await pool.query(
-        `SELECT body, from_me, sender FROM wa_messages WHERE id=$1 AND chat_id=$2 AND account_phone=$3`,
+        `SELECT body, media_path, from_me, sender FROM wa_messages WHERE id=$1 AND chat_id=$2 AND account_phone=$3`,
         [quotedMsgId, formattedJid, accPhone]
       );
       if (res.rows[0]) {
+        quotedBody =
+          res.rows[0].body ||
+          (res.rows[0].media_path
+            ? res.rows[0].media_path.split('_').slice(1).join('_')
+            : '[Media]');
         sendOptions.quoted = {
           key: {
             id: quotedMsgId,
@@ -1060,7 +1176,7 @@ async function sendMessage(jid, text, quotedMsgId) {
     }
   }
 
-  const result = await sock.sendMessage(formattedJid, sendOptions);
+  const result = await sock.sendMessage(formattedJid, sendContent, sendOptions);
   const ts = new Date();
   const savedMsg = {
     id: result.key.id,
@@ -1071,14 +1187,15 @@ async function sendMessage(jid, text, quotedMsgId) {
     msgType: 'text',
     timestamp: ts,
     status: 'sent',
-    quotedBody: quotedMsgId ? `↩ Reply` : null
+    quotedBody,
+    replyToMsgId: quotedMsgId || null
   };
 
   await pool.query(
-    `INSERT INTO wa_messages (id, chat_id, account_phone, from_me, sender_name, body, msg_type, timestamp, is_read, status, quoted_body)
-     VALUES ($1,$2,$3,true,'You',$4,'text',$5,true,'sent',$6)
+    `INSERT INTO wa_messages (id, chat_id, account_phone, from_me, sender_name, body, msg_type, timestamp, is_read, status, quoted_body, is_reply, reply_to_msg_id)
+     VALUES ($1,$2,$3,true,'You',$4,'text',$5,true,'sent',$6,$7,$8)
      ON CONFLICT (id, chat_id, account_phone) DO NOTHING`,
-    [savedMsg.id, formattedJid, accPhone, text, ts, savedMsg.quotedBody]
+    [savedMsg.id, formattedJid, accPhone, text, ts, savedMsg.quotedBody, !!quotedMsgId, quotedMsgId || null]
   );
   await saveChat(formattedJid, null, text, ts, 0, formattedJid.endsWith('@g.us'));
 
@@ -1098,9 +1215,47 @@ function safeMediaFilename(filename, fallback) {
 function mediaKindToMessageType(mediaType, mime) {
   const kind = String(mediaType || '').toLowerCase();
   const m = String(mime || '').toLowerCase();
+  if (kind === 'sticker' || m === 'image/webp' || m === 'image/gif') return 'stickerMessage';
   if (kind === 'image' || m.startsWith('image/')) return 'imageMessage';
   if (kind === 'video' || m.startsWith('video/')) return 'videoMessage';
   return 'documentMessage';
+}
+
+function stickerFilename(filename) {
+  const base = safeMediaFilename(filename, 'sticker.webp').replace(/\.[^.]+$/, '');
+  return `${base || 'sticker'}.webp`;
+}
+
+async function prepareStickerMedia(buffer, mimetype, filename) {
+  const inputMime = String(mimetype || '').toLowerCase();
+  if (inputMime === 'image/webp' || /\.webp$/i.test(filename || '')) {
+    return {
+      buffer,
+      mimetype: 'image/webp',
+      filename: stickerFilename(filename),
+    };
+  }
+
+  const image = getSharp()(buffer, {
+    animated: inputMime === 'image/gif' || /\.gif$/i.test(filename || ''),
+    pages: -1,
+    limitInputPixels: false,
+  });
+
+  const converted = await image
+    .resize(512, 512, {
+      fit: 'contain',
+      background: { r: 0, g: 0, b: 0, alpha: 0 },
+      withoutEnlargement: true,
+    })
+    .webp({ quality: 80, effort: 4 })
+    .toBuffer();
+
+  return {
+    buffer: converted,
+    mimetype: 'image/webp',
+    filename: stickerFilename(filename),
+  };
 }
 
 async function sendPreparedMedia(formattedJid, msgType, buffer, mimetype, filename, caption, quoted) {
@@ -1109,16 +1264,14 @@ async function sendPreparedMedia(formattedJid, msgType, buffer, mimetype, filena
     content = { image: buffer, mimetype, caption };
   } else if (msgType === 'videoMessage') {
     content = { video: buffer, mimetype, caption };
+  } else if (msgType === 'stickerMessage') {
+    content = { sticker: buffer, mimetype: mimetype || 'image/webp' };
   } else {
     content = { document: buffer, mimetype, fileName: filename, caption };
   }
-  if (quoted) {
-    content.quoted = quoted;
-    console.log('[WA] Quoted message included in payload:', JSON.stringify(quoted, null, 2));
-  }
 
   console.log(`[WA] Sending ${msgType} payload structure keys:`, Object.keys(content));
-  return sock.sendMessage(formattedJid, content);
+  return sock.sendMessage(formattedJid, content, quoted ? { quoted } : {});
 }
 
 async function sendMediaMessage(jid, media, quotedMsgId) {
@@ -1130,8 +1283,16 @@ async function sendMediaMessage(jid, media, quotedMsgId) {
 
   const mimetype = media.mimetype || 'application/octet-stream';
   const msgType = mediaKindToMessageType(media.mediaType, mimetype);
-  const filename = safeMediaFilename(media.filename, msgType === 'imageMessage' ? 'photo.jpg' : msgType === 'videoMessage' ? 'video.mp4' : 'document');
-  const caption = String(media.caption || '').trim();
+  let finalBuffer = buffer;
+  let finalMimetype = mimetype;
+  let filename = safeMediaFilename(media.filename, msgType === 'imageMessage' ? 'photo.jpg' : msgType === 'videoMessage' ? 'video.mp4' : msgType === 'stickerMessage' ? 'sticker.webp' : 'document');
+  if (msgType === 'stickerMessage') {
+    const preparedSticker = await prepareStickerMedia(buffer, mimetype, filename);
+    finalBuffer = preparedSticker.buffer;
+    finalMimetype = preparedSticker.mimetype;
+    filename = preparedSticker.filename;
+  }
+  const caption = msgType === 'stickerMessage' ? '' : String(media.caption || '').trim();
 
   let quoted = null;
   if (quotedMsgId) {
@@ -1161,7 +1322,7 @@ async function sendMediaMessage(jid, media, quotedMsgId) {
   try {
     // Attempt combined send (Document + Caption in one bubble)
     console.log(`[WA] Attempting combined send of ${finalType} to ${formattedJid} with caption: "${caption || ''}"`);
-    result = await sendPreparedMedia(formattedJid, finalType, buffer, mimetype, filename, caption, quoted);
+    result = await sendPreparedMedia(formattedJid, finalType, finalBuffer, finalMimetype, filename, caption, quoted);
     console.log(`[WA] Send successful, ID: ${result?.key?.id}`);
   } catch (err) {
     console.error(`[WA] Combined send failed for ${finalType}:`, err.message);
@@ -1169,7 +1330,7 @@ async function sendMediaMessage(jid, media, quotedMsgId) {
     // Fallback: If combined fails, try file only to at least deliver the content
     console.warn(`[WA] Falling back to file-only transmission...`);
     try {
-      result = await sendPreparedMedia(formattedJid, finalType, buffer, mimetype, filename, null, quoted);
+      result = await sendPreparedMedia(formattedJid, finalType, finalBuffer, finalMimetype, filename, null, quoted);
       console.log(`[WA] File-only fallback successful, ID: ${result?.key?.id}`);
 
       // If file-only worked, send caption as separate follow-up
@@ -1188,7 +1349,7 @@ async function sendMediaMessage(jid, media, quotedMsgId) {
   const mediaDir = path.join(__dirname, '../wa_media');
   if (!fs.existsSync(mediaDir)) fs.mkdirSync(mediaDir, { recursive: true });
   const savedName = id + '_' + filename;
-  fs.writeFileSync(path.join(mediaDir, savedName), buffer);
+  fs.writeFileSync(path.join(mediaDir, savedName), finalBuffer);
 
   const body = caption || filename || 'Media Message';
 
@@ -1223,15 +1384,16 @@ async function sendMediaMessage(jid, media, quotedMsgId) {
     timestamp: ts,
     status: 'sent',
     quotedBody,
+    replyToMsgId: quotedMsgId || null,
     mediaPath: savedName,
     filename: filename
   };
 
   await pool.query(
-    `INSERT INTO wa_messages (id, chat_id, account_phone, from_me, sender_name, body, msg_type, timestamp, is_read, status, quoted_body, media_path)
-     VALUES ($1,$2,$3,true,'You',$4,$5,$6,true,'sent',$7,$8)
+    `INSERT INTO wa_messages (id, chat_id, account_phone, from_me, sender_name, body, msg_type, timestamp, is_read, status, quoted_body, is_reply, reply_to_msg_id, media_path)
+     VALUES ($1,$2,$3,true,'You',$4,$5,$6,true,'sent',$7,$8,$9,$10)
      ON CONFLICT (id, chat_id, account_phone) DO NOTHING`,
-    [id, formattedJid, accPhone, body, finalType, ts, savedMsg.quotedBody, savedName]
+    [id, formattedJid, accPhone, body, finalType, ts, savedMsg.quotedBody, !!quotedMsgId, quotedMsgId || null, savedName]
   );
   await saveChat(formattedJid, null, body, ts, 0, formattedJid.endsWith('@g.us'));
 
@@ -1283,7 +1445,7 @@ async function downloadMedia(msgId) {
       const mimeMap = {
         '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.png': 'image/png', '.gif': 'image/gif',
         '.mp4': 'video/mp4', '.pdf': 'application/pdf', '.bin': 'application/octet-stream',
-        '.ogg': 'audio/ogg'
+        '.ogg': 'audio/ogg', '.webp': 'image/webp'
       };
       const mime = mimeMap[ext] || 'application/octet-stream';
       const filename = files[0].replace(msgId + '_', '');
@@ -1302,8 +1464,9 @@ async function downloadMedia(msgId) {
   );
   const type = getContentType(cached.message);
   const docMsg = cached.message.documentMessage;
-  const filename = docMsg?.fileName || (type === 'imageMessage' ? 'image.jpg' : type === 'videoMessage' ? 'video.mp4' : 'file.bin');
-  const mime = docMsg?.mimetype || 'application/octet-stream';
+  const stickerMsg = cached.message.stickerMessage;
+  const filename = docMsg?.fileName || (type === 'imageMessage' ? 'image.jpg' : type === 'videoMessage' ? 'video.mp4' : type === 'stickerMessage' ? 'sticker.webp' : 'file.bin');
+  const mime = docMsg?.mimetype || stickerMsg?.mimetype || (type === 'stickerMessage' ? 'image/webp' : 'application/octet-stream');
   return { buffer, mime, filename };
 }
 
@@ -1443,3 +1606,5 @@ async function importExportedChat(chatText, chatJid, mediaFiles, clearOld) {
 }
 
 module.exports = { startWA, sendMessage, sendMediaMessage, logout, getStatus, getQR, requestQR, setIO, getGroupMetadata, downloadMedia, msgCache, importExportedChat, getConnectedPhone };
+
+

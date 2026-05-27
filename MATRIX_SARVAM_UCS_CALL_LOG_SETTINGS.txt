@@ -205,6 +205,30 @@ Purpose:
 * old call retrieval
 * report synchronization
 
+Critical UI state:
+
+If the report page shows a button like:
+
+Send to Destination Port
+
+then report pushing is not currently being sent/triggered for that report.
+This is the Matrix-side setting/state that can make the PBX show fresh call
+records internally while UniComm CRM stays stale.
+
+For missing historical/day call logs, check these pages first:
+
+* OG Call Report
+* IC Call Report
+* Internal Call Report
+
+Each required report must be sent/enabled to the destination port:
+
+192.168.0.205 : 5001
+
+The tower server IP is correct for production. The failure is when the report
+delivery/action itself is off or not triggered, even though the destination IP
+and port are correct.
+
 IMPORTANT:
 Only change:
 
