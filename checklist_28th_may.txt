@@ -206,3 +206,121 @@ PENDING / NOT YET DONE
 ====================================================
   END OF CHECKLIST — 28th May 2026
 ====================================================
+
+
+====================================================
+  UPDATES — Later in the Session (28th May 2026)
+====================================================
+
+----------------------------------------------------
+13. CAMPAIGNS TABLE VIEW IN MARKETING SUITE (6926567)
+----------------------------------------------------
+[x] camp-list tbody was missing from HTML — added proper table card
+    above AI Campaign Generator section
+[x] Table columns: Name, Goal, Channel, Group/Segment, Launch,
+    Interval, Open%, CTR%, Status, Action
+[x] Matches broadcast table layout exactly
+[x] New Campaign button in table header opens modal
+[x] Refresh button calls loadCampaignsTable()
+[x] Empty state shows helpful message
+[x] renderCampaigns() rewritten — table rows instead of cards
+[x] deleteCampaign() updated — btn.closest('tr').remove()
+[x] loadCampaignsTable() added as standalone function
+[x] loadDashboardData() always renders campaigns (even empty)
+
+
+----------------------------------------------------
+14. CAMPAIGN AUDIT — ALL BUTTONS VERIFIED (c2c1ce9)
+----------------------------------------------------
+[x] All 19 element IDs in modal verified — HTML matches JS exactly
+[x] All onclick handlers verified — every function defined and called
+[x] ncLoadGroupsDropdown(skipReset):
+    - Clears nc-name, nc-product, nc-date, nc-time, A/B fields on open
+    - skipReset=true preserves pre-filled values from AI wizard
+[x] createCampaignFromWizard():
+    - Now sets nc-campaign-goal via goal mapping table
+      (lead generation → Lead Generation, quote requests → Sales Conversion, etc.)
+    - Calls ncLoadGroupsDropdown(true) to keep pre-filled values
+[x] deleteCampaign: btn.closest('tr').remove() confirmed correct
+[x] campaign-table + camp-list tbody confirmed present in HTML
+
+
+----------------------------------------------------
+15. CAMPAIGN LAUNCH, PAUSE, STATS WIRED (16d5509)
+----------------------------------------------------
+Backend (campaigns.js):
+[x] POST /api/campaigns/:id/launch
+    - Fetches group members by group_id OR contacts by segment
+    - Calls eb.sendBroadcast() in background (non-blocking)
+    - Updates status → Sending on start
+    - Updates status → Sent, sent_count, bounce_rate on completion
+    - Updates status → Failed on error
+[x] PATCH /api/campaigns/:id/pause
+    - Toggles status: Paused ↔ Active
+    - Returns updated campaign row
+[x] Imported eb (emailBroadcast service) into campaigns.js
+
+Frontend (dashboard.html):
+[x] createCampaign():
+    - If no future schedule → opens launch prompt immediately
+    - If future date set → saves as Scheduled with notification
+[x] openCampaignLaunchPrompt():
+    - Modal to enter subject + HTML body before sending
+    - Pre-fills subject from goal + product
+    - Pre-fills body with goal-aware default content
+      (Lead Gen / Sales Conversion / Re-engagement variants)
+    - Shows {{name}} / {{company}} personalisation hint
+    - Note: unsubscribe footer added automatically
+[x] campaignLaunchSend():
+    - POSTs subject + html + group_id to /launch endpoint
+    - Shows "Sending…" notification immediately
+    - Refreshes campaign table after 3 seconds
+[x] campaignPause():
+    - Calls PATCH /campaigns/:id/pause
+    - Updates button icon live (pause ↔ play)
+    - Shows pause/resume notification
+[x] campaignStats():
+    - Fetches campaign by id from API
+    - Opens stats popup showing:
+      Open Rate, CTR, Bounce Rate, Unsub Rate (4-metric grid)
+      Status, Goal, Channel, Sent count
+      Launch time (formatted in campaign timezone)
+      Send interval
+      A/B Subject B (if enabled)
+    - "Launch Now" button inside stats popup
+[x] renderCampaigns():
+    - Pause button: correct icon (pause/play based on status)
+    - Stats button: calls campaignStats(id)
+    - Both have real onclick handlers (were empty before)
+
+
+----------------------------------------------------
+16. SYNTAX FIX (cec918e)
+----------------------------------------------------
+[x] dashboard.html line 11453: comment + function declaration
+    merged onto one line — fixed missing newline before showDbStatus
+[x] getDiagnostics confirmed: No diagnostics found after fix
+
+
+----------------------------------------------------
+CURRENT PENDING / TOWER DEPLOY NEEDED
+----------------------------------------------------
+[ ] Tower server needs pull for commits: 6926567, d4fdba0, 33cd692,
+    016e334, c2c1ce9, 16d5509, cec918e
+    Command:
+    cd C:\UniComm\Unicircuit_UniComm-main
+    git fetch origin
+    git reset --hard origin/main
+    cd backend
+    npm install --prefer-offline
+    pm2 restart unicomm --update-env
+
+[ ] Tier 3 campaign features (future phase):
+    - Trigger-based automation flows (welcome, abandoned cart)
+    - Re-engagement cron (inactive > 30 days)
+    - Continuous learning / analytics aggregation
+    - WhatsApp campaign send support
+
+====================================================
+  END OF UPDATES — 28th May 2026
+====================================================
