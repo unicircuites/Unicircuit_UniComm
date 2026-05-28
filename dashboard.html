@@ -10832,6 +10832,55 @@ Keep it concise and professional.`;
         }).catch(function () { });
     }
 
+    async function clLoadTemplates() {
+      var sel = document.getElementById('cl-template-select');
+      if (!sel) return;
+      sel.innerHTML = '<option value="">— Append a saved template —</option>';
+      try {
+        var res = await fetch(API_BASE + '/templates', { headers: getAuthHeaders() });
+        if (!res.ok) return;
+        var templates = await res.json();
+        templates.forEach(function (t) {
+          var opt = document.createElement('option');
+          opt.value = t.id;
+          opt.textContent = t.name + (t.subject ? ' — ' + t.subject : '');
+          sel.appendChild(opt);
+        });
+      } catch (_) { }
+    }
+
+    function clAppendTemplate() {
+      var sel = document.getElementById('cl-template-select');
+      if (!sel || !sel.value) return;
+      fetch(API_BASE + '/templates/' + sel.value, { headers: getAuthHeaders() })
+        .then(function (r) { return r.ok ? r.json() : null; })
+        .then(function (t) {
+          if (!t) return;
+          var subj = document.getElementById('cl-subject');
+          var body = document.getElementById('cl-body-editor');
+          if (subj && !subj.value.trim() && t.subject) subj.value = t.subject;
+          if (body && t.html_body) {
+            bcSetActiveEditor('cl-body-editor');
+            body.focus();
+            var html = (body.innerHTML || '').trim() ? '<br><br>' + t.html_body : t.html_body;
+            var selObj = window.getSelection();
+            if (!selObj.rangeCount || !body.contains(selObj.getRangeAt(0).commonAncestorContainer)) {
+              var r = document.createRange();
+              r.selectNodeContents(body);
+              r.collapse(false);
+              selObj.removeAllRanges();
+              selObj.addRange(r);
+            }
+            document.execCommand('insertHTML', false, html);
+            bcSaveSelection();
+          }
+          if (sel) sel.value = '';
+          notify('Template appended', t.name, 'var(--blue)', 'fas fa-file-alt');
+        }).catch(function (err) {
+          notify('Template', err.message || 'Could not append template', 'var(--red)', 'fas fa-exclamation-circle');
+        });
+    }
+
     // MARKETING MODULE
 
     // ── Store last AI-generated campaign copy so action buttons can use it ──
@@ -11465,6 +11514,16 @@ Best regards,<br>
             <span><i class="fas fa-paper-plane" style="color:var(--blue2);margin-right:8px;"></i>Launch Campaign — ${escHtml(name)}</span>
             <i class="fas fa-times modal-close" onclick="document.getElementById('camp-launch-overlay').style.display='none'"></i>
           </div>
+          <div
+            style="display:flex;gap:8px;align-items:center;padding:8px 10px;background:rgba(59,130,246,0.06);border:1px solid rgba(59,130,246,0.15);border-radius:8px;margin-bottom:10px;">
+            <i class="fas fa-file-alt" style="color:var(--blue2);font-size:12px;flex-shrink:0;"></i>
+            <select class="inp" id="cl-template-select"
+              style="font-size:12px;padding:5px 8px;flex:1;background:transparent;border:none;outline:none;">
+              <option value="">— Append a saved template —</option>
+            </select>
+            <button type="button" class="btn btn-blue btn-xs" onclick="clAppendTemplate()"><i
+                class="fas fa-plus-circle"></i> Append</button>
+          </div>
           <div class="form-group">
             <label class="form-label">Email Subject <span style="font-size:10px;color:var(--muted);">(40–60 chars recommended)</span></label>
             <input class="inp" id="cl-subject" value="${escHtml(defaultSubject)}" />
@@ -11581,6 +11640,7 @@ Best regards,<br>
           </div>
         </div>`;
       renderComposeAttachmentsList();
+      clLoadTemplates();
     }
 
     // ── CAMPAIGN SEND ─────────────────────────────────────────────────────────────
