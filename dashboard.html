@@ -4174,7 +4174,7 @@
                 <i class="fas fa-paper-plane" style="color:var(--blue2);width:14px;"></i> Send Broadcast
               </button>
               <button class="btn btn-ghost btn-sm" style="width:100%;justify-content:flex-start;gap:9px;padding:8px 12px;border-radius:7px;"
-                onclick="closeMktQuickMenu();openModal('campaign-modal');">
+                onclick="closeMktQuickMenu();openModal('campaign-modal');ncLoadGroupsDropdown();">
                 <i class="fas fa-rocket" style="color:var(--cyan);width:14px;"></i> Launch Campaign
               </button>
               <button class="btn btn-ghost btn-sm" style="width:100%;justify-content:flex-start;gap:9px;padding:8px 12px;border-radius:7px;"
@@ -5069,7 +5069,7 @@
                     onmouseover="this.style.background='rgba(255,255,255,0.06)'" onmouseout="this.style.background=''">
                     <i class="fas fa-paper-plane" style="color:var(--blue2);width:14px;"></i> Send Broadcast
                   </div>
-                  <div onclick="closeOaMktMenu();openModal('campaign-modal');"
+                  <div onclick="closeOaMktMenu();openModal('campaign-modal');ncLoadGroupsDropdown();"
                     style="display:flex;align-items:center;gap:9px;padding:8px 12px;border-radius:7px;cursor:pointer;font-size:12.5px;color:var(--text);"
                     onmouseover="this.style.background='rgba(255,255,255,0.06)'" onmouseout="this.style.background=''">
                     <i class="fas fa-rocket" style="color:var(--cyan);width:14px;"></i> Launch Campaign
@@ -6650,7 +6650,7 @@
 </div>
 
   <div class="modal-overlay" id="campaign-modal">
-    <div class="modal">
+    <div class="modal" style="max-width:680px;">
       <div class="modal-title">
         <span><i class="fas fa-bullhorn" style="color:var(--gold);margin-right:8px;"></i>Create Campaign</span>
         <i class="fas fa-times modal-close" onclick="closeModal('campaign-modal')"></i>
@@ -6659,13 +6659,28 @@
           placeholder="Q2 Switchgear Promotion" /></div>
       <div class="form-group"><label class="form-label">Product / Service</label><input class="inp" id="nc-product" />
       </div>
-      <div class="form-group"><label class="form-label">Target Contacts (segment)</label><select class="inp"
-          id="nc-seg">
-          <option>All</option>
-          <option>Hot Lead</option>
-          <option>Client</option>
-          <option>Prospect</option>
-        </select></div>
+
+      <!-- Target Contacts — group picker (same pattern as broadcast) -->
+      <div class="form-group">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:5px;">
+          <label class="form-label" style="margin-bottom:0;">Target Contacts (group)</label>
+          <button type="button" class="btn btn-ghost btn-xs" onclick="openGroupsManager()">
+            <i class="fas fa-cog"></i> Manage Groups
+          </button>
+        </div>
+        <div style="display:flex;gap:6px;align-items:center;">
+          <select id="nc-group-select" class="inp" style="flex:1;font-size:12px;padding:5px 8px;">
+            <option value="">— Load from a group —</option>
+          </select>
+          <button type="button" class="btn btn-blue btn-xs" onclick="ncLoadFromGroup()">
+            <i class="fas fa-users"></i> Load Group
+          </button>
+        </div>
+        <div style="margin-top:5px;display:flex;gap:8px;align-items:center;">
+          <span id="nc-group-count" style="font-size:11px;color:var(--muted);">No group selected</span>
+        </div>
+      </div>
+
       <div class="form-row">
         <div><label class="form-label">Channel</label><select class="inp" id="nc-channel">
             <option>Email</option>
@@ -6674,8 +6689,39 @@
           </select></div>
         <div><label class="form-label">Schedule</label><input class="inp" id="nc-date" type="date" /></div>
       </div>
-      <button class="btn btn-gold" style="width:100%;justify-content:center;" onclick="createCampaign()"><i
-          class="fas fa-rocket"></i> Create & Launch</button>
+
+      <!-- AI Campaign Generator (PicoClaw) -->
+      <div style="border:1px solid rgba(245,166,35,0.18);border-radius:10px;padding:12px 14px;margin-top:4px;background:rgba(245,166,35,0.03);">
+        <div style="font-size:10.5px;font-weight:700;color:var(--gold);margin-bottom:10px;letter-spacing:.5px;">
+          <i class="fas fa-robot"></i> AI CAMPAIGN GENERATOR — PICOCLAW
+        </div>
+        <div class="form-row" style="margin-bottom:8px;">
+          <div class="form-group" style="margin-bottom:0;">
+            <label class="form-label">Target Audience</label>
+            <input class="inp" id="nc-audience" placeholder="Electrical contractors, industrial OEMs" />
+          </div>
+          <div class="form-group" style="margin-bottom:0;">
+            <label class="form-label">Goal</label>
+            <select class="inp" id="nc-goal">
+              <option>Lead generation</option>
+              <option>Product awareness</option>
+              <option>Quote requests</option>
+              <option>Order follow-up</option>
+            </select>
+          </div>
+        </div>
+        <button type="button" class="btn btn-ghost btn-sm" style="width:100%;justify-content:center;" onclick="ncGenerateAICopy()">
+          <i class="fas fa-wand-magic-sparkles" style="color:var(--cyan);"></i> Generate AI Campaign Copy
+        </button>
+        <div id="nc-ai-result" style="margin-top:10px;"></div>
+      </div>
+
+      <div style="display:flex;gap:8px;margin-top:12px;">
+        <button class="btn btn-gold" style="flex:1;justify-content:center;" onclick="createCampaign()">
+          <i class="fas fa-rocket"></i> Create & Launch
+        </button>
+        <button class="btn btn-ghost" onclick="closeModal('campaign-modal')">Cancel</button>
+      </div>
     </div>
   </div>
 
@@ -10555,6 +10601,7 @@ Keep it concise and professional.`;
         channelEl.value = hasEmail && hasWA ? 'Both' : hasWA ? 'WhatsApp' : 'Email';
       }
       openModal('campaign-modal');
+      ncLoadGroupsDropdown();
     }
 
     // Pre-fill broadcast modal from AI wizard and open it
@@ -11109,7 +11156,10 @@ Keep it concise and professional.`;
     async function createCampaign() {
       const name = document.getElementById('nc-name').value.trim();
       const product = document.getElementById('nc-product').value.trim();
-      const seg = document.getElementById('nc-seg').value;
+      const groupSel = document.getElementById('nc-group-select');
+      const seg = groupSel && groupSel.selectedOptions[0]
+        ? (groupSel.selectedOptions[0].dataset.name || groupSel.selectedOptions[0].textContent.replace(/\s*\(\d+.*\)$/, '').trim() || 'All')
+        : 'All';
       const channel = document.getElementById('nc-channel').value;
       const date = document.getElementById('nc-date').value;
 
@@ -11134,6 +11184,89 @@ Keep it concise and professional.`;
       } catch (_) {
         closeModal('campaign-modal');
         notify('Campaign saved locally', name + ' (offline)', 'var(--gold)', 'fas fa-bullhorn');
+      }
+    }
+
+    // ── Campaign modal: load groups into dropdown ──────────────────────────
+    async function ncLoadGroupsDropdown() {
+      var sel = document.getElementById('nc-group-select');
+      if (!sel) return;
+      // Reset state on open
+      var countEl = document.getElementById('nc-group-count');
+      var aiEl = document.getElementById('nc-ai-result');
+      if (countEl) countEl.textContent = 'No group selected';
+      if (aiEl) aiEl.innerHTML = '';
+      sel.innerHTML = '<option value="">— Load from a group —</option>';
+      try {
+        var res = await fetch(API_BASE + '/groups', { headers: getAuthHeaders() });
+        if (!res.ok) return;
+        var groups = await res.json();
+        groups.forEach(function (g) {
+          var opt = document.createElement('option');
+          opt.value = g.id;
+          opt.dataset.name = g.name;
+          opt.textContent = g.name + ' (' + g.member_count + ' contacts)';
+          sel.appendChild(opt);
+        });
+      } catch (_) { }
+    }
+
+    // ── Campaign modal: load selected group and update count label ─────────
+    async function ncLoadFromGroup() {
+      var sel = document.getElementById('nc-group-select');
+      var countEl = document.getElementById('nc-group-count');
+      if (!sel || !sel.value) {
+        notify('Select a group first', '', 'var(--red)', 'fas fa-exclamation-circle');
+        return;
+      }
+      try {
+        var res = await fetch(API_BASE + '/groups/' + sel.value, { headers: getAuthHeaders() });
+        var data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Failed');
+        var count = (data.members || []).length;
+        if (countEl) countEl.textContent = data.name + ' — ' + count + ' contact' + (count !== 1 ? 's' : '') + ' selected';
+        notify('Group loaded', data.name + ' · ' + count + ' contacts', 'var(--green)', 'fas fa-users');
+      } catch (err) {
+        notify('Error', err.message, 'var(--red)', 'fas fa-exclamation-circle');
+      }
+    }
+
+    // ── Campaign modal: AI copy generator (PicoClaw) ───────────────────────
+    async function ncGenerateAICopy() {
+      const product = (document.getElementById('nc-product') || {}).value || '';
+      const audience = (document.getElementById('nc-audience') || {}).value || '';
+      const goal = (document.getElementById('nc-goal') || {}).value || '';
+      const channel = (document.getElementById('nc-channel') || {}).value || 'Email';
+      const el = document.getElementById('nc-ai-result');
+      if (!el) return;
+      if (!product && !audience) {
+        notify('Fill in Product/Service first', '', 'var(--gold)', 'fas fa-exclamation-circle');
+        return;
+      }
+      el.innerHTML = '<div style="font-size:12px;color:var(--muted);"><span class="spin-loader"></span> PicoClaw is crafting your campaign copy…</div>';
+      try {
+        const channels = channel === 'Both' ? ['Email', 'WhatsApp'] : [channel];
+        const prompt = 'You are a B2B marketing specialist for Unicircuit Engineering Services LLP (Indian electrical engineering company).\n\nGenerate campaign copy for:\nProduct: ' + product + '\nTarget audience: ' + (audience || 'Electrical contractors, industrial OEMs') + '\nGoal: ' + goal + '\nChannels: ' + channels.join(', ') + '\n\nGenerate:\n'
+          + (channels.includes('Email') ? '1) EMAIL SUBJECT: (one line)\n   EMAIL BODY: (80-word professional body with {{name}} personalization)\n' : '')
+          + (channels.includes('WhatsApp') ? '2) WHATSAPP: (40-word broadcast message)\n' : '')
+          + '\nUse Indian B2B engineering industry context. Professional, compelling, clear CTA.';
+
+        const text = await callPicoClaw(prompt);
+        const safeText = escHtml(text);
+
+        // Auto-fill campaign name if empty
+        const nameEl = document.getElementById('nc-name');
+        if (nameEl && !nameEl.value.trim() && product) {
+          nameEl.value = (goal || 'Campaign') + ' — ' + product;
+        }
+
+        el.innerHTML = '<div style="background:rgba(245,166,35,0.05);border:1px solid rgba(245,166,35,0.12);border-radius:8px;padding:10px 12px;">'
+          + '<pre style="font-size:12px;line-height:1.6;white-space:pre-wrap;font-family:\'Outfit\';color:var(--text);max-height:180px;overflow-y:auto;">' + safeText + '</pre>'
+          + '<div style="margin-top:8px;display:flex;gap:6px;flex-wrap:wrap;">'
+          + '<button class="btn btn-ghost btn-xs" onclick="navigator.clipboard&&navigator.clipboard.writeText(' + JSON.stringify(text) + ').then(function(){notify(\'Copied\',\'AI copy copied\',\'var(--green)\',\'fas fa-check\')})"><i class="fas fa-copy"></i> Copy</button>'
+          + '</div></div>';
+      } catch (e) {
+        el.innerHTML = '<div style="color:var(--red2);font-size:12px;">AI error — ' + escHtml(e.message) + '</div>';
       }
     }
 
