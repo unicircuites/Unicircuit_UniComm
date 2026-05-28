@@ -19,6 +19,7 @@ async function ensureCampaignColumns() {
     `ALTER TABLE campaigns ADD COLUMN IF NOT EXISTS sent_count INT DEFAULT 0`,
     `ALTER TABLE campaigns ADD COLUMN IF NOT EXISTS send_interval_ms INT DEFAULT 180000`,
     `ALTER TABLE campaigns ADD COLUMN IF NOT EXISTS timezone VARCHAR(60) DEFAULT 'Asia/Kolkata'`,
+    `ALTER TABLE campaigns ADD COLUMN IF NOT EXISTS group_id INT`,
   ];
   for (const sql of cols) {
     await pool.query(sql).catch(() => {}); // ignore if already exists
@@ -40,15 +41,15 @@ router.get('/', async (req, res) => {
 router.post('/', async (req, res) => {
   const { name, product, segment, channel, status, scheduled_at,
           goal, ab_test_enabled, ab_subject_b,
-          send_interval_ms, timezone } = req.body;
+          send_interval_ms, timezone, group_id } = req.body;
   if (!name) return res.status(400).json({ error: 'Campaign name is required.' });
   try {
     const result = await pool.query(`
-      INSERT INTO campaigns (name,product,segment,channel,status,scheduled_at,goal,ab_test_enabled,ab_subject_b,send_interval_ms,timezone)
-      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) RETURNING *
+      INSERT INTO campaigns (name,product,segment,channel,status,scheduled_at,goal,ab_test_enabled,ab_subject_b,send_interval_ms,timezone,group_id)
+      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12) RETURNING *
     `, [name, product||null, segment||'All', channel||'Email', status||'Draft',
         scheduled_at||null, goal||null, ab_test_enabled||false, ab_subject_b||null,
-        send_interval_ms||180000, timezone||'Asia/Kolkata']);
+        send_interval_ms||180000, timezone||'Asia/Kolkata', group_id||null]);
     return res.status(201).json(result.rows[0]);
   } catch (err) {
     return res.status(500).json({ error: 'Failed to create campaign.' });
@@ -101,6 +102,17 @@ router.patch('/:id/stats', async (req, res) => {
   }
 });
 
+// GET /api/campaigns/:id — get single campaign
+router.get('/:id', async (req, res) => {
+  try {
+    const result = await pool.query(`SELECT * FROM campaigns WHERE id=$1`, [req.params.id]);
+    if (!result.rowCount) return res.status(404).json({ error: 'Campaign not found.' });
+    return res.json(result.rows[0]);
+  } catch (err) {
+    return res.status(500).json({ error: 'Failed to fetch campaign.' });
+  }
+});
+
 // POST /api/campaigns/:id/launch — fetch group members and send emails
 router.post('/:id/launch', async (req, res) => {
   const { subject, html, group_id } = req.body;
@@ -113,26 +125,50 @@ router.post('/:id/launch', async (req, res) => {
     campaign = r.rows[0];
   } catch (err) { return res.status(500).json({ error: err.message }); }
 
-  // Resolve recipients from group_id or fall back to all contacts with email
+  // Resolve recipients — try group_id first, then campaign's stored segment
   let recipients = [];
   try {
-    if (group_id) {
+    // Try group_id passed in request body first, then fall back to campaign's stored group_id
+    const resolvedGroupId = group_id || campaign.group_id || null;
+    if (resolvedGroupId) {
       const gRes = await pool.query(`
         SELECT c.fname, c.lname, c.email
         FROM recipient_group_members m
         JOIN contacts c ON c.id = m.contact_id
         WHERE m.group_id = $1 AND c.email IS NOT NULL AND c.email <> ''
-      `, [group_id]);
+      `, [resolvedGroupId]);
       recipients = gRes.rows.map(c => ({
         email: c.email,
         name: ((c.fname || '') + ' ' + (c.lname || '')).trim() || c.email.split('@')[0],
       }));
-    } else {
-      const cRes = await pool.query(`
-        SELECT fname, lname, email FROM contacts
-        WHERE email IS NOT NULL AND email <> '' AND segment = $1
-        LIMIT 500
-      `, [campaign.segment || 'All']);
+    }
+
+    // If no group_id or group was empty, try looking up a group by the segment name
+    if (!recipients.length && campaign.segment && campaign.segment !== 'All') {
+      const grpRes = await pool.query(`
+        SELECT c.fname, c.lname, c.email
+        FROM recipient_groups g
+        JOIN recipient_group_members m ON m.group_id = g.id
+        JOIN contacts c ON c.id = m.contact_id
+        WHERE LOWER(g.name) = LOWER($1) AND c.email IS NOT NULL AND c.email <> ''
+      `, [campaign.segment]);
+      recipients = grpRes.rows.map(c => ({
+        email: c.email,
+        name: ((c.fname || '') + ' ' + (c.lname || '')).trim() || c.email.split('@')[0],
+      }));
+    }
+
+    // Final fallback — all contacts with email matching segment value, or all contacts
+    if (!recipients.length) {
+      const seg = campaign.segment && campaign.segment !== 'All' ? campaign.segment : null;
+      const cRes = seg
+        ? await pool.query(
+            `SELECT fname, lname, email FROM contacts
+             WHERE email IS NOT NULL AND email <> '' AND segment = $1 LIMIT 500`,
+            [seg])
+        : await pool.query(
+            `SELECT fname, lname, email FROM contacts
+             WHERE email IS NOT NULL AND email <> '' LIMIT 500`);
       recipients = cRes.rows.map(c => ({
         email: c.email,
         name: ((c.fname || '') + ' ' + (c.lname || '')).trim() || c.email.split('@')[0],

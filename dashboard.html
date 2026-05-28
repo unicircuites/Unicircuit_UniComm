@@ -11252,8 +11252,11 @@ Keep it concise and professional.`;
 
     // ── CAMPAIGN LAUNCH PROMPT ────────────────────────────────────────────────────
     // Opens a small modal to collect subject + HTML body before sending
-    function openCampaignLaunchPrompt(campaignId, name, product, goal, seg, groupSel) {
-      const groupId = groupSel && groupSel.value ? groupSel.value : null;
+    function openCampaignLaunchPrompt(campaignId, name, product, goal, seg, groupSelOrId) {
+      // Accept either a DOM select element or a raw group id number/string
+      const groupId = groupSelOrId && typeof groupSelOrId === 'object'
+        ? (groupSelOrId.value || null)
+        : (groupSelOrId || null);
       const defaultSubject = (goal || 'Campaign') + ': ' + (product || name);
       const defaultBody = `<p style="font-family:Arial,sans-serif;font-size:14px;line-height:1.6;color:#222;">
 Dear {{name}},<br><br>
@@ -11429,7 +11432,7 @@ Best regards,<br>
             </div>
             <div style="display:flex;gap:8px;margin-top:14px;">
               <button class="btn btn-gold btn-sm" style="flex:1;justify-content:center;"
-                onclick="document.getElementById('camp-stats-overlay').style.display='none';openCampaignLaunchPrompt(${c.id},'${escHtml(c.name).replace(/'/g,"\\'")}','${escHtml(c.product||'').replace(/'/g,"\\'")}','${escHtml(c.goal||'').replace(/'/g,"\\'")}','${escHtml(c.segment||'').replace(/'/g,"\\'")}',null)">
+                onclick="document.getElementById('camp-stats-overlay').style.display='none';openCampaignLaunchPrompt(${c.id},'${escHtml(c.name).replace(/'/g,"\\'")}','${escHtml(c.product||'').replace(/'/g,"\\'")}','${escHtml(c.goal||'').replace(/'/g,"\\'")}','${escHtml(c.segment||'').replace(/'/g,"\\'")}',${c.group_id||'null'})">
                 <i class="fas fa-rocket"></i> Launch Now
               </button>
               <button class="btn btn-ghost btn-sm" onclick="document.getElementById('camp-stats-overlay').style.display='none'">Close</button>
@@ -11532,6 +11535,7 @@ Best regards,<br>
       const seg = groupSel && groupSel.selectedOptions[0]
         ? (groupSel.selectedOptions[0].dataset.name || groupSel.selectedOptions[0].textContent.replace(/\s*\(\d+.*\)$/, '').trim() || 'All')
         : 'All';
+      const groupId = groupSel && groupSel.value ? parseInt(groupSel.value) : null;
       const channel = document.getElementById('nc-channel').value;
       const date = document.getElementById('nc-date').value;
       const time = (document.getElementById('nc-time') || {}).value || '09:00';
@@ -11553,7 +11557,7 @@ Best regards,<br>
           body: JSON.stringify({
             name, product, segment: seg, channel, status: 'Draft', scheduled_at: scheduledAt,
             goal, ab_test_enabled: abEnabled, ab_subject_b: abSubjectB || null,
-            send_interval_ms: intervalMs, timezone,
+            send_interval_ms: intervalMs, timezone, group_id: groupId,
           }),
         });
         const data = await res.json();
@@ -11569,7 +11573,7 @@ Best regards,<br>
             // Launch immediately — need subject + html from user
             // Prompt for subject if channel includes Email
             if (channel === 'Email' || channel === 'Both') {
-              openCampaignLaunchPrompt(campaignId, name, product, goal, seg, groupSel);
+              openCampaignLaunchPrompt(campaignId, name, product, goal, seg, groupId);
             } else {
               notify('Campaign created', name + ' (WhatsApp campaigns require manual send)', 'var(--green)', 'fas fa-bullhorn');
             }
