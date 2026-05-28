@@ -132,7 +132,7 @@ router.post('/:id/launch', async (req, res) => {
     const resolvedGroupId = group_id || campaign.group_id || null;
     if (resolvedGroupId) {
       const gRes = await pool.query(`
-        SELECT c.fname, c.lname, c.email
+        SELECT c.fname, c.lname, c.company, c.email
         FROM recipient_group_members m
         JOIN contacts c ON c.id = m.contact_id
         WHERE m.group_id = $1 AND c.email IS NOT NULL AND c.email <> ''
@@ -140,13 +140,14 @@ router.post('/:id/launch', async (req, res) => {
       recipients = gRes.rows.map(c => ({
         email: c.email,
         name: ((c.fname || '') + ' ' + (c.lname || '')).trim() || c.email.split('@')[0],
+        company: c.company || '',
       }));
     }
 
     // If no group_id or group was empty, try looking up a group by the segment name
     if (!recipients.length && campaign.segment && campaign.segment !== 'All') {
       const grpRes = await pool.query(`
-        SELECT c.fname, c.lname, c.email
+        SELECT c.fname, c.lname, c.company, c.email
         FROM recipient_groups g
         JOIN recipient_group_members m ON m.group_id = g.id
         JOIN contacts c ON c.id = m.contact_id
@@ -155,6 +156,7 @@ router.post('/:id/launch', async (req, res) => {
       recipients = grpRes.rows.map(c => ({
         email: c.email,
         name: ((c.fname || '') + ' ' + (c.lname || '')).trim() || c.email.split('@')[0],
+        company: c.company || '',
       }));
     }
 
@@ -163,15 +165,16 @@ router.post('/:id/launch', async (req, res) => {
       const seg = campaign.segment && campaign.segment !== 'All' ? campaign.segment : null;
       const cRes = seg
         ? await pool.query(
-            `SELECT fname, lname, email FROM contacts
+            `SELECT fname, lname, company, email FROM contacts
              WHERE email IS NOT NULL AND email <> '' AND segment = $1 LIMIT 500`,
             [seg])
         : await pool.query(
-            `SELECT fname, lname, email FROM contacts
+            `SELECT fname, lname, company, email FROM contacts
              WHERE email IS NOT NULL AND email <> '' LIMIT 500`);
       recipients = cRes.rows.map(c => ({
         email: c.email,
         name: ((c.fname || '') + ' ' + (c.lname || '')).trim() || c.email.split('@')[0],
+        company: c.company || '',
       }));
     }
   } catch (err) { return res.status(500).json({ error: 'Failed to load recipients: ' + err.message }); }

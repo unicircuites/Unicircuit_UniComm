@@ -100,9 +100,11 @@ async function sendBroadcast(recipients, subject, html, onProgress, delayMs = 20
       continue;
     }
 
-    // Personalise HTML — replace {{name}} placeholder
+    // Personalise HTML — replace {{name}} and {{company}} placeholders
     const personalHtml = appendUnsubscribeFooter(
-      html.replace(/\{\{name\}\}/gi, name || email.split('@')[0]),
+      html
+        .replace(/\{\{name\}\}/gi, name || email.split('@')[0])
+        .replace(/\{\{company\}\}/gi, (typeof r === 'object' && r.company) ? r.company : email.split('@')[1] || ''),
       email
     );
 
