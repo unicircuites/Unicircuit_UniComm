@@ -10713,18 +10713,32 @@ Keep it concise and professional.`;
     // Pre-fill campaign modal from AI wizard and open it
     async function createCampaignFromWizard() {
       const d = _lastAiCampaignCopy;
-      const nameEl = document.getElementById('nc-name');
+      const nameEl    = document.getElementById('nc-name');
       const productEl = document.getElementById('nc-product');
       const channelEl = document.getElementById('nc-channel');
-      if (nameEl) nameEl.value = d.product ? (d.goal || 'Campaign') + ' — ' + d.product : 'AI Campaign';
+      const goalEl    = document.getElementById('nc-campaign-goal');
+      if (nameEl)    nameEl.value    = d.product ? (d.goal || 'Campaign') + ' — ' + d.product : 'AI Campaign';
       if (productEl) productEl.value = d.product || '';
       if (channelEl) {
         const hasEmail = d.text.toLowerCase().includes('email');
-        const hasWA = d.text.toLowerCase().includes('whatsapp');
+        const hasWA    = d.text.toLowerCase().includes('whatsapp');
         channelEl.value = hasEmail && hasWA ? 'Both' : hasWA ? 'WhatsApp' : 'Email';
       }
+      // Map AI goal text to campaign goal dropdown value
+      if (goalEl && d.goal) {
+        const goalMap = {
+          'lead generation':    'Lead Generation',
+          'product awareness':  'Brand Awareness',
+          'quote requests':     'Sales Conversion',
+          'order follow-up':    'Customer Retention',
+          're-engagement':      'Re-engagement',
+          'customer retention': 'Customer Retention',
+        };
+        const mapped = goalMap[(d.goal || '').toLowerCase()];
+        if (mapped) goalEl.value = mapped;
+      }
       openModal('campaign-modal');
-      ncLoadGroupsDropdown();
+      ncLoadGroupsDropdown(true); // true = skip reset, keep pre-filled values
     }
 
     // Pre-fill broadcast modal from AI wizard and open it
@@ -11361,20 +11375,32 @@ Keep it concise and professional.`;
     }
 
     // ── Campaign modal: load groups into dropdown ──────────────────────────
-    async function ncLoadGroupsDropdown() {
+    async function ncLoadGroupsDropdown(skipReset) {
       var sel = document.getElementById('nc-group-select');
       if (!sel) return;
-      // Reset state on open
+      // Reset form state on fresh open (skip when pre-filling from AI wizard)
+      if (!skipReset) {
+        var nameEl = document.getElementById('nc-name');
+        var productEl = document.getElementById('nc-product');
+        var dateEl = document.getElementById('nc-date');
+        var timeEl = document.getElementById('nc-time');
+        var abSubBLen = document.getElementById('nc-ab-subject-b-len');
+        if (nameEl) nameEl.value = '';
+        if (productEl) productEl.value = '';
+        if (dateEl) dateEl.value = '';
+        if (timeEl) timeEl.value = '09:00';
+        if (abSubBLen) { abSubBLen.textContent = '0 / 60 chars'; abSubBLen.style.color = 'var(--muted)'; }
+      }
       var countEl = document.getElementById('nc-group-count');
-      var aiEl = document.getElementById('nc-ai-result');
-      var abCb = document.getElementById('nc-ab-enabled');
+      var aiEl    = document.getElementById('nc-ai-result');
+      var abCb    = document.getElementById('nc-ab-enabled');
       var abFields = document.getElementById('nc-ab-fields');
-      var abSubB = document.getElementById('nc-ab-subject-b');
-      if (countEl) countEl.textContent = 'No group selected';
-      if (aiEl) aiEl.innerHTML = '';
-      if (abCb) abCb.checked = false;
+      var abSubB  = document.getElementById('nc-ab-subject-b');
+      if (countEl)  countEl.textContent = 'No group selected';
+      if (aiEl)     aiEl.innerHTML = '';
+      if (abCb)     abCb.checked = false;
       if (abFields) abFields.style.display = 'none';
-      if (abSubB) abSubB.value = '';
+      if (abSubB)   abSubB.value = '';
       sel.innerHTML = '<option value="">— Load from a group —</option>';
       try {
         var res = await fetch(API_BASE + '/groups', { headers: getAuthHeaders() });
