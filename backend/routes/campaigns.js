@@ -16,6 +16,8 @@ async function ensureCampaignColumns() {
     `ALTER TABLE campaigns ADD COLUMN IF NOT EXISTS bounce_rate NUMERIC(5,2) DEFAULT 0`,
     `ALTER TABLE campaigns ADD COLUMN IF NOT EXISTS unsubscribe_rate NUMERIC(5,2) DEFAULT 0`,
     `ALTER TABLE campaigns ADD COLUMN IF NOT EXISTS sent_count INT DEFAULT 0`,
+    `ALTER TABLE campaigns ADD COLUMN IF NOT EXISTS send_interval_ms INT DEFAULT 180000`,
+    `ALTER TABLE campaigns ADD COLUMN IF NOT EXISTS timezone VARCHAR(60) DEFAULT 'Asia/Kolkata'`,
   ];
   for (const sql of cols) {
     await pool.query(sql).catch(() => {}); // ignore if already exists
@@ -36,14 +38,16 @@ router.get('/', async (req, res) => {
 // POST /api/campaigns
 router.post('/', async (req, res) => {
   const { name, product, segment, channel, status, scheduled_at,
-          goal, ab_test_enabled, ab_subject_b } = req.body;
+          goal, ab_test_enabled, ab_subject_b,
+          send_interval_ms, timezone } = req.body;
   if (!name) return res.status(400).json({ error: 'Campaign name is required.' });
   try {
     const result = await pool.query(`
-      INSERT INTO campaigns (name,product,segment,channel,status,scheduled_at,goal,ab_test_enabled,ab_subject_b)
-      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING *
+      INSERT INTO campaigns (name,product,segment,channel,status,scheduled_at,goal,ab_test_enabled,ab_subject_b,send_interval_ms,timezone)
+      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) RETURNING *
     `, [name, product||null, segment||'All', channel||'Email', status||'Draft',
-        scheduled_at||null, goal||null, ab_test_enabled||false, ab_subject_b||null]);
+        scheduled_at||null, goal||null, ab_test_enabled||false, ab_subject_b||null,
+        send_interval_ms||180000, timezone||'Asia/Kolkata']);
     return res.status(201).json(result.rows[0]);
   } catch (err) {
     return res.status(500).json({ error: 'Failed to create campaign.' });
@@ -53,14 +57,17 @@ router.post('/', async (req, res) => {
 // PUT /api/campaigns/:id
 router.put('/:id', async (req, res) => {
   const { name, product, segment, channel, status, progress, scheduled_at,
-          goal, ab_test_enabled, ab_subject_b } = req.body;
+          goal, ab_test_enabled, ab_subject_b,
+          send_interval_ms, timezone } = req.body;
   try {
     const result = await pool.query(`
       UPDATE campaigns SET name=$1,product=$2,segment=$3,channel=$4,status=$5,progress=$6,
-        scheduled_at=$7,goal=$8,ab_test_enabled=$9,ab_subject_b=$10
-      WHERE id=$11 RETURNING *
+        scheduled_at=$7,goal=$8,ab_test_enabled=$9,ab_subject_b=$10,
+        send_interval_ms=$11,timezone=$12
+      WHERE id=$13 RETURNING *
     `, [name, product, segment, channel, status, progress||0, scheduled_at||null,
-        goal||null, ab_test_enabled||false, ab_subject_b||null, req.params.id]);
+        goal||null, ab_test_enabled||false, ab_subject_b||null,
+        send_interval_ms||180000, timezone||'Asia/Kolkata', req.params.id]);
     if (result.rowCount === 0) return res.status(404).json({ error: 'Campaign not found.' });
     return res.json(result.rows[0]);
   } catch (err) {

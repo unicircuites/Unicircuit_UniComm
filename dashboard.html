@@ -6704,7 +6704,40 @@
             <option>WhatsApp</option>
             <option>Both</option>
           </select></div>
-        <div><label class="form-label">Schedule</label><input class="inp" id="nc-date" type="date" /></div>
+        <div>
+          <label class="form-label">Launch Date</label>
+          <input class="inp" id="nc-date" type="date" />
+        </div>
+        <div>
+          <label class="form-label">Launch Time</label>
+          <input class="inp" id="nc-time" type="time" value="09:00" />
+        </div>
+      </div>
+
+      <!-- Send Interval -->
+      <div class="form-row" style="margin-top:8px;">
+        <div>
+          <label class="form-label">Send Interval <span style="font-size:10px;color:var(--muted);">(delay between emails)</span></label>
+          <div style="display:flex;gap:6px;align-items:center;">
+            <input class="inp" id="nc-interval-val" type="number" value="3" min="1" max="999"
+              style="width:72px;flex-shrink:0;" oninput="ncUpdateIntervalPreview()" />
+            <select class="inp" id="nc-interval-unit" style="width:auto;" onchange="ncUpdateIntervalPreview()">
+              <option value="1000">seconds</option>
+              <option value="60000" selected>minutes</option>
+              <option value="3600000">hours</option>
+            </select>
+            <span id="nc-interval-preview" style="font-size:11px;color:var(--muted);white-space:nowrap;">= 3 min</span>
+          </div>
+        </div>
+        <div>
+          <label class="form-label">Timezone</label>
+          <select class="inp" id="nc-timezone">
+            <option value="Asia/Kolkata">IST — India (UTC+5:30)</option>
+            <option value="UTC">UTC</option>
+            <option value="Asia/Dubai">GST — Dubai (UTC+4)</option>
+            <option value="Europe/London">GMT — London</option>
+          </select>
+        </div>
       </div>
 
       <!-- A/B Subject Line Testing -->
@@ -11106,6 +11139,7 @@ Keep it concise and professional.`;
             ${escHtml(c.name)}${abBadge}
           </div>
           <div style="font-size:11px;color:var(--muted);margin-top:2px;">${escHtml(c.channel||'')} · ${escHtml(c.segment||'')}${c.product ? ' · ' + escHtml(c.product) : ''}</div>
+          ${c.scheduled_at ? `<div style="font-size:10.5px;color:var(--muted2);margin-top:2px;"><i class="fas fa-clock" style="font-size:9px;"></i> ${new Date(c.scheduled_at).toLocaleString('en-IN',{timeZone:c.timezone||'Asia/Kolkata',day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'})} ${c.timezone==='Asia/Kolkata'?'IST':c.timezone||''} · every ${c.send_interval_ms>=3600000?(c.send_interval_ms/3600000).toFixed(1)+'h':c.send_interval_ms>=60000?(c.send_interval_ms/60000)+'min':(c.send_interval_ms/1000)+'s'}</div>` : ''}
           ${goalBadge ? '<div style="margin-top:4px;">' + goalBadge + '</div>' : ''}
         </div>
         <span class="badge ${statusBadge(c.status)}" style="flex-shrink:0;margin-left:8px;">${escHtml(c.status||'Draft')}</span>
@@ -11247,6 +11281,12 @@ Keep it concise and professional.`;
         : 'All';
       const channel = document.getElementById('nc-channel').value;
       const date = document.getElementById('nc-date').value;
+      const time = (document.getElementById('nc-time') || {}).value || '09:00';
+      const intervalVal  = parseInt((document.getElementById('nc-interval-val')  || {}).value  || '3', 10);
+      const intervalUnit = parseInt((document.getElementById('nc-interval-unit') || {}).value || '60000', 10);
+      const intervalMs   = intervalVal * intervalUnit;
+      const timezone     = (document.getElementById('nc-timezone') || {}).value || 'Asia/Kolkata';
+      const scheduledAt  = date ? (date + 'T' + time + ':00') : null;
       const goal = (document.getElementById('nc-campaign-goal') || {}).value || null;
       const abEnabled = document.getElementById('nc-ab-enabled') && document.getElementById('nc-ab-enabled').checked;
       const abSubjectB = abEnabled ? ((document.getElementById('nc-ab-subject-b') || {}).value || '').trim() : null;
@@ -11258,8 +11298,9 @@ Keep it concise and professional.`;
           method: 'POST',
           headers: getAuthHeaders(),
           body: JSON.stringify({
-            name, product, segment: seg, channel, status: 'Draft', scheduled_at: date || null,
+            name, product, segment: seg, channel, status: 'Draft', scheduled_at: scheduledAt,
             goal, ab_test_enabled: abEnabled, ab_subject_b: abSubjectB || null,
+            send_interval_ms: intervalMs, timezone,
           }),
         });
         const data = await res.json();
@@ -11312,6 +11353,18 @@ Keep it concise and professional.`;
     function ncToggleAB(enabled) {
       var fields = document.getElementById('nc-ab-fields');
       if (fields) fields.style.display = enabled ? 'block' : 'none';
+    }
+
+    // ── Send interval preview ──────────────────────────────────────────────
+    function ncUpdateIntervalPreview() {
+      var val  = parseInt((document.getElementById('nc-interval-val')  || {}).value  || '3', 10);
+      var unit = parseInt((document.getElementById('nc-interval-unit') || {}).value || '60000', 10);
+      var ms   = val * unit;
+      var label = ms < 60000 ? (ms / 1000) + ' sec'
+                : ms < 3600000 ? (ms / 60000) + ' min'
+                : (ms / 3600000).toFixed(1) + ' hr';
+      var el = document.getElementById('nc-interval-preview');
+      if (el) el.textContent = '= ' + label;
     }
 
     // ── Personalization token copy helper ──────────────────────────────────
