@@ -20,6 +20,10 @@ async function ensureCampaignColumns() {
     `ALTER TABLE campaigns ADD COLUMN IF NOT EXISTS send_interval_ms INT DEFAULT 180000`,
     `ALTER TABLE campaigns ADD COLUMN IF NOT EXISTS timezone VARCHAR(60) DEFAULT 'Asia/Kolkata'`,
     `ALTER TABLE campaigns ADD COLUMN IF NOT EXISTS group_id INT`,
+    `ALTER TABLE campaigns ADD COLUMN IF NOT EXISTS subject TEXT`,
+    `ALTER TABLE campaigns ADD COLUMN IF NOT EXISTS body TEXT`,
+    `ALTER TABLE campaigns ADD COLUMN IF NOT EXISTS attachments JSONB DEFAULT '[]'`,
+    `ALTER TABLE campaigns ADD COLUMN IF NOT EXISTS deliveries JSONB DEFAULT '[]'`,
   ];
   for (const sql of cols) {
     await pool.query(sql).catch(() => {}); // ignore if already exists
@@ -115,7 +119,7 @@ router.get('/:id', async (req, res) => {
 
 // POST /api/campaigns/:id/launch — fetch group members and send emails
 router.post('/:id/launch', async (req, res) => {
-  const { subject, html, group_id } = req.body;
+  const { subject, html, group_id, attachments } = req.body;
   if (!subject || !html) return res.status(400).json({ error: 'subject and html are required to launch.' });
 
   let campaign;
@@ -179,27 +183,74 @@ router.post('/:id/launch', async (req, res) => {
     }
   } catch (err) { return res.status(500).json({ error: 'Failed to load recipients: ' + err.message }); }
 
+  // Guard: don't re-send if already Sending or Sent
+  let priorDeliveries = campaign.deliveries || [];
+  if (typeof priorDeliveries === 'string') {
+    try { priorDeliveries = JSON.parse(priorDeliveries); } catch (_) { priorDeliveries = []; }
+  }
+  if (
+    campaign.status === 'Sending' ||
+    campaign.status === 'Sent' ||
+    campaign.status === 'Paused' ||
+    Number(campaign.sent_count || 0) > 0 ||
+    (Array.isArray(priorDeliveries) && priorDeliveries.length > 0)
+  ) {
+    return res.status(400).json({ error: `Campaign has already been launched or is ${campaign.status}. Delete and recreate to send again.` });
+  }
+
   if (!recipients.length) return res.status(400).json({ error: 'No recipients found for this campaign.' });
 
-  // Mark as sending
-  await pool.query(`UPDATE campaigns SET status='Sending', sent_count=$1 WHERE id=$2`,
-    [recipients.length, req.params.id]).catch(() => {});
+  const pendingDeliveries = recipients.map((r) => ({
+    email: r.email,
+    name: r.name || '',
+    status: 'pending',
+    sent_at: null,
+    subject,
+    body: html,
+  }));
+
+  const safeAttachments = Array.isArray(attachments) ? attachments : [];
+
+  // Mark as sending and save the campaign content
+  await pool.query(`UPDATE campaigns SET status='Sending', sent_count=$1, subject=$2, body=$3, attachments=$4, deliveries=$5 WHERE id=$6`,
+    [recipients.length, subject, html, JSON.stringify(safeAttachments), JSON.stringify(pendingDeliveries), req.params.id]).catch((err) => {
+      console.error(`[Campaign #${req.params.id}] Initial save failed:`, err.message);
+    });
 
   // Respond immediately
   res.json({ success: true, total: recipients.length, message: `Sending to ${recipients.length} recipients…` });
 
   // Send in background
   const delayMs = parseInt(campaign.send_interval_ms || 180000);
-  eb.sendBroadcast(recipients, subject, html, null, delayMs)
+  eb.sendBroadcast(recipients, subject, html, async (sent, failed, _current, results) => {
+    const doneByEmail = new Map(results.deliveries.map((d) => [String(d.email || '').toLowerCase(), d]));
+    const mergedDeliveries = pendingDeliveries.map((d) => doneByEmail.get(String(d.email || '').toLowerCase()) || d);
+    await pool.query(`
+      UPDATE campaigns SET progress=$1,
+        bounce_rate=$2, deliveries=$3
+      WHERE id=$4
+    `, [
+      parseFloat((((sent + failed) / recipients.length) * 100).toFixed(2)),
+      failed > 0 ? parseFloat(((failed / recipients.length) * 100).toFixed(2)) : 0,
+      JSON.stringify(mergedDeliveries),
+      req.params.id,
+    ]);
+  }, delayMs, safeAttachments)
     .then(async (results) => {
-      const openRate = 0; // updated later via stats endpoint
-      await pool.query(`
-        UPDATE campaigns SET status='Sent', sent_count=$1, progress=100,
-          open_rate=$2, ctr=$3, bounce_rate=$4
-        WHERE id=$5
-      `, [results.sent, openRate, 0,
-          results.failed > 0 ? parseFloat(((results.failed / recipients.length) * 100).toFixed(2)) : 0,
-          req.params.id]);
+      try {
+        await pool.query(`
+          UPDATE campaigns SET status='Sent', sent_count=$1, progress=100,
+            bounce_rate=$2, subject=$3, body=$4, attachments=$5, deliveries=$6
+          WHERE id=$7
+        `, [results.sent,
+            results.failed > 0 ? parseFloat(((results.failed / recipients.length) * 100).toFixed(2)) : 0,
+            subject, html,
+            JSON.stringify(safeAttachments),
+            JSON.stringify(results.deliveries),
+            req.params.id]);
+      } catch (err) {
+        console.error(`[Campaign #${req.params.id}] Final log update failed:`, err.message);
+      }
       console.log(`[Campaign #${req.params.id}] Done — sent:${results.sent} failed:${results.failed}`);
     })
     .catch(async (err) => {

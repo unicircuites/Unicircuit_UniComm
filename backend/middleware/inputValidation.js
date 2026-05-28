@@ -46,6 +46,12 @@ const CONTENT_FIELDS = [
   'talking_points',
   'summary',
   'analysis',
+  // Fields that may contain large base64 blobs or attachment metadata
+  'attachments',
+  'contentbytes',
+  'content_bytes',
+  'contentid',
+  'filename',
 ];
 
 /**
@@ -57,6 +63,10 @@ function isContentField(fieldPath) {
   const lastPart = parts[parts.length - 1];
 
   // Check if last part matches content field names
+  // If the path explicitly includes an attachments container, treat it as content
+  const lowerPath = fieldPath.toLowerCase();
+  if (lowerPath.includes('attachments') || lowerPath.includes('files')) return true;
+
   return CONTENT_FIELDS.some(cf => lastPart.toLowerCase().includes(cf.toLowerCase()));
 }
 

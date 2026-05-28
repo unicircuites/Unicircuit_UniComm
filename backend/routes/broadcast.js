@@ -82,14 +82,28 @@ router.post('/send', async (req, res) => {
   if (!subject || !html || !Array.isArray(recipients) || !recipients.length)
     return res.status(400).json({ error: 'subject, html, recipients[] required' });
 
+  const pendingDeliveries = recipients.map((r) => {
+    const email = typeof r === 'string' ? r : r.email;
+    const name = typeof r === 'object' ? (r.name || '') : '';
+    return { email, name, status: 'pending', sent_at: null };
+  });
+
   // Save broadcast record
   let broadcastId;
   try {
     const fromEmail = process.env.SMTP_FROM || process.env.SMTP_USER;
     const result = await pool.query(
-      `INSERT INTO email_broadcasts (subject, html_body, recipients, from_email, total, status, attachments)
-       VALUES ($1,$2,$3,$4,$5,'sending',$6) RETURNING id`,
-      [subject, html, JSON.stringify(recipients), fromEmail, recipients.length, JSON.stringify(Array.isArray(attachments) ? attachments : [])]
+      `INSERT INTO email_broadcasts (subject, html_body, recipients, from_email, total, status, attachments, deliveries)
+       VALUES ($1,$2,$3,$4,$5,'sending',$6,$7) RETURNING id`,
+      [
+        subject,
+        html,
+        JSON.stringify(recipients),
+        fromEmail,
+        recipients.length,
+        JSON.stringify(Array.isArray(attachments) ? attachments : []),
+        JSON.stringify(pendingDeliveries),
+      ]
     );
     broadcastId = result.rows[0].id;
   } catch (err) {
@@ -101,12 +115,23 @@ router.post('/send', async (req, res) => {
 
   // Send in background
   const delay = parseInt(delay_ms || 2000);
-  eb.sendBroadcast(recipients, subject, html, null, delay, attachments)
+  eb.sendBroadcast(recipients, subject, html, async (sent, failed, _current, results) => {
+    const doneByEmail = new Map(results.deliveries.map((d) => [String(d.email || '').toLowerCase(), d]));
+    const mergedDeliveries = pendingDeliveries.map((d) => doneByEmail.get(String(d.email || '').toLowerCase()) || d);
+    await pool.query(
+      `UPDATE email_broadcasts SET sent=$1, failed=$2, errors=$3, deliveries=$4 WHERE id=$5`,
+      [sent, failed, JSON.stringify(results.errors), JSON.stringify(mergedDeliveries), broadcastId]
+    );
+  }, delay, attachments)
     .then(async (results) => {
-      await pool.query(
-        `UPDATE email_broadcasts SET sent=$1, failed=$2, status='sent', sent_at=NOW(), errors=$3, deliveries=$4 WHERE id=$5`,
-        [results.sent, results.failed, JSON.stringify(results.errors), JSON.stringify(results.deliveries), broadcastId]
-      );
+      try {
+        await pool.query(
+          `UPDATE email_broadcasts SET sent=$1, failed=$2, status='sent', sent_at=NOW(), errors=$3, deliveries=$4 WHERE id=$5`,
+          [results.sent, results.failed, JSON.stringify(results.errors), JSON.stringify(results.deliveries), broadcastId]
+        );
+      } catch (err) {
+        console.error(`[Broadcast #${broadcastId}] Final log update failed:`, err.message);
+      }
       console.log(`[Broadcast #${broadcastId}] Done — sent:${results.sent} failed:${results.failed}`);
     })
     .catch(async (err) => {

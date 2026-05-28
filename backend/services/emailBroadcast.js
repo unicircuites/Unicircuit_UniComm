@@ -57,8 +57,8 @@ function appendUnsubscribeFooter(html, recipientEmail) {
   const footer = `
 <div style="margin-top:32px;padding-top:16px;border-top:1px solid #e5e7eb;font-family:Arial,sans-serif;font-size:11px;color:#9ca3af;text-align:center;line-height:1.6;">
   <p style="margin:0 0 4px;">You are receiving this email from <strong>${fromName}</strong>.</p>
-  <p style="margin:0;">To unsubscribe, reply with subject <strong>UNSUBSCRIBE</strong> or contact us at
-    <a href="mailto:${process.env.SMTP_FROM || process.env.SMTP_USER || ''}" style="color:#9ca3af;">${process.env.SMTP_FROM || process.env.SMTP_USER || ''}</a>.
+  <p style="margin:0;">If you do not wish to receive any further communications, please
+    <a href="https://link.email.tatatelebusiness.com/report/unsubscribe/6a1536d82945ed20fe8b4567/6a15371f51a11dfb78a30740" style="color:#9ca3af;">click here.</a>
   </p>
 </div>`;
   // Inject before </body> if present, otherwise append
@@ -81,6 +81,15 @@ async function sendOne(to, subject, html, text, attachments) {
   return info;
 }
 
+async function reportProgress(onProgress, results, email) {
+  if (!onProgress) return;
+  try {
+    await onProgress(results.sent, results.failed, email, results);
+  } catch (err) {
+    console.error(`[Broadcast] Progress log update failed for ${email}:`, err.message);
+  }
+}
+
 // ── SEND BROADCAST ────────────────────────────────────────────────────────
 // recipients: [{email, name}] or ['email1', 'email2']
 // onProgress: callback(sent, failed, current) for real-time updates
@@ -96,7 +105,7 @@ async function sendBroadcast(recipients, subject, html, onProgress, delayMs = 20
       results.failed++;
       results.errors.push({ email, error: 'Invalid email' });
       results.deliveries.push({ email, name, status: 'failed', error: 'Invalid email', sent_at: new Date().toISOString() });
-      if (onProgress) onProgress(results.sent, results.failed, email);
+      await reportProgress(onProgress, results, email);
       continue;
     }
 
@@ -110,9 +119,15 @@ async function sendBroadcast(recipients, subject, html, onProgress, delayMs = 20
 
     const sentAt = new Date().toISOString();
     try {
-      await sendOne(email, subject, personalHtml, null, attachments);
+      const info = await sendOne(email, subject, personalHtml, null, attachments);
+      const accepted = Array.isArray(info.accepted) ? info.accepted.map(v => String(v).toLowerCase()) : [];
+      const rejected = Array.isArray(info.rejected) ? info.rejected.map(v => String(v).toLowerCase()) : [];
+      const lowerEmail = String(email).toLowerCase();
+      if (rejected.includes(lowerEmail) && !accepted.includes(lowerEmail)) {
+        throw new Error('SMTP rejected recipient');
+      }
       results.sent++;
-      results.deliveries.push({ email, name, status: 'sent', sent_at: sentAt });
+      results.deliveries.push({ email, name, status: 'sent', sent_at: sentAt, message_id: info.messageId || null, smtp_accepted: accepted });
       console.log(`[Broadcast] Sent ${i+1}/${recipients.length} → ${email} @ ${sentAt}`);
     } catch (err) {
       results.failed++;
@@ -121,7 +136,7 @@ async function sendBroadcast(recipients, subject, html, onProgress, delayMs = 20
       console.error(`[Broadcast] Failed → ${email}:`, err.message);
     }
 
-    if (onProgress) onProgress(results.sent, results.failed, email);
+    await reportProgress(onProgress, results, email);
 
     // Delay between sends to avoid rate limiting
     if (i < recipients.length - 1) {

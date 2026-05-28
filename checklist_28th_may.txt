@@ -324,3 +324,82 @@ CURRENT PENDING / TOWER DEPLOY NEEDED
 ====================================================
   END OF UPDATES — 28th May 2026
 ====================================================
+
+
+====================================================
+  LIVE WORKING TREE UPDATE (28th May 2026, 4:43 PM+)
+====================================================
+
+----------------------------------------------------
+17. BROADCAST DELIVERY LOG HARDENING (UNCOMMITTED)
+----------------------------------------------------
+[x] `backend/routes/broadcast.js`
+    - Added `pendingDeliveries` snapshot at send start
+    - Saves `deliveries` JSON in `email_broadcasts` on insert
+    - Progress callback now merges per-recipient status into DB while sending
+    - Final update wrapped with try/catch to avoid crash on log write failure
+[x] `backend/services/emailBroadcast.js`
+    - Added `reportProgress()` helper with safe async callback handling
+    - Validates SMTP `accepted/rejected` recipients before marking as sent
+    - Stores richer delivery metadata (`message_id`, `smtp_accepted`)
+
+
+----------------------------------------------------
+18. CAMPAIGN SEND AUDIT TRAIL (UNCOMMITTED)
+----------------------------------------------------
+[x] `backend/routes/campaigns.js`
+    - Added self-healing columns: `subject`, `body`, `deliveries`
+    - Launch guard prevents re-send when campaign is already launched/paused/sent
+    - Stores campaign subject/body + pending deliveries when launch starts
+    - Live progress updates `progress`, `bounce_rate`, and `deliveries`
+    - Final send completion persists full delivery log and message content
+
+
+----------------------------------------------------
+19. DASHBOARD DELIVERY LOG + PREVIEW UX (UNCOMMITTED)
+----------------------------------------------------
+[x] `dashboard.html`
+    - Broadcast list: added Refresh button and refresh action inside preview modal
+    - Broadcast preview supports pending/sent/failed badges with safer HTML escaping
+    - Added campaign preview modal with recipient-level delivery log + iframe preview
+    - Campaign table actions changed to Preview + Delivery Log workflow
+    - Campaign launch editor upgraded to rich HTML editor toolbar
+    - AI campaign copy can be extracted and appended into launch editor
+    - Delivery log popup now supports polling/refresh while status is Sending
+
+
+----------------------------------------------------
+20. CURRENT UNTRACKED FILES (NOT COMMITTED)
+----------------------------------------------------
+[ ] PBX screenshots and diagnostics:
+    - `backend/pbx_*.png`
+    - `backend/pbx_vms_report.txt`
+[ ] Temp / diagnostic scripts:
+    - `backend/test_insert.js`
+    - `backend/test_matrix_vms.js`
+    - `backend/tmp_pbx_diag.js`
+
+
+----------------------------------------------------
+21. CAMPAIGN EDITOR + SIGNATURE DESIGNER UPGRADE (READY TO COMMIT)
+----------------------------------------------------
+[x] `dashboard.html`
+    - Campaign launch editor now has broadcast-style text color and highlight color popups
+    - Campaign launch emoji picker now includes search plus the fuller emoji category set
+    - Campaign launch editor keeps toolbar actions targeted to `cl-body-editor`
+    - Signature builder `Designer (freeform)` option now opens a real editable designer surface
+    - Signature designer supports font, size, bold/italic/underline, text color, highlight, alignment
+    - Signature designer supports image, table, CTA button, raw HTML insert, and complex preset insertion
+    - Designer signature HTML is used for preview, insert, save signature, and saved template reload
+    - Complex signature preset added for multi-row/company-signature layouts like logo + contact + certification badges
+[x] Verification
+    - Ran `node check_syntax.js`
+    - Result: `Done checking 8 scripts.`
+
+
+----------------------------------------------------
+22. NEXT ACTIONS
+----------------------------------------------------
+[ ] Review + stage only intended code changes
+[ ] Commit this working tree update set (broadcast/campaign/dashboard)
+[ ] Deploy to Tower after commit (git fetch/reset, npm install, pm2 restart)
