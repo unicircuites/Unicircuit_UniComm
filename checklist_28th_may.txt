@@ -1,0 +1,208 @@
+====================================================
+  UNI_CRM — Work Checklist  |  28th May 2026
+====================================================
+
+SESSION SUMMARY
+---------------
+All changes pushed to GitHub → origin/main
+Tower server deployed via git pull + pm2 restart
+Commits today: d4fdba0, 33cd692, 016e334, b5353ad, 6c7d9df
+
+
+----------------------------------------------------
+1. GITHUB PUSH & TOWER DEPLOYMENT
+----------------------------------------------------
+[x] Staged and committed all pending local changes
+[x] Pushed to origin/main (commit 6c7d9df)
+[x] Tower server: git stash → git fetch → git reset --hard origin/main
+[x] Tower: npm install --prefer-offline
+[x] Tower: pm2 restart unicomm --update-env
+[x] Tower: pm2 save + pm2 flush unicomm
+[x] Tower: pm2 status → online, 122.8 MB RAM, no errors
+[x] Tower logs clean — all background services initialized
+
+
+----------------------------------------------------
+2. DEPLOYMENT.MD — Git Pull Commands Added
+----------------------------------------------------
+[x] Added "Tower Server — Git Pull & Deploy" section
+[x] Step-by-step commands (stash → fetch → reset → npm install → restart)
+[x] One-liner copy-paste command added
+[x] Deploy checklist added (with cert check + browser verify)
+[x] Recovery steps for missing certs and stash restore
+[x] Committed as: docs: add git pull deploy commands (b5353ad)
+
+
+----------------------------------------------------
+3. PROGRESS_CHECKLIST.MD — Auto-generated from diff
+----------------------------------------------------
+[x] Created PROGRESS_CHECKLIST.md at project root
+[x] Covers: email attachments, WA dedup, SMDR, dashboard UI, new scripts
+[x] Remaining unstaged files noted (PBX screenshots, temp test files)
+
+
+----------------------------------------------------
+4. EMAIL BROADCAST — ATTACHMENT SUPPORT (6c7d9df)
+----------------------------------------------------
+[x] emailBroadcast.js — normalizeAttachments() helper
+    - Validates base64, sanitizes filenames, handles inline CID
+[x] emailBroadcast.js — sendOne() accepts attachments param
+[x] emailBroadcast.js — sendBroadcast() forwards attachments per recipient
+[x] broadcast.js route — POST /test accepts + forwards attachments
+[x] broadcast.js route — POST /send accepts attachments, stores in DB
+[x] DB migration: attachments JSONB column added to email_broadcasts
+
+
+----------------------------------------------------
+5. OUTLOOK / GRAPH API — LARGE ATTACHMENT SUPPORT (6c7d9df)
+----------------------------------------------------
+[x] outlook.js — graphFetchRaw() helper with token injection
+[x] outlook.js — uploadLargeAttachmentToMessage() chunked upload
+    - 3.125 MB chunks (multiple of 320 KiB) via Graph upload sessions
+[x] outlook.js — addAttachmentsToMessage() routes by size (<3MB vs >3MB)
+[x] outlook.js — sendDraftMessage() create draft → attach → send flow
+[x] POST /drafts: uses addAttachmentsToMessage() instead of inline
+[x] POST /send: uses sendDraftMessage() when attachments present
+
+
+----------------------------------------------------
+6. WHATSAPP — CHAT LIST DEDUPLICATION (6c7d9df)
+----------------------------------------------------
+[x] GET /chats: rewrote with LATERAL JOIN for live last_message/last_time
+[x] LID dedup: NOT EXISTS subquery suppresses LID when s.whatsapp.net exists
+[x] Group filter simplified to id LIKE '%@g.us'
+[x] POST /send-media: added sticker to allowed media types
+[x] whatsapp.js service — lazy-loaded sharp via getSharp()
+[x] Reconnect detection: emit wa:chats_updated after Baileys replay
+
+
+----------------------------------------------------
+7. SMDR / MATRIX PBX — RELIABILITY (6c7d9df)
+----------------------------------------------------
+[x] looksLikeMatrixCallRecord() guard — skips non-call lines
+[x] isMatrixDate() / parseMatrixDate() — accepts - / . separators
+[x] Same date regex fix applied in calls.js route
+[x] safelyAckMatrixPacket() — safe ACK with socket state checks
+[x] ACK sent on ENQ handshake
+[x] ACK sent after STX/ETX framed SMDR data packets
+[x] Named constants: MATRIX_ENQ, MATRIX_ACK, MATRIX_STX, MATRIX_ETX
+[x] Suppressed false-positive warning for PBX_HOST 192.168.0.205
+[x] Tracking vars: lastSavedCallTime, savedCallCount, parseFailureCount
+[x] getStatus() exposes: lastActivityAgeSeconds, dataStreamHealthy,
+    staleAfterSeconds, savedCallCount, parseFailureCount
+
+
+----------------------------------------------------
+8. DASHBOARD UI UPDATES (6c7d9df)
+----------------------------------------------------
+[x] Marketing quick-actions dropdown in top nav (#mkt-quick-wrap)
+    - Send Broadcast, Launch Campaign, Create Template
+[x] Marketing quick-actions dropdown in contact panel (#oa-mkt-wrap)
+[x] WhatsApp composer: input replaced with auto-resize textarea
+[x] WhatsApp composer: emoji picker button + popup
+[x] WhatsApp composer: AI suggestions bar (#wa-compose-suggestions)
+[x] Calls table: colspan updated 7 → 8 for Recording column
+
+
+----------------------------------------------------
+9. CAMPAIGN MODAL — GROUP PICKER (016e334)
+----------------------------------------------------
+[x] Replaced static segment dropdown (All/Hot Lead/Client/Prospect)
+    with group picker matching broadcast modal pattern
+[x] "Load from a group" dropdown populated from /api/groups
+[x] Load Group button — shows group name + contact count
+[x] Manage Groups button — opens existing groups-modal
+[x] ncLoadGroupsDropdown() wired to all 3 openModal('campaign-modal') sites
+    - Top nav Marketing dropdown
+    - Contact panel Marketing dropdown
+    - AI wizard "Save as Campaign"
+[x] ncLoadFromGroup() shows group name + contact count below picker
+[x] Modal state resets cleanly on each open
+
+
+----------------------------------------------------
+10. CAMPAIGN MODAL — PICOCLAW AI GENERATOR (016e334)
+----------------------------------------------------
+[x] AI Campaign Generator section added inside campaign modal
+[x] Target Audience input + Goal dropdown
+[x] "Generate AI Campaign Copy" button → calls callPicoClaw()
+    via /api/system/ai/chat
+[x] Auto-fills Campaign Name from product + goal if empty
+[x] Copy button on AI result
+[x] ncGenerateAICopy() uses callPicoClaw (same as Marketing Suite)
+
+
+----------------------------------------------------
+11. CAMPAIGN SPEC — GOAL, A/B TEST, METRICS (33cd692)
+----------------------------------------------------
+Backend:
+[x] campaigns.js — self-healing ALTER TABLE (non-breaking):
+    goal, ab_test_enabled, ab_subject_b,
+    open_rate, ctr, bounce_rate, unsubscribe_rate, sent_count
+[x] POST /api/campaigns — accepts all new fields
+[x] PUT /api/campaigns/:id — persists all new fields
+[x] PATCH /api/campaigns/:id/stats — dedicated metrics update endpoint
+
+Frontend:
+[x] Campaign Goal dropdown (top-level, next to Campaign Name):
+    Lead Generation, Sales Conversion, User Engagement,
+    Customer Retention, Brand Awareness, Re-engagement
+[x] A/B Subject Line section:
+    - Checkbox toggle (Enable A/B test)
+    - Subject B input with live 40-60 char counter
+      (green when in range, red when over limit)
+[x] Personalization token hints: {{name}} {{company}} click-to-copy chips
+[x] AI Goal dropdown expanded: Re-engagement + Customer Retention added
+[x] ncGenerateAICopy() — goal-aware strategy hints per campaign goal:
+    - Subject line rules (40-60 chars)
+    - Preheader generation
+    - {{name}} / {{company}} token instructions
+    - Spam avoidance rules
+    - "Use as Subject B" button on AI result
+[x] ncUseAsAbSubjectB() — one-click sets AI subject as Subject B
+[x] ncToggleAB() — shows/hides A/B fields
+[x] ncInsertToken() — click-to-copy personalization tokens
+[x] createCampaign() — sends goal, ab_test_enabled, ab_subject_b
+[x] renderCampaigns() — goal badge (colour-coded per goal type),
+    A/B badge, 4-metric grid (Open Rate / CTR / Bounce / Unsub)
+
+Email Compliance:
+[x] emailBroadcast.js — appendUnsubscribeFooter()
+    - Auto-appends CAN-SPAM / GDPR compliant footer to all broadcasts
+    - Skips if "unsubscribe" already present in HTML
+    - Injected before </body> or appended if no body tag
+[x] sendBroadcast() — applies footer per recipient after personalisation
+
+
+----------------------------------------------------
+12. CAMPAIGN MODAL — SCHEDULE & INTERVAL (d4fdba0)
+----------------------------------------------------
+[x] Launch Date + Launch Time — separate inputs (default 09:00)
+    Combined into full scheduled_at timestamp (date + time)
+[x] Send Interval — number + unit (seconds / minutes / hours)
+    Live preview label (e.g. "= 3 min")
+    Default: 3 minutes between emails
+[x] Timezone dropdown — IST (default), UTC, Dubai GST, London GMT
+[x] All fields stored in DB:
+    send_interval_ms INT, timezone VARCHAR(60)
+[x] campaigns.js — schema migration adds send_interval_ms + timezone
+[x] POST + PUT routes updated to persist new fields
+[x] Campaign cards show scheduled launch time + interval
+    formatted in the campaign's own timezone
+
+
+----------------------------------------------------
+PENDING / NOT YET DONE
+----------------------------------------------------
+[ ] Tier 3 campaign features (separate phase):
+    - Trigger-based automation flows (welcome, abandoned cart)
+    - Re-engagement cron (inactive > 30 days)
+    - Continuous learning / analytics aggregation
+[ ] PBX screenshots (backend/pbx_*.png) — not committed
+[ ] Temp test files (test_insert.js, tmp_pbx_diag.js) — not committed
+[ ] Tower server pull for today's commits (d4fdba0, 33cd692, 016e334)
+
+
+====================================================
+  END OF CHECKLIST — 28th May 2026
+====================================================
