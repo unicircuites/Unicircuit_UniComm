@@ -1,5 +1,6 @@
 const express = require('express');
 const pool    = require('../db/pool');
+const eb      = require('../services/emailBroadcast');
 const { authenticate } = require('../middleware/auth');
 
 const router = express.Router();
@@ -98,6 +99,88 @@ router.patch('/:id/stats', async (req, res) => {
   } catch (err) {
     return res.status(500).json({ error: 'Failed to update stats.' });
   }
+});
+
+// POST /api/campaigns/:id/launch — fetch group members and send emails
+router.post('/:id/launch', async (req, res) => {
+  const { subject, html, group_id } = req.body;
+  if (!subject || !html) return res.status(400).json({ error: 'subject and html are required to launch.' });
+
+  let campaign;
+  try {
+    const r = await pool.query(`SELECT * FROM campaigns WHERE id=$1`, [req.params.id]);
+    if (!r.rowCount) return res.status(404).json({ error: 'Campaign not found.' });
+    campaign = r.rows[0];
+  } catch (err) { return res.status(500).json({ error: err.message }); }
+
+  // Resolve recipients from group_id or fall back to all contacts with email
+  let recipients = [];
+  try {
+    if (group_id) {
+      const gRes = await pool.query(`
+        SELECT c.fname, c.lname, c.email
+        FROM recipient_group_members m
+        JOIN contacts c ON c.id = m.contact_id
+        WHERE m.group_id = $1 AND c.email IS NOT NULL AND c.email <> ''
+      `, [group_id]);
+      recipients = gRes.rows.map(c => ({
+        email: c.email,
+        name: ((c.fname || '') + ' ' + (c.lname || '')).trim() || c.email.split('@')[0],
+      }));
+    } else {
+      const cRes = await pool.query(`
+        SELECT fname, lname, email FROM contacts
+        WHERE email IS NOT NULL AND email <> '' AND segment = $1
+        LIMIT 500
+      `, [campaign.segment || 'All']);
+      recipients = cRes.rows.map(c => ({
+        email: c.email,
+        name: ((c.fname || '') + ' ' + (c.lname || '')).trim() || c.email.split('@')[0],
+      }));
+    }
+  } catch (err) { return res.status(500).json({ error: 'Failed to load recipients: ' + err.message }); }
+
+  if (!recipients.length) return res.status(400).json({ error: 'No recipients found for this campaign.' });
+
+  // Mark as sending
+  await pool.query(`UPDATE campaigns SET status='Sending', sent_count=$1 WHERE id=$2`,
+    [recipients.length, req.params.id]).catch(() => {});
+
+  // Respond immediately
+  res.json({ success: true, total: recipients.length, message: `Sending to ${recipients.length} recipients…` });
+
+  // Send in background
+  const delayMs = parseInt(campaign.send_interval_ms || 180000);
+  eb.sendBroadcast(recipients, subject, html, null, delayMs)
+    .then(async (results) => {
+      const openRate = 0; // updated later via stats endpoint
+      await pool.query(`
+        UPDATE campaigns SET status='Sent', sent_count=$1, progress=100,
+          open_rate=$2, ctr=$3, bounce_rate=$4
+        WHERE id=$5
+      `, [results.sent, openRate, 0,
+          results.failed > 0 ? parseFloat(((results.failed / recipients.length) * 100).toFixed(2)) : 0,
+          req.params.id]);
+      console.log(`[Campaign #${req.params.id}] Done — sent:${results.sent} failed:${results.failed}`);
+    })
+    .catch(async (err) => {
+      await pool.query(`UPDATE campaigns SET status='Failed' WHERE id=$1`, [req.params.id]);
+      console.error(`[Campaign #${req.params.id}] Error:`, err.message);
+    });
+});
+
+// PATCH /api/campaigns/:id/pause — toggle pause/resume
+router.patch('/:id/pause', async (req, res) => {
+  try {
+    const r = await pool.query(`SELECT status FROM campaigns WHERE id=$1`, [req.params.id]);
+    if (!r.rowCount) return res.status(404).json({ error: 'Campaign not found.' });
+    const current = r.rows[0].status;
+    const next = current === 'Paused' ? 'Active' : 'Paused';
+    const updated = await pool.query(
+      `UPDATE campaigns SET status=$1 WHERE id=$2 RETURNING *`, [next, req.params.id]
+    );
+    return res.json(updated.rows[0]);
+  } catch (err) { return res.status(500).json({ error: err.message }); }
 });
 
 // DELETE /api/campaigns/:id

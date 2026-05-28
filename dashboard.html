@@ -11212,9 +11212,17 @@ Keep it concise and professional.`;
           <td><span class="badge ${statusBadge(c.status)}">${escHtml(c.status||'Draft')}</span></td>
           <td>
             <div style="display:flex;gap:4px;">
-              <button class="btn btn-ghost btn-xs" title="Pause"><i class="fas fa-pause"></i></button>
-              <button class="btn btn-blue btn-xs" title="Stats"><i class="fas fa-chart-bar"></i></button>
-              <button class="btn btn-red btn-xs" onclick="deleteCampaign(${c.id},this)" title="Delete"><i class="fas fa-trash"></i></button>
+              <button class="btn btn-ghost btn-xs" title="${c.status === 'Paused' ? 'Resume' : 'Pause'}"
+                onclick="campaignPause(${c.id}, this)">
+                <i class="fas fa-${c.status === 'Paused' ? 'play' : 'pause'}"></i>
+              </button>
+              <button class="btn btn-blue btn-xs" title="Stats"
+                onclick="campaignStats(${c.id})">
+                <i class="fas fa-chart-bar"></i>
+              </button>
+              <button class="btn btn-red btn-xs" onclick="deleteCampaign(${c.id},this)" title="Delete">
+                <i class="fas fa-trash"></i>
+              </button>
             </div>
           </td>
         </tr>`;
@@ -11242,8 +11250,197 @@ Keep it concise and professional.`;
       } catch (_) { notify('Error', 'Could not delete campaign', 'var(--red)', 'fas fa-exclamation-circle'); }
     }
 
-    // ── DB STATUS BADGE ──────────────────────────────────────────────────────────
-    function showDbStatus(online) {
+    // ── CAMPAIGN LAUNCH PROMPT ────────────────────────────────────────────────────
+    // Opens a small modal to collect subject + HTML body before sending
+    function openCampaignLaunchPrompt(campaignId, name, product, goal, seg, groupSel) {
+      const groupId = groupSel && groupSel.value ? groupSel.value : null;
+      const defaultSubject = (goal || 'Campaign') + ': ' + (product || name);
+      const defaultBody = `<p style="font-family:Arial,sans-serif;font-size:14px;line-height:1.6;color:#222;">
+Dear {{name}},<br><br>
+We are pleased to share details about <strong>${product || name}</strong>.<br><br>
+${goal === 'Lead Generation' ? 'We would love to connect and explore how we can support your requirements.' :
+  goal === 'Sales Conversion' ? 'This is a limited-time opportunity — act now to secure the best pricing.' :
+  goal === 'Re-engagement' ? 'We noticed we haven\'t connected in a while and wanted to reach out.' :
+  'Please feel free to reach out for more information.'}
+<br><br>
+Best regards,<br>
+<strong>Unicircuit Engineering Services LLP</strong>
+</p>`;
+
+      // Build and show the launch modal
+      let overlay = document.getElementById('camp-launch-overlay');
+      if (!overlay) {
+        overlay = document.createElement('div');
+        overlay.id = 'camp-launch-overlay';
+        overlay.className = 'modal-overlay';
+        overlay.style.display = 'flex';
+        document.body.appendChild(overlay);
+      }
+      overlay.style.display = 'flex';
+      overlay.innerHTML = `
+        <div class="modal" style="max-width:600px;">
+          <div class="modal-title">
+            <span><i class="fas fa-paper-plane" style="color:var(--blue2);margin-right:8px;"></i>Launch Campaign — ${escHtml(name)}</span>
+            <i class="fas fa-times modal-close" onclick="document.getElementById('camp-launch-overlay').style.display='none'"></i>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Email Subject <span style="font-size:10px;color:var(--muted);">(40–60 chars recommended)</span></label>
+            <input class="inp" id="cl-subject" value="${escHtml(defaultSubject)}" />
+          </div>
+          <div class="form-group">
+            <label class="form-label">Email Body (HTML)</label>
+            <textarea class="inp" id="cl-body" rows="8" style="font-size:12px;font-family:monospace;resize:vertical;">${escHtml(defaultBody)}</textarea>
+          </div>
+          <div style="font-size:11px;color:var(--muted);margin-bottom:10px;">
+            <i class="fas fa-info-circle"></i> Use <code>{{name}}</code> and <code>{{company}}</code> for personalisation.
+            Unsubscribe footer is added automatically.
+          </div>
+          <div style="display:flex;gap:8px;">
+            <button class="btn btn-gold" style="flex:1;justify-content:center;"
+              onclick="campaignLaunchSend(${campaignId}, ${groupId ? groupId : 'null'})">
+              <i class="fas fa-rocket"></i> Send Now
+            </button>
+            <button class="btn btn-ghost" onclick="document.getElementById('camp-launch-overlay').style.display='none'">
+              Cancel
+            </button>
+          </div>
+        </div>`;
+    }
+
+    // ── CAMPAIGN SEND ─────────────────────────────────────────────────────────────
+    async function campaignLaunchSend(campaignId, groupId) {
+      const subject = (document.getElementById('cl-subject') || {}).value || '';
+      const html    = (document.getElementById('cl-body')    || {}).value || '';
+      if (!subject.trim()) { notify('Subject required', '', 'var(--red)', 'fas fa-exclamation-circle'); return; }
+      if (!html.trim())    { notify('Email body required', '', 'var(--red)', 'fas fa-exclamation-circle'); return; }
+
+      document.getElementById('camp-launch-overlay').style.display = 'none';
+      notify('Sending…', 'Campaign is being delivered', 'var(--blue2)', 'fas fa-paper-plane');
+
+      try {
+        const res = await fetch(`${API_BASE}/campaigns/${campaignId}/launch`, {
+          method: 'POST',
+          headers: getAuthHeaders(),
+          body: JSON.stringify({ subject, html, group_id: groupId }),
+        });
+        const data = await res.json();
+        if (res.ok) {
+          notify('Campaign launched', data.message || 'Sending in progress', 'var(--green)', 'fas fa-rocket');
+          setTimeout(loadCampaignsTable, 3000); // refresh table after 3s
+        } else {
+          notify('Launch failed', data.error, 'var(--red)', 'fas fa-exclamation-circle');
+        }
+      } catch (err) {
+        notify('Error', err.message, 'var(--red)', 'fas fa-exclamation-circle');
+      }
+    }
+
+    // ── CAMPAIGN PAUSE / RESUME ───────────────────────────────────────────────────
+    async function campaignPause(id, btn) {
+      try {
+        const res = await fetch(`${API_BASE}/campaigns/${id}/pause`, {
+          method: 'PATCH', headers: getAuthHeaders(),
+        });
+        const data = await res.json();
+        if (res.ok) {
+          const isPaused = data.status === 'Paused';
+          btn.title = isPaused ? 'Resume' : 'Pause';
+          btn.innerHTML = `<i class="fas fa-${isPaused ? 'play' : 'pause'}"></i>`;
+          notify(isPaused ? 'Campaign paused' : 'Campaign resumed', '', isPaused ? 'var(--gold)' : 'var(--green)', `fas fa-${isPaused ? 'pause' : 'play'}`);
+          loadCampaignsTable();
+        } else {
+          notify('Error', data.error, 'var(--red)', 'fas fa-exclamation-circle');
+        }
+      } catch (err) {
+        notify('Error', err.message, 'var(--red)', 'fas fa-exclamation-circle');
+      }
+    }
+
+    // ── CAMPAIGN STATS POPUP ──────────────────────────────────────────────────────
+    async function campaignStats(id) {
+      try {
+        const res = await fetch(`${API_BASE}/campaigns/${id}`, { headers: getAuthHeaders() });
+        const c = await res.json();
+        if (!res.ok) { notify('Error', c.error, 'var(--red)', 'fas fa-exclamation-circle'); return; }
+
+        const fmt = v => parseFloat(v || 0).toFixed(1) + '%';
+        const intervalMs = parseInt(c.send_interval_ms || 180000);
+        const intervalLabel = intervalMs >= 3600000 ? (intervalMs/3600000).toFixed(1) + ' hr'
+          : intervalMs >= 60000 ? (intervalMs/60000) + ' min' : (intervalMs/1000) + ' sec';
+        const launchLabel = c.scheduled_at
+          ? new Date(c.scheduled_at).toLocaleString('en-IN', { timeZone: c.timezone || 'Asia/Kolkata', day:'2-digit', month:'short', year:'numeric', hour:'2-digit', minute:'2-digit' })
+          : 'Not scheduled';
+
+        let overlay = document.getElementById('camp-stats-overlay');
+        if (!overlay) {
+          overlay = document.createElement('div');
+          overlay.id = 'camp-stats-overlay';
+          overlay.className = 'modal-overlay';
+          document.body.appendChild(overlay);
+        }
+        overlay.style.display = 'flex';
+        overlay.innerHTML = `
+          <div class="modal" style="max-width:520px;">
+            <div class="modal-title">
+              <span><i class="fas fa-chart-bar" style="color:var(--blue2);margin-right:8px;"></i>${escHtml(c.name)}</span>
+              <i class="fas fa-times modal-close" onclick="document.getElementById('camp-stats-overlay').style.display='none'"></i>
+            </div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px;">
+              <div style="background:rgba(255,255,255,0.03);border-radius:8px;padding:12px;">
+                <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;">Status</div>
+                <div style="font-size:15px;font-weight:700;margin-top:4px;color:var(--text);">${escHtml(c.status||'Draft')}</div>
+              </div>
+              <div style="background:rgba(255,255,255,0.03);border-radius:8px;padding:12px;">
+                <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;">Goal</div>
+                <div style="font-size:15px;font-weight:700;margin-top:4px;color:var(--gold);">${escHtml(c.goal||'—')}</div>
+              </div>
+              <div style="background:rgba(255,255,255,0.03);border-radius:8px;padding:12px;">
+                <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;">Channel</div>
+                <div style="font-size:15px;font-weight:700;margin-top:4px;">${escHtml(c.channel||'Email')}</div>
+              </div>
+              <div style="background:rgba(255,255,255,0.03);border-radius:8px;padding:12px;">
+                <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;">Sent</div>
+                <div style="font-size:15px;font-weight:700;margin-top:4px;color:var(--green2);">${c.sent_count||0}</div>
+              </div>
+            </div>
+            <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:14px;">
+              <div style="text-align:center;background:rgba(16,185,129,0.07);border-radius:8px;padding:10px 4px;">
+                <div style="font-size:18px;font-weight:800;color:var(--green2);">${fmt(c.open_rate)}</div>
+                <div style="font-size:9.5px;color:var(--muted);margin-top:2px;">Open Rate</div>
+              </div>
+              <div style="text-align:center;background:rgba(59,130,246,0.07);border-radius:8px;padding:10px 4px;">
+                <div style="font-size:18px;font-weight:800;color:var(--blue2);">${fmt(c.ctr)}</div>
+                <div style="font-size:9.5px;color:var(--muted);margin-top:2px;">CTR</div>
+              </div>
+              <div style="text-align:center;background:rgba(245,166,35,0.07);border-radius:8px;padding:10px 4px;">
+                <div style="font-size:18px;font-weight:800;color:var(--gold);">${fmt(c.bounce_rate)}</div>
+                <div style="font-size:9.5px;color:var(--muted);margin-top:2px;">Bounce</div>
+              </div>
+              <div style="text-align:center;background:rgba(239,68,68,0.07);border-radius:8px;padding:10px 4px;">
+                <div style="font-size:18px;font-weight:800;color:var(--red2);">${fmt(c.unsubscribe_rate)}</div>
+                <div style="font-size:9.5px;color:var(--muted);margin-top:2px;">Unsub</div>
+              </div>
+            </div>
+            <div style="font-size:11.5px;color:var(--muted2);display:flex;flex-direction:column;gap:5px;">
+              <div><i class="fas fa-users" style="width:14px;"></i> Segment: <strong>${escHtml(c.segment||'All')}</strong></div>
+              <div><i class="fas fa-clock" style="width:14px;"></i> Launch: <strong>${launchLabel}</strong></div>
+              <div><i class="fas fa-hourglass-half" style="width:14px;"></i> Interval: <strong>${intervalLabel}</strong></div>
+              ${c.ab_test_enabled ? `<div><i class="fas fa-flask" style="width:14px;color:var(--blue2);"></i> A/B Subject B: <strong>${escHtml(c.ab_subject_b||'—')}</strong></div>` : ''}
+            </div>
+            <div style="display:flex;gap:8px;margin-top:14px;">
+              <button class="btn btn-gold btn-sm" style="flex:1;justify-content:center;"
+                onclick="document.getElementById('camp-stats-overlay').style.display='none';openCampaignLaunchPrompt(${c.id},'${escHtml(c.name).replace(/'/g,"\\'")}','${escHtml(c.product||'').replace(/'/g,"\\'")}','${escHtml(c.goal||'').replace(/'/g,"\\'")}','${escHtml(c.segment||'').replace(/'/g,"\\'")}',null)">
+                <i class="fas fa-rocket"></i> Launch Now
+              </button>
+              <button class="btn btn-ghost btn-sm" onclick="document.getElementById('camp-stats-overlay').style.display='none'">Close</button>
+            </div>
+          </div>`;
+      } catch (err) {
+        notify('Error', err.message, 'var(--red)', 'fas fa-exclamation-circle');
+      }
+    }
+
+    // ── DB STATUS BADGE ──────────────────────────────────────────────────────────    function showDbStatus(online) {
       // Add a small badge to the topbar
       const actions = document.querySelector('.topbar-actions');
       if (!actions) return;
@@ -11360,9 +11557,23 @@ Keep it concise and professional.`;
         });
         const data = await res.json();
         if (res.ok) {
+          const campaignId = data.id;
           closeModal('campaign-modal');
-          notify('Campaign created', name + (goal ? ' · ' + goal : ''), 'var(--green)', 'fas fa-bullhorn');
-          // Reload campaigns
+
+          // Determine if scheduled for future or launch now
+          const isScheduled = scheduledAt && new Date(scheduledAt) > new Date();
+          if (isScheduled) {
+            notify('Campaign scheduled', name + ' · ' + new Date(scheduledAt).toLocaleString(), 'var(--gold)', 'fas fa-clock');
+          } else {
+            // Launch immediately — need subject + html from user
+            // Prompt for subject if channel includes Email
+            if (channel === 'Email' || channel === 'Both') {
+              openCampaignLaunchPrompt(campaignId, name, product, goal, seg, groupSel);
+            } else {
+              notify('Campaign created', name + ' (WhatsApp campaigns require manual send)', 'var(--green)', 'fas fa-bullhorn');
+            }
+          }
+          // Reload table
           const campRes = await fetch(`${API_BASE}/campaigns`, { headers: getAuthHeaders() });
           if (campRes.ok) renderCampaigns(await campRes.json());
         } else {
