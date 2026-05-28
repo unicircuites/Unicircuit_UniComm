@@ -6655,12 +6655,29 @@
         <span><i class="fas fa-bullhorn" style="color:var(--gold);margin-right:8px;"></i>Create Campaign</span>
         <i class="fas fa-times modal-close" onclick="closeModal('campaign-modal')"></i>
       </div>
-      <div class="form-group"><label class="form-label">Campaign Name</label><input class="inp" id="nc-name"
-          placeholder="Q2 Switchgear Promotion" /></div>
-      <div class="form-group"><label class="form-label">Product / Service</label><input class="inp" id="nc-product" />
+
+      <!-- Row 1: Name + Goal -->
+      <div class="form-row">
+        <div class="form-group" style="flex:2;margin-bottom:0;">
+          <label class="form-label">Campaign Name</label>
+          <input class="inp" id="nc-name" placeholder="Q2 Switchgear Promotion" />
+        </div>
+        <div class="form-group" style="flex:1;margin-bottom:0;">
+          <label class="form-label">Campaign Goal</label>
+          <select class="inp" id="nc-campaign-goal">
+            <option value="Lead Generation">Lead Generation</option>
+            <option value="Sales Conversion">Sales Conversion</option>
+            <option value="User Engagement">User Engagement</option>
+            <option value="Customer Retention">Customer Retention</option>
+            <option value="Brand Awareness">Brand Awareness</option>
+            <option value="Re-engagement">Re-engagement</option>
+          </select>
+        </div>
       </div>
 
-      <!-- Target Contacts — group picker (same pattern as broadcast) -->
+      <div class="form-group" style="margin-top:10px;"><label class="form-label">Product / Service</label><input class="inp" id="nc-product" /></div>
+
+      <!-- Target Contacts — group picker -->
       <div class="form-group">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:5px;">
           <label class="form-label" style="margin-bottom:0;">Target Contacts (group)</label>
@@ -6690,8 +6707,29 @@
         <div><label class="form-label">Schedule</label><input class="inp" id="nc-date" type="date" /></div>
       </div>
 
+      <!-- A/B Subject Line Testing -->
+      <div style="margin-top:8px;padding:10px 12px;border:1px solid var(--border2);border-radius:8px;background:rgba(59,130,246,0.03);">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">
+          <span style="font-size:11px;font-weight:700;color:var(--blue2);letter-spacing:.4px;">
+            <i class="fas fa-flask"></i> A/B SUBJECT LINE TEST
+          </span>
+          <label style="display:flex;align-items:center;gap:6px;font-size:11px;color:var(--muted2);cursor:pointer;">
+            <input type="checkbox" id="nc-ab-enabled" onchange="ncToggleAB(this.checked)" style="cursor:pointer;" />
+            Enable A/B test
+          </label>
+        </div>
+        <div id="nc-ab-fields" style="display:none;">
+          <div style="font-size:10.5px;color:var(--muted);margin-bottom:6px;">
+            Subject A is your main subject line (set in the broadcast step). Enter Subject B here — winner is picked by open rate.
+          </div>
+          <input class="inp" id="nc-ab-subject-b" placeholder="Subject B — alternative subject line (40–60 chars)" style="font-size:12px;"
+            oninput="var l=this.value.length,el=document.getElementById('nc-ab-subject-b-len');if(el){el.textContent=l+' / 60 chars';el.style.color=l>60?'var(--red2)':l>=40?'var(--green2)':'var(--muted)';}" />
+          <div id="nc-ab-subject-b-len" style="font-size:10px;color:var(--muted);margin-top:3px;text-align:right;">0 / 60 chars</div>
+        </div>
+      </div>
+
       <!-- AI Campaign Generator (PicoClaw) -->
-      <div style="border:1px solid rgba(245,166,35,0.18);border-radius:10px;padding:12px 14px;margin-top:4px;background:rgba(245,166,35,0.03);">
+      <div style="border:1px solid rgba(245,166,35,0.18);border-radius:10px;padding:12px 14px;margin-top:8px;background:rgba(245,166,35,0.03);">
         <div style="font-size:10.5px;font-weight:700;color:var(--gold);margin-bottom:10px;letter-spacing:.5px;">
           <i class="fas fa-robot"></i> AI CAMPAIGN GENERATOR — PICOCLAW
         </div>
@@ -6701,14 +6739,23 @@
             <input class="inp" id="nc-audience" placeholder="Electrical contractors, industrial OEMs" />
           </div>
           <div class="form-group" style="margin-bottom:0;">
-            <label class="form-label">Goal</label>
+            <label class="form-label">AI Goal (for copy)</label>
             <select class="inp" id="nc-goal">
               <option>Lead generation</option>
               <option>Product awareness</option>
               <option>Quote requests</option>
               <option>Order follow-up</option>
+              <option>Re-engagement</option>
+              <option>Customer retention</option>
             </select>
           </div>
+        </div>
+        <!-- Personalization token hints -->
+        <div style="font-size:10.5px;color:var(--muted);margin-bottom:8px;">
+          <span style="font-weight:600;color:var(--muted2);">Personalization tokens:</span>
+          <span onclick="ncInsertToken('{{name}}')" style="cursor:pointer;background:rgba(255,255,255,0.06);border-radius:4px;padding:1px 6px;margin:0 3px;font-family:monospace;font-size:10px;">{{name}}</span>
+          <span onclick="ncInsertToken('{{company}}')" style="cursor:pointer;background:rgba(255,255,255,0.06);border-radius:4px;padding:1px 6px;margin:0 3px;font-family:monospace;font-size:10px;">{{company}}</span>
+          <span style="color:var(--muted);font-size:10px;">— click to copy, use in subject/body</span>
         </div>
         <button type="button" class="btn btn-ghost btn-sm" style="width:100%;justify-content:center;" onclick="ncGenerateAICopy()">
           <i class="fas fa-wand-magic-sparkles" style="color:var(--cyan);"></i> Generate AI Campaign Copy
@@ -11035,23 +11082,61 @@ Keep it concise and professional.`;
       const el = document.getElementById('camp-list');
       if (!el) return;
       const statusBadge = s => s === 'Active' ? 'b-green' : s === 'Live' ? 'b-green' : s === 'Scheduled' ? 'b-gold' : 'b-gray';
-      el.innerHTML = camps.map(c => `
+      const goalColor = g => {
+        if (!g) return 'var(--muted)';
+        const m = { 'Lead Generation':'var(--green2)', 'Sales Conversion':'var(--gold)', 'User Engagement':'var(--blue2)',
+                    'Customer Retention':'var(--cyan)', 'Brand Awareness':'var(--purple)', 'Re-engagement':'var(--red2)' };
+        return m[g] || 'var(--muted2)';
+      };
+      el.innerHTML = camps.map(c => {
+        const openR  = parseFloat(c.open_rate  || 0).toFixed(1);
+        const ctrR   = parseFloat(c.ctr        || 0).toFixed(1);
+        const bounceR= parseFloat(c.bounce_rate|| 0).toFixed(1);
+        const unsubR = parseFloat(c.unsubscribe_rate || 0).toFixed(1);
+        const hasMetrics = parseFloat(c.open_rate || 0) > 0 || parseFloat(c.ctr || 0) > 0;
+        const abBadge = c.ab_test_enabled
+          ? `<span class="badge b-blue" style="font-size:9px;padding:1px 6px;margin-left:4px;"><i class="fas fa-flask"></i> A/B</span>` : '';
+        const goalBadge = c.goal
+          ? `<span style="font-size:9.5px;font-weight:600;color:${goalColor(c.goal)};background:rgba(255,255,255,0.05);border-radius:4px;padding:1px 6px;">${c.goal}</span>` : '';
+        return `
     <div class="camp-card">
-      <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:9px;">
-        <div>
-          <div style="font-weight:700;font-size:13px;">${c.name}</div>
-          <div style="font-size:11px;color:var(--muted);margin-top:2px;">${c.channel} · ${c.segment} · ${c.product || ''}</div>
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:6px;">
+        <div style="min-width:0;">
+          <div style="font-weight:700;font-size:13px;display:flex;align-items:center;gap:4px;flex-wrap:wrap;">
+            ${escHtml(c.name)}${abBadge}
+          </div>
+          <div style="font-size:11px;color:var(--muted);margin-top:2px;">${escHtml(c.channel||'')} · ${escHtml(c.segment||'')}${c.product ? ' · ' + escHtml(c.product) : ''}</div>
+          ${goalBadge ? '<div style="margin-top:4px;">' + goalBadge + '</div>' : ''}
         </div>
-        <span class="badge ${statusBadge(c.status)}">${c.status}</span>
+        <span class="badge ${statusBadge(c.status)}" style="flex-shrink:0;margin-left:8px;">${escHtml(c.status||'Draft')}</span>
       </div>
       <div class="prog-bar"><div class="prog-fill" style="width:${c.progress || 0}%;background:var(--blue);"></div></div>
+      ${hasMetrics ? `
+      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:4px;margin-top:8px;text-align:center;">
+        <div style="background:rgba(255,255,255,0.03);border-radius:6px;padding:4px 2px;">
+          <div style="font-size:11px;font-weight:700;color:var(--green2);">${openR}%</div>
+          <div style="font-size:9px;color:var(--muted);">Open Rate</div>
+        </div>
+        <div style="background:rgba(255,255,255,0.03);border-radius:6px;padding:4px 2px;">
+          <div style="font-size:11px;font-weight:700;color:var(--blue2);">${ctrR}%</div>
+          <div style="font-size:9px;color:var(--muted);">CTR</div>
+        </div>
+        <div style="background:rgba(255,255,255,0.03);border-radius:6px;padding:4px 2px;">
+          <div style="font-size:11px;font-weight:700;color:var(--gold);">${bounceR}%</div>
+          <div style="font-size:9px;color:var(--muted);">Bounce</div>
+        </div>
+        <div style="background:rgba(255,255,255,0.03);border-radius:6px;padding:4px 2px;">
+          <div style="font-size:11px;font-weight:700;color:var(--red2);">${unsubR}%</div>
+          <div style="font-size:9px;color:var(--muted);">Unsub</div>
+        </div>
+      </div>` : ''}
       <div style="display:flex;gap:6px;margin-top:10px;">
         <button class="btn btn-ghost btn-xs"><i class="fas fa-pause"></i> Pause</button>
         <button class="btn btn-blue btn-xs"><i class="fas fa-chart-bar"></i> Stats</button>
         <button class="btn btn-red btn-xs" onclick="deleteCampaign(${c.id},this)"><i class="fas fa-trash"></i></button>
       </div>
-    </div>
-  `).join('');
+    </div>`;
+      }).join('');
     }
 
     // ── DELETE CAMPAIGN VIA API ──────────────────────────────────────────────────
@@ -11162,6 +11247,9 @@ Keep it concise and professional.`;
         : 'All';
       const channel = document.getElementById('nc-channel').value;
       const date = document.getElementById('nc-date').value;
+      const goal = (document.getElementById('nc-campaign-goal') || {}).value || null;
+      const abEnabled = document.getElementById('nc-ab-enabled') && document.getElementById('nc-ab-enabled').checked;
+      const abSubjectB = abEnabled ? ((document.getElementById('nc-ab-subject-b') || {}).value || '').trim() : null;
 
       if (!name) { notify('Campaign name required', '', 'var(--red)', 'fas fa-exclamation-circle'); return; }
 
@@ -11169,12 +11257,15 @@ Keep it concise and professional.`;
         const res = await fetch(`${API_BASE}/campaigns`, {
           method: 'POST',
           headers: getAuthHeaders(),
-          body: JSON.stringify({ name, product, segment: seg, channel, status: 'Draft', scheduled_at: date || null }),
+          body: JSON.stringify({
+            name, product, segment: seg, channel, status: 'Draft', scheduled_at: date || null,
+            goal, ab_test_enabled: abEnabled, ab_subject_b: abSubjectB || null,
+          }),
         });
         const data = await res.json();
         if (res.ok) {
           closeModal('campaign-modal');
-          notify('Campaign created', name, 'var(--green)', 'fas fa-bullhorn');
+          notify('Campaign created', name + (goal ? ' · ' + goal : ''), 'var(--green)', 'fas fa-bullhorn');
           // Reload campaigns
           const campRes = await fetch(`${API_BASE}/campaigns`, { headers: getAuthHeaders() });
           if (campRes.ok) renderCampaigns(await campRes.json());
@@ -11194,8 +11285,14 @@ Keep it concise and professional.`;
       // Reset state on open
       var countEl = document.getElementById('nc-group-count');
       var aiEl = document.getElementById('nc-ai-result');
+      var abCb = document.getElementById('nc-ab-enabled');
+      var abFields = document.getElementById('nc-ab-fields');
+      var abSubB = document.getElementById('nc-ab-subject-b');
       if (countEl) countEl.textContent = 'No group selected';
       if (aiEl) aiEl.innerHTML = '';
+      if (abCb) abCb.checked = false;
+      if (abFields) abFields.style.display = 'none';
+      if (abSubB) abSubB.value = '';
       sel.innerHTML = '<option value="">— Load from a group —</option>';
       try {
         var res = await fetch(API_BASE + '/groups', { headers: getAuthHeaders() });
@@ -11209,6 +11306,21 @@ Keep it concise and professional.`;
           sel.appendChild(opt);
         });
       } catch (_) { }
+    }
+
+    // ── A/B toggle ─────────────────────────────────────────────────────────
+    function ncToggleAB(enabled) {
+      var fields = document.getElementById('nc-ab-fields');
+      if (fields) fields.style.display = enabled ? 'block' : 'none';
+    }
+
+    // ── Personalization token copy helper ──────────────────────────────────
+    function ncInsertToken(token) {
+      if (navigator.clipboard) {
+        navigator.clipboard.writeText(token).then(function () {
+          notify('Copied', token + ' copied to clipboard', 'var(--green)', 'fas fa-check');
+        });
+      }
     }
 
     // ── Campaign modal: load selected group and update count label ─────────
@@ -11233,10 +11345,11 @@ Keep it concise and professional.`;
 
     // ── Campaign modal: AI copy generator (PicoClaw) ───────────────────────
     async function ncGenerateAICopy() {
-      const product = (document.getElementById('nc-product') || {}).value || '';
+      const product  = (document.getElementById('nc-product')  || {}).value || '';
       const audience = (document.getElementById('nc-audience') || {}).value || '';
-      const goal = (document.getElementById('nc-goal') || {}).value || '';
-      const channel = (document.getElementById('nc-channel') || {}).value || 'Email';
+      const aiGoal   = (document.getElementById('nc-goal')     || {}).value || 'Lead generation';
+      const campGoal = (document.getElementById('nc-campaign-goal') || {}).value || '';
+      const channel  = (document.getElementById('nc-channel')  || {}).value || 'Email';
       const el = document.getElementById('nc-ai-result');
       if (!el) return;
       if (!product && !audience) {
@@ -11246,10 +11359,41 @@ Keep it concise and professional.`;
       el.innerHTML = '<div style="font-size:12px;color:var(--muted);"><span class="spin-loader"></span> PicoClaw is crafting your campaign copy…</div>';
       try {
         const channels = channel === 'Both' ? ['Email', 'WhatsApp'] : [channel];
-        const prompt = 'You are a B2B marketing specialist for Unicircuit Engineering Services LLP (Indian electrical engineering company).\n\nGenerate campaign copy for:\nProduct: ' + product + '\nTarget audience: ' + (audience || 'Electrical contractors, industrial OEMs') + '\nGoal: ' + goal + '\nChannels: ' + channels.join(', ') + '\n\nGenerate:\n'
-          + (channels.includes('Email') ? '1) EMAIL SUBJECT: (one line)\n   EMAIL BODY: (80-word professional body with {{name}} personalization)\n' : '')
-          + (channels.includes('WhatsApp') ? '2) WHATSAPP: (40-word broadcast message)\n' : '')
-          + '\nUse Indian B2B engineering industry context. Professional, compelling, clear CTA.';
+
+        // Goal-specific strategy hints
+        const strategyHints = {
+          'Lead Generation':    'Focus on curiosity and a clear lead-capture CTA. Offer a free consultation or quote.',
+          'Sales Conversion':   'Highlight ROI, urgency, and a direct purchase/order CTA. Use social proof.',
+          'User Engagement':    'Be conversational, ask a question, invite a reply or click.',
+          'Customer Retention': 'Acknowledge the relationship, offer exclusive value, reinforce trust.',
+          'Brand Awareness':    'Tell a story, highlight expertise, no hard sell — build credibility.',
+          'Re-engagement':      'Acknowledge inactivity warmly, offer a compelling reason to return.',
+        };
+        const strategy = strategyHints[campGoal] || strategyHints[aiGoal] || '';
+
+        const prompt =
+          'You are a B2B marketing specialist for Unicircuit Engineering Services LLP (Indian electrical engineering company).\n\n' +
+          'Campaign Goal: ' + (campGoal || aiGoal) + '\n' +
+          (strategy ? 'Strategy: ' + strategy + '\n' : '') +
+          'Product/Service: ' + product + '\n' +
+          'Target audience: ' + (audience || 'Electrical contractors, industrial OEMs') + '\n' +
+          'Channels: ' + channels.join(', ') + '\n\n' +
+          'Rules:\n' +
+          '- Subject line: 40–60 characters, create curiosity or urgency\n' +
+          '- Use {{name}} for recipient name personalization\n' +
+          '- Use {{company}} for company name personalization\n' +
+          '- CTA must be clear and action-focused (e.g. "Request a Quote", "Schedule a Demo")\n' +
+          '- Avoid spam trigger words (FREE!!!, BUY NOW!!!)\n' +
+          '- Professional Indian B2B engineering tone\n\n' +
+          'Generate:\n' +
+          (channels.includes('Email')
+            ? '1) EMAIL SUBJECT: (40–60 chars, curiosity/urgency)\n' +
+              '   EMAIL PREHEADER: (one line preview text)\n' +
+              '   EMAIL BODY: (80-word professional body with {{name}} and {{company}} personalization, clear CTA)\n'
+            : '') +
+          (channels.includes('WhatsApp')
+            ? '2) WHATSAPP: (40-word broadcast message, conversational tone)\n'
+            : '');
 
         const text = await callPicoClaw(prompt);
         const safeText = escHtml(text);
@@ -11257,17 +11401,38 @@ Keep it concise and professional.`;
         // Auto-fill campaign name if empty
         const nameEl = document.getElementById('nc-name');
         if (nameEl && !nameEl.value.trim() && product) {
-          nameEl.value = (goal || 'Campaign') + ' — ' + product;
+          nameEl.value = (campGoal || aiGoal || 'Campaign') + ' — ' + product;
         }
 
+        // Try to extract subject for A/B hint
+        const subjectMatch = text.match(/EMAIL SUBJECT[:\s]+(.+)/i);
+        const extractedSubject = subjectMatch ? subjectMatch[1].trim().replace(/^["']|["']$/g, '') : '';
+
         el.innerHTML = '<div style="background:rgba(245,166,35,0.05);border:1px solid rgba(245,166,35,0.12);border-radius:8px;padding:10px 12px;">'
-          + '<pre style="font-size:12px;line-height:1.6;white-space:pre-wrap;font-family:\'Outfit\';color:var(--text);max-height:180px;overflow-y:auto;">' + safeText + '</pre>'
+          + '<pre style="font-size:12px;line-height:1.6;white-space:pre-wrap;font-family:\'Outfit\';color:var(--text);max-height:200px;overflow-y:auto;">' + safeText + '</pre>'
           + '<div style="margin-top:8px;display:flex;gap:6px;flex-wrap:wrap;">'
-          + '<button class="btn btn-ghost btn-xs" onclick="navigator.clipboard&&navigator.clipboard.writeText(' + JSON.stringify(text) + ').then(function(){notify(\'Copied\',\'AI copy copied\',\'var(--green)\',\'fas fa-check\')})"><i class="fas fa-copy"></i> Copy</button>'
+          + '<button class="btn btn-ghost btn-xs" onclick="navigator.clipboard&&navigator.clipboard.writeText(' + JSON.stringify(text) + ').then(function(){notify(\'Copied\',\'AI copy copied\',\'var(--green)\',\'fas fa-check\')})"><i class="fas fa-copy"></i> Copy All</button>'
+          + (extractedSubject ? '<button class="btn btn-ghost btn-xs" onclick="ncUseAsAbSubjectB(' + JSON.stringify(extractedSubject) + ')"><i class="fas fa-flask"></i> Use as Subject B</button>' : '')
           + '</div></div>';
       } catch (e) {
         el.innerHTML = '<div style="color:var(--red2);font-size:12px;">AI error — ' + escHtml(e.message) + '</div>';
       }
+    }
+
+    // ── Use AI-generated subject as A/B Subject B ──────────────────────────
+    function ncUseAsAbSubjectB(subject) {
+      var cb = document.getElementById('nc-ab-enabled');
+      var fields = document.getElementById('nc-ab-fields');
+      var inp = document.getElementById('nc-ab-subject-b');
+      if (cb) { cb.checked = true; }
+      if (fields) fields.style.display = 'block';
+      if (inp) {
+        inp.value = subject;
+        var lenEl = document.getElementById('nc-ab-subject-b-len');
+        if (lenEl) lenEl.textContent = subject.length + ' / 60 chars';
+        lenEl && (lenEl.style.color = subject.length > 60 ? 'var(--red2)' : 'var(--muted)');
+      }
+      notify('Subject B set', subject, 'var(--blue2)', 'fas fa-flask');
     }
 
     // ── System Health Indicators ──────────────────────────────────────────────

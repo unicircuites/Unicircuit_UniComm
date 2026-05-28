@@ -49,6 +49,25 @@ function normalizeAttachments(attachments) {
   }).filter(Boolean);
 }
 
+// ── UNSUBSCRIBE FOOTER (CAN-SPAM / GDPR compliance) ──────────────────────
+function appendUnsubscribeFooter(html, recipientEmail) {
+  // Skip if footer already present
+  if (html && html.includes('unsubscribe')) return html;
+  const fromName = process.env.SMTP_FROM_NAME || 'Unicircuit Engineering Services LLP';
+  const footer = `
+<div style="margin-top:32px;padding-top:16px;border-top:1px solid #e5e7eb;font-family:Arial,sans-serif;font-size:11px;color:#9ca3af;text-align:center;line-height:1.6;">
+  <p style="margin:0 0 4px;">You are receiving this email from <strong>${fromName}</strong>.</p>
+  <p style="margin:0;">To unsubscribe, reply with subject <strong>UNSUBSCRIBE</strong> or contact us at
+    <a href="mailto:${process.env.SMTP_FROM || process.env.SMTP_USER || ''}" style="color:#9ca3af;">${process.env.SMTP_FROM || process.env.SMTP_USER || ''}</a>.
+  </p>
+</div>`;
+  // Inject before </body> if present, otherwise append
+  if (/<\/body>/i.test(html)) {
+    return html.replace(/<\/body>/i, footer + '</body>');
+  }
+  return html + footer;
+}
+
 async function sendOne(to, subject, html, text, attachments) {
   const t = createTransporter();
   const info = await t.sendMail({
@@ -82,7 +101,10 @@ async function sendBroadcast(recipients, subject, html, onProgress, delayMs = 20
     }
 
     // Personalise HTML — replace {{name}} placeholder
-    const personalHtml = html.replace(/\{\{name\}\}/gi, name || email.split('@')[0]);
+    const personalHtml = appendUnsubscribeFooter(
+      html.replace(/\{\{name\}\}/gi, name || email.split('@')[0]),
+      email
+    );
 
     const sentAt = new Date().toISOString();
     try {
