@@ -5,6 +5,7 @@
  * GET  /auth/callback               — OAuth2 callback (no JWT needed)
  * GET  /api/outlook/inbox           — list inbox messages
  * GET  /api/outlook/message/:id     — get full message body (+ uniqueBody, attachments)
+ * GET  /api/outlook/message/:id/attachments — list attachment metadata
  * GET  /api/outlook/thread          — messages in a conversation (?conversationId=)
  * GET  /api/outlook/message/:mid/attachment/:aid/raw — inline attachment bytes (auth)
  * POST /api/outlook/send            — send email
@@ -1964,8 +1965,8 @@ router.get('/thread', async (req, res) => {
 router.get('/message/:messageId/attachment/:attachmentId/raw', async (req, res) => {
   try {
     const token = await graph.getAccessToken(MS_EMAIL);
-    const mid = encodeURIComponent(req.params.messageId);
-    const aid = encodeURIComponent(req.params.attachmentId);
+    const mid = encodeURIComponent(parseOutlookMessageId(req.params.messageId));
+    const aid = encodeURIComponent(parseOutlookMessageId(req.params.attachmentId));
     const url = `https://graph.microsoft.com/v1.0/me/messages/${mid}/attachments/${aid}/$value`;
     const r = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
     if (!r.ok) {
@@ -1983,42 +1984,218 @@ router.get('/message/:messageId/attachment/:attachmentId/raw', async (req, res) 
   }
 });
 
+const OUTLOOK_MESSAGE_SELECT = [
+  'id', 'subject', 'from', 'toRecipients', 'ccRecipients', 'receivedDateTime', 'sentDateTime', 'createdDateTime',
+  'body', 'uniqueBody', 'isRead', 'hasAttachments', 'importance', 'conversationId', 'webLink', 'isDraft',
+].join(',');
+
+function parseOutlookMessageId(raw) {
+  if (raw == null || raw === '') return '';
+  let id = String(raw).trim();
+  try {
+    let decoded = decodeURIComponent(id);
+    while (decoded !== id) {
+      id = decoded;
+      decoded = decodeURIComponent(id);
+    }
+  } catch (_) { /* keep id */ }
+  return id;
+}
+
+function isGraphMessageNotFound(err) {
+  if (!err) return false;
+  if (err.status === 404) return true;
+  const msg = String(err.message || '');
+  const code = String(err.code || '');
+  return /not found/i.test(msg)
+    || /ErrorItemNotFound/i.test(code)
+    || /ErrorInvalidIdMalformed/i.test(code);
+}
+
+/** List attachments for a message (metadata only; bytes via /attachment/:aid/raw). */
+async function fetchMessageAttachments(messageId) {
+  const id = parseOutlookMessageId(messageId);
+  const mid = encodeURIComponent(id);
+  const paths = [
+    `/me/messages/${mid}/attachments?$top=100`,
+    `/me/mailFolders/drafts/messages/${mid}/attachments?$top=100`,
+    `/me/mailFolders/sentitems/messages/${mid}/attachments?$top=100`,
+    `/me/mailFolders/inbox/messages/${mid}/attachments?$top=100`,
+  ];
+  let lastErr;
+  for (const path of paths) {
+    try {
+      const attData = await graph.graphGet(path, MS_EMAIL);
+      return attData.value || [];
+    } catch (err) {
+      lastErr = err;
+      if (!isGraphMessageNotFound(err)) throw err;
+    }
+  }
+  if (lastErr) throw lastErr;
+  return [];
+}
+
+async function fetchOutlookMessageFromGraph(messageId) {
+  const id = parseOutlookMessageId(messageId);
+  if (!id) throw new Error('Message id is required');
+  const mid = encodeURIComponent(id);
+  const q = `$select=${encodeURIComponent(OUTLOOK_MESSAGE_SELECT)}`;
+  const paths = [
+    `/me/messages/${mid}?${q}`,
+    `/me/mailFolders/drafts/messages/${mid}?${q}`,
+    `/me/mailFolders/sentitems/messages/${mid}?${q}`,
+    `/me/mailFolders/inbox/messages/${mid}?${q}`,
+    `/me/mailFolders/deleteditems/messages/${mid}?${q}`,
+  ];
+  let lastErr;
+  for (const path of paths) {
+    try {
+      return await graph.graphGet(path, MS_EMAIL);
+    } catch (err) {
+      lastErr = err;
+      if (!isGraphMessageNotFound(err)) throw err;
+    }
+  }
+  throw lastErr || new Error('Message not found');
+}
+
+async function fetchCachedOutlookMessageRow(messageId) {
+  const id = parseOutlookMessageId(messageId);
+  if (!id) return null;
+  const result = await pool.query(`
+    SELECT id, conversation_id, subject, from_address, from_name,
+           to_recipients, cc_recipients, received_datetime, sent_datetime,
+           is_read, body_preview, has_attachments, importance, folder
+    FROM outlook_emails_cache
+    WHERE id = $1
+    LIMIT 1
+  `, [id]);
+  return result.rows[0] || null;
+}
+
+function cachedRowToMessagePayload(row, warning) {
+  const preview = row.body_preview || '';
+  return {
+    id: row.id,
+    conversationId: row.conversation_id,
+    subject: row.subject || '',
+    from: { emailAddress: { address: row.from_address || '', name: row.from_name || '' } },
+    toRecipients: row.to_recipients || [],
+    ccRecipients: row.cc_recipients || [],
+    receivedDateTime: row.received_datetime,
+    sentDateTime: row.sent_datetime,
+    isRead: row.is_read,
+    hasAttachments: row.has_attachments,
+    importance: row.importance || 'normal',
+    isDraft: row.folder === 'drafts',
+    bodyPreview: preview,
+    body: { contentType: 'text', content: preview },
+    uniqueBody: { contentType: 'text', content: preview },
+    partial: true,
+    loadWarning: warning || null,
+  };
+}
+
 // ── GET /api/outlook/message/:id ──────────────────────────────────────────
 router.get('/message/:id', async (req, res) => {
   try {
-    const sel = [
-      'id', 'subject', 'from', 'toRecipients', 'ccRecipients', 'receivedDateTime',
-      'body', 'uniqueBody', 'isRead', 'hasAttachments', 'importance', 'conversationId', 'webLink',
-    ].join(',');
-    // Do not use attachments($select=…): OData treats the collection as base
-    // microsoft.graph.attachment, which has no contentId/contentBytes (those live on fileAttachment).
-    const q = `$select=${encodeURIComponent(sel)}&$expand=${encodeURIComponent('attachments')}`;
-    const data = await graph.graphGet(
-      `/me/messages/${encodeURIComponent(req.params.id)}?${q}`,
-      MS_EMAIL
-    );
-    // Auto-mark as read
-    graph.graphPatch(`/me/messages/${req.params.id}`, { isRead: true }, MS_EMAIL).catch(() => {});
+    const messageId = parseOutlookMessageId(req.params.id);
+    if (!messageId) return res.status(400).json({ error: 'Message id is required' });
+
+    let data;
+    let graphErr = null;
+    try {
+      data = await fetchOutlookMessageFromGraph(messageId);
+    } catch (err) {
+      graphErr = err;
+      const row = await fetchCachedOutlookMessageRow(messageId);
+      if (!row) throw err;
+      console.warn('[Outlook] Graph message load failed, using cache:', err.message);
+      data = cachedRowToMessagePayload(row, err.message);
+    }
+
+    if (data.hasAttachments && !data.partial) {
+      try {
+        data.attachments = await fetchMessageAttachments(messageId);
+      } catch (attErr) {
+        console.warn('[Outlook] Attachment list failed:', attErr.message);
+        data.attachments = [];
+      }
+    }
+
+    if (!data.partial && !data.isDraft) {
+      const mid = encodeURIComponent(messageId);
+      graph.graphPatch(`/me/messages/${mid}`, { isRead: true }, MS_EMAIL).catch(() => {});
+    }
+
     return res.json(data);
+  } catch (err) {
+    if (err.message === 'NOT_AUTHENTICATED') return res.status(401).json({ error: 'NOT_AUTHENTICATED' });
+    const status = isGraphMessageNotFound(err) ? 404 : (err.status || 500);
+    return res.status(status).json({ error: err.message });
+  }
+});
+
+// ── GET /api/outlook/message/:id/attachments ─────────────────────────────
+router.get('/message/:id/attachments', async (req, res) => {
+  try {
+    const attachments = await fetchMessageAttachments(req.params.id);
+    return res.json({ attachments });
   } catch (err) {
     if (err.message === 'NOT_AUTHENTICATED') return res.status(401).json({ error: 'NOT_AUTHENTICATED' });
     return res.status(500).json({ error: err.message });
   }
 });
 
+async function refreshSentItemsCache(top = 15) {
+  const data = await graph.graphGet(
+    `/me/mailFolders/sentitems/messages?$top=${top}&$skip=0`
+    + `&$select=id,conversationId,subject,from,toRecipients,ccRecipients,sentDateTime,receivedDateTime,createdDateTime,bodyPreview,hasAttachments,isRead`
+    + `&$orderby=sentDateTime desc`,
+    MS_EMAIL
+  );
+  const messages = data.value || [];
+  if (messages.length) {
+    await storeMessagesInDB(messages, 'sent');
+  }
+  return messages;
+}
+
 // ── GET /api/outlook/sent ─────────────────────────────────────────────────
 router.get('/sent', async (req, res) => {
   const top  = parseInt(req.query.top  || '25');
   const skip = parseInt(req.query.skip || '0');
+  const search = String(req.query.search || req.query.filter || '').trim();
   try {
-    const data = await graph.graphGet(
-      `/me/mailFolders/sentitems/messages?$top=${top}&$skip=${skip}`
-      + `&$select=id,subject,toRecipients,sentDateTime,bodyPreview,hasAttachments`
-      + `&$orderby=sentDateTime desc`,
-      MS_EMAIL
-    );
+    const sel = 'id,conversationId,subject,from,toRecipients,ccRecipients,sentDateTime,receivedDateTime,createdDateTime,bodyPreview,hasAttachments,isRead';
+    let path = `/me/mailFolders/sentitems/messages?$top=${top}&$skip=${skip}`
+      + `&$select=${sel}`
+      + `&$orderby=sentDateTime desc`;
+    let data;
+    if (search) {
+      const escaped = search.replace(/'/g, "''");
+      const filteredPath = path + `&$filter=contains(subject,'${escaped}') or contains(bodyPreview,'${escaped}')`;
+      try {
+        data = await graph.graphGet(filteredPath, MS_EMAIL);
+      } catch (filterErr) {
+        console.warn('[Outlook] Sent search filter failed, loading page without filter:', filterErr.message);
+        data = await graph.graphGet(path, MS_EMAIL);
+      }
+    } else {
+      data = await graph.graphGet(path, MS_EMAIL);
+    }
 
-    const messages = data.value || [];
+    let messages = data.value || [];
+    if (search) {
+      const q = search.toLowerCase();
+      messages = messages.filter(m => {
+        const subj = String(m.subject || '').toLowerCase();
+        const prev = String(m.bodyPreview || '').toLowerCase();
+        const toStr = (m.toRecipients || []).map(r => String(r?.emailAddress?.address || '').toLowerCase()).join(' ');
+        return subj.includes(q) || prev.includes(q) || toStr.includes(q);
+      });
+    }
 
     // Store messages in database for fallback
     if (messages.length > 0) {
@@ -2045,30 +2222,52 @@ router.get('/sent/fallback', async (req, res) => {
   console.log('[Outlook] GET /sent/fallback — loading from DB');
 
   try {
+    const search = String(req.query.search || req.query.filter || '').trim().toLowerCase();
     const result = await pool.query(`
       SELECT
         id,
         conversation_id AS "conversationId",
         subject,
+        from_address,
+        from_name,
         to_recipients,
+        cc_recipients,
         sent_datetime,
+        received_datetime,
         body_preview,
-        has_attachments
+        has_attachments,
+        is_read
       FROM outlook_emails_cache
       WHERE folder = 'sent'
       ORDER BY sent_datetime DESC NULLS LAST
       LIMIT $1 OFFSET $2
     `, [top, skip]);
 
-    const messages = result.rows.map(row => ({
+    let messages = result.rows.map(row => ({
       id: row.id,
       conversationId: row.conversationId,
       subject: row.subject,
+      from: row.from_address ? { emailAddress: { address: row.from_address, name: row.from_name || row.from_address } } : undefined,
       toRecipients: row.to_recipients || [],
+      ccRecipients: row.cc_recipients || [],
       sentDateTime: row.sent_datetime,
+      receivedDateTime: row.received_datetime,
       bodyPreview: row.body_preview,
-      hasAttachments: row.has_attachments
+      hasAttachments: row.has_attachments,
+      isRead: row.is_read
     }));
+
+    if (search) {
+      messages = messages.filter(m => {
+        const subj = String(m.subject || '').toLowerCase();
+        const prev = String(m.bodyPreview || '').toLowerCase();
+        const toStr = (m.toRecipients || []).map(r => {
+          const a = r?.emailAddress?.address || r?.address || (typeof r === 'string' ? r : '');
+          return String(a).toLowerCase();
+        }).join(' ');
+        return subj.includes(search) || prev.includes(search) || toStr.includes(search);
+      });
+    }
 
     console.log('[Outlook] Fallback: Loaded', messages.length, 'sent messages from DB');
 
@@ -2478,6 +2677,12 @@ router.post('/send', async (req, res) => {
     } catch(_) {}
 
     clearStorageScanCache();
+    // Pull latest sent items into local cache so UniComm list updates immediately
+    try {
+      await refreshSentItemsCache(20);
+    } catch (cacheErr) {
+      console.warn('[Outlook] Post-send sent cache refresh failed:', cacheErr.message);
+    }
     return res.json({ success: true, message: 'Email sent successfully.' });
   } catch (err) {
     if (err.message === 'NOT_AUTHENTICATED') return res.status(401).json({ error: 'NOT_AUTHENTICATED' });
@@ -2508,6 +2713,7 @@ router.post('/reply/:id', async (req, res) => {
       await addAttachmentsToMessage(draft.id, graphAttachments);
       await graph.graphPost(`/me/messages/${encodeURIComponent(draft.id)}/send`, {}, MS_EMAIL);
       clearStorageScanCache();
+      try { await refreshSentItemsCache(20); } catch (_) { }
       return res.json({ success: true, attachments: graphAttachments.length });
     }
 
@@ -2515,6 +2721,7 @@ router.post('/reply/:id', async (req, res) => {
       message: { body: { contentType: 'HTML', content: body } },
     }, MS_EMAIL);
     clearStorageScanCache();
+    try { await refreshSentItemsCache(20); } catch (_) { }
     return res.json({ success: true });
   } catch (err) {
     if (err.message === 'NOT_AUTHENTICATED') return res.status(401).json({ error: 'NOT_AUTHENTICATED' });

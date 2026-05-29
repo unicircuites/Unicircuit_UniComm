@@ -1,0 +1,165 @@
+Checklist generated from current Git changes on 29 May.
+Source: git status, git diff --stat, git diff --name-status, git ls-files --others --exclude-standard.
+
+Tracked modified files
+
+- [ ] Review .gitignore change: dependency section renamed to "Dependencies / interpreter environments".
+- [ ] Review .gitignore change: added .npm-cache/ and npm-cache/.
+- [ ] Review .gitignore change: added Python/interpreter env ignores: .venv/, venv/, env/, ENV/, interpreter-env/, backend/interpreter-env/.
+- [ ] Review .gitignore change: added Python cache/type/tool ignores: __pycache__/, *.py[cod], *$py.class, .pytest_cache/, .mypy_cache/, .ruff_cache/.
+- [ ] Review .gitignore change: added .aider* ignore.
+- [ ] Note .gitignore warning: LF will be replaced by CRLF when Git touches it.
+- [ ] Review backend/routes/calls.js import of backend/services/recordingLinker.
+- [ ] Review backend/routes/calls.js new POST /api/calls/link-recordings endpoint.
+- [ ] Review backend/routes/calls.js new GET /api/calls/recordings/play endpoint.
+- [ ] Review backend/routes/calls.js playback path resolution through recordingLinker.resolveRecordingFullPath.
+- [ ] Review backend/routes/calls.js playback access check against PBX_RECORDINGS_DIR and LOCAL_STORED_DIR.
+- [ ] Review backend/routes/dashboard.js safeQuery helper and skipped-query behavior.
+- [ ] Review backend/routes/dashboard.js countSyncedEmails fallback from outlook_emails_cache to contacts.emails_count.
+- [ ] Review backend/routes/dashboard.js countWaChats totals and unread aggregation from wa_chats.
+- [ ] Review backend/routes/dashboard.js changed /api/dashboard/stats payload: calls_7d, calls_today, emails_synced, wa_chats, contacts, calls, campaigns, pipeline.
+- [ ] Review backend/routes/dashboard.js contacts "new_today" now backed by 7-day created_at count.
+- [ ] Review backend/routes/dashboard.js pipeline total_value/open/won calculations and numeric value regex.
+- [ ] Review backend/routes/dashboard.js new GET /api/dashboard/overview endpoint.
+- [ ] Review backend/routes/dashboard.js overview live_calls query and contact join by normalized phone.
+- [ ] Review backend/routes/dashboard.js overview top_contacts query for recent call interactions.
+- [ ] Review backend/routes/dashboard.js overview activity_mix query from call_logs, wa_messages, outlook_emails_cache.
+- [ ] Review backend/routes/dashboard.js overview pipeline_value query.
+- [ ] Review backend/routes/dashboard.js overview latest_wa_thread query and response shape.
+- [ ] Review backend/routes/outlook.js route comment update for GET /api/outlook/message/:id/attachments.
+- [ ] Review backend/routes/outlook.js raw attachment route now parses/decodes message and attachment IDs before encoding.
+- [ ] Review backend/routes/outlook.js OUTLOOK_MESSAGE_SELECT field list.
+- [ ] Review backend/routes/outlook.js parseOutlookMessageId repeated decode behavior.
+- [ ] Review backend/routes/outlook.js isGraphMessageNotFound helper.
+- [ ] Review backend/routes/outlook.js fetchMessageAttachments folder fallback paths.
+- [ ] Review backend/routes/outlook.js fetchOutlookMessageFromGraph folder fallback paths.
+- [ ] Review backend/routes/outlook.js fetchCachedOutlookMessageRow DB fallback.
+- [ ] Review backend/routes/outlook.js cachedRowToMessagePayload partial message payload.
+- [ ] Review backend/routes/outlook.js /message/:id Graph fallback to DB cache.
+- [ ] Review backend/routes/outlook.js /message/:id attachment loading and draft/read handling.
+- [ ] Review backend/routes/outlook.js new /message/:id/attachments endpoint.
+- [ ] Review backend/routes/outlook.js refreshSentItemsCache helper.
+- [ ] Review backend/routes/outlook.js /sent search/filter support and client-side filtering.
+- [ ] Review backend/routes/outlook.js /sent selected fields now include conversation/from/cc/received/created/isRead.
+- [ ] Review backend/routes/outlook.js /sent/fallback added search/filter support.
+- [ ] Review backend/routes/outlook.js /sent/fallback now returns from, cc, receivedDateTime, and isRead.
+- [ ] Review backend/routes/outlook.js sent cache refresh after send.
+- [ ] Review backend/routes/outlook.js sent cache refresh after reply with attachments.
+- [ ] Review backend/routes/outlook.js sent cache refresh after plain reply.
+- [ ] Review backend/server.js status: marked modified in git status, but no textual diff was reported by git diff.
+- [ ] Review dashboard.html BOM removal at file start.
+- [ ] Review dashboard.html email/task layout CSS: .mail-task-list flex-shrink.
+- [ ] Review dashboard.html new email list row CSS classes.
+- [ ] Review dashboard.html email detail/thread flex layout CSS.
+- [ ] Review dashboard.html attachment bar/chip/preview CSS.
+- [ ] Review dashboard.html dashboard KPI refresh button in top bar.
+- [ ] Review dashboard.html dashboard KPI cards changed from static values to data-kpi driven live values.
+- [ ] Review dashboard.html "WhatsApp Conv." KPI renamed to "WA Chats".
+- [ ] Review dashboard.html "AI Lead Score" KPI replaced with "Missed Calls".
+- [ ] Review dashboard.html live calls table changed from hardcoded demo rows to #dash-live-calls-body dynamic content.
+- [ ] Review dashboard.html latest WhatsApp thread changed from hardcoded demo bubbles to #dash-wa-thread dynamic content.
+- [ ] Review dashboard.html top contacts changed from hardcoded demo contacts to #dash-top-contacts dynamic content.
+- [ ] Review dashboard.html revenue attribution card changed to "Channel Activity (7d)" dynamic activity mix.
+- [ ] Review dashboard.html AI insights card dynamic fields and PicoClaw/live analytics text.
+- [ ] Review dashboard.html added getAuthHeaders implementation near dashboard code.
+- [ ] Review dashboard.html added dashboard helpers: formatKpiNumber, formatCompactCurrencyIN, dashCallTypeBadge, contactInitials, summarizeAiSegmentFromCalls.
+- [ ] Review dashboard.html added renderDashboardOverview.
+- [ ] Review dashboard.html added refreshDashboardOverview with optional PicoClaw insight path.
+- [ ] Review dashboard.html added updateKPIs.
+- [ ] Review dashboard.html added refreshDashboardKpis.
+- [ ] Review dashboard.html added startDashboardKpiAutoRefresh.
+- [ ] Review dashboard.html email folder/list rendering changes including sent-folder search/filter and conversation grouping behavior.
+- [ ] Review dashboard.html added outlookMessageApiUrl helper.
+- [ ] Review dashboard.html added email iframe/link sandbox helpers: OUTLOOK_EMAIL_BODY_SANDBOX, outlookEnsureEmailLinkListener, outlookPrepareEmailHtmlForView, outlookWrapEmailBodyDocument.
+- [ ] Review dashboard.html added Outlook attachment helpers: outlookFetchMessageAttachments, outlookAttachmentRawUrl, outlookIsGraphFileAttachment, outlookListableAttachments, outlookAttachmentIcon, outlookAttachmentCanPreview.
+- [ ] Review dashboard.html added attachment download/preview/render helpers: outlookDownloadAttachment, renderOutlookAttachmentsPanel, outlookToggleAttachmentPreview, renderOutlookThreadAttachments.
+- [ ] Review dashboard.html added message body/date/reply helpers: outlookPickFullBody, outlookMessageDateTime, outlookFormatMessageDate, focusComposeBodyTop, setComposeBodyWithQuotedAtBottom.
+- [ ] Review dashboard.html added buildReplyQuoteHtml and buildForwardQuoteHtml.
+- [ ] Review dashboard.html added outlookFetchFullBodyHtml.
+- [ ] Review dashboard.html added updateThreadGrowClass.
+- [ ] Review dashboard.html thread rendering changes for full body, attachments, grow class, and iframe wrapping.
+- [ ] Review dashboard.html openReplyFromThread changes for full body reply/forward quoting.
+- [ ] Review dashboard.html single message detail changes for attachment panel, full body loading, sent-folder behavior, and cache fallback banner.
+- [ ] Review dashboard.html openReply changes: async loading, reply/reply-all recipient handling, unknown sender banner, full body quote at bottom, focus at top.
+- [ ] Review dashboard.html send flow change: detects forward, refreshes sent folder for new sends/forwards, refreshes inbox multiple times, updates folder counts.
+- [ ] Review dashboard.html digital signature image insertion now supports optional click URL.
+- [ ] Review dashboard.html media modal reset/clear now includes media-img-link.
+- [ ] Review dashboard.html added mediaNormalizeClickUrl.
+- [ ] Review dashboard.html media insertion now wraps images with optional click-through links.
+- [ ] Review dashboard.html media panel UI added "Click URL" field and updated explanatory text.
+- [ ] Review dashboard.html added pbxPlayRecording audio modal/player.
+- [ ] Review dashboard.html PBX call log recording cell now shows Play/Download for playable audio and disabled N/A otherwise.
+- [ ] Review dashboard.html PBX sync flow now calls POST /calls/link-recordings after sync.
+- [ ] Review dashboard.html PBX sync notifications/errors now mention recording linking.
+
+Tracked deleted files
+
+- [ ] Confirm deletion is intentional: backend/pbx_deep_report.txt (1674 deleted lines).
+- [ ] Confirm deletion is intentional: dashboard.html.bak (3026 deleted lines).
+- [ ] Confirm deletion is intentional: wa_section.txt (24 deleted lines).
+
+Untracked new files
+
+- [ ] Decide whether to keep/commit .kiro/CURSOR/HOW_TO_USE.md.
+- [ ] Review .kiro/CURSOR/HOW_TO_USE.md content for policy/security concerns before committing.
+- [ ] Decide whether to keep/commit backend/services/recordingLinker.js.
+- [ ] Review backend/services/recordingLinker.js recursive audio scan and skipped backup folders.
+- [ ] Review backend/services/recordingLinker.js normalizePhone behavior using last 10 digits.
+- [ ] Review backend/services/recordingLinker.js parseDurationToMs.
+- [ ] Review backend/services/recordingLinker.js parseRecordingFilename for Matrix CT/LM formats and DDMMYYYY_HHMMSS parsing.
+- [ ] Review backend/services/recordingLinker.js index and match logic by phone, extension, and timestamp tolerance.
+- [ ] Review backend/services/recordingLinker.js loadStoredRecordingEntries from pbx_recordings.
+- [ ] Review backend/services/recordingLinker.js loadFilesystemRecordingEntries from PBX_RECORDINGS_DIR.
+- [ ] Review backend/services/recordingLinker.js linkRecordingsToCallLogs transaction and recording_file updates.
+- [ ] Review backend/services/recordingLinker.js resolveRecordingFullPath path-safety behavior.
+- [ ] Decide whether backend/test_linker.js is a dev diagnostic script or should be excluded.
+- [ ] Review backend/test_linker.js live DB/linker diagnostic behavior before running or committing.
+- [ ] Decide whether root test_linker.js is needed in addition to backend/test_linker.js.
+- [ ] Review root test_linker.js hardcoded fallback REC_DIR: C:\MatrixVMS\Voicemail_Backup.
+- [ ] Decide whether to keep/commit task_progress.md.
+- [ ] Review task_progress.md old task checklist and mojibake characters.
+- [ ] Decide whether to keep/commit image.png.
+- [ ] Decide whether to keep/commit backend/pbx_CTI_Parameters.png.
+- [ ] Decide whether to keep/commit backend/pbx_CTI_Status.png.
+- [ ] Decide whether to keep/commit backend/pbx_Extension_Voice_Mail_Settings.png.
+- [ ] Decide whether to keep/commit backend/pbx_General_Mailbox_Settings.png.
+- [ ] Decide whether to keep/commit backend/pbx_Mailbox_Status.png.
+- [ ] Decide whether to keep/commit backend/pbx_SMDR_Online_Settings.png.
+- [ ] Decide whether to keep/commit backend/pbx_SMDR_Posting_IP_Port_for_CRM_.png.
+- [ ] Decide whether to keep/commit backend/pbx_SMDR_Reports.png.
+- [ ] Decide whether to keep/commit backend/pbx_SMDR_Storage_Filters.png.
+- [ ] Decide whether to keep/commit backend/pbx_System_Details_disk_memory_.png.
+- [ ] Decide whether to keep/commit backend/pbx_System_Usage_Report.png.
+- [ ] Decide whether to keep/commit backend/pbx_USB_Storage_Status.png.
+- [ ] Decide whether to keep/commit backend/pbx_VMS_Debug_Info.png.
+- [ ] Decide whether to keep/commit backend/pbx_VMS_General_Parameters.png.
+- [ ] Decide whether to keep/commit backend/pbx__Call_Taping_Recording_Settings.png.
+- [ ] Decide whether to keep/commit backend/pbx__Network_Drive_where_recordings_go_.png.
+- [ ] Decide whether to keep/commit backend/pbx_screenshot.png.
+- [ ] Decide whether to keep/commit backend/pbx_smdr__SmdrOnline.html.png.
+
+Integration checks
+
+- [ ] Verify dashboard.html can call GET /api/dashboard/stats with auth headers.
+- [ ] Verify dashboard.html can call GET /api/dashboard/overview with auth headers.
+- [ ] Verify /api/dashboard/stats tolerates missing optional tables without breaking dashboard load.
+- [ ] Verify /api/dashboard/overview tolerates missing optional tables without breaking dashboard load.
+- [ ] Verify dashboard KPI refresh button works and spinner state resets.
+- [ ] Verify dashboard KPI auto-refresh does not create duplicate timers.
+- [ ] Verify dashboard live calls, latest WA thread, top contacts, channel activity, and AI insight render with real data and empty states.
+- [ ] Verify Outlook message open works for inbox, sent, drafts, deleted, and cached fallback messages.
+- [ ] Verify Outlook attachments list, preview, and download work for normal file attachments.
+- [ ] Verify inline/content-id attachments are not duplicated as visible chips unless intended.
+- [ ] Verify Outlook raw attachment route still streams bytes after ID parse/decode changes.
+- [ ] Verify reply, reply all, forward, and sent-folder refresh behavior after sending.
+- [ ] Verify media image Click URL is normalized correctly for https, http, mailto, tel, protocol-relative, www, and bare domains.
+- [ ] Verify PBX POST /api/calls/link-recordings links expected recordings and does not relink already used files.
+- [ ] Verify PBX GET /api/calls/recordings/play streams local stored recordings from backend/pbx_recordings.
+- [ ] Verify PBX GET /api/calls/recordings/play streams network recordings from PBX_RECORDINGS_DIR.
+- [ ] Verify PBX playback rejects path traversal and unrelated absolute paths.
+- [ ] Verify PBX call log Play and Download buttons work for wav, mp3, ogg, and m4a files.
+- [ ] Verify manual PBX sync still succeeds when recording linker finds zero playable recordings.
+- [ ] Verify backend/test_linker.js and root test_linker.js are not accidentally shipped if they are only diagnostics.
+- [ ] Run backend/server startup check after deciding what to do with untracked scripts/assets.
+- [ ] Run the relevant frontend smoke test for dashboard, Outlook, media modal, and PBX call logs.
+- [ ] Re-run git status and confirm every file in the final diff is intentionally kept, ignored, or removed.

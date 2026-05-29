@@ -1,0 +1,8 @@
+- [ ] Understand dashboard stats structure
+- [ ] Read backend server.js routes and data
+- [ ] Understand backend database/model structure
+- [ ] Create plan for wiring real data to dashboard
+- [ ] Implement backend /api/dashboard/stats
+- [ ] Add frontend script to fetch and update KPI values
+- [ ] Add auto‑refresh and manual reload button
+- [ ] Test and verify

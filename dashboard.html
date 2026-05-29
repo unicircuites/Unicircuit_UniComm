@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 
 <head>
@@ -855,6 +855,7 @@
       gap: 8px;
       max-height: 190px;
       overflow-y: auto;
+      flex-shrink: 0;
     }
 
     .mail-task-card {
@@ -885,6 +886,85 @@
 
     .email-row-important {
       box-shadow: inset 3px 0 0 var(--red2);
+    }
+
+    .email-list-row {
+      padding: 11px 14px;
+      border-bottom: 1px solid var(--border);
+      cursor: pointer;
+      transition: background 0.1s;
+      display: flex;
+      gap: 10px;
+      align-items: flex-start;
+    }
+
+    .email-list-row:hover {
+      background: rgba(255, 255, 255, 0.03);
+    }
+
+    html.light .email-list-row:hover {
+      background: rgba(0, 0, 0, 0.03);
+    }
+
+    .email-list-row-main {
+      flex: 1;
+      min-width: 0;
+      overflow: hidden;
+    }
+
+    .email-list-row-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 8px;
+      min-width: 0;
+    }
+
+    .email-list-party {
+      font-size: 12.5px;
+      color: var(--text);
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      min-width: 0;
+      flex: 1;
+    }
+
+    .email-list-party.is-read {
+      font-weight: 500;
+      color: var(--muted2);
+    }
+
+    .email-list-party.is-unread {
+      font-weight: 700;
+      color: var(--text);
+    }
+
+    .email-list-time {
+      font-size: 10.5px;
+      color: var(--muted);
+      flex-shrink: 0;
+      min-width: 86px;
+      text-align: right;
+      white-space: nowrap;
+    }
+
+    .email-list-subject {
+      font-size: 12px;
+      color: var(--text);
+      margin-top: 2px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .email-list-preview {
+      font-size: 11px;
+      color: var(--muted);
+      margin-top: 2px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
     }
 
     /* ── KPI CARDS ── */
@@ -2706,24 +2786,135 @@
     }
 
     /* One scroll: outer pane does not scroll; iframe (or plain-text wrap) scrolls internally */
+    .card.email-detail-stack #email-single-view {
+      flex: 1;
+      min-height: 0;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    .card.email-detail-stack #email-thread-conversation {
+      flex: 1;
+      min-height: 0;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+
+    #email-thread-messages {
+      flex: 1;
+      min-height: 0;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .thread-msg-item.thread-msg-grow {
+      flex: 1;
+      min-height: 0;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .thread-msg-item.thread-msg-grow .thread-msg-body {
+      flex: 1;
+      min-height: 0;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .thread-msg-item.thread-msg-grow [id^="tbody-content-"] {
+      flex: 1;
+      min-height: 0;
+      display: flex;
+      flex-direction: column;
+      padding: 0 16px 12px 58px !important;
+    }
+
+    .card.email-detail-stack .email-body-iframe,
+    .card.email-detail-stack #email-body-frame {
+      width: 100%;
+      flex: 1;
+      min-height: 320px;
+      height: 100%;
+      border: 0;
+      background: #fff;
+      display: block;
+    }
+
     .card.email-detail-stack #email-detail-body {
       flex: 1;
       min-height: 0;
       overflow: hidden;
       display: flex;
       flex-direction: column;
-      padding: 16px;
+      padding: 0;
       font-size: 13px;
       line-height: 1.65;
       color: var(--text);
     }
 
-    .card.email-detail-stack #email-body-frame {
-      flex: 1;
-      min-height: 0;
+    .outlook-attachments-bar {
+      flex-shrink: 0;
+      padding: 10px 16px;
+      border-bottom: 1px solid var(--border);
+      background: rgba(0, 120, 212, 0.04);
+    }
+
+    .outlook-attachments-bar .outlook-att-title {
+      font-size: 10px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--muted);
+      margin-bottom: 8px;
+    }
+
+    .outlook-attachments-bar .outlook-att-list {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .outlook-att-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 10px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      background: var(--card);
+      font-size: 12px;
+      color: var(--text);
+      max-width: 100%;
+    }
+
+    .outlook-att-chip .outlook-att-name {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      max-width: 220px;
+    }
+
+    .outlook-att-chip button {
+      flex-shrink: 0;
+    }
+
+    .outlook-att-preview {
       width: 100%;
-      border: 0;
-      background: transparent;
+      margin-top: 6px;
+    }
+
+    .outlook-att-preview audio,
+    .outlook-att-preview video {
+      max-width: 100%;
+      border-radius: 6px;
+    }
+
+    .thread-msg-attachments {
+      padding: 8px 16px 8px 58px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.04);
     }
 
     .card.email-detail-stack .email-plain-scroll {
@@ -4130,6 +4321,10 @@
           <div class="pill-tag" id="topbar-clock"
             style="font-family:'JetBrains Mono',monospace;font-size:11.5px;min-width:220px;justify-content:center;">
           </div>
+          <button type="button" class="btn btn-ghost btn-sm" id="dashboard-kpi-refresh"
+            onclick="refreshDashboardKpis()" title="Refresh dashboard KPIs">
+            <i class="fas fa-sync-alt" id="dashboard-kpi-refresh-icon"></i>
+          </button>
           <!-- PostgreSQL -->
           <div class="pill-tag" id="svc-postgres" style="cursor:default;">
             <span class="svc-dot" id="dot-postgres"
@@ -4202,8 +4397,8 @@
                 <div class="kpi-icon" style="background:rgba(245,166,35,0.12);color:var(--gold);"><i
                     class="fas fa-phone-volume"></i></div>
               </div>
-              <div class="kpi-val">1,284</div>
-              <div class="kpi-change" style="color:var(--green2);"><i class="fas fa-arrow-up"></i> +12% this week</div>
+              <div class="kpi-val" data-kpi="calls_7d">—</div>
+              <div class="kpi-change" data-kpi-change="calls_7d" style="color:var(--green2);"><i class="fas fa-sync-alt"></i> Loading…</div>
               <div class="kpi-bar">
                 <div class="kpi-fill" style="width:72%;background:var(--gold);"></div>
               </div>
@@ -4214,20 +4409,20 @@
                 <div class="kpi-icon" style="background:rgba(59,130,246,0.12);color:var(--blue2);"><i
                     class="fas fa-envelope-open-text"></i></div>
               </div>
-              <div class="kpi-val">3,245</div>
-              <div class="kpi-change" style="color:var(--muted2);">Outlook Graph API</div>
+              <div class="kpi-val" data-kpi="emails_synced">—</div>
+              <div class="kpi-change" data-kpi-change="emails_synced" style="color:var(--muted2);"><i class="fas fa-sync-alt"></i> Loading…</div>
               <div class="kpi-bar">
                 <div class="kpi-fill" style="width:84%;background:var(--blue);"></div>
               </div>
             </div>
             <div class="kpi green fu fu2">
               <div class="kpi-top">
-                <div class="kpi-label">WhatsApp Conv.</div>
+                <div class="kpi-label">WA Chats</div>
                 <div class="kpi-icon" style="background:rgba(16,185,129,0.12);color:var(--green2);"><i
                     class="fab fa-whatsapp"></i></div>
               </div>
-              <div class="kpi-val">847</div>
-              <div class="kpi-change" style="color:var(--green2);"><i class="fas fa-arrow-up"></i> +23 today</div>
+              <div class="kpi-val" data-kpi="wa_chats">—</div>
+              <div class="kpi-change" data-kpi-change="wa_chats" style="color:var(--green2);"><i class="fas fa-sync-alt"></i> Loading…</div>
               <div class="kpi-bar">
                 <div class="kpi-fill" style="width:61%;background:var(--green);"></div>
               </div>
@@ -4238,20 +4433,20 @@
                 <div class="kpi-icon" style="background:rgba(6,182,212,0.12);color:var(--cyan);"><i
                     class="fas fa-address-book"></i></div>
               </div>
-              <div class="kpi-val">48</div>
-              <div class="kpi-change" style="color:var(--green2);"><i class="fas fa-plus"></i> 3 new this week</div>
+              <div class="kpi-val" data-kpi="contacts">—</div>
+              <div class="kpi-change" data-kpi-change="contacts" style="color:var(--green2);"><i class="fas fa-sync-alt"></i> Loading…</div>
               <div class="kpi-bar">
                 <div class="kpi-fill" style="width:55%;background:var(--cyan);"></div>
               </div>
             </div>
             <div class="kpi red fu fu4">
               <div class="kpi-top">
-                <div class="kpi-label">AI Lead Score</div>
+                <div class="kpi-label">Missed Calls</div>
                 <div class="kpi-icon" style="background:rgba(239,68,68,0.12);color:var(--red2);"><i
-                    class="fas fa-chart-simple"></i></div>
+                    class="fas fa-phone-slash"></i></div>
               </div>
-              <div class="kpi-val">74<span style="font-size:13px;font-weight:400;">/100</span></div>
-              <div class="kpi-change" style="color:var(--red2);"><i class="fas fa-exclamation-triangle"></i> Churn: 8%
+              <div class="kpi-val" data-kpi="missed_calls">—</div>
+              <div class="kpi-change" data-kpi-change="missed_calls" style="color:var(--red2);"><i class="fas fa-sync-alt"></i> Loading…
               </div>
               <div class="kpi-bar">
                 <div class="kpi-fill" style="width:74%;background:var(--red);"></div>
@@ -4279,46 +4474,9 @@
                       <th>AI</th>
                     </tr>
                   </thead>
-                  <tbody>
+                  <tbody id="dash-live-calls-body">
                     <tr>
-                      <td><b>Amit Sharma</b><br><span style="font-size:10.5px;color:var(--muted);">Ext. 201</span></td>
-                      <td>+91 98200 44512</td>
-                      <td>4m 12s</td>
-                      <td><span class="badge b-green">Out</span></td>
-                      <td><button class="btn btn-blue btn-xs" onclick="quickCallSummary(this)"><i
-                            class="fas fa-robot"></i> Summarise</button></td>
-                    </tr>
-                    <tr>
-                      <td><b>L&T ECC</b><br><span style="font-size:10.5px;color:var(--muted);">+91 22 6121 8800</span>
-                      </td>
-                      <td>Ext. 305 Sales</td>
-                      <td>18m 47s</td>
-                      <td><span class="badge b-blue">In</span></td>
-                      <td><span class="badge b-green"><i class="fas fa-check"></i> Quotation</span></td>
-                    </tr>
-                    <tr>
-                      <td><b>Priya Nair</b><br><span style="font-size:10.5px;color:var(--muted);">Ext. 108</span></td>
-                      <td>+91 80 4112 3390</td>
-                      <td>–</td>
-                      <td><span class="badge b-red">Missed</span></td>
-                      <td><button class="btn btn-blue btn-xs" onclick="quickCallSummary(this)"><i
-                            class="fas fa-robot"></i> Summarise</button></td>
-                    </tr>
-                    <tr>
-                      <td><b>BHEL Procurement</b></td>
-                      <td>Ext. 305 Sales</td>
-                      <td>9m 03s</td>
-                      <td><span class="badge b-blue">In</span></td>
-                      <td><button class="btn btn-blue btn-xs" onclick="quickCallSummary(this)"><i
-                            class="fas fa-robot"></i> Summarise</button></td>
-                    </tr>
-                    <tr>
-                      <td><b>Rajan – Purchase</b><br><span style="font-size:10.5px;color:var(--muted);">Ext. 202</span>
-                      </td>
-                      <td>Ext. 401 Accounts</td>
-                      <td>2m 55s</td>
-                      <td><span class="badge b-gold">Internal</span></td>
-                      <td><span style="color:var(--muted);font-size:11px;">–</span></td>
+                      <td colspan="5" style="text-align:center;color:var(--muted);padding:14px;">Loading live call stats…</td>
                     </tr>
                   </tbody>
                 </table>
@@ -4354,18 +4512,8 @@
                   <h3><i class="fab fa-whatsapp" style="color:#25D366;"></i> Latest WA Thread</h3>
                   <button class="btn btn-ghost btn-xs" onclick="nav('whatsapp',null)">View all →</button>
                 </div>
-                <div class="wa-list" style="max-height:150px;">
-                  <div style="display:flex;flex-direction:column;gap:6px;">
-                    <div class="wa-bubble wa-in">Hi, wanted to check status of PO #UC-2024-087. Dispatch update?<div
-                        class="wa-time">Suresh K. · 10:22 AM</div>
-                    </div>
-                    <div class="wa-bubble wa-out">PO dispatched via Blue Dart. AWB: 23456789. ETA: 6 Apr.<div
-                        class="wa-time">You · 10:35 AM ✓✓</div>
-                    </div>
-                    <div class="wa-bubble wa-in">Thanks! Can you share the invoice?<div class="wa-time">Suresh K. ·
-                        10:38 AM</div>
-                    </div>
-                  </div>
+                <div class="wa-list" style="max-height:150px;" id="dash-wa-thread">
+                  <div style="color:var(--muted);font-size:11px;">Loading latest WhatsApp thread…</div>
                 </div>
                 <div style="padding:10px 14px;border-top:1px solid var(--border);display:flex;gap:7px;">
                   <input class="inp" id="dash-wa-input" placeholder="Quick reply…"
@@ -4384,67 +4532,44 @@
               <div class="card-header">
                 <h3><i class="fas fa-trophy" style="color:var(--gold);"></i> Top Contacts Today</h3>
               </div>
-              <div class="card-body">
-                <div class="stat-row">
-                  <div style="display:flex;align-items:center;gap:8px;flex:1;">
-                    <div class="contact-avatar"
-                      style="width:28px;height:28px;background:rgba(59,130,246,0.15);color:var(--blue2);font-size:11px;">
-                      LT</div>
-                    <div class="stat-label">L&T ECC</div>
-                  </div><span class="badge b-green">Hot</span>
-                </div>
-                <div class="stat-row">
-                  <div style="display:flex;align-items:center;gap:8px;flex:1;">
-                    <div class="contact-avatar"
-                      style="width:28px;height:28px;background:rgba(245,166,35,0.15);color:var(--gold2);font-size:11px;">
-                      BH</div>
-                    <div class="stat-label">BHEL Procurement</div>
-                  </div><span class="badge b-gold">Warm</span>
-                </div>
-                <div class="stat-row">
-                  <div style="display:flex;align-items:center;gap:8px;flex:1;">
-                    <div class="contact-avatar"
-                      style="width:28px;height:28px;background:rgba(139,92,246,0.15);color:#c4b5fd;font-size:11px;">SE
-                    </div>
-                    <div class="stat-label">Schneider Elec.</div>
-                  </div><span class="badge b-blue">Active</span>
-                </div>
+              <div class="card-body" id="dash-top-contacts">
+                <div style="color:var(--muted);font-size:11px;">Loading contact rankings…</div>
               </div>
             </div>
             <div class="card fu fu2">
               <div class="card-header">
-                <h3><i class="fas fa-chart-line" style="color:var(--green2);"></i> Revenue Attribution</h3>
+                <h3><i class="fas fa-chart-line" style="color:var(--green2);"></i> Channel Activity (7d)</h3>
               </div>
               <div class="card-body">
-                <div style="font-size:26px;font-weight:800;color:var(--text);letter-spacing:-1px;">₹24.3L</div>
-                <div style="font-size:11.5px;color:var(--green2);margin-bottom:12px;"><i class="fas fa-arrow-up"></i>
-                  +18% vs last campaign</div>
+                <div style="font-size:26px;font-weight:800;color:var(--text);letter-spacing:-1px;" id="dash-revenue-total">0</div>
+                <div style="font-size:11.5px;color:var(--green2);margin-bottom:12px;" id="dash-revenue-sub"><i class="fas fa-database"></i>
+                  Calls · WhatsApp · Email volume</div>
                 <div class="stat-row">
                   <div class="stat-label">Email</div>
                   <div style="flex:1;margin:0 10px;">
                     <div class="prog-bar">
-                      <div class="prog-fill" style="width:65%;background:var(--blue);"></div>
+                      <div class="prog-fill" id="dash-revenue-email-fill" style="width:0%;background:var(--blue);"></div>
                     </div>
                   </div>
-                  <div class="stat-val" style="font-size:11.5px;">₹15.8L</div>
+                  <div class="stat-val" style="font-size:11.5px;" id="dash-revenue-email-val">₹0</div>
                 </div>
                 <div class="stat-row">
                   <div class="stat-label">WhatsApp</div>
                   <div style="flex:1;margin:0 10px;">
                     <div class="prog-bar">
-                      <div class="prog-fill" style="width:25%;background:var(--green);"></div>
+                      <div class="prog-fill" id="dash-revenue-wa-fill" style="width:0%;background:var(--green);"></div>
                     </div>
                   </div>
-                  <div class="stat-val" style="font-size:11.5px;">₹6.1L</div>
+                  <div class="stat-val" style="font-size:11.5px;" id="dash-revenue-wa-val">₹0</div>
                 </div>
                 <div class="stat-row">
                   <div class="stat-label">Calls</div>
                   <div style="flex:1;margin:0 10px;">
                     <div class="prog-bar">
-                      <div class="prog-fill" style="width:10%;background:var(--gold);"></div>
+                      <div class="prog-fill" id="dash-revenue-calls-fill" style="width:0%;background:var(--gold);"></div>
                     </div>
                   </div>
-                  <div class="stat-val" style="font-size:11.5px;">₹2.4L</div>
+                  <div class="stat-val" style="font-size:11.5px;" id="dash-revenue-calls-val">₹0</div>
                 </div>
               </div>
             </div>
@@ -4455,20 +4580,21 @@
               <div class="card-body">
                 <div class="stat-row">
                   <div class="stat-label">Lead model</div>
-                  <div class="stat-val" style="font-size:12px;">XGBoost · AUC 0.87</div>
+                  <div class="stat-val" style="font-size:12px;" id="dash-ai-model">PicoClaw · Live CRM analytics</div>
                 </div>
                 <div class="stat-row">
                   <div class="stat-label">Top segment</div>
-                  <div class="stat-val" style="font-size:11.5px;color:var(--gold);">Frequent callers</div>
+                  <div class="stat-val" style="font-size:11.5px;color:var(--gold);" id="dash-ai-top-segment">—</div>
                 </div>
                 <div class="stat-row">
                   <div class="stat-label">Conversion</div>
-                  <div class="stat-val" style="color:var(--green2);">22%</div>
+                  <div class="stat-val" style="color:var(--green2);" id="dash-ai-conversion">0%</div>
                 </div>
                 <div class="stat-row">
-                  <div class="stat-label">Churn alerts</div>
-                  <div><span class="badge b-red">3 accounts</span></div>
+                  <div class="stat-label">Missed calls</div>
+                  <div><span class="badge b-red" id="dash-ai-churn">0</span></div>
                 </div>
+                <div style="font-size:11px;color:var(--muted);margin-top:6px;line-height:1.4;" id="dash-ai-insight-text">PicoClaw insight will appear here.</div>
                 <button class="btn btn-gold btn-sm" style="width:100%;justify-content:center;margin-top:8px;"
                   onclick="nav('ai',null)"><i class="fas fa-robot"></i> Ask AI Assistant</button>
               </div>
@@ -5189,7 +5315,7 @@
                       an email</span></h3>
                 </div>
                 <!-- Conversation thread view (Outlook-style) -->
-                <div id="email-thread-conversation" style="display:none;flex:1;overflow-y:auto;padding:0;">
+                <div id="email-thread-conversation" style="display:none;flex:1;min-height:0;overflow:hidden;flex-direction:column;padding:0;">
                   <div id="email-thread-messages"></div>
                 </div>
                 <!-- Single message view (fallback when no thread) -->
@@ -5223,10 +5349,10 @@
                           <button class="btn btn-ghost btn-xs" onclick="openReply(true)" title="Reply All"><i
                               class="fas fa-reply-all"></i></button>
                           <button class="btn btn-ghost btn-xs"
-                            onclick="forwardFromThread({id:activeMessageId,subject:activeMailMessage?.subject,fromAddr:activeMailMessage?.from?.emailAddress?.address,fromName:activeMailMessage?.from?.emailAddress?.name,toRecipients:(activeMailMessage?.toRecipients||[]).map(r=>r.emailAddress?.address).filter(Boolean),ccRecipients:(activeMailMessage?.ccRecipients||[]).map(r=>r.emailAddress?.address).filter(Boolean),receivedDateTime:activeMailMessage?.receivedDateTime,bodyPreview:activeMailMessage?.bodyPreview})"
+                            onclick="forwardFromThread({id:activeMessageId,subject:activeMailMessage?.subject,fromAddr:activeMailMessage?.from?.emailAddress?.address,fromName:activeMailMessage?.from?.emailAddress?.name,toRecipients:(activeMailMessage?.toRecipients||[]).map(r=>r.emailAddress?.address).filter(Boolean),ccRecipients:(activeMailMessage?.ccRecipients||[]).map(r=>r.emailAddress?.address).filter(Boolean),receivedDateTime:activeMailMessage?.receivedDateTime||activeMailMessage?.sentDateTime,bodyPreview:activeMailMessage?.bodyPreview})"
                             title="Forward"><i class="fas fa-share"></i></button>
                           <button class="btn btn-blue btn-xs"
-                            onclick="sendAgainFromThread({id:activeMessageId,subject:activeMailMessage?.subject,fromAddr:activeMailMessage?.from?.emailAddress?.address,fromName:activeMailMessage?.from?.emailAddress?.name,toRecipients:(activeMailMessage?.toRecipients||[]).map(r=>r.emailAddress?.address).filter(Boolean),ccRecipients:(activeMailMessage?.ccRecipients||[]).map(r=>r.emailAddress?.address).filter(Boolean),receivedDateTime:activeMailMessage?.receivedDateTime,bodyPreview:activeMailMessage?.bodyPreview})"
+                            onclick="sendAgainFromThread({id:activeMessageId,subject:activeMailMessage?.subject,fromAddr:activeMailMessage?.from?.emailAddress?.address,fromName:activeMailMessage?.from?.emailAddress?.name,toRecipients:(activeMailMessage?.toRecipients||[]).map(r=>r.emailAddress?.address).filter(Boolean),ccRecipients:(activeMailMessage?.ccRecipients||[]).map(r=>r.emailAddress?.address).filter(Boolean),receivedDateTime:activeMailMessage?.receivedDateTime||activeMailMessage?.sentDateTime,bodyPreview:activeMailMessage?.bodyPreview})"
                             title="Send Again"><i class="fas fa-paper-plane"></i></button>
                           <button class="btn btn-gold btn-xs" onclick="openTaskModal()" title="Assign Task"><i
                               class="fas fa-user-check"></i></button>
@@ -5238,6 +5364,7 @@
                       </div>
                     </div>
                   </div>
+                  <div id="email-detail-attachments" class="outlook-attachments-bar" style="display:none;"></div>
                   <div id="email-detail-body" style="flex:1;overflow:hidden;">
                     <div style="text-align:center;padding:30px;color:var(--muted);"><i class="fas fa-envelope"
                         style="font-size:32px;opacity:0.12;display:block;margin-bottom:10px;"></i>Select an email to
@@ -6864,6 +6991,16 @@
     // ──────────────────────────────────────────────────────────────
     // UNICIRCUIT UNICOMM PRO – ADVANCED AI PLATFORM
     // ──────────────────────────────────────────────────────────────
+    // API_BASE is declared earlier in the page.
+
+    function getAuthHeaders() {
+      const token = localStorage.getItem('uc_token') || sessionStorage.getItem('uc_token');
+      return {
+        Authorization: 'Bearer ' + (token || ''),
+        'Content-Type': 'application/json',
+      };
+    }
+
     const SYSTEM = `You are UniComm AI, the intelligent communication platform assistant for Unicircuit Engineering Services LLP – a professional electrical engineering solutions company based in India. Unicircuit deals in: switchgear (MCBs, MCCBs, ACBs), VFDs (Variable Frequency Drives), PLCs, MCC panels, DB panels, cable trays, cable management systems, power quality analysers, and related industrial electrical products. Their key clients include L&T ECC, BHEL, Siemens, Schneider Electric, ABB India, and various electrical contractors and EPCs.
 
 Your responsibilities:
@@ -11193,6 +11330,8 @@ Keep it concise and professional.`;
 
       // ── LOAD DATA FROM API (with fallback to local data) ────────────────────
       loadDashboardData();
+      refreshDashboardKpis();
+      refreshDashboardOverview({ usePicoClaw: true });
       initSystemStatus();
       initWASocket();
 
@@ -11255,8 +11394,6 @@ Keep it concise and professional.`;
         if (cRes.ok) {
           const dbContacts = await cRes.json();
           contacts = dbContacts.map(c => hydrateContact(c));
-          const kpiEl = document.querySelector('.kpi.cyan .kpi-val');
-          if (kpiEl) kpiEl.textContent = contacts.length;
         }
 
         // Load pipeline from DB
@@ -11285,18 +11422,16 @@ Keep it concise and professional.`;
           renderCampaigns(await campRes.json());
         }
 
-        // Load dashboard stats
-        const statsRes = await fetch(`${API_BASE}/dashboard/stats`, { headers: getAuthHeaders() });
-        if (statsRes.ok) {
-          const stats = await statsRes.json();
-          updateKPIs(stats);
-        }
+        await refreshDashboardKpis();
+        await refreshDashboardOverview({ usePicoClaw: false });
+        startDashboardKpiAutoRefresh();
 
         // Show DB connected badge
         // showDbStatus(true);  // replaced by initSystemStatus() / PostgreSQL health indicator
       } catch (err) {
         console.warn('API not available, using local data:', err.message);
-        // showDbStatus(false);  // replaced by initSystemStatus() / PostgreSQL health indicator
+        await refreshDashboardKpis();
+        await refreshDashboardOverview({ usePicoClaw: false });
       }
     }
 
@@ -11369,19 +11504,278 @@ Keep it concise and professional.`;
       }
     }
 
-    // ── UPDATE KPI CARDS FROM DB STATS ──────────────────────────────────────────
-    function updateKPIs(stats) {
-      if (stats.contacts) {
-        const el = document.querySelector('.kpi.cyan .kpi-val');
-        if (el) el.textContent = stats.contacts.total;
-        const ch = document.querySelector('.kpi.cyan .kpi-change');
-        if (ch) ch.innerHTML = `<i class="fas fa-plus"></i> ${stats.contacts.new_today} new today`;
-      }
-      if (stats.pipeline) {
-        const el = document.querySelector('.kpi.red .kpi-val');
-        if (el) el.innerHTML = `${stats.pipeline.deals}<span style="font-size:13px;font-weight:400;"> deals</span>`;
+  let dashboardKpiTimer = null;
+
+  function formatKpiNumber(n) {
+    const num = Number(n);
+    if (!Number.isFinite(num)) return '0';
+    return num.toLocaleString('en-IN');
+  }
+
+  function formatCompactCurrencyIN(amount) {
+    const num = Number(amount);
+    if (!Number.isFinite(num) || num <= 0) return '₹0';
+    return new Intl.NumberFormat('en-IN', {
+      style: 'currency',
+      currency: 'INR',
+      maximumFractionDigits: 1,
+      notation: 'compact',
+    }).format(num);
+  }
+
+  function dashCallTypeBadge(type) {
+    const t = String(type || '').toLowerCase();
+    if (t === 'in') return 'b-blue';
+    if (t === 'out') return 'b-green';
+    if (t === 'missed') return 'b-red';
+    if (t === 'internal') return 'b-gold';
+    return 'b-gray';
+  }
+
+  function contactInitials(name) {
+    const txt = String(name || '').trim();
+    if (!txt) return 'NA';
+    return txt.split(/\s+/).slice(0, 2).map((p) => p[0]).join('').toUpperCase();
+  }
+
+  function summarizeAiSegmentFromCalls(calls = []) {
+    if (!calls.length) return 'No recent call activity';
+    const missed = calls.filter((c) => String(c.call_type || '').toLowerCase() === 'missed').length;
+    if (missed >= 2) return 'Missed-call follow-up candidates';
+    const withAi = calls.filter((c) => !!c.ai_summary).length;
+    if (withAi >= 2) return 'Well-documented PBX interactions';
+    return 'Frequent recent callers';
+  }
+
+  function renderDashboardOverview(overview, stats) {
+    const calls = Array.isArray(overview?.live_calls) ? overview.live_calls : [];
+    const liveBody = document.getElementById('dash-live-calls-body');
+    if (liveBody) {
+      if (!calls.length) {
+        liveBody.innerHTML = '<tr><td colspan="5" style="text-align:center;color:var(--muted);padding:14px;">No recent calls found.</td></tr>';
+      } else {
+        liveBody.innerHTML = calls.map((call) => {
+          const name = escHtml(call.contact_name || call.caller || 'Unknown');
+          const callerMeta = escHtml(call.caller || '—');
+          const destination = escHtml(call.destination || '—');
+          const duration = escHtml(call.duration || '—');
+          const badgeClass = dashCallTypeBadge(call.call_type);
+          const callType = escHtml(call.call_type || '—');
+          const aiCell = call.ai_summary
+            ? '<span class="badge b-green"><i class="fas fa-check"></i> Summary</span>'
+            : `<button class="btn btn-blue btn-xs" onclick="quickCallSummary(this)"><i class="fas fa-robot"></i> Summarise</button>`;
+          return `<tr>
+            <td><b>${name}</b><br><span style="font-size:10.5px;color:var(--muted);">${callerMeta}</span></td>
+            <td>${destination}</td>
+            <td>${duration}</td>
+            <td><span class="badge ${badgeClass}">${callType}</span></td>
+            <td>${aiCell}</td>
+          </tr>`;
+        }).join('');
       }
     }
+
+    const waThread = document.getElementById('dash-wa-thread');
+    const wa = overview?.latest_wa_thread || {};
+    const waMessages = Array.isArray(wa.messages) ? wa.messages : [];
+    if (waThread) {
+      if (!waMessages.length) {
+        waThread.innerHTML = '<div style="color:var(--muted);font-size:11px;">No WhatsApp thread available yet.</div>';
+      } else {
+        waThread.innerHTML = waMessages.map((m) => {
+          const bubbleClass = m.from_me ? 'wa-out' : 'wa-in';
+          const who = m.from_me ? 'You' : escHtml(wa.chat_name || 'Client');
+          const when = m.timestamp ? new Date(m.timestamp).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }) : '';
+          return `<div class="wa-bubble ${bubbleClass}">${escHtml(m.body || '')}<div class="wa-time">${who}${when ? ` · ${when}` : ''}</div></div>`;
+        }).join('');
+      }
+    }
+
+    const topContactsWrap = document.getElementById('dash-top-contacts');
+    const topContacts = Array.isArray(overview?.top_contacts) ? overview.top_contacts : [];
+    if (topContactsWrap) {
+      if (!topContacts.length) {
+        topContactsWrap.innerHTML = '<div style="color:var(--muted);font-size:11px;">No contact interactions in the last 24h.</div>';
+      } else {
+        topContactsWrap.innerHTML = topContacts.map((c, idx) => {
+          const moods = ['b-green', 'b-gold', 'b-blue'];
+          const labels = ['Hot', 'Warm', 'Active'];
+          const name = escHtml(c.name || c.phone_digits || 'Unknown');
+          const initials = escHtml(contactInitials(name));
+          return `<div class="stat-row">
+            <div style="display:flex;align-items:center;gap:8px;flex:1;">
+              <div class="contact-avatar" style="width:28px;height:28px;background:rgba(59,130,246,0.15);color:var(--blue2);font-size:11px;">${initials}</div>
+              <div class="stat-label">${name}</div>
+            </div>
+            <span class="badge ${moods[idx] || 'b-gray'}">${labels[idx] || 'Active'} · ${formatKpiNumber(c.interactions || 0)}</span>
+          </div>`;
+        }).join('');
+      }
+    }
+
+    const mix = overview?.activity_mix || overview?.revenue_attribution || {};
+    const mixTotal = Number(mix.total || 0);
+    const mixEmail = Number(mix.email || 0);
+    const mixWa = Number(mix.whatsapp || 0);
+    const mixCalls = Number(mix.calls || 0);
+    const divSafe = (n) => mixTotal > 0 ? Math.round((Math.max(0, n) / mixTotal) * 100) : 0;
+    const revTotalEl = document.getElementById('dash-revenue-total');
+    const revSub = document.getElementById('dash-revenue-sub');
+    const revEmailVal = document.getElementById('dash-revenue-email-val');
+    const revWaVal = document.getElementById('dash-revenue-wa-val');
+    const revCallsVal = document.getElementById('dash-revenue-calls-val');
+    const revEmailFill = document.getElementById('dash-revenue-email-fill');
+    const revWaFill = document.getElementById('dash-revenue-wa-fill');
+    const revCallsFill = document.getElementById('dash-revenue-calls-fill');
+    const pipeVal = overview?.pipeline_value || {};
+    if (revTotalEl) revTotalEl.textContent = formatKpiNumber(mixTotal);
+    if (revSub) {
+      const pipeHint = Number(pipeVal.open || 0) > 0
+        ? ` · Open pipeline ${formatCompactCurrencyIN(pipeVal.open)}`
+        : '';
+      revSub.innerHTML = `<i class="fas fa-database"></i> Last 7 days touchpoints${pipeHint}`;
+    }
+    if (revEmailVal) revEmailVal.textContent = formatKpiNumber(mixEmail);
+    if (revWaVal) revWaVal.textContent = formatKpiNumber(mixWa);
+    if (revCallsVal) revCallsVal.textContent = formatKpiNumber(mixCalls);
+    if (revEmailFill) revEmailFill.style.width = `${divSafe(mixEmail)}%`;
+    if (revWaFill) revWaFill.style.width = `${divSafe(mixWa)}%`;
+    if (revCallsFill) revCallsFill.style.width = `${divSafe(mixCalls)}%`;
+
+    const conversionPct = stats?.pipeline?.deals
+      ? Math.round(((stats.pipeline.won || 0) / Math.max(1, stats.pipeline.deals)) * 100)
+      : 0;
+    const missed = Number(stats?.calls?.missed || 0);
+    const aiTopSegment = document.getElementById('dash-ai-top-segment');
+    const aiConversion = document.getElementById('dash-ai-conversion');
+    const aiChurn = document.getElementById('dash-ai-churn');
+    if (aiTopSegment) aiTopSegment.textContent = summarizeAiSegmentFromCalls(calls);
+    if (aiConversion) aiConversion.textContent = `${conversionPct}%`;
+    if (aiChurn) aiChurn.textContent = `${formatKpiNumber(missed)} missed`;
+  }
+
+  async function refreshDashboardOverview(options = {}) {
+    const usePicoClaw = !!options.usePicoClaw;
+    try {
+      const [overviewRes, statsRes] = await Promise.all([
+        fetch(`${API_BASE}/dashboard/overview`, { headers: getAuthHeaders() }),
+        fetch(`${API_BASE}/dashboard/stats`, { headers: getAuthHeaders() }),
+      ]);
+      if (!overviewRes.ok || !statsRes.ok) return;
+      const overview = await overviewRes.json().catch(() => ({}));
+      const stats = await statsRes.json().catch(() => ({}));
+      renderDashboardOverview(overview, stats);
+
+      if (usePicoClaw) {
+        const insightEl = document.getElementById('dash-ai-insight-text');
+        if (insightEl) insightEl.textContent = 'PicoClaw is reading live CRM stats…';
+        const aiPrompt = [
+          'You are UniComm AI.',
+          'Generate one short dashboard insight (max 22 words) from this live CRM data.',
+          `calls_7d=${stats?.calls_7d?.total || 0}, calls_today=${stats?.calls_today?.total || 0}, missed_calls=${stats?.calls?.missed || 0}, wa_chats=${stats?.wa_chats?.total || 0}, wa_unread=${stats?.wa_chats?.unread || 0}, emails_synced=${stats?.emails_synced?.total || 0}, active_campaigns=${stats?.campaigns?.active || 0}, pipeline_open=${stats?.pipeline?.open || 0}, pipeline_won=${stats?.pipeline?.won || 0}.`,
+          'Return plain text only.',
+        ].join('\n');
+        try {
+          const aiInsight = await callPicoClaw(aiPrompt);
+          if (insightEl) insightEl.textContent = (aiInsight || '').trim() || 'PicoClaw could not generate an insight right now.';
+        } catch (_) {
+          if (insightEl) insightEl.textContent = 'PicoClaw insight unavailable. Live stats are still shown.';
+        }
+      }
+    } catch (err) {
+      console.warn('[Dashboard] overview refresh failed:', err.message);
+    }
+  }
+
+  // ── UPDATE KPI CARDS FROM DB STATS ─────────────────────────────────────────
+  function updateKPIs(stats) {
+    if (!stats) return;
+
+    const calls7d = stats.calls_7d?.total ?? stats.calls?.total ?? 0;
+    const callsVal = document.querySelector('[data-kpi="calls_7d"]');
+    const callsCh = document.querySelector('[data-kpi-change="calls_7d"]');
+    const callsFill = document.querySelector('#sec-dashboard .kpi.gold .kpi-fill');
+    if (callsVal) callsVal.textContent = formatKpiNumber(calls7d);
+    if (callsCh) callsCh.innerHTML = '<i class="fas fa-database"></i> Last 7 days (PBX)';
+    if (callsFill) callsFill.style.width = Math.min(100, Math.round((calls7d / 2000) * 100)) + '%';
+
+    const emails = stats.emails_synced?.total ?? 0;
+    const emailsVal = document.querySelector('[data-kpi="emails_synced"]');
+    const emailsCh = document.querySelector('[data-kpi-change="emails_synced"]');
+    const emailsFill = document.querySelector('#sec-dashboard .kpi.blue .kpi-fill');
+    if (emailsVal) emailsVal.textContent = formatKpiNumber(emails);
+    if (emailsCh) emailsCh.textContent = 'Outlook cache / CRM';
+    if (emailsFill) emailsFill.style.width = Math.min(100, Math.round((emails / 5000) * 100)) + '%';
+
+    const waChats = stats.wa_chats?.total ?? 0;
+    const waUnread = stats.wa_chats?.unread ?? 0;
+    const waVal = document.querySelector('[data-kpi="wa_chats"]');
+    const waCh = document.querySelector('[data-kpi-change="wa_chats"]');
+    const waFill = document.querySelector('#sec-dashboard .kpi.green .kpi-fill');
+    if (waVal) waVal.textContent = formatKpiNumber(waChats);
+    if (waCh) {
+      waCh.innerHTML = waUnread > 0
+        ? `<i class="fas fa-comment-dots"></i> ${formatKpiNumber(waUnread)} unread`
+        : '<i class="fas fa-database"></i> Live WhatsApp inbox';
+    }
+    if (waFill) waFill.style.width = Math.min(100, Math.round((waChats / 300) * 100)) + '%';
+
+    const activeContacts = stats.contacts?.total ?? 0;
+    const contactsNew = stats.contacts?.new_today ?? 0;
+    const contactsVal = document.querySelector('[data-kpi="contacts"]');
+    const contactsCh = document.querySelector('[data-kpi-change="contacts"]');
+    const contactsFill = document.querySelector('#sec-dashboard .kpi.cyan .kpi-fill');
+    if (contactsVal) contactsVal.textContent = formatKpiNumber(activeContacts);
+    if (contactsCh) {
+      contactsCh.innerHTML = contactsNew > 0
+        ? `<i class="fas fa-plus"></i> ${formatKpiNumber(contactsNew)} new this week`
+        : '<i class="fas fa-database"></i> CRM contacts';
+    }
+    if (contactsFill) contactsFill.style.width = Math.min(100, Math.round((activeContacts / 200) * 100)) + '%';
+
+    const missedCalls = stats.calls?.missed ?? 0;
+    const callsToday = stats.calls_today?.total ?? 0;
+    const missedVal = document.querySelector('[data-kpi="missed_calls"]');
+    const missedCh = document.querySelector('[data-kpi-change="missed_calls"]');
+    const missedFill = document.querySelector('#sec-dashboard .kpi.red .kpi-fill');
+    if (missedVal) missedVal.textContent = formatKpiNumber(missedCalls);
+    if (missedCh) {
+      missedCh.innerHTML = callsToday > 0
+        ? `<i class="fas fa-phone"></i> ${formatKpiNumber(callsToday)} calls today`
+        : '<i class="fas fa-database"></i> Follow up on PBX';
+    }
+    if (missedFill) missedFill.style.width = Math.min(100, Math.round((missedCalls / 50) * 100)) + '%';
+  }
+
+  async function refreshDashboardKpis() {
+    const icon = document.getElementById('dashboard-kpi-refresh-icon');
+    if (icon) icon.classList.add('fa-spin');
+    try {
+      const statsRes = await fetch(`${API_BASE}/dashboard/stats`, { headers: getAuthHeaders() });
+      const stats = await statsRes.json().catch(() => ({}));
+      if (statsRes.ok) {
+        updateKPIs(stats);
+        console.log('[Dashboard] KPIs updated from API', stats);
+      } else {
+        console.warn('[Dashboard] KPI stats HTTP', statsRes.status, stats.error || stats);
+        document.querySelectorAll('[data-kpi-change]').forEach((el) => {
+          if (el.textContent.includes('Loading')) el.textContent = 'Could not load stats';
+        });
+      }
+    } catch (err) {
+      console.warn('[Dashboard] KPI refresh failed:', err.message);
+    } finally {
+      if (icon) icon.classList.remove('fa-spin');
+    }
+    refreshDashboardOverview({ usePicoClaw: false });
+  }
+
+  function startDashboardKpiAutoRefresh() {
+    if (dashboardKpiTimer) clearInterval(dashboardKpiTimer);
+    dashboardKpiTimer = setInterval(refreshDashboardKpis, 60000);
+  }
+
+  window.refreshDashboardKpis = refreshDashboardKpis;
 
     // ── LEGACY PBX CALLS (REMOVED: COLLIDES WITH MATRIX INTEGRATION) ──
 
@@ -12489,6 +12883,17 @@ Best regards,<br>
     }
 
     // ── renderSenderCell (inbox) ──────────────────────────────────────────────
+    function outlookPlainPreview(text) {
+      const raw = String(text || '');
+      if (!raw) return '';
+      if (raw.includes('<')) {
+        const tmp = document.createElement('div');
+        tmp.innerHTML = raw;
+        return escHtml(String(tmp.textContent || tmp.innerText || '').replace(/\s+/g, ' ').trim());
+      }
+      return escHtml(raw);
+    }
+
     function renderSenderCell(email, displayName) {
       if (!email) return `<span style="color:var(--muted);">—</span>`;
       if (ContactResolver.isUnknownSender(email)) {
@@ -12608,12 +13013,11 @@ Best regards,<br>
     function renderRecipientCell(toAddresses, ccAddresses) {
       const all = [...(toAddresses || []), ...(ccAddresses || [])];
       if (!all.length) return `<span style="color:var(--muted);">—</span>`;
-      // Show first 2 recipients only to keep row clean; rest shown in mail body
       const shown = all.slice(0, 2);
       const extra = all.length - shown.length;
       const parts = shown.map(addr => {
-        const email = addr.emailAddress?.address || addr.address || String(addr);
-        const dn = addr.emailAddress?.name || addr.name || '';
+        const email = addr?.emailAddress?.address || addr?.address || (typeof addr === 'string' ? addr : '');
+        const dn = addr?.emailAddress?.name || addr?.name || '';
         if (!email) return '';
         if (ContactResolver.isUnknownSender(email)) {
           return `<span style="color:var(--muted2);">${escHtml(email)}</span>`;
@@ -14953,6 +15357,9 @@ Best regards,<br>
     async function loadInbox(forceRefresh) {
       const listEl = document.getElementById('email-list');
       if (!listEl) return;
+      if (forceRefresh) {
+        window._outlookMailForceRefresh = true;
+      }
 
       const connected = await checkOutlookStatus();
 
@@ -14979,8 +15386,8 @@ Best regards,<br>
             fallback: `${API_BASE}/outlook/inbox/fallback?top=${inboxPageSize}&skip=${skip}`
           },
           'sent': {
-            api: `${API_BASE}/outlook/sent?top=${inboxPageSize}&skip=${skip}`,
-            fallback: `${API_BASE}/outlook/sent/fallback?top=${inboxPageSize}&skip=${skip}`
+            api: `${API_BASE}/outlook/sent?top=${inboxPageSize}&skip=${skip}${searchQuery ? '&search=' + encodeURIComponent(searchQuery) : ''}`,
+            fallback: `${API_BASE}/outlook/sent/fallback?top=${inboxPageSize}&skip=${skip}${searchQuery ? '&search=' + encodeURIComponent(searchQuery) : ''}`
           },
           'drafts': {
             api: `${API_BASE}/outlook/drafts?top=${inboxPageSize}&skip=${skip}`,
@@ -15030,19 +15437,41 @@ Best regards,<br>
             const res = await fetch(endpoints.api, { headers: getAuthHeaders() });
             const data = await res.json();
 
-            if (res.ok && data.messages && data.messages.length > 0) {
+            if (res.ok && Array.isArray(data.messages)) {
               msgs = data.messages;
               dataSource = data.source || 'api';
               console.log('[Inbox] ✓ Loaded from Graph API:', msgs.length, 'messages');
+              if (!msgs.length && !window._outlookMailForceRefresh) {
+                console.log('[Inbox] API returned empty list, trying DB fallback');
+                throw new Error('API_EMPTY_OR_ERROR');
+              }
             } else {
               console.log('[Inbox] API returned no messages or error, trying DB fallback');
               throw new Error('API_EMPTY_OR_ERROR');
             }
           } catch (apiErr) {
             console.warn('[Inbox] API failed:', apiErr.message, '— trying DB fallback');
+          } finally {
+            window._outlookMailForceRefresh = false;
           }
         } else if (window.forceOffline) {
           console.log('[Inbox] ⚠️️ Force offline mode active — skipping API, loading from DB');
+          window._outlookMailForceRefresh = false;
+        }
+
+        // Client-side search for sent/drafts (recipient names/emails not always in Graph $filter)
+        if (searchQuery && (inboxFolder === 'sent' || inboxFolder === 'drafts')) {
+          const q = searchQuery.toLowerCase();
+          msgs = msgs.filter(m => {
+            const subj = String(m.subject || '').toLowerCase();
+            const prev = String(m.bodyPreview || '').toLowerCase();
+            const recips = [...(m.toRecipients || []), ...(m.ccRecipients || [])].map(r => {
+              const a = r?.emailAddress?.address || r?.address || (typeof r === 'string' ? r : '');
+              const n = r?.emailAddress?.name || r?.name || '';
+              return `${n} ${a}`.toLowerCase();
+            }).join(' ');
+            return subj.includes(q) || prev.includes(q) || recips.includes(q);
+          });
         }
 
         // Fallback to database if API failed, not connected, or force offline mode
@@ -15172,25 +15601,30 @@ Best regards,<br>
         const badge = document.getElementById('inbox-unread-badge');
         if (badge) { badge.textContent = unread; badge.style.display = unread ? 'inline-flex' : 'none'; }
 
-        // Group by conversationId — show only latest message per conversation (Outlook style)
-        const convMap = new Map();
-        msgs.forEach(m => {
-          const cid = m.conversationId || m.id;
-          const existing = convMap.get(cid);
-          const mTime = new Date(m.receivedDateTime || m.sentDateTime || m.createdDateTime || 0).getTime();
-          if (!existing) {
-            convMap.set(cid, { ...m, _count: 1 });
-          } else {
-            const eTime = new Date(existing.receivedDateTime || existing.sentDateTime || existing.createdDateTime || 0).getTime();
-            if (mTime > eTime) {
-              convMap.set(cid, { ...m, _count: existing._count + 1 });
+        // Sent/Drafts: show every message (Outlook Sent Items lists each send separately).
+        // Inbox-style folders: group by conversation — latest message per thread.
+        let grouped;
+        if (inboxFolder === 'sent' || inboxFolder === 'drafts') {
+          grouped = sortMessagesWithPins(msgs.map(m => ({ ...m, _count: 1 })));
+        } else {
+          const convMap = new Map();
+          msgs.forEach(m => {
+            const cid = m.conversationId || m.id;
+            const existing = convMap.get(cid);
+            const mTime = new Date(m.receivedDateTime || m.sentDateTime || m.createdDateTime || 0).getTime();
+            if (!existing) {
+              convMap.set(cid, { ...m, _count: 1 });
             } else {
-              existing._count++;
+              const eTime = new Date(existing.receivedDateTime || existing.sentDateTime || existing.createdDateTime || 0).getTime();
+              if (mTime > eTime) {
+                convMap.set(cid, { ...m, _count: existing._count + 1 });
+              } else {
+                existing._count++;
+              }
             }
-          }
-        });
-
-        const grouped = sortMessagesWithPins(Array.from(convMap.values()));
+          });
+          grouped = sortMessagesWithPins(Array.from(convMap.values()));
+        }
 
         // Ensure all grouped messages have category
         grouped.forEach(m => {
@@ -15519,8 +15953,8 @@ Best regards,<br>
         const fromEmail = m.from?.emailAddress?.address || '';
         const fromName = m.from?.emailAddress?.name || '';
         const isSent = window.currentEmailFolder === 'sent';
-        const senderCell = isSent
-          ? renderRecipientCell(m.toRecipients, m.ccRecipients)
+        const partyCell = isSent
+          ? `<span style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:0.04em;margin-right:5px;">To</span>${renderRecipientCell(m.toRecipients, m.ccRecipients)}`
           : renderSenderCell(fromEmail, fromName);
         const time = m.receivedDateTime || m.sentDateTime
           ? new Date(m.receivedDateTime || m.sentDateTime).toLocaleString('en-IN', { day: '2-digit', month: 'short', year: '2-digit', hour: '2-digit', minute: '2-digit' })
@@ -15530,20 +15964,22 @@ Best regards,<br>
         const attachIcon = m.hasAttachments ? `<i class="fas fa-paperclip" style="color:var(--muted);font-size:10px;margin-left:4px;"></i>` : '';
         const countBadge = m._count > 1 ? `<span style="font-size:10px;color:var(--muted);background:rgba(255,255,255,0.08);border-radius:10px;padding:1px 6px;margin-left:4px;">${m._count}</span>` : '';
         const pinBadge = pinnedIds.has(m.id) ? `<i class="fas fa-thumbtack" title="Pinned" style="color:var(--gold);font-size:10px;margin-left:4px;"></i>` : '';
-        const categoryBadge = m.category ? `<span class="mail-category ${normalizeMailCategory(m.category)}" title="${m.categoryReason || ''}">${displayMailCategory(m.category)}</span>` : '';
+        const categoryBadge = m.category ? `<span class="mail-category ${normalizeMailCategory(m.category)}" title="${escHtml(m.categoryReason || '')}">${displayMailCategory(m.category)}</span>` : '';
         const rowClass = isImportantMail(m) ? 'email-row-important' : '';
         const triageBadge = triageBadgeHtml(mailTaskTriageCache[m.id] || mailTaskTriageCache[m.conversationId] || 'none');
+        const partyClass = m.isRead ? 'is-read' : 'is-unread';
+        const subjectText = escHtml(m.subject || '(no subject)');
+        const previewText = outlookPlainPreview(m.bodyPreview);
         return `
-      <div class="${rowClass}" onclick="openEmail('${m.id}')" oncontextmenu="openSmartEmailContextMenu(event, ${jsArg(m.id)})" style="padding:11px 14px;border-bottom:1px solid var(--border);cursor:pointer;transition:background 0.1s;display:flex;gap:10px;align-items:flex-start;"
-           onmouseover="this.style.background='rgba(255,255,255,0.03)'" onmouseout="this.style.background=''" id="email-row-${m.id}">
+      <div class="email-list-row ${rowClass}" onclick="openEmail('${m.id}')" oncontextmenu="openSmartEmailContextMenu(event, ${jsArg(m.id)})" id="email-row-${m.id}">
         ${unreadDot}
-        <div style="flex:1;min-width:0;">
-          <div style="display:flex;justify-content:space-between;align-items:center;gap:6px;">
-            <span style="font-size:12.5px;font-weight:${m.isRead ? '500' : '700'};color:${m.isRead ? 'var(--muted2)' : 'var(--text)'};display:flex;align-items:center;flex-wrap:wrap;gap:2px;min-width:0;">${senderCell}${countBadge}${pinBadge}${categoryBadge}</span>
-            <span style="font-size:10.5px;color:var(--muted);flex-shrink:0;min-width:86px;text-align:right;">${time}</span>
+        <div class="email-list-row-main">
+          <div class="email-list-row-head">
+            <div class="email-list-party ${partyClass}">${partyCell}${countBadge}${pinBadge}${categoryBadge}</div>
+            <div class="email-list-time">${time}</div>
           </div>
-          <div style="font-size:12px;color:var(--text);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${triageBadge}${m.subject || '(no subject)'}${importanceIcon}${attachIcon}</div>
-          <div style="font-size:11px;color:var(--muted);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${m.bodyPreview || ''}</div>
+          <div class="email-list-subject">${triageBadge}${subjectText}${importanceIcon}${attachIcon}</div>
+          <div class="email-list-preview">${previewText}</div>
         </div>
       </div>`;
       }).join('');
@@ -15915,9 +16351,100 @@ Best regards,<br>
       return String(s).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
     }
 
+    /** Graph message IDs often end with "=" — must encode in URL paths. */
+    function outlookMessageApiUrl(messageId, subpath) {
+      const mid = encodeURIComponent(String(messageId || '').trim());
+      const base = `${API_BASE}/outlook/message/${mid}`;
+      if (!subpath) return base;
+      return `${base}/${String(subpath).replace(/^\//, '')}`;
+    }
+
+    /** Sandbox flags so linked images (<a><img></a>) and text links open in the browser. */
+    const OUTLOOK_EMAIL_BODY_SANDBOX = 'allow-same-origin allow-popups allow-popups-to-escape-sandbox allow-scripts';
+
+    function outlookEnsureEmailLinkListener() {
+      if (window._outlookEmailLinkListener) return;
+      window._outlookEmailLinkListener = true;
+      window.addEventListener('message', function (ev) {
+        if (!ev.data || ev.data.type !== 'outlook-email-link') return;
+        const href = String(ev.data.href || '').trim();
+        if (!href || /^javascript:/i.test(href)) return;
+        if (!/^(https?:|mailto:|tel:)/i.test(href)) return;
+        window.open(href, '_blank', 'noopener,noreferrer');
+      });
+    }
+
+    /** Make <a href> / image-map links open in a new tab when the body is shown in our iframe. */
+    function outlookPrepareEmailHtmlForView(html) {
+      if (!html) return '';
+      try {
+        const doc = new DOMParser().parseFromString('<div id="outlook-email-root">' + html + '</div>', 'text/html');
+        const root = doc.getElementById('outlook-email-root');
+        if (!root) return html;
+
+        function primeLink(el) {
+          const href = String(el.getAttribute('href') || '').trim();
+          if (!href || /^javascript:/i.test(href)) return;
+          if (!el.getAttribute('target')) el.setAttribute('target', '_blank');
+          const rel = String(el.getAttribute('rel') || '').split(/\s+/).filter(Boolean);
+          ['noopener', 'noreferrer'].forEach((r) => { if (!rel.includes(r)) rel.push(r); });
+          el.setAttribute('rel', rel.join(' '));
+          el.style.cursor = 'pointer';
+        }
+
+        root.querySelectorAll('a[href]').forEach(primeLink);
+        root.querySelectorAll('area[href]').forEach(primeLink);
+        root.querySelectorAll('a[href] img, a[href] picture').forEach((img) => {
+          img.style.pointerEvents = 'auto';
+          img.style.cursor = 'pointer';
+        });
+
+        return root.innerHTML;
+      } catch (_) {
+        return html;
+      }
+    }
+
+    function outlookWrapEmailBodyDocument(htmlSrc) {
+      const prepared = outlookPrepareEmailHtmlForView(htmlSrc);
+      // Build closing script tag via concatenation so the HTML parser does not end this block early.
+      const linkScript =
+        '<scr' + 'ipt>(function(){' +
+        'document.addEventListener("click",function(e){' +
+        'var a=e.target&&e.target.closest?e.target.closest("a[href],area[href]"):null;' +
+        'if(!a)return;' +
+        'var h=a.getAttribute("href")||"";' +
+        'if(!h||/^javascript:/i.test(h)||/^#/i.test(h))return;' +
+        'e.preventDefault();' +
+        'try{window.parent.postMessage({type:"outlook-email-link",href:a.href},"*");}catch(_){}' +
+        'try{window.open(a.href,"_blank","noopener,noreferrer");}catch(_){}' +
+        '},true);' +
+        '})();</scr' + 'ipt>';
+      return '<!DOCTYPE html><html><head><meta charset="UTF-8">' +
+        '<base target="_blank" rel="noopener noreferrer">' +
+        '<style>' +
+        'html,body{height:100%;margin:0;padding:12px;box-sizing:border-box;background:#ffffff!important;color:#1a1a1a;' +
+        'font-family:\'Segoe UI\',Outfit,sans-serif;font-size:13px;line-height:1.65;overflow-x:hidden;overflow-y:auto;-webkit-overflow-scrolling:touch;}' +
+        'img{max-width:100%;height:auto;}' +
+        'a,a img,a picture{cursor:pointer;}' +
+        'a img{pointer-events:auto;}' +
+        '</style></head><body>' + prepared + linkScript + '</body></html>';
+    }
+
+    async function outlookFetchMessageAttachments(messageId, existing) {
+      const list = existing || [];
+      if (list.length) return list;
+      try {
+        const res = await fetch(outlookMessageApiUrl(messageId, 'attachments'), { headers: getAuthHeaders() });
+        const data = await res.json();
+        if (res.ok && Array.isArray(data.attachments)) return data.attachments;
+      } catch (_) { /* ignore */ }
+      return list;
+    }
+
     async function outlookFetchAttachmentDataUrl(messageId, attachmentId) {
       const res = await fetch(
-        `${API_BASE}/outlook/message/${encodeURIComponent(messageId)}/attachment/${encodeURIComponent(attachmentId)}/raw`,
+        outlookAttachmentRawUrl(messageId, attachmentId),
         { headers: getAuthHeaders() }
       );
       if (!res.ok) return null;
@@ -15957,6 +16484,231 @@ Best regards,<br>
         out = out.replace(re, dataUrl);
       }
       return out;
+    }
+
+    function outlookAttachmentRawUrl(messageId, attachmentId) {
+      return outlookMessageApiUrl(messageId, `attachment/${encodeURIComponent(attachmentId)}/raw`);
+    }
+
+    function outlookIsGraphFileAttachment(att) {
+      const t = String(att && att['@odata.type'] || '').toLowerCase();
+      return !t || t.includes('fileattachment');
+    }
+
+    /** Attachments to show in the paperclip bar (skip inline signature images). */
+    function outlookListableAttachments(attachments) {
+      return (attachments || []).filter((att) => {
+        if (!outlookIsGraphFileAttachment(att)) return true;
+        if (!att.isInline) return true;
+        const cid = String(att.contentId || '').trim();
+        if (!cid) return true;
+        const name = String(att.name || '').toLowerCase();
+        if (/\.(mp3|wav|ogg|m4a|aac|flac|mp4|webm|mov|avi|mkv|wmv|zip|pdf|docx?|xlsx?|pptx?)$/i.test(name)) return true;
+        return false;
+      });
+    }
+
+    function outlookAttachmentIcon(att) {
+      const ct = String(att.contentType || '').toLowerCase();
+      const name = String(att.name || '').toLowerCase();
+      if (ct.startsWith('audio/') || /\.(mp3|wav|ogg|m4a|aac|flac)$/i.test(name)) return 'fa-file-audio';
+      if (ct.startsWith('video/') || /\.(mp4|webm|mov|avi|mkv|wmv)$/i.test(name)) return 'fa-file-video';
+      if (ct.startsWith('image/') || /\.(jpe?g|png|gif|webp|bmp|svg)$/i.test(name)) return 'fa-file-image';
+      if (ct.includes('pdf') || name.endsWith('.pdf')) return 'fa-file-pdf';
+      return 'fa-paperclip';
+    }
+
+    function outlookAttachmentCanPreview(att) {
+      const ct = String(att.contentType || '').toLowerCase();
+      const name = String(att.name || '').toLowerCase();
+      if (ct.startsWith('audio/') || ct.startsWith('video/')) return true;
+      return /\.(mp3|wav|ogg|m4a|aac|mp4|webm|mov)$/i.test(name);
+    }
+
+    async function outlookDownloadAttachment(messageId, attachmentId, fileName) {
+      try {
+        const res = await fetch(outlookAttachmentRawUrl(messageId, attachmentId), { headers: getAuthHeaders() });
+        if (!res.ok) throw new Error('Download failed');
+        const blob = await res.blob();
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = fileName || 'attachment';
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        setTimeout(() => URL.revokeObjectURL(url), 60000);
+      } catch (err) {
+        notify('Download failed', err.message || 'Could not download attachment', 'var(--red)', 'fas fa-exclamation-circle');
+      }
+    }
+
+    function renderOutlookAttachmentsPanel(containerEl, messageId, attachments) {
+      if (!containerEl) return;
+      const list = outlookListableAttachments(attachments);
+      if (!list.length) {
+        containerEl.style.display = 'none';
+        containerEl.innerHTML = '';
+        return;
+      }
+      const chips = list.map((att) => {
+        const name = escHtml(att.name || 'attachment');
+        const size = att.size ? formatBytes(att.size) : '';
+        const icon = outlookAttachmentIcon(att);
+        const aid = outlookEscapeAttr(att.id || '');
+        const safeName = String(att.name || 'attachment').replace(/'/g, "\\'");
+        const preview = outlookAttachmentCanPreview(att) && att.id
+          ? `<div class="outlook-att-preview" id="outlook-att-preview-${aid}" style="display:none;"></div>`
+          : '';
+        const previewBtn = outlookAttachmentCanPreview(att) && att.id
+          ? `<button type="button" class="btn btn-ghost btn-xs" onclick="outlookToggleAttachmentPreview('${outlookEscapeAttr(messageId)}','${aid}','${safeName}')" title="Preview"><i class="fas fa-play"></i></button>`
+          : '';
+        return `<div class="outlook-att-chip" style="flex-direction:column;align-items:flex-start;">
+          <div style="display:flex;align-items:center;gap:8px;width:100%;">
+            <i class="fas ${icon}" style="color:#0078d4;"></i>
+            <span class="outlook-att-name" title="${name}">${name}</span>
+            ${size ? `<span style="font-size:10px;color:var(--muted);flex-shrink:0;">${escHtml(size)}</span>` : ''}
+            ${previewBtn}
+            <button type="button" class="btn btn-blue btn-xs" onclick="outlookDownloadAttachment('${outlookEscapeAttr(messageId)}','${aid}','${safeName}')" title="Download"><i class="fas fa-download"></i></button>
+          </div>${preview}
+        </div>`;
+      }).join('');
+      containerEl.innerHTML =
+        `<div class="outlook-att-title"><i class="fas fa-paperclip"></i> Attachments (${list.length})</div>` +
+        `<div class="outlook-att-list">${chips}</div>`;
+      containerEl.style.display = 'block';
+    }
+
+    async function outlookToggleAttachmentPreview(messageId, attachmentId, fileName) {
+      const el = document.getElementById(`outlook-att-preview-${attachmentId}`);
+      if (!el) return;
+      if (el.style.display !== 'none' && el.innerHTML) {
+        el.style.display = 'none';
+        el.innerHTML = '';
+        return;
+      }
+      el.style.display = 'block';
+      el.innerHTML = '<div style="font-size:11px;color:var(--muted);padding:4px 0;">Loading preview…</div>';
+      try {
+        const res = await fetch(outlookAttachmentRawUrl(messageId, attachmentId), { headers: getAuthHeaders() });
+        if (!res.ok) throw new Error('Preview failed');
+        const blob = await res.blob();
+        const url = URL.createObjectURL(blob);
+        const ct = (blob.type || '').toLowerCase();
+        const name = String(fileName || '').toLowerCase();
+        if (ct.startsWith('video/') || /\.(mp4|webm|mov|avi|mkv)$/i.test(name)) {
+          el.innerHTML = `<video controls src="${url}" style="max-height:240px;"></video>`;
+        } else {
+          el.innerHTML = `<audio controls src="${url}" style="width:100%;"></audio>`;
+        }
+      } catch (err) {
+        el.innerHTML = `<div style="color:var(--red2);font-size:11px;">${escHtml(err.message || 'Preview unavailable')}</div>`;
+      }
+    }
+
+    function renderOutlookThreadAttachments(containerEl, messageId, attachments) {
+      if (!containerEl) return;
+      const list = outlookListableAttachments(attachments);
+      if (!list.length) {
+        containerEl.style.display = 'none';
+        containerEl.innerHTML = '';
+        return;
+      }
+      renderOutlookAttachmentsPanel(containerEl, messageId, attachments);
+      containerEl.classList.add('thread-msg-attachments');
+    }
+
+    /** Prefer full body (includes quoted reply/forward chains); uniqueBody strips those. */
+    function outlookPickFullBody(msg) {
+      if (!msg) return { content: '', contentType: 'text' };
+      if (msg.body?.content) return msg.body;
+      if (msg.uniqueBody?.content) return msg.uniqueBody;
+      return { content: msg.bodyPreview || '', contentType: 'text' };
+    }
+
+    function outlookMessageDateTime(msg) {
+      return msg?.receivedDateTime || msg?.sentDateTime || msg?.createdDateTime || '';
+    }
+
+    function outlookFormatMessageDate(iso) {
+      if (!iso) return '';
+      try {
+        return new Date(iso).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' });
+      } catch (_) {
+        return '';
+      }
+    }
+
+    function focusComposeBodyTop() {
+      const bodyEl = document.getElementById('compose-body');
+      if (!bodyEl) return;
+      bodyEl.focus();
+      try {
+        const range = document.createRange();
+        const sel = window.getSelection();
+        range.setStart(bodyEl, 0);
+        range.collapse(true);
+        sel.removeAllRanges();
+        sel.addRange(range);
+      } catch (_) { }
+    }
+
+    function setComposeBodyWithQuotedAtBottom(quotedHtml) {
+      const bodyEl = document.getElementById('compose-body');
+      if (!bodyEl) return;
+      bodyEl.innerHTML = '<div><br><br></div>' + (quotedHtml || '');
+      focusComposeBodyTop();
+    }
+
+    function buildReplyQuoteHtml(msg, bodyHtml) {
+      const fromName = msg.from?.emailAddress?.name || msg.from?.emailAddress?.address || '';
+      const fromEmail = msg.from?.emailAddress?.address || '';
+      const sentDate = outlookFormatMessageDate(outlookMessageDateTime(msg));
+      const content = bodyHtml || msg.body?.content || msg.bodyPreview || '';
+      return `<div style="border-left:3px solid #ccc;padding-left:12px;margin-top:8px;color:#555;font-size:13px;">` +
+        `<div style="margin-bottom:6px;font-size:12px;color:#888;">On ${sentDate}, <b>${escHtml(fromName)}</b> &lt;${escHtml(fromEmail)}&gt; wrote:</div>` +
+        content + `</div>`;
+    }
+
+    function buildForwardQuoteHtml(meta, bodyHtml) {
+      const sentDate = outlookFormatMessageDate(meta.receivedDateTime || meta.sentDateTime || '');
+      const senderDisplay = meta.fromName
+        ? escHtml(meta.fromName) + ' &lt;' + escHtml(meta.fromAddr) + '&gt;'
+        : escHtml(meta.fromAddr || '');
+      const subj = meta.subject || '';
+      const toRecips = (meta.toRecipients || []).join(', ');
+      return `<div style="border-left:3px solid #ccc;padding-left:12px;margin-top:8px;color:#555;font-size:13px;">` +
+        `<div style="margin-bottom:4px;font-size:12px;color:#888;"><b>---------- Forwarded message ----------</b></div>` +
+        `<div style="font-size:12px;color:#888;margin-bottom:6px;">From: ${senderDisplay}<br>Date: ${sentDate}<br>Subject: ${escHtml(subj)}${toRecips ? '<br>To: ' + escHtml(toRecips) : ''}</div>` +
+        `<div style="margin-top:8px;">${bodyHtml || ''}</div></div>`;
+    }
+
+    async function outlookFetchFullBodyHtml(messageId, fallback) {
+      try {
+        const res = await fetch(outlookMessageApiUrl(messageId), { headers: getAuthHeaders() });
+        const msg = await res.json();
+        if (!res.ok) throw new Error(msg.error || 'Failed to load message');
+        activeMailMessage = msg;
+        const pick = outlookPickFullBody(msg);
+        let html = pick.content || fallback || '';
+        if (String(pick.contentType || 'text').toLowerCase() === 'html' && html) {
+          html = await outlookEmbedInlineCids(html, messageId, msg.attachments || []);
+        }
+        return html;
+      } catch (_) {
+        return fallback || '';
+      }
+    }
+
+    function updateThreadGrowClass(currentId) {
+      document.querySelectorAll('.thread-msg-item').forEach(el => el.classList.remove('thread-msg-grow'));
+      const id = currentId || '';
+      let target = id ? document.getElementById(`tmsg-${outlookEscapeAttr(id)}`) : null;
+      if (!target) {
+        const items = document.querySelectorAll('.thread-msg-item');
+        target = items.length ? items[items.length - 1] : null;
+      }
+      if (target) target.classList.add('thread-msg-grow');
     }
 
     // ── Outlook-style conversation thread renderer ────────────────────────────
@@ -16089,7 +16841,7 @@ Best regards,<br>
         }
 
         if (singleView) singleView.style.display = 'none';
-        if (threadConv) threadConv.style.display = 'block';
+        if (threadConv) threadConv.style.display = 'flex';
         if (!threadMsgs) return;
 
         threadMsgs.innerHTML = msgs.map((m, idx) => {
@@ -16117,8 +16869,11 @@ Best regards,<br>
           }
           const toList = _renderThreadAddr(m.toRecipients);
           const ccList = _renderThreadAddr(m.ccRecipients);
-          const time = m.receivedDateTime ? new Date(m.receivedDateTime).toLocaleString('en-IN', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '';
+          const time = outlookFormatMessageDate(m.receivedDateTime || m.sentDateTime || m.createdDateTime);
           const preview = (m.bodyPreview || '').slice(0, 120);
+          const threadAttachIcon = m.hasAttachments
+            ? '<i class="fas fa-paperclip" style="font-size:10px;color:var(--muted);margin-left:4px;" title="Has attachments"></i>'
+            : '';
           const initials = getInitials(from);
           const bgColor = avatarColor(from);
           const msgId = outlookEscapeAttr(m.id);
@@ -16127,11 +16882,11 @@ Best regards,<br>
           const msgMeta = JSON.stringify({
             id: m.id,
             subject: m.subject || '',
-            receivedDateTime: m.receivedDateTime || '',
+            receivedDateTime: m.receivedDateTime || m.sentDateTime || m.createdDateTime || '',
             fromName: m.from?.emailAddress?.name || '',
             fromAddr: m.from?.emailAddress?.address || '',
             toRecipients: (m.toRecipients || []).map(r => r.emailAddress?.address || '').filter(Boolean),
-            ccRecipients: (m.ccRecipients || []).map(r => r.ccRecipients?.address || '').filter(Boolean),
+            ccRecipients: (m.ccRecipients || []).map(r => r.emailAddress?.address || '').filter(Boolean),
             bodyPreview: m.bodyPreview || '',
           });
           const metaAttr = msgMeta.replace(/"/g, '&quot;');
@@ -16142,7 +16897,7 @@ Best regards,<br>
             <div style="width:32px;height:32px;border-radius:50%;background:${bgColor};display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:#fff;flex-shrink:0;">${initials}</div>
             <div style="flex:1;min-width:0;">
               <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;">
-                <span style="font-size:12.5px;font-weight:700;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:260px;">${escHtml(from)}${fromAddr && fromAddr !== from ? ' <span style="font-weight:400;color:var(--muted);">&lt;' + escHtml(fromAddr) + '&gt;</span>' : ''}</span>
+                <span style="font-size:12.5px;font-weight:700;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:260px;">${escHtml(from)}${fromAddr && fromAddr !== from ? ' <span style="font-weight:400;color:var(--muted);">&lt;' + escHtml(fromAddr) + '&gt;</span>' : ''}${threadAttachIcon}</span>
                 <span style="font-size:10.5px;color:var(--muted);flex-shrink:0;">${time}</span>
               </div>
               <div class="thread-msg-preview" style="font-size:11.5px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;${expanded ? 'display:none;' : ''}">${escHtml(preview)}</div>
@@ -16169,6 +16924,7 @@ Best regards,<br>
         }).join('');
 
         msgs.forEach((m, idx) => { if (idx === msgs.length - 1 || m.id === currentId) loadThreadMsgBody(m.id); });
+        updateThreadGrowClass(currentId || msgs[msgs.length - 1]?.id);
         setTimeout(() => {
           const t = document.getElementById(`tmsg-${outlookEscapeAttr(currentId || msgs[msgs.length - 1].id)}`);
           if (t) t.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -16191,6 +16947,7 @@ Best regards,<br>
       if (preview) preview.style.display = isOpen ? '' : 'none';
       if (chevron) { chevron.classList.toggle('fa-chevron-down', isOpen); chevron.classList.toggle('fa-chevron-up', !isOpen); }
       if (!isOpen) loadThreadMsgBody(msgId);
+      if (!isOpen) updateThreadGrowClass(msgId);
     }
 
     async function loadThreadMsgBody(msgId) {
@@ -16198,21 +16955,34 @@ Best regards,<br>
       if (!el || el.dataset.loaded) return;
       el.dataset.loaded = '1';
       try {
-        const res = await fetch(`${API_BASE}/outlook/message/${msgId}`, { headers: getAuthHeaders() });
+        const res = await fetch(outlookMessageApiUrl(msgId), { headers: getAuthHeaders() });
         const msg = await res.json();
         if (!res.ok) throw new Error(msg.error || 'Failed');
-        const bodyPick = msg.uniqueBody?.content ? msg.uniqueBody : (msg.body?.content ? msg.body : null);
-        const raw = bodyPick?.content || msg.body?.content || msg.bodyPreview || '';
-        const ctype = String(bodyPick?.contentType || msg.body?.contentType || 'text').toLowerCase();
+        if (msg.hasAttachments) {
+          msg.attachments = await outlookFetchMessageAttachments(msgId, msg.attachments);
+        }
+        const bodyPick = outlookPickFullBody(msg);
+        const raw = bodyPick.content || msg.bodyPreview || '';
+        const ctype = String(bodyPick.contentType || 'text').toLowerCase();
+        const attBarId = `thread-att-${msgId}`;
+        let attHtml = '';
+        const listable = outlookListableAttachments(msg.attachments || []);
+        if (listable.length) {
+          attHtml = `<div id="${attBarId}" class="outlook-attachments-bar thread-msg-attachments" style="display:none;"></div>`;
+        }
         if (ctype === 'html' && raw) {
           let htmlSrc = await outlookEmbedInlineCids(raw, msg.id, msg.attachments || []);
-          const wrapped = '<!DOCTYPE html><html><head><meta charset="UTF-8"><style>html,body{height:100%;margin:0;padding:12px;box-sizing:border-box;background:#ffffff!important;color:#1a1a1a;font-family:\'Segoe UI\',sans-serif;font-size:13px;line-height:1.65;overflow-x:hidden;}img{max-width:100%;height:auto;}</style></head><body>' + htmlSrc + '</body></html>';
+          outlookEnsureEmailLinkListener();
+          const wrapped = outlookWrapEmailBodyDocument(htmlSrc);
           const blob = new Blob([wrapped], { type: 'text/html;charset=utf-8' });
           const blobUrl = URL.createObjectURL(blob);
-          el.innerHTML = `<iframe sandbox="allow-same-origin" src="${blobUrl}" style="width:100%;min-height:200px;border:none;display:block;" onload="this.style.height=(this.contentDocument.body.scrollHeight+24)+'px'"></iframe>`;
+          el.innerHTML = attHtml + `<iframe class="email-body-iframe" sandbox="${OUTLOOK_EMAIL_BODY_SANDBOX}" src="${blobUrl}" title="Email body"></iframe>`;
         } else {
-          el.innerHTML = `<pre style="white-space:pre-wrap;font-family:'Outfit',sans-serif;font-size:13px;color:var(--text);margin:12px 0;">${escHtml(raw)}</pre>`;
+          el.innerHTML = attHtml + `<pre style="white-space:pre-wrap;font-family:'Outfit',sans-serif;font-size:13px;color:var(--text);margin:12px 0;flex:1;overflow-y:auto;">${escHtml(raw)}</pre>`;
         }
+        const attBar = document.getElementById(attBarId);
+        if (attBar) renderOutlookThreadAttachments(attBar, msg.id, msg.attachments || []);
+        updateThreadGrowClass(msgId);
       } catch (err) {
         el.innerHTML = `<div style="color:var(--red2);padding:12px;font-size:12px;">${err.message}</div>`;
       }
@@ -16229,18 +16999,16 @@ Best regards,<br>
      * @param {object} meta  — { id, subject, fromAddr, fromName, toRecipients[], ccRecipients[], receivedDateTime, bodyPreview }
      * @param {boolean} replyAll
      */
-    function openReplyFromThread(meta, replyAll) {
+    async function openReplyFromThread(meta, replyAll) {
       if (!meta || !meta.id) return;
 
       const myEmail = (outlookConnectedEmail || '').toLowerCase().trim();
       const senderAddr = (meta.fromAddr || '').toLowerCase().trim();
       const isSentByMe = senderAddr === myEmail;
 
-      // ── Subject ──────────────────────────────────────────────────────────
       const subj = meta.subject || '';
       const reSubj = /^re:/i.test(subj.trim()) ? subj : 'Re: ' + subj;
 
-      // ── Recipient lists ───────────────────────────────────────────────────
       function dedup(arr) { return [...new Set(arr.map(a => a.toLowerCase().trim()).filter(a => a && a !== myEmail))]; }
 
       let toList = [];
@@ -16253,7 +17021,6 @@ Best regards,<br>
         const toSet = new Set(toList);
         ccList = ccRecips.filter(a => !toSet.has(a));
       } else {
-        // Reply: sender only (or original To if we sent it)
         if (isSentByMe) {
           toList = dedup(meta.toRecipients || []);
         } else {
@@ -16262,9 +17029,9 @@ Best regards,<br>
         ccList = [];
       }
 
-      // ── Open modal and fill fields ────────────────────────────────────────
       document.getElementById('compose-title').textContent = replyAll ? 'Reply All' : 'Reply';
       resetComposeForm();
+      activeMessageId = meta.id;
       openModal('compose-email-modal');
       loadComposeTemplates();
       composeLoadGroupsDropdown();
@@ -16276,37 +17043,21 @@ Best regards,<br>
       if (ccEl) ccEl.value = ccList.join('; ');
       if (subjEl) subjEl.value = reSubj;
 
-      // ── Quoted body ───────────────────────────────────────────────────────
       const bodyEl = document.getElementById('compose-body');
       if (bodyEl) {
-        const sentDate = meta.receivedDateTime
-          ? new Date(meta.receivedDateTime).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' })
-          : '';
-        const senderDisplay = meta.fromName
-          ? escHtml(meta.fromName) + ' &lt;' + escHtml(meta.fromAddr) + '&gt;'
-          : escHtml(meta.fromAddr);
-        bodyEl.innerHTML =
-          `<br><br>` +
-          `<div style="border-left:3px solid #ccc;padding-left:12px;margin-top:8px;color:#555;font-size:13px;">` +
-          `<div style="margin-bottom:6px;font-size:12px;color:#888;">On ${sentDate}, <b>${senderDisplay}</b> wrote:</div>` +
-          escHtml(meta.bodyPreview || '') +
-          `</div>`;
-        // Place cursor at top
-        try {
-          const range = document.createRange();
-          const sel = window.getSelection();
-          range.setStart(bodyEl, 0);
-          range.collapse(true);
-          sel.removeAllRanges();
-          sel.addRange(range);
-        } catch (_) { }
+        bodyEl.innerHTML = '<div style="text-align:center;padding:20px;color:#888;">Loading message content…</div>';
+        const fullBody = await outlookFetchFullBodyHtml(meta.id, meta.bodyPreview || '');
+        const quoteMsg = {
+          from: { emailAddress: { name: meta.fromName || '', address: meta.fromAddr || '' } },
+          receivedDateTime: meta.receivedDateTime || meta.sentDateTime || '',
+          sentDateTime: meta.sentDateTime || meta.receivedDateTime || '',
+          bodyPreview: meta.bodyPreview || ''
+        };
+        setComposeBodyWithQuotedAtBottom(buildReplyQuoteHtml(quoteMsg, fullBody));
       }
 
-      // Unknown sender banner
       injectReplyUnknownBanner(isSentByMe ? (meta.toRecipients || [])[0] || '' : senderAddr, isSentByMe);
-
-      composeApplyDefaultSignature('reply');
-      setTimeout(() => { if (bodyEl) bodyEl.focus(); }, 200);
+      setTimeout(() => focusComposeBodyTop(), 200);
     }
 
     /**
@@ -16331,41 +17082,12 @@ Best regards,<br>
 
       const bodyEl = document.getElementById('compose-body');
       if (bodyEl) {
-        // Fetch full message body
-        let fullBody = '';
-        try {
-          const res = await fetch(`${API_BASE}/outlook/message/${meta.id}`, { headers: getAuthHeaders() });
-          const msg = await res.json();
-          if (res.ok) {
-            const bodyPick = msg.uniqueBody?.content ? msg.uniqueBody : (msg.body?.content ? msg.body : null);
-            fullBody = bodyPick?.content || msg.body?.content || msg.bodyPreview || '';
-          }
-        } catch (err) {
-          fullBody = meta.bodyPreview || '';
-        }
-
-        const sentDate = meta.receivedDateTime
-          ? new Date(meta.receivedDateTime).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' })
-          : '';
-        const senderDisplay = meta.fromName
-          ? escHtml(meta.fromName) + ' &lt;' + escHtml(meta.fromAddr) + '&gt;'
-          : escHtml(meta.fromAddr);
-
-        const toRecips = (meta.toRecipients || []).join(', ');
-
-        bodyEl.innerHTML =
-          `<br><br>` +
-          `<div style="border-left:3px solid #ccc;padding-left:12px;margin-top:8px;color:#555;font-size:13px;">` +
-          `<div style="margin-bottom:4px;font-size:12px;color:#888;"><b>---------- Forwarded message ----------</b></div>` +
-          `<div style="font-size:12px;color:#888;margin-bottom:6px;">From: ${senderDisplay}<br>Date: ${sentDate}<br>Subject: ${escHtml(subj)}${toRecips ? '<br>To: ' + escHtml(toRecips) : ''}</div>` +
-          `<div style="margin-top:8px;">${fullBody}</div>` +
-          `</div>`;
-        // Focus To field for forward
+        bodyEl.innerHTML = '<div style="text-align:center;padding:20px;color:#888;">Loading message content…</div>';
+        const fullBody = await outlookFetchFullBodyHtml(meta.id, meta.bodyPreview || '');
+        setComposeBodyWithQuotedAtBottom(buildForwardQuoteHtml(meta, fullBody));
         const toEl = document.getElementById('compose-to');
         if (toEl) setTimeout(() => toEl.focus(), 200);
       }
-
-      composeApplyDefaultSignature('reply');
     }
 
     /**
@@ -16398,11 +17120,11 @@ Best regards,<br>
 
         let fullBody = '';
         try {
-          const res = await fetch(`${API_BASE}/outlook/message/${meta.id}`, { headers: getAuthHeaders() });
+          const res = await fetch(outlookMessageApiUrl(meta.id), { headers: getAuthHeaders() });
           const msg = await res.json();
           if (res.ok) {
-            const bodyPick = msg.body?.content ? msg.body : (msg.uniqueBody?.content ? msg.uniqueBody : null);
-            fullBody = bodyPick?.content || msg.bodyPreview || '';
+            const bodyPick = outlookPickFullBody(msg);
+            fullBody = bodyPick.content || msg.bodyPreview || '';
 
             // Extract attachments
             if (msg.attachments && msg.attachments.length > 0) {
@@ -16547,7 +17269,7 @@ Best regards,<br>
       const msg = await res.json();
       if (!res.ok) throw new Error(msg.error || 'Could not load email');
       activeMailMessage = msg;
-      return String(msg.body?.content || msg.uniqueBody?.content || msg.bodyPreview || meta.bodyPreview || '').replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+      return String(outlookPickFullBody(msg).content || msg.bodyPreview || meta.bodyPreview || '').replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
     }
 
     async function smartReplyAI(meta) {
@@ -17329,7 +18051,7 @@ Best regards,<br>
       if (!confirm(confirmMsg)) return;
 
       // Delete from Outlook via Graph API
-      fetch(`${API_BASE}/outlook/message/${meta.id}`, {
+      fetch(outlookMessageApiUrl(meta.id), {
         method: 'DELETE',
         headers: getAuthHeaders()
       })
@@ -17354,7 +18076,7 @@ Best regards,<br>
     function printMessageFromMenu(meta) {
       if (!meta || !meta.id) return;
 
-      fetch(`${API_BASE}/outlook/message/${meta.id}`, {
+      fetch(outlookMessageApiUrl(meta.id), {
         headers: getAuthHeaders()
       })
         .then(res => res.json())
@@ -17415,7 +18137,7 @@ Best regards,<br>
     function markAsUnreadFromMenu(meta) {
       if (!meta || !meta.id) return;
 
-      fetch(`${API_BASE}/outlook/message/${meta.id}/unread`, {
+      fetch(outlookMessageApiUrl(meta.id, 'unread'), {
         method: 'PATCH',
         headers: getAuthHeaders()
       })
@@ -17434,7 +18156,7 @@ Best regards,<br>
     function downloadMessageFromMenu(meta, format) {
       if (!meta || !meta.id) return;
 
-      fetch(`${API_BASE}/outlook/message/${meta.id}`, {
+      fetch(outlookMessageApiUrl(meta.id), {
         headers: getAuthHeaders()
       })
         .then(res => res.json())
@@ -17496,7 +18218,7 @@ ${body}`;
     function copyEmailContentFromMenu(meta) {
       if (!meta || !meta.id) return;
 
-      fetch(`${API_BASE}/outlook/message/${meta.id}`, {
+      fetch(outlookMessageApiUrl(meta.id), {
         headers: getAuthHeaders()
       })
         .then(res => res.json())
@@ -17570,16 +18292,21 @@ ${plainText}`;
       const metaEl = document.getElementById('email-detail-meta');
       if (subjectEl) subjectEl.textContent = 'Loading…';
       if (bodyEl) bodyEl.innerHTML = `<div style="text-align:center;padding:20px;"><div class="spin-loader" style="margin:0 auto;"></div></div>`;
+      const attPanelLoad = document.getElementById('email-detail-attachments');
+      if (attPanelLoad) { attPanelLoad.style.display = 'none'; attPanelLoad.innerHTML = ''; }
 
       try {
-        const res = await fetch(`${API_BASE}/outlook/message/${id}`, { headers: getAuthHeaders() });
+        const res = await fetch(outlookMessageApiUrl(id), { headers: getAuthHeaders() });
         const msg = await res.json();
         if (!res.ok) throw new Error(msg.error || msg.message || 'Failed to load message');
         activeMailMessage = msg;
+        if (msg.hasAttachments) {
+          msg.attachments = await outlookFetchMessageAttachments(id, msg.attachments);
+        }
 
         if (subjectEl) subjectEl.textContent = msg.subject || '(no subject)';
         const from = msg.from?.emailAddress?.name || msg.from?.emailAddress?.address || '';
-        const time = msg.receivedDateTime ? new Date(msg.receivedDateTime).toLocaleString('en-IN') : '';
+        const time = outlookFormatMessageDate(outlookMessageDateTime(msg));
         if (metaEl) {
           const fromEmail = msg.from?.emailAddress?.address || '';
           const fromName = msg.from?.emailAddress?.name || '';
@@ -17646,40 +18373,55 @@ ${plainText}`;
 
         await loadEmailThread(msg.conversationId, id);
 
+        const attPanel = document.getElementById('email-detail-attachments');
+        renderOutlookAttachmentsPanel(attPanel, msg.id, msg.attachments || []);
+
         if (bodyEl) {
-          const bodyPick =
-            msg.uniqueBody && msg.uniqueBody.content
-              ? msg.uniqueBody
-              : (msg.body && msg.body.content ? msg.body : null);
-          const raw = (bodyPick && bodyPick.content) || msg.body?.content || msg.bodyPreview || '';
-          const ctype = String((bodyPick && bodyPick.contentType) || msg.body?.contentType || 'text').toLowerCase();
+          let loadBanner = '';
+          if (msg.partial && msg.loadWarning) {
+            loadBanner = '<div style="padding:8px 12px;margin:0 0 8px;background:rgba(245,166,35,0.12);border:1px solid rgba(245,166,35,0.35);border-radius:6px;font-size:11.5px;color:var(--gold);">Showing preview only — full body could not be loaded from Outlook. Try refresh or open in Outlook.</div>';
+          }
+          const bodyPick = outlookPickFullBody(msg);
+          const raw = bodyPick.content || msg.bodyPreview || '';
+          const ctype = String(bodyPick.contentType || 'text').toLowerCase();
           const isLight = document.documentElement.classList.contains('light');
-          const wrapBg = isLight ? '#ffffff' : '#161b2c';
           const wrapFg = isLight ? '#1a2035' : '#e8ecf4';
-          const linkCol = isLight ? '#2563eb' : '#60a5fa';
           if (ctype === 'html' && raw) {
             let htmlSrc = await outlookEmbedInlineCids(raw, msg.id, msg.attachments || []);
-            const wrapped = '<!DOCTYPE html><html><head><meta charset="UTF-8"><style>' +
-              'html,body{height:100%;margin:0;padding:12px;box-sizing:border-box;background:#ffffff!important;color:#1a1a1a;' +
-              'font-family:\'Segoe UI\',Outfit,sans-serif;font-size:13px;line-height:1.65;overflow-x:hidden;overflow-y:auto;-webkit-overflow-scrolling:touch;}' +
-              'img{max-width:100%;height:auto;}' +
-              '</style></head><body>' + htmlSrc + '</body></html>';
+            outlookEnsureEmailLinkListener();
+            const wrapped = outlookWrapEmailBodyDocument(htmlSrc);
             const blob = new Blob([wrapped], { type: 'text/html;charset=utf-8' });
             outlookEmailBlobUrl = URL.createObjectURL(blob);
-            bodyEl.innerHTML = '<iframe id="email-body-frame" sandbox="allow-same-origin" src="' + outlookEmailBlobUrl + '" title="Email body"></iframe>';
+            bodyEl.innerHTML = loadBanner + '<iframe id="email-body-frame" class="email-body-iframe" sandbox="' + OUTLOOK_EMAIL_BODY_SANDBOX + '" src="' + outlookEmailBlobUrl + '" title="Email body"></iframe>';
           } else {
             const esc = String(raw).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-            bodyEl.innerHTML = '<div class="email-plain-scroll"><pre style="white-space:pre-wrap;font-family:\'Outfit\',sans-serif;font-size:13px;color:' + wrapFg + ';margin:0;">' + esc + '</pre></div>';
+            bodyEl.innerHTML = loadBanner + '<div class="email-plain-scroll"><pre style="white-space:pre-wrap;font-family:\'Outfit\',sans-serif;font-size:13px;color:' + wrapFg + ';margin:0;">' + esc + '</pre></div>';
           }
         }
         renderMailTasksPanel();
-        // Pre-fill compose To field
-        const replyTo = msg.from?.emailAddress?.address || '';
         const toEl = document.getElementById('compose-to');
-        if (toEl && replyTo) toEl.value = replyTo;
+        if (toEl) {
+          const isSentFolder = window.currentEmailFolder === 'sent';
+          if (isSentFolder) {
+            const recip = (msg.toRecipients || [])[0]?.emailAddress?.address || '';
+            if (recip) toEl.value = recip;
+          } else {
+            const replyTo = msg.from?.emailAddress?.address || '';
+            if (replyTo) toEl.value = replyTo;
+          }
+        }
 
       } catch (err) {
-        if (bodyEl) bodyEl.innerHTML = `<div style="color:var(--red2);padding:16px;">${err.message}</div>`;
+        const cached = (window.currentFolderMessages || []).find((m) => m.id === id);
+        if (cached && bodyEl) {
+          if (subjectEl) subjectEl.textContent = cached.subject || '(no subject)';
+          const preview = cached.bodyPreview || '';
+          const banner = '<div style="padding:8px 12px;margin:8px;background:rgba(245,166,35,0.12);border:1px solid rgba(245,166,35,0.35);border-radius:6px;font-size:11.5px;color:var(--gold);">Could not load full message from Outlook. Showing list preview.</div>';
+          bodyEl.innerHTML = banner + '<div class="email-plain-scroll"><pre style="white-space:pre-wrap;font-family:\'Outfit\',sans-serif;font-size:13px;color:var(--text);margin:0;">' + escHtml(preview) + '</pre></div>';
+          activeMailMessage = cached;
+        } else if (bodyEl) {
+          bodyEl.innerHTML = `<div style="color:var(--red2);padding:16px;">${escHtml(err.message)}</div>`;
+        }
       }
     }
 
@@ -18040,118 +18782,78 @@ ${plainText}`;
       if (container) container.prepend(banner);
     }
 
-    function openReply(replyAll) {
+    async function openReply(replyAll) {
       if (!activeMessageId) return;
       document.getElementById('compose-title').textContent = replyAll ? 'Reply All' : 'Reply';
+      resetComposeForm();
       openModal('compose-email-modal');
-      loadComposeTemplates(); // Load templates
+      loadComposeTemplates();
       setupComposeRecipientAutocomplete();
-      composeApplyDefaultSignature('reply');
+      composeLoadGroupsDropdown();
 
-      // Use already-loaded activeMailMessage if available, otherwise fetch
-      const doReply = function (msg) {
-        const myEmail = (outlookConnectedEmail || '').toLowerCase().trim();
-
-        // ── Subject ──────────────────────────────────────────────────────────
-        const subj = msg.subject || '';
-        const reSubj = /^re:/i.test(subj.trim()) ? subj : 'Re: ' + subj;
-        const subjEl = document.getElementById('compose-subject');
-        if (subjEl) subjEl.value = reSubj;
-
-        // ── Determine sender ─────────────────────────────────────────────────
-        const senderAddr = (msg.from?.emailAddress?.address || '').toLowerCase().trim();
-        const isSentByMe = senderAddr === myEmail;
-
-        // ── Helper: extract unique email addresses, excluding self ───────────
-        function extractEmails(recipientArray) {
-          return (recipientArray || [])
-            .map(r => (r.emailAddress?.address || '').trim())
-            .filter(a => a && a.toLowerCase() !== myEmail);
+      let msg = (activeMailMessage && activeMailMessage.id === activeMessageId) ? activeMailMessage : null;
+      if (!msg) {
+        try {
+          const res = await fetch(outlookMessageApiUrl(activeMessageId), { headers: getAuthHeaders() });
+          msg = await res.json();
+          if (!res.ok) throw new Error(msg.error || 'Failed to load message');
+          activeMailMessage = msg;
+        } catch (_) {
+          return;
         }
-
-        // ── Unknown sender banner ────────────────────────────────────────────
-        if (isSentByMe) {
-          const firstRecip = (msg.toRecipients || [])[0]?.emailAddress?.address || '';
-          injectReplyUnknownBanner(firstRecip, true);
-        } else {
-          injectReplyUnknownBanner(senderAddr, false);
-        }
-
-        const toEl = document.getElementById('compose-to');
-        const ccEl = document.getElementById('compose-cc');
-
-        if (replyAll) {
-          // ── Reply All ────────────────────────────────────────────────────
-          // To = sender (if not self) + original To recipients (minus self)
-          // CC = original CC recipients (minus self, minus anyone already in To)
-          const toRecips = extractEmails(msg.toRecipients);
-          const ccRecips = extractEmails(msg.ccRecipients);
-
-          let toList = isSentByMe
-            ? toRecips
-            : [senderAddr, ...toRecips].filter(a => a);
-
-          // Deduplicate To list
-          toList = [...new Set(toList.map(a => a.toLowerCase()))];
-
-          // CC = original CC minus anyone already in To
-          const toSet = new Set(toList.map(a => a.toLowerCase()));
-          const ccList = [...new Set(ccRecips.map(a => a.toLowerCase()))].filter(a => !toSet.has(a));
-
-          if (toEl) toEl.value = toList.join('; ');
-          if (ccEl) ccEl.value = ccList.join('; ');
-
-        } else {
-          // ── Reply (sender only) ──────────────────────────────────────────
-          // If WE sent the original → reply to original To recipients
-          // Otherwise → reply to sender only
-          if (isSentByMe) {
-            const toAddrs = extractEmails(msg.toRecipients);
-            if (toEl) toEl.value = toAddrs.join('; ');
-          } else {
-            if (toEl) toEl.value = senderAddr;
-          }
-          if (ccEl) ccEl.value = '';
-        }
-
-        // ── Quoted body ──────────────────────────────────────────────────────
-        const bodyEl = document.getElementById('compose-body');
-        if (bodyEl) {
-          const fromName = msg.from?.emailAddress?.name || senderAddr;
-          const fromEmail = msg.from?.emailAddress?.address || senderAddr;
-          const sentDate = msg.receivedDateTime
-            ? new Date(msg.receivedDateTime).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' })
-            : '';
-          const originalHtml = msg.body?.content || msg.bodyPreview || '';
-          const quotedBlock =
-            `<br><br>` +
-            `<div style="border-left:3px solid #ccc;padding-left:12px;margin-top:8px;color:#555;font-size:13px;">` +
-            `<div style="margin-bottom:6px;font-size:12px;color:#888;">` +
-            `On ${sentDate}, <b>${escHtml(fromName)}</b> &lt;${escHtml(fromEmail)}&gt; wrote:</div>` +
-            originalHtml +
-            `</div>`;
-          bodyEl.innerHTML = quotedBlock;
-          // Place cursor at top
-          const range = document.createRange();
-          const sel = window.getSelection();
-          range.setStart(bodyEl, 0);
-          range.collapse(true);
-          sel.removeAllRanges();
-          sel.addRange(range);
-        }
-      };
-
-      // Use cached message if available and matches, otherwise fetch
-      if (activeMailMessage && activeMailMessage.id === activeMessageId) {
-        doReply(activeMailMessage);
-      } else {
-        fetch(`${API_BASE}/outlook/message/${activeMessageId}`, { headers: getAuthHeaders() })
-          .then(r => r.json())
-          .then(msg => { activeMailMessage = msg; doReply(msg); })
-          .catch(() => { });
       }
 
-      setTimeout(() => { const b = document.getElementById('compose-body'); if (b) b.focus(); }, 200);
+      const myEmail = (outlookConnectedEmail || '').toLowerCase().trim();
+      const subj = msg.subject || '';
+      const reSubj = /^re:/i.test(subj.trim()) ? subj : 'Re: ' + subj;
+      const subjEl = document.getElementById('compose-subject');
+      if (subjEl) subjEl.value = reSubj;
+
+      const senderAddr = (msg.from?.emailAddress?.address || '').toLowerCase().trim();
+      const isSentByMe = senderAddr === myEmail;
+
+      function extractEmails(recipientArray) {
+        return (recipientArray || [])
+          .map(r => (r.emailAddress?.address || '').trim())
+          .filter(a => a && a.toLowerCase() !== myEmail);
+      }
+
+      if (isSentByMe) {
+        injectReplyUnknownBanner((msg.toRecipients || [])[0]?.emailAddress?.address || '', true);
+      } else {
+        injectReplyUnknownBanner(senderAddr, false);
+      }
+
+      const toEl = document.getElementById('compose-to');
+      const ccEl = document.getElementById('compose-cc');
+
+      if (replyAll) {
+        const toRecips = extractEmails(msg.toRecipients);
+        const ccRecips = extractEmails(msg.ccRecipients);
+        let toList = isSentByMe ? toRecips : [senderAddr, ...toRecips].filter(Boolean);
+        toList = [...new Set(toList.map(a => a.toLowerCase()))];
+        const toSet = new Set(toList.map(a => a.toLowerCase()));
+        const ccList = [...new Set(ccRecips.map(a => a.toLowerCase()))].filter(a => !toSet.has(a));
+        if (toEl) toEl.value = toList.join('; ');
+        if (ccEl) ccEl.value = ccList.join('; ');
+      } else {
+        if (isSentByMe) {
+          const toAddrs = extractEmails(msg.toRecipients);
+          if (toEl) toEl.value = toAddrs.join('; ');
+        } else {
+          if (toEl) toEl.value = senderAddr;
+        }
+        if (ccEl) ccEl.value = '';
+      }
+
+      const bodyEl = document.getElementById('compose-body');
+      if (bodyEl) {
+        bodyEl.innerHTML = '<div style="text-align:center;padding:20px;color:#888;">Loading message content…</div>';
+        const fullBody = await outlookFetchFullBodyHtml(msg.id, msg.body?.content || msg.bodyPreview || '');
+        setComposeBodyWithQuotedAtBottom(buildReplyQuoteHtml(msg, fullBody));
+      }
+
+      setTimeout(() => focusComposeBodyTop(), 200);
     }
 
     async function aiDraftReply() {
@@ -18623,6 +19325,7 @@ ${plainText}`;
       const isReply = !!activeMessageId;
       const composeTitle = document.getElementById('compose-title')?.textContent || '';
       const replyAll = composeTitle.toLowerCase().includes('all');
+      const isForward = /forward/i.test(composeTitle) || /^fwd?:/i.test(subject || '');
 
       if (isReply) {
         // Reply — only body required (To/Subject pre-filled but not used by /reply endpoint)
@@ -18681,9 +19384,16 @@ ${plainText}`;
           }
           clearCompose();
           if (statusEl) { statusEl.style.display = 'block'; statusEl.style.color = 'var(--green2)'; statusEl.textContent = '✓ Email sent successfully via Outlook.'; }
-          // Refresh inbox to show the reply
-          setTimeout(() => loadInbox(), 1500);
+          // Refresh Sent Items so forwards/new sends appear (Graph can lag a few seconds)
+          if (!isReply || isForward) {
+            switchOutlookFolder('sent', document.querySelector('.outlook-folder-item[data-folder="sent"]'));
+          }
+          const refreshMail = () => loadInbox(true);
+          setTimeout(refreshMail, 600);
+          setTimeout(refreshMail, 2500);
+          setTimeout(refreshMail, 5000);
           setTimeout(() => oaRefreshStorageIfOpen(), 1800);
+          setTimeout(() => updateFolderCounts(), 2000);
         } else {
           if (data.error === 'NOT_AUTHENTICATED') {
             notify('Not connected', 'Please connect Outlook first', 'var(--red)', 'fab fa-microsoft');
@@ -22035,7 +22745,14 @@ ${plainText}`;
       var url = prompt('Image URL or data URL:', '');
       if (!url) return;
       var width = prompt('Width in px:', '90') || '90';
-      dsigInsertHTML('<img src="' + escAttr(url) + '" width="' + escAttr(width) + '" style="display:block;height:auto;max-width:100%;" alt="">');
+      var link = prompt('Click URL when image is clicked (optional):', '') || '';
+      var imgTag = '<img src="' + escAttr(url) + '" width="' + escAttr(width) + '" style="display:block;height:auto;max-width:100%;" alt="">';
+      var clickUrl = mediaNormalizeClickUrl(link);
+      if (clickUrl) {
+        dsigInsertHTML('<a href="' + escAttr(clickUrl) + '" target="_blank" rel="noopener noreferrer" style="text-decoration:none;">' + imgTag + '</a>');
+      } else {
+        dsigInsertHTML(imgTag);
+      }
     }
     function dsigInsertTable() {
       dsigInsertHTML('<table style="border-collapse:collapse;width:100%;margin:8px 0;"><tr><td style="border:1px solid #d9e2ec;padding:8px;">Label</td><td style="border:1px solid #d9e2ec;padding:8px;">Value</td></tr></table>');
@@ -22807,7 +23524,7 @@ ${plainText}`;
       ['media-img-file', 'media-vid-file', 'media-aud-file', 'media-doc-file'].forEach(function (id) {
         var el = document.getElementById(id); if (el) el.value = '';
       });
-      ['media-img-url', 'media-vid-url', 'media-aud-url'].forEach(function (id) {
+      ['media-img-url', 'media-img-link', 'media-vid-url', 'media-aud-url'].forEach(function (id) {
         var el = document.getElementById(id); if (el) el.value = '';
       });
       ['media-img-preview', 'media-vid-preview', 'media-aud-preview', 'media-doc-preview'].forEach(function (id) {
@@ -22850,6 +23567,12 @@ ${plainText}`;
       var shortName = { image: 'img', video: 'vid', audio: 'aud', document: 'doc' }[type];
       var input = document.getElementById('media-' + shortName + '-file');
       if (input) input.value = '';
+      if (type === 'image') {
+        var imgUrl = document.getElementById('media-img-url');
+        var imgLink = document.getElementById('media-img-link');
+        if (imgUrl) imgUrl.value = '';
+        if (imgLink) imgLink.value = '';
+      }
       var prev = document.getElementById('media-' + shortName + '-preview');
       if (prev) prev.style.display = 'none';
       if (type !== 'document') {
@@ -22857,6 +23580,16 @@ ${plainText}`;
         if (el) el.src = '';
       }
       updateMediaModalSizeBar();
+    }
+
+    /** Normalize a click-through URL for image links (https added when omitted). */
+    function mediaNormalizeClickUrl(url) {
+      var u = String(url || '').trim();
+      if (!u) return '';
+      if (/^(https?:|mailto:|tel:)/i.test(u)) return u;
+      if (/^\/\//.test(u)) return 'https:' + u;
+      if (/^www\./i.test(u)) return 'https://' + u;
+      return 'https://' + u;
     }
 
     function mediaPreviewFile(type, input) {
@@ -22979,6 +23712,7 @@ ${plainText}`;
 
       // URL fields — read while modal DOM is still live
       var imgUrl  = ((document.getElementById('media-img-url')    || {}).value || '').trim();
+      var imgLink = ((document.getElementById('media-img-link')   || {}).value || '').trim();
       var vidUrl  = ((document.getElementById('media-vid-url')    || {}).value || '').trim();
       var audUrl  = ((document.getElementById('media-aud-url')    || {}).value || '').trim();
       var imgW    = (((document.getElementById('media-img-width') || {}).value || '100%')).trim() || '100%';
@@ -23001,7 +23735,13 @@ ${plainText}`;
       if (imgSrc) {
         var iwStyle = /^\d+$/.test(imgW) ? 'width:' + imgW + 'px;' : 'width:' + imgW + ';';
         var safeImgName = outlookEscapeAttr(imgName || '');
-        parts.push('<img src="' + imgSrc + '" data-filename="' + safeImgName + '" alt="' + escHtml(imgAlt) + '" style="' + iwStyle + 'max-width:100%;display:block;margin:6px 0;" /><br>');
+        var imgTag = '<img src="' + escAttr(imgSrc) + '" data-filename="' + safeImgName + '" alt="' + escHtml(imgAlt) + '" style="' + iwStyle + 'max-width:100%;display:block;margin:6px 0;" />';
+        var clickUrl = mediaNormalizeClickUrl(imgLink);
+        if (clickUrl) {
+          parts.push('<a href="' + escAttr(clickUrl) + '" target="_blank" rel="noopener noreferrer" style="text-decoration:none;display:inline-block;cursor:pointer;">' + imgTag + '</a><br>');
+        } else {
+          parts.push(imgTag + '<br>');
+        }
       }
 
       // ── Process File Attachments (Video, Audio, Document) ──────────────────
@@ -23426,6 +24166,37 @@ ${plainText}`;
       }
     }
 
+    function pbxPlayRecording(filePath) {
+      const url = `${API_BASE}/calls/recordings/play?file=${encodeURIComponent(filePath.replace(/\\\\/g, '/'))}`;
+      
+      // Check if modal exists, if not create it
+      let modal = document.getElementById('pbx-audio-modal');
+      if (!modal) {
+        modal = document.createElement('div');
+        modal.id = 'pbx-audio-modal';
+        modal.className = 'modal-overlay';
+        modal.innerHTML = `
+          <div class="modal" style="max-width:400px; padding: 20px;">
+            <div class="modal-title" style="margin-bottom: 15px;">
+              <span><i class="fas fa-play-circle" style="color:var(--gold);margin-right:8px;"></i>Audio Player</span>
+              <span class="modal-close" onclick="closeModal('pbx-audio-modal'); document.getElementById('pbx-audio-player').pause();"><i class="fas fa-times"></i></span>
+            </div>
+            <audio id="pbx-audio-player" controls style="width: 100%; outline: none;" autoplay>
+              Your browser does not support the audio element.
+            </audio>
+          </div>
+        `;
+        document.body.appendChild(modal);
+      }
+      
+      const player = document.getElementById('pbx-audio-player');
+      player.src = url;
+      player.load(); // Ensure the browser reloads the new source
+      player.play().catch(e => notify('Playback Error', 'Could not play audio automatically. Please click play.', 'var(--gold)', 'fas fa-info-circle'));
+      openModal('pbx-audio-modal');
+    }
+
+
     function debouncedLoadCallLogs() {
 
       clearTimeout(_callSearchDebounce);
@@ -23513,10 +24284,13 @@ ${plainText}`;
               ? `<div><b>${escHtml(contactName)}</b>${notesIcon}</div><div style="font-size:11px;color:var(--muted);">${escHtml(callerPhone)}</div>`
               : escHtml(callerPhone || '-');
             const recordingKey = pbxRecordingLookupKey(log);
-            const hasRecording = !!(log.recording_file && String(log.recording_file).trim());
+            const hasRecording = /\.(wav|mp3|ogg|m4a)$/i.test(String(log.recording_file || '').trim());
             const recordingCell = hasRecording
-              ? `<button class="btn btn-green btn-xs" onclick="event.stopPropagation();pbxCopyRecordingKey(${log.id})" title="Recording linked. Copy lookup key: ${escAttr(recordingKey)}"><i class="fas fa-microphone"></i> Linked</button>`
-              : `<button class="btn btn-ghost btn-xs" onclick="event.stopPropagation();pbxCopyRecordingKey(${log.id})" title="Copy future recording lookup key: ${escAttr(recordingKey)}"><i class="fas fa-microphone-lines"></i> Key</button>`;
+              ? `<div style="display:flex;gap:4px;">
+                   <button class="btn btn-green btn-xs" onclick="event.stopPropagation();pbxPlayRecording('${escAttr(log.recording_file)}')" title="Play Recording"><i class="fas fa-play"></i> Play</button>
+                   <a href="${API_BASE}/calls/recordings/play?file=${encodeURIComponent(log.recording_file.replace(/\\\\/g, '/'))}" download class="btn btn-ghost btn-xs" onclick="event.stopPropagation();" title="Download"><i class="fas fa-download"></i></a>
+                 </div>`
+              : `<button class="btn btn-ghost btn-xs" disabled style="opacity:0.5;" title="Not Available"><i class="fas fa-microphone-slash"></i> N/A</button>`;
 
             return `
           <tr onclick="selectCallRecord(this, ${log.id})">
@@ -23871,19 +24645,27 @@ ${plainText}`;
         });
         const data = await res.json();
         pbxConsoleStep(traceId, 'sync response body', data);
-        if (res.ok) {
-          notify('PBX Sync Complete', data.message || `Checked live listener (${data.total || 0} stored records)`, 'var(--green2)', 'fas fa-check-circle');
+        
+        // Link recordings
+        pbxConsoleStep(traceId, 'fetch POST /calls/link-recordings start');
+        notify('PBX Linker', 'Linking audio recordings to call logs...', 'var(--blue2)', 'fas fa-link');
+        const linkRes = await fetch(`${API_BASE}/calls/link-recordings`, { method: 'POST', headers: getAuthHeaders() });
+        const linkData = await linkRes.json();
+        
+        if (res.ok && linkRes.ok) {
+          notify('PBX Sync Complete', `${data.message || 'Records synced'}. Linked ${linkData.matched || 0} new recordings.`, 'var(--green2)', 'fas fa-check-circle');
           refreshPbxCallLogsLatest('sync-latest');
         } else {
-          throw new Error(data.error);
+          throw new Error(data.error || linkData.error || 'Sync/Link failed');
         }
       } catch (err) {
-        pbxConsoleError(traceId, 'PBX sync failed', err);
-        notify('Sync Failed', err.message, 'var(--red2)', 'fas fa-exclamation-circle');
+        pbxConsoleError(traceId, 'pbxSyncNow failed', err);
+        notify('Sync Error', err.message, 'var(--red2)', 'fas fa-exclamation-circle');
       } finally {
-        pbxConsoleEnd(traceId, 'Manual PBX sync finished');
+        pbxConsoleEnd(traceId, 'pbxSyncNow finished');
       }
     }
+
 
     function pbxReconnect() {
       const traceId = pbxTraceId('RECONNECT');
@@ -27466,7 +28248,8 @@ Nagpur, Maharashtra, 440017, India<br>
       <div id="mpanel-image">
         <div style="font-size:11.5px;color:var(--muted);margin-bottom:10px;">
           <b style="color:var(--text);">File upload</b> — embeds image inline (keep under 2 MB).<br>
-          <b style="color:var(--text);">URL</b> — paste a public image link; Outlook renders it inline. ✅
+          <b style="color:var(--text);">Image URL</b> — paste a public image link; Outlook renders it inline. ✅<br>
+          <b style="color:var(--text);">Click URL</b> — optional; wraps the image in a link (opens in browser when recipient clicks). ✅
         </div>
         <div style="display:flex;gap:8px;margin-bottom:10px;">
           <label class="btn btn-blue btn-sm" style="cursor:pointer;"><i class="fas fa-upload"></i> Upload Image
@@ -27492,6 +28275,11 @@ Nagpur, Maharashtra, 440017, India<br>
             <label class="form-label">Alt text</label>
             <input id="media-img-alt" class="inp" placeholder="Image description" style="font-size:12px;">
           </div>
+        </div>
+        <div style="margin-top:10px;">
+          <label class="form-label">Click URL <span style="font-weight:400;color:var(--muted);">(optional — link when image is clicked)</span></label>
+          <input id="media-img-link" class="inp" placeholder="https://example.com/landing-page"
+            style="width:100%;font-size:12px;">
         </div>
       </div>
 

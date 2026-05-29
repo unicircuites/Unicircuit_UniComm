@@ -1,6 +1,20 @@
-# Dependencies
+# Dependencies / interpreter environments
 node_modules/
 backend/node_modules/
+.npm-cache/
+npm-cache/
+.venv/
+venv/
+env/
+ENV/
+interpreter-env/
+backend/interpreter-env/
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
 
 # Environment variables — never commit secrets
 backend/.env
@@ -79,3 +93,4 @@ final_clean.js
 
 # Large local vendor/manual extracts
 ETERNITY NE V1R7.3.3 System Manual_compressed-compressed-pages-deleted-compressed.txt
+.aider*

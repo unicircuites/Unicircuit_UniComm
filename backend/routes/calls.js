@@ -24,6 +24,7 @@ const fs = require('fs');
 const backupJobs = {};
 const { authenticate } = require('../middleware/auth');
 const smdr = require('../services/matrixSmdr');
+const recordingLinker = require('../services/recordingLinker');
 
 
 const router = express.Router();
@@ -1387,7 +1388,41 @@ router.get('/section-summary', async (req, res) => {
 // RECORDINGS — scan filesystem for .wav / .mp3 files
 // ═══════════════════════════════════════════════════════════════════
 
+router.post('/link-recordings', async (req, res) => {
+  try {
+    const result = await recordingLinker.linkRecordingsToCallLogs(REC_DIR);
+    if (!result.success) {
+      return res.status(500).json({ error: result.error || result.message });
+    }
+    return res.json({ message: result.message, matched: result.matchedCount });
+  } catch (err) {
+    return res.status(500).json({ error: 'Failed to link recordings: ' + err.message });
+  }
+});
 
+router.get('/recordings/play', (req, res) => {
+  try {
+    const file = req.query.file;
+    if (!file) return res.status(400).json({ error: 'No file specified' });
+
+    const fullPath = recordingLinker.resolveRecordingFullPath(file, REC_DIR);
+    if (!fullPath) {
+      return res.status(404).json({ error: 'Recording file not found' });
+    }
+
+    const allowedRoots = [
+      path.resolve(REC_DIR),
+      path.resolve(recordingLinker.LOCAL_STORED_DIR)
+    ];
+    if (!allowedRoots.some(root => fullPath.startsWith(root))) {
+      return res.status(403).json({ error: 'Access forbidden' });
+    }
+
+    return res.sendFile(fullPath);
+  } catch (err) {
+    return res.status(500).json({ error: 'Failed to stream recording: ' + err.message });
+  }
+});
 
 router.get('/recordings', (req, res) => {
   try {

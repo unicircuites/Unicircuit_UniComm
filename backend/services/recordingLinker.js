@@ -1,0 +1,410 @@
+const fs = require('fs');
+const path = require('path');
+const pool = require('../db/pool');
+
+const LOCAL_STORED_DIR = path.join(__dirname, '..', 'pbx_recordings');
+const TIMESTAMP_TOLERANCE_MS = parseInt(process.env.PBX_RECORDING_MATCH_TOLERANCE_MS || '60000', 10);
+const AUDIO_EXT_RE = /\.(wav|mp3|ogg|m4a)$/i;
+
+/**
+ * Scans directories recursively for audio files
+ */
+function getAllRecordingFiles(dir) {
+  let results = [];
+  if (!fs.existsSync(dir)) return results;
+
+  const items = fs.readdirSync(dir, { withFileTypes: true });
+
+  for (const item of items) {
+    const fullPath = path.join(dir, item.name);
+
+    if (item.isDirectory()) {
+      const skipFolders = ['_BACKUPS', '_BACK', 'BACKUP', 'BACKUPS'];
+      if (skipFolders.some(name => item.name.toUpperCase().includes(name))) {
+        continue;
+      }
+      results = results.concat(getAllRecordingFiles(fullPath));
+    } else {
+      const ext = path.extname(item.name).toLowerCase();
+      if (['.wav', '.mp3', '.ogg', '.m4a'].includes(ext)) {
+        results.push(fullPath);
+      }
+    }
+  }
+
+  return results;
+}
+
+/**
+ * Normalizes a phone number for matching.
+ * Keeps only digits, and takes the last 10 digits to handle
+ * varying country codes (e.g. +91, 0, etc).
+ */
+function normalizePhone(str) {
+  if (!str) return '';
+  const digits = String(str).replace(/\D/g, '');
+  if (digits.length >= 10) return digits.slice(-10);
+
+  const match = String(str).match(/\d+/);
+  return match ? match[0] : '';
+}
+
+function isPlayableRecordingPath(value) {
+  return !!(value && AUDIO_EXT_RE.test(String(value).trim()));
+}
+
+function parseDurationToMs(durStr) {
+  if (!durStr) return 0;
+  durStr = String(durStr).trim();
+  if (durStr.includes(':')) {
+    const parts = durStr.split(':').map(Number);
+    if (parts.length === 3) return (parts[0] * 3600 + parts[1] * 60 + parts[2]) * 1000;
+  }
+  let seconds = 0;
+  const mMatch = durStr.match(/(\d+)\s*m/i);
+  if (mMatch) seconds += parseInt(mMatch[1], 10) * 60;
+  const sMatch = durStr.match(/(\d+)\s*s/i);
+  if (sMatch) seconds += parseInt(sMatch[1], 10);
+  return seconds * 1000;
+}
+
+/**
+ * Parses Matrix recording filenames (CT/LM).
+ * Supports both CT_<phone>_<ext> and CT_<ext>_<phone> — short numeric token = extension.
+ */
+function parseRecordingFilename(filename) {
+  const baseName = path.basename(filename);
+  const clean = baseName.replace(/\.[^.]+$/, '');
+  const parts = clean.split('_');
+
+  const dateIndex = parts.findIndex((part, index) =>
+    /^\d{8}$/.test(part || '') && /^\d{6}$/.test(parts[index + 1] || '')
+  );
+  if (dateIndex < 0) return null;
+
+  const datePart = parts[dateIndex];
+  const timePart = parts[dateIndex + 1];
+  const day = datePart.substring(0, 2);
+  const month = datePart.substring(2, 4);
+  const year = datePart.substring(4, 8);
+  const hour = timePart.substring(0, 2);
+  const minute = timePart.substring(2, 4);
+  const second = timePart.substring(4, 6);
+  const timestamp = new Date(`${year}-${month}-${day}T${hour}:${minute}:${second}`);
+  if (Number.isNaN(timestamp.getTime())) return null;
+
+  let extension = '';
+  let phone = '';
+  const remaining = parts.filter((part, index) =>
+    part &&
+    !/^(CT|LM)$/i.test(part) &&
+    index !== dateIndex &&
+    index !== dateIndex + 1
+  );
+
+  for (const part of remaining) {
+    const digits = String(part).replace(/\D/g, '');
+    if (/^\d{1,5}$/.test(digits) && digits === String(part).replace(/\D/g, '')) {
+      if (!extension) extension = digits;
+      else if (!phone && digits.length >= 6) phone = normalizePhone(part);
+    } else if (digits.length >= 6) {
+      phone = normalizePhone(part);
+    }
+  }
+
+  if (!extension || !phone) return null;
+
+  return {
+    filename: baseName,
+    timestamp,
+    timestampMs: timestamp.getTime(),
+    extension: normalizePhone(extension),
+    phone,
+    rawPhone: phone
+  };
+}
+
+function indexKey(phone, extension) {
+  return `${phone}|${extension}`;
+}
+
+function addToIndex(index, phone, extension, entry) {
+  if (!phone || !extension) return;
+  const key = indexKey(phone, extension);
+  if (!index.has(key)) index.set(key, []);
+  index.get(key).push(entry);
+}
+
+function buildRecordingIndex(entries) {
+  const index = new Map();
+  for (const entry of entries) {
+    addToIndex(index, entry.phone, entry.extension, entry);
+  }
+  for (const list of index.values()) {
+    list.sort((a, b) => a.timestampMs - b.timestampMs);
+  }
+  return index;
+}
+
+function formatCallDateValue(callDate) {
+  if (!callDate) return '';
+  if (callDate instanceof Date) {
+    const y = callDate.getFullYear();
+    const m = String(callDate.getMonth() + 1).padStart(2, '0');
+    const day = String(callDate.getDate()).padStart(2, '0');
+    return `${y}-${m}-${day}`;
+  }
+  return String(callDate).split('T')[0];
+}
+
+function getCallTimestamps(call) {
+  let callEndMs = 0;
+  if (call.call_date && call.call_time) {
+    const d = formatCallDateValue(call.call_date);
+    const time = String(call.call_time).split('.')[0];
+    const obj = new Date(`${d}T${time}`);
+    if (!Number.isNaN(obj.getTime())) callEndMs = obj.getTime();
+  } else if (call.created_at) {
+    callEndMs = new Date(call.created_at).getTime();
+  }
+  if (!callEndMs) return null;
+
+  const durationMs = parseDurationToMs(call.duration);
+  return {
+    callStartMs: callEndMs - durationMs,
+    callEndMs
+  };
+}
+
+function getCallMatchKeys(call) {
+  const phones = new Set();
+  const extensions = new Set();
+
+  for (const field of [call.caller, call.destination, call.extension]) {
+    const digits = String(field || '').replace(/\D/g, '');
+    if (digits.length >= 10) {
+      phones.add(normalizePhone(field));
+    } else {
+      const short = normalizePhone(field);
+      if (short) extensions.add(short);
+    }
+  }
+
+  return { phones: [...phones], extensions: [...extensions] };
+}
+
+function timestampMatches(recMs, callStartMs, callEndMs) {
+  const diffToStart = Math.abs(recMs - callStartMs);
+  const diffToEnd = Math.abs(recMs - callEndMs);
+  const minDiffMs = Math.min(diffToStart, diffToEnd);
+
+  if (minDiffMs <= TIMESTAMP_TOLERANCE_MS) return minDiffMs;
+  if (recMs >= callStartMs - TIMESTAMP_TOLERANCE_MS && recMs <= callEndMs + TIMESTAMP_TOLERANCE_MS) {
+    return minDiffMs;
+  }
+  return null;
+}
+
+function findBestMatch(call, index, usedPaths) {
+  const times = getCallTimestamps(call);
+  if (!times) return null;
+
+  const { phones, extensions } = getCallMatchKeys(call);
+  if (!phones.length || !extensions.length) return null;
+
+  let bestMatch = null;
+  let bestDiff = Infinity;
+
+  for (const phone of phones) {
+    for (const ext of extensions) {
+      const candidates = index.get(indexKey(phone, ext)) || [];
+      for (const rec of candidates) {
+        if (usedPaths.has(rec.playbackPath)) continue;
+
+        const diff = timestampMatches(rec.timestampMs, times.callStartMs, times.callEndMs);
+        if (diff === null) continue;
+
+        if (diff < bestDiff) {
+          bestDiff = diff;
+          bestMatch = rec;
+        }
+      }
+    }
+  }
+
+  return bestMatch;
+}
+
+async function loadStoredRecordingEntries() {
+  const entries = [];
+  const { rows } = await pool.query(`
+    SELECT original_filename, local_path, extension_number, customer_number, recording_date
+    FROM pbx_recordings
+    WHERE local_path IS NOT NULL AND local_path <> ''
+    ORDER BY recording_date DESC NULLS LAST, id DESC
+  `);
+
+  for (const row of rows) {
+    const parsed = parseRecordingFilename(row.original_filename || row.local_path);
+    const phone = normalizePhone(row.customer_number) || parsed?.phone;
+    const extension = normalizePhone(row.extension_number) || parsed?.extension;
+    const timestampMs = row.recording_date
+      ? new Date(row.recording_date).getTime()
+      : parsed?.timestampMs;
+
+    if (!phone || !extension || !timestampMs || Number.isNaN(timestampMs)) continue;
+    if (!fs.existsSync(row.local_path)) continue;
+
+    const rel = path.relative(LOCAL_STORED_DIR, row.local_path).replace(/\\/g, '/');
+    entries.push({
+      phone,
+      extension,
+      timestampMs,
+      playbackPath: rel,
+      source: 'db'
+    });
+  }
+
+  return entries;
+}
+
+function loadFilesystemRecordingEntries(recordingsDir) {
+  const entries = [];
+  if (!recordingsDir || !fs.existsSync(recordingsDir)) return entries;
+
+  for (const file of getAllRecordingFiles(recordingsDir)) {
+    const parsed = parseRecordingFilename(file);
+    if (!parsed) continue;
+
+    entries.push({
+      phone: parsed.phone,
+      extension: parsed.extension,
+      timestampMs: parsed.timestampMs,
+      playbackPath: path.relative(recordingsDir, file).replace(/\\/g, '/'),
+      source: 'fs'
+    });
+  }
+
+  return entries;
+}
+
+/**
+ * Main linking function.
+ * Matches unlinked call logs with stored PBX recordings (DB + optional network folder).
+ */
+async function linkRecordingsToCallLogs(recordingsDir) {
+  try {
+    console.log('[Linker] Starting recording linking process...');
+
+    const { rows: unlinkedCalls } = await pool.query(`
+      SELECT id, call_date, call_time, duration, created_at, caller, destination, extension, call_type
+      FROM call_logs
+      WHERE recording_file IS NULL
+         OR recording_file = ''
+         OR recording_file !~* '\\.(wav|mp3|ogg|m4a)$'
+    `);
+
+    if (!unlinkedCalls.length) {
+      console.log('[Linker] No unlinked call logs found. Exiting.');
+      return { success: true, matchedCount: 0, message: 'No unlinked calls found' };
+    }
+
+    console.log(`[Linker] Found ${unlinkedCalls.length} call logs needing recording links.`);
+
+    const storedEntries = await loadStoredRecordingEntries();
+    const fsEntries = loadFilesystemRecordingEntries(recordingsDir);
+    const allEntries = [...storedEntries, ...fsEntries];
+
+    console.log(`[Linker] Indexed ${storedEntries.length} stored DB recordings, ${fsEntries.length} network files.`);
+
+    if (!allEntries.length) {
+      return {
+        success: false,
+        matchedCount: 0,
+        message: 'No playable recordings found in database or PBX_RECORDINGS_DIR'
+      };
+    }
+
+    const index = buildRecordingIndex(allEntries);
+    const usedPaths = new Set();
+
+    const alreadyLinked = await pool.query(`
+      SELECT recording_file FROM call_logs
+      WHERE recording_file IS NOT NULL AND recording_file <> ''
+        AND recording_file ~* '\\.(wav|mp3|ogg|m4a)$'
+    `);
+    for (const row of alreadyLinked.rows) {
+      usedPaths.add(String(row.recording_file).replace(/\\/g, '/'));
+    }
+
+    let matchedCount = 0;
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+
+      for (const call of unlinkedCalls) {
+        const bestMatch = findBestMatch(call, index, usedPaths);
+        if (!bestMatch) continue;
+
+        await client.query(
+          `UPDATE call_logs SET recording_file = $1 WHERE id = $2`,
+          [bestMatch.playbackPath, call.id]
+        );
+        usedPaths.add(bestMatch.playbackPath);
+        matchedCount++;
+      }
+
+      await client.query('COMMIT');
+      console.log(`[Linker] Successfully linked ${matchedCount} recordings to call logs.`);
+    } catch (dbErr) {
+      await client.query('ROLLBACK');
+      throw dbErr;
+    } finally {
+      client.release();
+    }
+
+    return {
+      success: true,
+      matchedCount,
+      message: `Successfully linked ${matchedCount} recordings (${storedEntries.length} indexed from DB)`
+    };
+  } catch (err) {
+    console.error('[Linker] Error linking recordings:', err.message);
+    return { success: false, error: err.message, matchedCount: 0 };
+  }
+}
+
+/**
+ * Resolve a recording path for streaming (network share or local PBX store).
+ */
+function resolveRecordingFullPath(fileParam, recordingsDir) {
+  if (!fileParam) return null;
+
+  const normalized = String(fileParam).replace(/\\/g, '/');
+  const roots = [
+    { base: path.resolve(recordingsDir || ''), file: normalized },
+    { base: path.resolve(LOCAL_STORED_DIR), file: normalized }
+  ];
+
+  if (path.isAbsolute(fileParam)) {
+    roots.push({ base: '', file: path.resolve(fileParam) });
+  }
+
+  for (const { base, file } of roots) {
+    const fullPath = base ? path.resolve(base, file) : file;
+    const safeBase = base || path.dirname(fullPath);
+    if (base && !fullPath.startsWith(safeBase)) continue;
+    if (fs.existsSync(fullPath)) return fullPath;
+  }
+
+  return null;
+}
+
+module.exports = {
+  linkRecordingsToCallLogs,
+  parseRecordingFilename,
+  normalizePhone,
+  isPlayableRecordingPath,
+  resolveRecordingFullPath,
+  LOCAL_STORED_DIR
+};
