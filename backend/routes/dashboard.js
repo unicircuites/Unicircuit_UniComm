@@ -121,6 +121,9 @@ router.get('/overview', async (req, res) => {
         cl.duration,
         cl.call_type,
         cl.ai_summary,
+        cl.recording_file,
+        TO_CHAR(cl.call_date, 'YYYY-MM-DD') AS call_date,
+        cl.call_time,
         COALESCE(NULLIF(trim(c.fname || ' ' || c.lname), ''), cl.caller, 'Unknown') AS contact_name
       FROM call_logs cl
       LEFT JOIN contacts c ON (

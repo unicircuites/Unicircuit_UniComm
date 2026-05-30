@@ -78,7 +78,7 @@ router.post('/verify', async (req, res) => {
 // ── POST /api/broadcast/send — create + send broadcast ───────────────────
 // Body: { subject, html, recipients: [{email,name}] or ['email'], delay_ms }
 router.post('/send', async (req, res) => {
-  const { subject, html, recipients, delay_ms, attachments } = req.body;
+  const { subject, html, recipients, delay_ms, attachments, batch_size } = req.body;
   if (!subject || !html || !Array.isArray(recipients) || !recipients.length)
     return res.status(400).json({ error: 'subject, html, recipients[] required' });
 
@@ -115,6 +115,7 @@ router.post('/send', async (req, res) => {
 
   // Send in background
   const delay = parseInt(delay_ms || 2000);
+  const batchSize = Math.max(1, parseInt(batch_size || 1, 10) || 1);
   eb.sendBroadcast(recipients, subject, html, async (sent, failed, _current, results) => {
     const doneByEmail = new Map(results.deliveries.map((d) => [String(d.email || '').toLowerCase(), d]));
     const mergedDeliveries = pendingDeliveries.map((d) => doneByEmail.get(String(d.email || '').toLowerCase()) || d);
@@ -122,7 +123,7 @@ router.post('/send', async (req, res) => {
       `UPDATE email_broadcasts SET sent=$1, failed=$2, errors=$3, deliveries=$4 WHERE id=$5`,
       [sent, failed, JSON.stringify(results.errors), JSON.stringify(mergedDeliveries), broadcastId]
     );
-  }, delay, attachments)
+  }, delay, attachments, batchSize)
     .then(async (results) => {
       try {
         await pool.query(

@@ -93,8 +93,9 @@ async function reportProgress(onProgress, results, email) {
 // ── SEND BROADCAST ────────────────────────────────────────────────────────
 // recipients: [{email, name}] or ['email1', 'email2']
 // onProgress: callback(sent, failed, current) for real-time updates
-async function sendBroadcast(recipients, subject, html, onProgress, delayMs = 2000, attachments = []) {
+async function sendBroadcast(recipients, subject, html, onProgress, delayMs = 2000, attachments = [], batchSize = 1) {
   const results = { sent: 0, failed: 0, errors: [], deliveries: [] };
+  const safeBatchSize = Math.max(1, parseInt(batchSize || 1, 10) || 1);
 
   for (let i = 0; i < recipients.length; i++) {
     const r = recipients[i];
@@ -110,16 +111,18 @@ async function sendBroadcast(recipients, subject, html, onProgress, delayMs = 20
     }
 
     // Personalise HTML — replace {{name}} and {{company}} placeholders
-    const personalHtml = appendUnsubscribeFooter(
-      html
-        .replace(/\{\{name\}\}/gi, name || email.split('@')[0])
-        .replace(/\{\{company\}\}/gi, (typeof r === 'object' && r.company) ? r.company : email.split('@')[1] || ''),
-      email
-    );
+    const company = (typeof r === 'object' && r.company) ? r.company : email.split('@')[1] || '';
+    const displayName = name || email.split('@')[0];
+    const personalize = (value) => String(value || '')
+      .replace(/\{\{name\}\}/gi, displayName)
+      .replace(/\{\{company\}\}/gi, company);
+
+    const personalSubject = personalize(subject);
+    const personalHtml = appendUnsubscribeFooter(personalize(html), email);
 
     const sentAt = new Date().toISOString();
     try {
-      const info = await sendOne(email, subject, personalHtml, null, attachments);
+      const info = await sendOne(email, personalSubject, personalHtml, null, attachments);
       const accepted = Array.isArray(info.accepted) ? info.accepted.map(v => String(v).toLowerCase()) : [];
       const rejected = Array.isArray(info.rejected) ? info.rejected.map(v => String(v).toLowerCase()) : [];
       const lowerEmail = String(email).toLowerCase();
@@ -138,8 +141,8 @@ async function sendBroadcast(recipients, subject, html, onProgress, delayMs = 20
 
     await reportProgress(onProgress, results, email);
 
-    // Delay between sends to avoid rate limiting
-    if (i < recipients.length - 1) {
+    // Delay after each batch to avoid rate limiting.
+    if (i < recipients.length - 1 && (i + 1) % safeBatchSize === 0) {
       await new Promise(r => setTimeout(r, delayMs));
     }
   }

@@ -37,6 +37,40 @@ async function ensureTables() {
 }
 ensureTables().catch(e => console.error('[Groups] Table init:', e.message));
 
+async function uniqueContactIdsByEmail(contactIds, groupId) {
+  const ids = [...new Set((Array.isArray(contactIds) ? contactIds : [])
+    .map(id => parseInt(id, 10))
+    .filter(Number.isFinite))];
+  if (!ids.length) return [];
+
+  const contacts = await pool.query(
+    `SELECT id, LOWER(TRIM(COALESCE(email, ''))) AS email FROM contacts WHERE id = ANY($1::int[])`,
+    [ids]
+  );
+  const existingKeys = new Set();
+  if (groupId) {
+    const existing = await pool.query(`
+      SELECT m.contact_id AS id, LOWER(TRIM(COALESCE(c.email, ''))) AS email
+      FROM recipient_group_members m
+      JOIN contacts c ON c.id = m.contact_id
+      WHERE m.group_id = $1
+    `, [groupId]);
+    existing.rows.forEach(row => {
+      existingKeys.add(row.email || `id:${row.id}`);
+    });
+  }
+
+  const seen = new Set();
+  const out = [];
+  contacts.rows.forEach(row => {
+    const key = row.email || `id:${row.id}`;
+    if (seen.has(key) || existingKeys.has(key)) return;
+    seen.add(key);
+    out.push(row.id);
+  });
+  return out;
+}
+
 // ── GET /api/groups ───────────────────────────────────────────────────────
 router.get('/', async (req, res) => {
   try {
@@ -65,13 +99,19 @@ router.post('/', async (req, res) => {
     const group = r.rows[0];
     // Add initial contacts if provided
     if (Array.isArray(contact_ids) && contact_ids.length) {
-      const vals = contact_ids.map((cid, i) => `($1, $${i+2})`).join(',');
-      await pool.query(
-        `INSERT INTO recipient_group_members (group_id, contact_id) VALUES ${vals} ON CONFLICT DO NOTHING`,
-        [group.id, ...contact_ids]
-      );
+      const uniqueIds = await uniqueContactIdsByEmail(contact_ids);
+      if (uniqueIds.length) {
+        const vals = uniqueIds.map((cid, i) => `($1, $${i+2})`).join(',');
+        await pool.query(
+          `INSERT INTO recipient_group_members (group_id, contact_id) VALUES ${vals} ON CONFLICT DO NOTHING`,
+          [group.id, ...uniqueIds]
+        );
+      }
     }
-    group.member_count = contact_ids ? contact_ids.length : 0;
+    const count = await pool.query(
+      `SELECT COUNT(*)::int AS n FROM recipient_group_members WHERE group_id=$1`, [group.id]
+    );
+    group.member_count = count.rows[0].n;
     res.status(201).json(group);
   } catch(e) { res.status(500).json({ error: e.message }); }
 });
@@ -166,8 +206,15 @@ router.post('/:id/members', async (req, res) => {
 
     if (!allContactIds.length) return res.status(400).json({ error: 'No valid contacts or emails provided' });
 
-    // Deduplicate
-    allContactIds = [...new Set(allContactIds)];
+    // Deduplicate exact IDs and duplicate email records already in this group.
+    allContactIds = await uniqueContactIdsByEmail(allContactIds, req.params.id);
+
+    if (!allContactIds.length) {
+      const count = await pool.query(
+        `SELECT COUNT(*)::int AS n FROM recipient_group_members WHERE group_id=$1`, [req.params.id]
+      );
+      return res.json({ success: true, member_count: count.rows[0].n, added: 0, total_submitted: 0, skipped_duplicates: true });
+    }
 
     const vals = allContactIds.map((cid, i) => `($1, $${i+2})`).join(',');
     const insertRes = await pool.query(

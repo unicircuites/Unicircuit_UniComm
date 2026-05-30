@@ -3,7 +3,7 @@ const path = require('path');
 const pool = require('../db/pool');
 
 const LOCAL_STORED_DIR = path.join(__dirname, '..', 'pbx_recordings');
-const TIMESTAMP_TOLERANCE_MS = parseInt(process.env.PBX_RECORDING_MATCH_TOLERANCE_MS || '60000', 10);
+const TIMESTAMP_TOLERANCE_MS = parseInt(process.env.PBX_RECORDING_MATCH_TOLERANCE_MS || '180000', 10);
 const AUDIO_EXT_RE = /\.(wav|mp3|ogg|m4a)$/i;
 
 /**
@@ -139,6 +139,7 @@ function buildRecordingIndex(entries) {
   const index = new Map();
   for (const entry of entries) {
     addToIndex(index, entry.phone, entry.extension, entry);
+    addToIndex(index, entry.phone, '*', entry);
   }
   for (const list of index.values()) {
     list.sort((a, b) => a.timestampMs - b.timestampMs);
@@ -159,8 +160,9 @@ function formatCallDateValue(callDate) {
 
 function getCallTimestamps(call) {
   let callEndMs = 0;
-  if (call.call_date && call.call_time) {
-    const d = formatCallDateValue(call.call_date);
+  const callDateValue = call.call_date_value || call.call_date;
+  if (callDateValue && call.call_time) {
+    const d = formatCallDateValue(callDateValue);
     const time = String(call.call_time).split('.')[0];
     const obj = new Date(`${d}T${time}`);
     if (!Number.isNaN(obj.getTime())) callEndMs = obj.getTime();
@@ -210,13 +212,14 @@ function findBestMatch(call, index, usedPaths) {
   if (!times) return null;
 
   const { phones, extensions } = getCallMatchKeys(call);
-  if (!phones.length || !extensions.length) return null;
+  if (!phones.length) return null;
 
   let bestMatch = null;
   let bestDiff = Infinity;
 
+  const extensionKeys = extensions.length ? extensions : ['*'];
   for (const phone of phones) {
-    for (const ext of extensions) {
+    for (const ext of extensionKeys) {
       const candidates = index.get(indexKey(phone, ext)) || [];
       for (const rec of candidates) {
         if (usedPaths.has(rec.playbackPath)) continue;
@@ -224,8 +227,10 @@ function findBestMatch(call, index, usedPaths) {
         const diff = timestampMatches(rec.timestampMs, times.callStartMs, times.callEndMs);
         if (diff === null) continue;
 
-        if (diff < bestDiff) {
-          bestDiff = diff;
+        const extensionPenalty = ext === '*' ? 1000 : 0;
+        const score = diff + extensionPenalty;
+        if (score < bestDiff) {
+          bestDiff = score;
           bestMatch = rec;
         }
       }
@@ -248,9 +253,9 @@ async function loadStoredRecordingEntries() {
     const parsed = parseRecordingFilename(row.original_filename || row.local_path);
     const phone = normalizePhone(row.customer_number) || parsed?.phone;
     const extension = normalizePhone(row.extension_number) || parsed?.extension;
-    const timestampMs = row.recording_date
+    const timestampMs = parsed?.timestampMs || (row.recording_date
       ? new Date(row.recording_date).getTime()
-      : parsed?.timestampMs;
+      : null);
 
     if (!phone || !extension || !timestampMs || Number.isNaN(timestampMs)) continue;
     if (!fs.existsSync(row.local_path)) continue;
@@ -296,20 +301,22 @@ async function linkRecordingsToCallLogs(recordingsDir) {
   try {
     console.log('[Linker] Starting recording linking process...');
 
-    const { rows: unlinkedCalls } = await pool.query(`
-      SELECT id, call_date, call_time, duration, created_at, caller, destination, extension, call_type
+    const { rows: candidateCalls } = await pool.query(`
+      SELECT id, TO_CHAR(call_date, 'YYYY-MM-DD') AS call_date_value,
+             call_date, call_time, duration, created_at, caller, destination, extension, call_type, recording_file
       FROM call_logs
-      WHERE recording_file IS NULL
-         OR recording_file = ''
-         OR recording_file !~* '\\.(wav|mp3|ogg|m4a)$'
     `);
+    const unlinkedCalls = candidateCalls.filter(call =>
+      !isPlayableRecordingPath(call.recording_file) ||
+      !resolveRecordingFullPath(call.recording_file, recordingsDir)
+    );
 
     if (!unlinkedCalls.length) {
       console.log('[Linker] No unlinked call logs found. Exiting.');
       return { success: true, matchedCount: 0, message: 'No unlinked calls found' };
     }
 
-    console.log(`[Linker] Found ${unlinkedCalls.length} call logs needing recording links.`);
+    console.log(`[Linker] Found ${unlinkedCalls.length} call logs needing recording links or stale path repair.`);
 
     const storedEntries = await loadStoredRecordingEntries();
     const fsEntries = loadFilesystemRecordingEntries(recordingsDir);
@@ -334,7 +341,9 @@ async function linkRecordingsToCallLogs(recordingsDir) {
         AND recording_file ~* '\\.(wav|mp3|ogg|m4a)$'
     `);
     for (const row of alreadyLinked.rows) {
-      usedPaths.add(String(row.recording_file).replace(/\\/g, '/'));
+      if (resolveRecordingFullPath(row.recording_file, recordingsDir)) {
+        usedPaths.add(String(row.recording_file).replace(/\\/g, '/'));
+      }
     }
 
     let matchedCount = 0;

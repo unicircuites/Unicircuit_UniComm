@@ -607,6 +607,14 @@ async function startWA(options = {}) {
 
   const { state, saveCreds } = await useMultiFileAuthState(AUTH_DIR);
 
+  // Initialize phoneNumber early from existing credentials to prevent 'unknown'
+  if (state.creds && state.creds.me && state.creds.me.id) {
+    const rawId = state.creds.me.id;
+    const idPart = rawId.split('_')[0].split('@')[0].split(':')[0];
+    phoneNumber = idPart || rawId;
+    userJid = rawId;
+  }
+
   let version = [2, 3000, 1017539718]; // Updated fallback to a more recent version
   try {
     const res = await fetchLatestBaileysVersion();
@@ -718,6 +726,8 @@ async function startWA(options = {}) {
       if (code === DisconnectReason.loggedOut) {
         // User logged out - clear session and restart
         console.log('[WA] Logged out - clearing session');
+        phoneNumber = null;
+        userJid = null;
         clearSession();
         reconnectAttempts = 0; // Reset attempts for a fresh start
         if (allowQrGeneration) scheduleReconnect('logged out');
@@ -769,24 +779,33 @@ async function startWA(options = {}) {
   sock.ev.on('messaging-history.set', async ({ chats, contacts, messages, isLatest }) => {
     console.log(`[WA] History chunk — chats=${chats.length} contacts=${contacts?.length || 0} messages=${messages.length} isLatest=${isLatest}`);
 
+    // Helper to yield the event loop to prevent blocking HTTP requests
+    const yieldEventLoop = () => new Promise(resolve => setImmediate(resolve));
+
     // 1. Save contacts FIRST (needed for name resolution)
     if (contacts?.length) {
-      for (const c of contacts) await saveContact(c);
+      for (let i = 0; i < contacts.length; i++) {
+        await saveContact(contacts[i]);
+        if (i % 50 === 0) await yieldEventLoop();
+      }
     }
 
     // 2. Save chats with resolved names
-    for (const chat of chats) {
+    for (let i = 0; i < chats.length; i++) {
+      const chat = chats[i];
       const isGroup = chat.id.endsWith('@g.us');
       const name = isGroup
         ? (chat.name || null)
         : getContactName(chat.id, chat.name);
       const ts = toDate(chat.conversationTimestamp);
       await saveChat(chat.id, name, '', ts, 0, isGroup);
+      if (i % 50 === 0) await yieldEventLoop();
     }
 
     // 3. Save real messages + cache for media download
     let saved = 0;
-    for (const msg of messages) {
+    for (let i = 0; i < messages.length; i++) {
+      const msg = messages[i];
       if (msg.key && msg.key.id && msg.message) {
         msgCache.set(msg.key.id, msg);
         if (msgCache.size > MAX_CACHE) msgCache.delete(msgCache.keys().next().value);
@@ -798,9 +817,10 @@ async function startWA(options = {}) {
       if (result) {
         saved++;
         const isGroup = jid.endsWith('@g.us');
-        const name = isGroup ? getContactName(jid, null) : getContactName(jid, msg.key.fromMe ? null : msg.pushName);
+        const name = isGroup ? null : getContactName(jid, result.senderName);
         await saveChat(jid, name, result.body, result.ts, 0, isGroup);
       }
+      if (i % 50 === 0) await yieldEventLoop();
     }
     console.log(`[WA] Chunk saved — ${saved} messages`);
 

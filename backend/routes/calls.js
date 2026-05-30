@@ -741,9 +741,12 @@ router.post('/:id/summarize', async (req, res) => {
     if (!rows.length) return res.status(404).json({ error: 'Call not found' });
     const call = rows[0];
 
-    const prompt = `You are a professional CRM assistant for Unicircuit Engineering Services. 
-Summarize this PBX call record and extract key details for the CRM.
-Format: Brief Summary (1-2 sentences), Tone, and follow-up recommendation.
+    const prompt = `You are a professional CRM assistant for Unicircuit Engineering Services.
+Summarize this PBX call record for a CRM user. Do not invent products, names, or discussion details that are not present in the record.
+Format exactly:
+Brief Summary: 1 sentence based only on the available call metadata.
+Tone: one cautious estimate, or "Unknown" if the record is too limited.
+Follow-up: one practical next action.
 
 CALL DETAILS:
 - Date: ${call.call_date} ${call.call_time}
@@ -752,6 +755,7 @@ CALL DETAILS:
 - Destination: ${call.destination}
 - Duration: ${call.duration}
 - Trunk: ${call.trunk}
+- Recording Linked: ${recordingLinker.isPlayableRecordingPath(call.recording_file) ? 'Yes' : 'No'}
 ${call.contact_notes ? `- Contact Notes: ${call.contact_notes}` : ''}
 
 Output only the summary text. No intro or outro.`;

@@ -238,6 +238,87 @@ router.post('/send', authenticate, async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
+router.post('/broadcast', authenticate, async (req, res) => {
+  const { recipients, message, delay_ms, attachments } = req.body;
+  const targets = Array.isArray(recipients) ? recipients : [];
+  const text = String(message || '').trim();
+  const files = Array.isArray(attachments) ? attachments.slice(0, 10) : [];
+
+  if (!targets.length) return res.status(400).json({ error: 'recipients[] required' });
+  if (!text && !files.length) return res.status(400).json({ error: 'message or attachments required' });
+
+  const ownPhone = String(wa.getConnectedPhone() || '').replace(/\D/g, '');
+
+  function normalizeBroadcastJid(value) {
+    const jid = String(value || '').trim();
+    if (!jid) return '';
+    if (jid.endsWith('@g.us') || jid.endsWith('@lid')) return jid;
+    if (jid.endsWith('@s.whatsapp.net')) {
+      const phone = jid.split('@')[0].split(':')[0].replace(/\D/g, '');
+      return phone ? `${phone}@s.whatsapp.net` : jid;
+    }
+    const phone = jid.replace(/\D/g, '');
+    return phone ? `${phone}@s.whatsapp.net` : jid;
+  }
+
+  const normalized = [];
+  const seen = new Set();
+  for (const item of targets) {
+    const rawJid = normalizeBroadcastJid(typeof item === 'string' ? item : item?.jid || '');
+    if (!rawJid || !rawJid.includes('@')) continue;
+    const phone = rawJid.endsWith('@s.whatsapp.net') ? rawJid.split('@')[0].split(':')[0].replace(/\D/g, '') : '';
+    if (ownPhone && phone && phone === ownPhone) continue;
+    const dedupeKey = rawJid.endsWith('@g.us') ? `group:${rawJid}` : (phone ? `phone:${phone}` : `jid:${rawJid}`);
+    if (seen.has(dedupeKey)) continue;
+    seen.add(dedupeKey);
+    normalized.push({ jid: rawJid, name: typeof item === 'object' ? item.name || '' : '' });
+  }
+  if (!normalized.length) return res.status(400).json({ error: 'No valid WhatsApp recipients found' });
+
+  const wait = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+  const delay = Math.max(500, Math.min(parseInt(delay_ms || 2000, 10) || 2000, 24 * 60 * 60 * 1000));
+
+  res.json({ success: true, total: normalized.length, queued: normalized.length });
+
+  (async () => {
+    let sent = 0;
+    let failed = 0;
+    for (let i = 0; i < normalized.length; i++) {
+      const target = normalized[i];
+      try {
+        if (files.length) {
+          for (let f = 0; f < files.length; f++) {
+            const att = files[f] || {};
+            const buffer = Buffer.from(String(att.contentBytes || att.data || '').replace(/^data:[^,]+,/, ''), 'base64');
+            if (!buffer.length) continue;
+            const mime = att.contentType || att.mimeType || 'application/octet-stream';
+            const mediaType = String(att.mediaType || '').toLowerCase()
+              || (String(mime).startsWith('image/') ? 'image'
+                : String(mime).startsWith('video/') ? 'video'
+                  : 'document');
+            await wa.sendMediaMessage(target.jid, {
+              buffer,
+              filename: att.name || att.fileName || 'broadcast-attachment',
+              mimetype: mime,
+              mediaType,
+              caption: f === 0 ? text : '',
+            }, null);
+            if (f < files.length - 1) await wait(800);
+          }
+        } else {
+          await wa.sendMessage(target.jid, text, null);
+        }
+        sent += 1;
+      } catch (err) {
+        failed += 1;
+        console.error(`[WA Broadcast] Failed for ${target.jid}:`, err.message);
+      }
+      if (i < normalized.length - 1) await wait(delay);
+    }
+    console.log(`[WA Broadcast] Done - sent:${sent} failed:${failed}`);
+  })().catch(err => console.error('[WA Broadcast] Worker error:', err.message));
+});
+
 router.post('/send-media', authenticate, async (req, res) => {
   const { jid, fileName, mimeType, mediaType, data, caption, quotedMsgId } = req.body;
   if (!jid || !fileName || !mimeType || !data) {

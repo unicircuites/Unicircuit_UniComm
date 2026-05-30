@@ -332,6 +332,19 @@
 
     /* ── LIGHT THEME: Additional visibility fixes ── */
 
+    /* Reply Tasks Panel visibility */
+    html.light .mail-task-panel {
+      background: rgba(0, 0, 0, 0.03);
+    }
+    html.light .mail-task-card {
+      background: var(--card);
+      box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+    }
+    html.light .mail-task-card.high,
+    html.light .mail-task-card.urgent {
+      background: rgba(239, 68, 68, 0.08);
+    }
+
     /* WA section: search box gets proper light bg */
     html.light #sec-whatsapp .search-box {
       background: rgba(0, 0, 0, 0.04);
@@ -909,25 +922,36 @@
     .email-list-row-main {
       flex: 1;
       min-width: 0;
-      overflow: hidden;
+      overflow: visible;
     }
 
     .email-list-row-head {
       display: flex;
       justify-content: space-between;
-      align-items: center;
+      align-items: flex-start;
       gap: 8px;
       min-width: 0;
+    }
+
+    /* Full sender/recipient — never truncate email names or addresses */
+    .email-addr-full {
+      white-space: normal;
+      overflow: visible;
+      text-overflow: clip;
+      word-break: break-word;
+      overflow-wrap: anywhere;
+      max-width: 100%;
     }
 
     .email-list-party {
       font-size: 12.5px;
       color: var(--text);
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
       min-width: 0;
       flex: 1;
+      white-space: normal;
+      overflow: visible;
+      word-break: break-word;
+      overflow-wrap: anywhere;
     }
 
     .email-list-party.is-read {
@@ -2802,38 +2826,116 @@
       flex-direction: column;
     }
 
-    #email-thread-messages {
-      flex: 1;
+    /* Older messages scroll above; last message is pinned in its own pane below */
+    #email-thread-older {
+      flex: 0 1 auto;
       min-height: 0;
+      max-height: 42%;
       overflow-y: auto;
-      display: flex;
-      flex-direction: column;
+      overflow-x: hidden;
+      border-bottom: 1px solid var(--border);
     }
 
-    .thread-msg-item.thread-msg-grow {
+    #email-thread-older:empty {
+      display: none;
+    }
+
+    #email-thread-last {
+      flex: 1 1 0;
+      min-height: 0;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      background: var(--card);
+    }
+
+    #email-thread-last:empty {
+      display: none;
+    }
+
+    /* Each message is its own block — never shrink/overlap siblings */
+    .thread-msg-item {
+      flex: 0 0 auto;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      position: relative;
+      isolation: isolate;
+      background: var(--card);
+    }
+
+    #email-thread-last > .thread-msg-item {
+      flex: 1 1 0;
+      min-height: 0;
+      border-bottom: none;
+    }
+
+    .thread-msg-header {
+      flex-shrink: 0;
+    }
+
+    .thread-msg-body {
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      min-height: 0;
+    }
+
+    .thread-msg-meta {
+      flex-shrink: 0;
+      position: relative;
+      z-index: 2;
+      background: var(--card);
+    }
+
+    .thread-msg-body [id^="tbody-content-"] {
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      min-height: 0;
+      padding: 0 16px 12px 58px;
+    }
+
+    #email-thread-last .thread-msg-body {
       flex: 1;
       min-height: 0;
       display: flex;
       flex-direction: column;
     }
 
-    .thread-msg-item.thread-msg-grow .thread-msg-body {
+    #email-thread-last [id^="tbody-content-"] {
       flex: 1;
       min-height: 0;
-      display: flex;
-      flex-direction: column;
+      overflow: hidden;
     }
 
-    .thread-msg-item.thread-msg-grow [id^="tbody-content-"] {
-      flex: 1;
-      min-height: 0;
-      display: flex;
-      flex-direction: column;
-      padding: 0 16px 12px 58px !important;
+    /* Older expanded messages: capped scroll region */
+    #email-thread-older .thread-msg-body [id^="tbody-content-"] {
+      max-height: min(280px, 32vh);
     }
 
-    .card.email-detail-stack .email-body-iframe,
-    .card.email-detail-stack #email-body-frame {
+    .thread-msg-item .thread-body-iframe {
+      width: 100%;
+      border: 0;
+      background: #fff;
+      display: block;
+      flex: none;
+    }
+
+    #email-thread-older .thread-body-iframe {
+      height: min(280px, 32vh);
+      min-height: 140px;
+    }
+
+    #email-thread-last .thread-body-iframe {
+      flex: 1 1 auto;
+      width: 100%;
+      min-height: 120px;
+      height: 100%;
+    }
+
+    .card.email-detail-stack #email-body-frame,
+    .card.email-detail-stack #email-single-view .email-body-iframe {
       width: 100%;
       flex: 1;
       min-height: 320px;
@@ -2913,6 +3015,10 @@
     }
 
     .thread-msg-attachments {
+      flex-shrink: 0;
+      position: relative;
+      z-index: 2;
+      background: var(--card);
       padding: 8px 16px 8px 58px;
       border-bottom: 1px solid rgba(255, 255, 255, 0.04);
     }
@@ -5230,7 +5336,7 @@
             </div>
           </div>
 
-          <div style="display:grid;grid-template-columns:200px 1fr 1.4fr;gap:14px;margin-top:10px;align-items:start;">
+          <div style="display:grid;grid-template-columns:200px minmax(0,1fr) minmax(0,1.4fr);gap:14px;margin-top:10px;align-items:start;">
             <!-- LEFT SIDEBAR: FOLDERS -->
             <div class="card" style="display:flex;flex-direction:column;max-height:calc(100vh - 140px);">
               <div class="card-header">
@@ -5316,7 +5422,8 @@
                 </div>
                 <!-- Conversation thread view (Outlook-style) -->
                 <div id="email-thread-conversation" style="display:none;flex:1;min-height:0;overflow:hidden;flex-direction:column;padding:0;">
-                  <div id="email-thread-messages"></div>
+                  <div id="email-thread-older"></div>
+                  <div id="email-thread-last"></div>
                 </div>
                 <!-- Single message view (fallback when no thread) -->
                 <div id="email-single-view" style="display:flex;flex-direction:column;flex:1;overflow:hidden;">
@@ -5333,12 +5440,12 @@
                           style="display:none;align-items:baseline;gap:6px;flex-wrap:wrap;margin-bottom:2px;">
                           <span
                             style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:0.05em;min-width:28px;">To</span>
-                          <span style="color:var(--muted2);font-size:12px;" id="email-detail-to"></span>
+                          <span style="color:var(--muted2);font-size:12px;display:flex;flex-wrap:wrap;gap:4px;flex:1;min-width:0;" id="email-detail-to"></span>
                         </div>
                         <div id="email-detail-cc-row" style="display:none;align-items:baseline;gap:6px;flex-wrap:wrap;">
                           <span
                             style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:0.05em;min-width:28px;">Cc</span>
-                          <span style="color:var(--muted2);font-size:12px;" id="email-detail-cc"></span>
+                          <span style="color:var(--muted2);font-size:12px;display:flex;flex-wrap:wrap;gap:4px;flex:1;min-width:0;" id="email-detail-cc"></span>
                         </div>
                       </div>
                       <div style="display:flex;align-items:center;gap:8px;flex-shrink:0;">
@@ -6528,7 +6635,7 @@
 <div class="modal-overlay" id="broadcast-modal">
   <div class="modal" style="max-width:760px;">
     <div class="modal-title">
-      <span><i class="fas fa-paper-plane" style="color:var(--blue2);margin-right:8px;"></i>Create Email
+      <span><i class="fas fa-paper-plane" style="color:var(--blue2);margin-right:8px;"></i>Create
         Broadcast</span>
       <span class="modal-close" onclick="closeModal('broadcast-modal')"><i class="fas fa-times"></i></span>
     </div>
@@ -6546,13 +6653,23 @@
     </div>
 
     <div class="form-group">
-      <label class="form-label">Subject *</label>
+      <label class="form-label">Channel</label>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;">
+        <button type="button" class="btn btn-blue btn-sm" id="bc-channel-email"
+          onclick="bcSetChannel('email')"><i class="fas fa-envelope"></i> Email</button>
+        <button type="button" class="btn btn-ghost btn-sm" id="bc-channel-whatsapp"
+          onclick="bcSetChannel('whatsapp')"><i class="fab fa-whatsapp"></i> WhatsApp</button>
+      </div>
+    </div>
+
+    <div class="form-group">
+      <label class="form-label" id="bc-subject-label">Subject *</label>
       <input class="inp" id="bc-subject" placeholder="e.g. New Product Launch — MCB Distribution Boards" />
     </div>
 
     <div class="form-group">
       <label class="form-label" style="display:flex;justify-content:space-between;align-items:center;">
-        <span>Email Body *</span>
+        <span id="bc-body-label">Email Body *</span>
         <button class="btn btn-ghost btn-xs" onmousedown="bcToolbarMousedown(event)"
           onclick="bcGenerateAI()"><i class="fas fa-robot"></i> AI Generate</button>
       </label>
@@ -6764,11 +6881,25 @@
 
     <div class="form-group">
       <label class="form-label" style="display:flex;justify-content:space-between;">
-        <span>Recipients *</span>
-        <span style="font-size:10.5px;color:var(--muted);">One per line: email or Name &lt;email&gt;</span>
+        <span id="bc-recipients-label">Recipients *</span>
+        <span id="bc-recipients-helper" style="font-size:10.5px;color:var(--muted);">One per line: email or Name &lt;email&gt;</span>
       </label>
+      <div id="bc-wa-picker" style="display:none;margin-bottom:8px;border:1px solid var(--border2);border-radius:8px;overflow:hidden;">
+        <div style="display:flex;gap:6px;align-items:center;padding:8px;background:var(--card2);border-bottom:1px solid var(--border);">
+          <div class="search-box" style="flex:1;padding:5px 8px;">
+            <i class="fas fa-search" style="font-size:10px;"></i>
+            <input id="bc-wa-search" placeholder="Search WhatsApp contacts and groups..." style="font-size:12px;"
+              oninput="bcRenderWhatsAppPicker(this.value)">
+          </div>
+          <button type="button" class="btn btn-ghost btn-xs" onclick="bcLoadWhatsAppTargets(true)"><i
+              class="fas fa-sync-alt"></i></button>
+        </div>
+        <div id="bc-wa-target-list" style="max-height:190px;overflow:auto;background:rgba(255,255,255,0.02);">
+          <div style="padding:14px;text-align:center;color:var(--muted);font-size:12px;">Open WhatsApp channel to load contacts and groups</div>
+        </div>
+      </div>
       <!-- Group picker -->
-      <div style="display:flex;gap:6px;align-items:center;margin-bottom:8px;flex-wrap:wrap;">
+      <div id="bc-email-group-tools" style="display:flex;gap:6px;align-items:center;margin-bottom:8px;flex-wrap:wrap;">
         <select id="bc-group-select" class="inp"
           style="font-size:12px;padding:5px 8px;flex:1;min-width:160px;">
           <option value="">— Load from a group —</option>
@@ -6782,7 +6913,7 @@
         placeholder="john@company.com&#10;Jane Doe &lt;jane@company.com&gt;&#10;sales@client.in"></textarea>
       <div style="margin-top:5px;display:flex;gap:8px;align-items:center;">
         <span id="bc-recipient-count" style="font-size:11px;color:var(--muted);">0 recipients</span>
-        <button class="btn btn-ghost btn-xs" onclick="bcLoadFromContacts()"><i
+        <button id="bc-load-contacts-btn" class="btn btn-ghost btn-xs" onclick="bcLoadFromContacts()"><i
             class="fas fa-address-book"></i> Load from Contacts DB</button>
       </div>
     </div>
@@ -6802,7 +6933,7 @@
             min</span>
         </div>
       </div>
-      <div>
+      <div id="bc-test-email-wrap">
         <label class="form-label">Test email (send preview first)</label>
         <div style="display:flex;gap:6px;">
           <input class="inp" id="bc-test-email" placeholder="your@email.com" style="flex:1;" />
@@ -10020,6 +10151,178 @@ Keep it concise and professional.`;
       } catch (err) { console.error('loadBroadcasts:', err); }
     }
 
+    var _bcChannel = 'email';
+    var _bcWhatsAppTargets = [];
+    var _bcSelectedWhatsAppJids = new Set();
+    var _bcWhatsAppGroupCache = {};
+    var _bcRecipientCountSeq = 0;
+
+    function bcSetChannel(channel) {
+      _bcChannel = channel === 'whatsapp' ? 'whatsapp' : 'email';
+      var isWa = _bcChannel === 'whatsapp';
+      var emailBtn = document.getElementById('bc-channel-email');
+      var waBtn = document.getElementById('bc-channel-whatsapp');
+      if (emailBtn) emailBtn.className = 'btn ' + (isWa ? 'btn-ghost' : 'btn-blue') + ' btn-sm';
+      if (waBtn) waBtn.className = 'btn ' + (isWa ? 'btn-green' : 'btn-ghost') + ' btn-sm';
+      var subjectLabel = document.getElementById('bc-subject-label');
+      if (subjectLabel) subjectLabel.textContent = isWa ? 'Campaign Name (optional)' : 'Subject *';
+      var bodyLabel = document.getElementById('bc-body-label');
+      if (bodyLabel) bodyLabel.textContent = isWa ? 'WhatsApp Message *' : 'Email Body *';
+      var recLabel = document.getElementById('bc-recipients-label');
+      if (recLabel) recLabel.textContent = isWa ? 'WhatsApp Recipients *' : 'Recipients *';
+      var recHelp = document.getElementById('bc-recipients-helper');
+      if (recHelp) recHelp.textContent = isWa ? 'Pick contacts/groups below, or paste WhatsApp JIDs one per line' : 'One per line: email or Name <email>';
+      var waPicker = document.getElementById('bc-wa-picker');
+      if (waPicker) waPicker.style.display = isWa ? 'block' : 'none';
+      var groupTools = document.getElementById('bc-email-group-tools');
+      if (groupTools) groupTools.style.display = isWa ? 'none' : 'flex';
+      var contactsBtn = document.getElementById('bc-load-contacts-btn');
+      if (contactsBtn) contactsBtn.style.display = isWa ? 'none' : '';
+      var testWrap = document.getElementById('bc-test-email-wrap');
+      if (testWrap) testWrap.style.display = isWa ? 'none' : '';
+      var textarea = document.getElementById('bc-recipients');
+      if (textarea) {
+        textarea.placeholder = isWa ? '919820000000@s.whatsapp.net\n120363000000000000@g.us' : 'john@company.com\nJane Doe <jane@company.com>\nsales@client.in';
+      }
+      bcUpdateIntervalPreview();
+      bcUpdateCount();
+      if (isWa) bcLoadWhatsAppTargets(false);
+    }
+
+    async function bcLoadWhatsAppTargets(force) {
+      var list = document.getElementById('bc-wa-target-list');
+      if (_bcWhatsAppTargets.length && !force) {
+        bcRenderWhatsAppPicker((document.getElementById('bc-wa-search') || {}).value || '');
+        return;
+      }
+      if (list) list.innerHTML = '<div style="padding:14px;text-align:center;color:var(--muted);font-size:12px;"><span class="spin-loader"></span> Loading WhatsApp contacts...</div>';
+      try {
+        var res = await fetch(API_BASE + '/wa/chats?_=' + Date.now(), { headers: getAuthHeaders(), cache: 'no-store' });
+        var chats = await res.json();
+        if (!res.ok) throw new Error(chats.error || 'Failed to load WhatsApp chats');
+        _bcWhatsAppTargets = (Array.isArray(chats) ? chats : []).filter(function (c) {
+          return c && c.id && (c.id.indexOf('@s.whatsapp.net') > -1 || c.id.indexOf('@g.us') > -1 || c.is_group);
+        }).map(function (c) {
+          var rawId = c.id.split('@')[0].split(':')[0];
+          var name = (typeof waResolveJidDisplay === 'function') ? waResolveJidDisplay(c.id, c.name || c.phone || rawId) : (c.name || c.phone || rawId);
+          return { jid: c.id, name: name, isGroup: !!c.is_group || c.id.indexOf('@g.us') > -1, phone: c.phone || rawId };
+        });
+        bcRenderWhatsAppPicker((document.getElementById('bc-wa-search') || {}).value || '');
+      } catch (err) {
+        if (list) list.innerHTML = '<div style="padding:14px;color:var(--red2);font-size:12px;">' + escHtml(err.message) + '</div>';
+      }
+    }
+
+    function bcRenderWhatsAppPicker(q) {
+      var list = document.getElementById('bc-wa-target-list');
+      if (!list) return;
+      var query = String(q || '').toLowerCase();
+      var rows = _bcWhatsAppTargets.filter(function (t) {
+        return !query || String(t.name || '').toLowerCase().includes(query) || String(t.phone || '').toLowerCase().includes(query) || String(t.jid || '').toLowerCase().includes(query);
+      });
+      if (!rows.length) {
+        list.innerHTML = '<div style="padding:14px;text-align:center;color:var(--muted);font-size:12px;">No WhatsApp contacts or groups found</div>';
+        return;
+      }
+      list.innerHTML = rows.map(function (t) {
+        var checked = _bcSelectedWhatsAppJids.has(t.jid) ? 'checked' : '';
+        var icon = t.isGroup ? 'fa-users' : 'fa-user';
+        var tag = t.isGroup ? 'Group' : 'Contact';
+        return '<label style="display:flex;align-items:center;gap:9px;padding:8px 10px;border-bottom:1px solid var(--border);cursor:pointer;">'
+          + '<input type="checkbox" ' + checked + ' onchange="bcToggleWhatsAppTarget(\'' + escHtml(t.jid).replace(/'/g, "\\'") + '\', this.checked)" style="width:15px;height:15px;">'
+          + '<i class="fas ' + icon + '" style="color:#25D366;width:14px;"></i>'
+          + '<div style="flex:1;min-width:0;"><div style="font-size:12.5px;font-weight:700;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + escHtml(t.name || t.jid) + '</div>'
+          + '<div style="font-size:10.5px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + tag + ' · ' + escHtml(t.jid) + '</div></div>'
+          + '</label>';
+      }).join('');
+    }
+
+    function bcToggleWhatsAppTarget(jid, checked) {
+      if (checked) _bcSelectedWhatsAppJids.add(jid);
+      else _bcSelectedWhatsAppJids.delete(jid);
+      bcSyncWhatsAppRecipientText();
+    }
+
+    function bcSyncWhatsAppRecipientText() {
+      var byJid = new Map(_bcWhatsAppTargets.map(function (t) { return [t.jid, t]; }));
+      var lines = Array.from(_bcSelectedWhatsAppJids).map(function (jid) {
+        var t = byJid.get(jid);
+        return (t && t.name ? t.name + ' <' + jid + '>' : jid);
+      });
+      var el = document.getElementById('bc-recipients');
+      if (el) el.value = lines.join('\n');
+      bcUpdateCount();
+    }
+
+    function bcParseWhatsAppRecipients(raw) {
+      var picked = Array.from(_bcSelectedWhatsAppJids);
+      var lines = String(raw || '').split('\n').map(function (l) { return l.trim(); }).filter(Boolean);
+      var parsed = lines.map(function (line) {
+        var m = line.match(/^(.+?)\s*<([^>]+)>$/);
+        return { name: m ? m[1].trim() : '', jid: (m ? m[2] : line).trim() };
+      }).filter(function (r) { return r.jid && r.jid.includes('@'); });
+      var byJid = new Map(_bcWhatsAppTargets.map(function (t) { return [t.jid, t]; }));
+      picked.forEach(function (jid) {
+        if (!parsed.some(function (r) { return r.jid === jid; })) {
+          var t = byJid.get(jid);
+          parsed.push({ jid: jid, name: t ? t.name : '' });
+        }
+      });
+      var seen = new Set();
+      return parsed.filter(function (r) {
+        if (seen.has(r.jid)) return false;
+        seen.add(r.jid);
+        return true;
+      });
+    }
+
+    function bcNormalizeWhatsAppDestination(item) {
+      var jid = String(item && item.jid || '').trim();
+      if (!jid) return null;
+      if (jid.indexOf('@g.us') > -1) return { jid: jid, name: item.name || '', dedupeKey: 'group:' + jid };
+      var phone = '';
+      if (item.phone) phone = String(item.phone).replace(/\D/g, '');
+      if (!phone && jid.indexOf('@s.whatsapp.net') > -1) phone = jid.split('@')[0].split(':')[0].replace(/\D/g, '');
+      if (phone) return { jid: phone + '@s.whatsapp.net', name: item.name || '', dedupeKey: 'phone:' + phone };
+      return { jid: jid, name: item.name || '', dedupeKey: 'jid:' + jid };
+    }
+
+    async function bcBuildWhatsAppRecipients(raw) {
+      var base = bcParseWhatsAppRecipients(raw);
+      var destinations = base.map(bcNormalizeWhatsAppDestination).filter(Boolean);
+      var seen = new Set();
+      return destinations.filter(function (r) {
+        if (!r || !r.jid || seen.has(r.dedupeKey)) return false;
+        seen.add(r.dedupeKey);
+        return true;
+      }).map(function (r) {
+        return { jid: r.jid, name: r.name || '' };
+      });
+    }
+
+    async function bcUpdateWhatsAppCountAsync(raw) {
+      var seq = ++_bcRecipientCountSeq;
+      var el = document.getElementById('bc-recipient-count');
+      if (el) el.textContent = 'Counting WhatsApp destinations...';
+      try {
+        var recipients = await bcBuildWhatsAppRecipients(raw);
+        if (seq !== _bcRecipientCountSeq) return;
+        if (el) el.textContent = recipients.length + ' selected WhatsApp destination' + (recipients.length !== 1 ? 's' : '');
+      } catch (_) {
+        if (seq !== _bcRecipientCountSeq) return;
+        var fallback = bcParseWhatsAppRecipients(raw).length;
+        if (el) el.textContent = fallback + ' selected WhatsApp source' + (fallback !== 1 ? 's' : '');
+      }
+    }
+
+    function bcHtmlToWhatsAppText(html) {
+      var div = document.createElement('div');
+      div.innerHTML = String(html || '')
+        .replace(/<br\s*\/?>/gi, '\n')
+        .replace(/<\/p>|<\/div>|<\/li>|<\/tr>/gi, '\n');
+      return (div.textContent || div.innerText || '').replace(/\n{3,}/g, '\n\n').trim();
+    }
+
     function bcParseRecipients(raw) {
       return raw.split('\n').map(function (l) { return l.trim(); }).filter(Boolean).map(function (line) {
         var m = line.match(/^(.+?)\s*<([^>]+)>$/);
@@ -10030,7 +10333,11 @@ Keep it concise and professional.`;
 
     function bcUpdateCount() {
       var raw = (document.getElementById('bc-recipients') || {}).value || '';
-      var count = bcParseRecipients(raw).length;
+      if (_bcChannel === 'whatsapp') {
+        bcUpdateWhatsAppCountAsync(raw);
+        return;
+      }
+      var count = _bcChannel === 'whatsapp' ? bcParseWhatsAppRecipients(raw).length : bcParseRecipients(raw).length;
       var el = document.getElementById('bc-recipient-count');
       if (el) el.textContent = count + ' recipient' + (count !== 1 ? 's' : '');
     }
@@ -10044,7 +10351,7 @@ Keep it concise and professional.`;
         : unit === 60000 ? (val === 1 ? '1 min' : val + ' min')
           : (val === 1 ? '1 hr' : val + ' hr');
       var el = document.getElementById('bc-delay-preview');
-      if (el) el.textContent = '= ' + label + ' between each email';
+      if (el) el.textContent = '= ' + label + ' between each ' + (_bcChannel === 'whatsapp' ? 'WhatsApp send' : 'email');
     }
 
     async function bcLoadFromContacts() {
@@ -10181,7 +10488,15 @@ Keep it concise and professional.`;
         }
 
         var memberIds = new Set((g.members || []).map(function (m) { return m.id; }));
-        var nonMembers = _groupsAllContacts.filter(function (c) { return !memberIds.has(c.id); });
+        var memberEmailKeys = new Set((g.members || []).map(function (m) { return String(m.email || '').trim().toLowerCase(); }).filter(Boolean));
+        var seenContactKeys = new Set();
+        var nonMembers = _groupsAllContacts.filter(function (c) {
+          var emailKey = String(c.email || '').trim().toLowerCase();
+          var key = emailKey || ('id:' + c.id);
+          if (memberIds.has(c.id) || (emailKey && memberEmailKeys.has(emailKey)) || seenContactKeys.has(key)) return false;
+          seenContactKeys.add(key);
+          return true;
+        });
 
         det.innerHTML = `
       <div>
@@ -10309,7 +10624,14 @@ Keep it concise and professional.`;
       if (!inp || !inp.value.trim()) return;
       var raw = inp.value.trim();
       // Split by comma or newline
-      var emails = raw.split(/[,\n]+/).map(function (e) { return e.trim(); }).filter(Boolean);
+      var seenEmails = new Set();
+      var emails = raw.split(/[,\n]+/).map(function (e) { return e.trim(); }).filter(Boolean).filter(function (entry) {
+        var m = entry.match(/([a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,})/);
+        var key = m ? m[1].toLowerCase().trim() : entry.toLowerCase();
+        if (seenEmails.has(key)) return false;
+        seenEmails.add(key);
+        return true;
+      });
       if (!emails.length) return;
       try {
         var res = await fetch(API_BASE + '/groups/' + groupId + '/members', {
@@ -10329,6 +10651,7 @@ Keep it concise and professional.`;
 
     async function groupsAddMember(groupId, contactId, btn) {
       try {
+        if (btn) { btn.disabled = true; btn.style.opacity = '0.6'; }
         var res = await fetch(API_BASE + '/groups/' + groupId + '/members', {
           method: 'POST', headers: getAuthHeaders(),
           body: JSON.stringify({ contact_ids: [contactId] })
@@ -10339,7 +10662,10 @@ Keep it concise and professional.`;
         await groupsShowDetail(groupId);
         await groupsLoadList();
         bcLoadGroupsDropdown();
-      } catch (e) { notify('Error', e.message, 'var(--red)', 'fas fa-exclamation-circle'); }
+      } catch (e) {
+        if (btn) { btn.disabled = false; btn.style.opacity = ''; }
+        notify('Error', e.message, 'var(--red)', 'fas fa-exclamation-circle');
+      }
     }
 
     async function groupsRemoveMember(groupId, contactId, btn) {
@@ -10412,6 +10738,29 @@ Keep it concise and professional.`;
       var delayUnit = parseInt((document.getElementById('bc-delay-unit') || {}).value || 60000);
       var delay = delayVal * delayUnit;
       var statusEl = document.getElementById('bc-status');
+      if (_bcChannel === 'whatsapp') {
+        if (!htmlBody || !raw) { if (statusEl) statusEl.innerHTML = '<span style="color:var(--red2);">Message and WhatsApp recipients required</span>'; return; }
+        if (statusEl) statusEl.innerHTML = '<span class="spin-loader"></span> Preparing selected WhatsApp destinations...';
+        var waRecipients = await bcBuildWhatsAppRecipients(raw);
+        if (!waRecipients.length) { if (statusEl) statusEl.innerHTML = '<span style="color:var(--red2);">No valid WhatsApp contacts or groups found</span>'; return; }
+        if (!confirm('Send WhatsApp broadcast to ' + waRecipients.length + ' selected WhatsApp destinations?')) return;
+        if (statusEl) statusEl.innerHTML = '<span class="spin-loader"></span> Queuing ' + waRecipients.length + ' WhatsApp sends...';
+        try {
+          var waPayload = await getEmailPayloadWithMediaAttachments(bcEl, true);
+          var waMessage = bcHtmlToWhatsAppText(waPayload.body || htmlBody);
+          var waAttachments = waPayload.attachments || [];
+          var resWa = await fetch(API_BASE + '/wa/broadcast', { method: 'POST', headers: getAuthHeaders(), body: JSON.stringify({ recipients: waRecipients, message: waMessage, delay_ms: delay, attachments: waAttachments }) });
+          var dataWa = await resWa.json();
+          if (resWa.ok) {
+            if (statusEl) statusEl.innerHTML = '<span style="color:var(--green2);"><i class="fas fa-check"></i> WhatsApp broadcast started — ' + dataWa.total + ' recipients queued</span>';
+            notify('WhatsApp broadcast started', dataWa.total + ' contacts/groups queued', 'var(--green)', 'fab fa-whatsapp');
+            setTimeout(function () { closeModal('broadcast-modal'); }, 1800);
+          } else {
+            if (statusEl) statusEl.innerHTML = '<span style="color:var(--red2);">' + (dataWa.error || 'Failed') + '</span>';
+          }
+        } catch (err) { if (statusEl) statusEl.innerHTML = '<span style="color:var(--red2);">' + err.message + '</span>'; }
+        return;
+      }
       if (!subject || !htmlBody || !raw) { if (statusEl) statusEl.innerHTML = '<span style="color:var(--red2);">Subject, body and recipients required</span>'; return; }
       var recipients = bcParseRecipients(raw);
       if (!recipients.length) { if (statusEl) statusEl.innerHTML = '<span style="color:var(--red2);">No valid emails found</span>'; return; }
@@ -10675,16 +11024,21 @@ Keep it concise and professional.`;
       var el = document.getElementById('bc-html');
       if (!el) return;
       var origContent = el.innerHTML;
-      el.innerHTML = '<div style="padding:12px;color:#888;font-size:13px;"><span class="spin-loader"></span> AI is writing your email…</div>';
+      var isWa = _bcChannel === 'whatsapp';
+      el.innerHTML = '<div style="padding:12px;color:#888;font-size:13px;"><span class="spin-loader"></span> AI is writing your ' + (isWa ? 'WhatsApp message' : 'email') + '…</div>';
       try {
-        var prompt = 'Write a professional HTML email body for Unicircuit Engineering Services LLP'
-          + (subject ? ' with subject: "' + subject + '"' : '')
-          + '. Use {{name}} for recipient personalization. Under 200 words. Include a clear CTA. Return ONLY the HTML body content (no <html>/<head>/<body> tags). Use inline styles for formatting.';
+        var prompt = isWa
+          ? ('Write a professional WhatsApp broadcast message for Unicircuit Engineering Services LLP'
+            + (subject ? ' for campaign: "' + subject + '"' : '')
+            + '. Suitable for Indian B2B engineering clients. Use {{name}} for personalization, include tasteful emoji where helpful, keep it under 120 words, and include a clear CTA. Return ONLY message body HTML using simple <p> and <br> tags.')
+          : ('Write a professional HTML email body for Unicircuit Engineering Services LLP'
+            + (subject ? ' with subject: "' + subject + '"' : '')
+            + '. Use {{name}} for recipient personalization. Under 200 words. Include a clear CTA. Return ONLY the HTML body content (no <html>/<head>/<body> tags). Use inline styles for formatting.');
         var text = await callPicoClaw(prompt);
         // Strip any accidental outer tags
         var clean = text.trim().replace(/^```html\s*/i,'').replace(/```\s*$/,'').trim();
         el.innerHTML = clean || origContent;
-        notify('AI email generated', 'Review and edit before sending', 'var(--blue2)', 'fas fa-robot');
+        notify(isWa ? 'AI WhatsApp message generated' : 'AI email generated', 'Review and edit before sending', 'var(--blue2)', 'fas fa-robot');
       } catch (err) {
         el.innerHTML = origContent;
         notify('AI error', err.message, 'var(--red)', 'fas fa-exclamation-circle');
@@ -12897,11 +13251,13 @@ Best regards,<br>
     function renderSenderCell(email, displayName) {
       if (!email) return `<span style="color:var(--muted);">—</span>`;
       if (ContactResolver.isUnknownSender(email)) {
-        // Unknown — show email in muted style, no badge/button (handled in mail body)
-        return `<span style="color:var(--muted2);">${escHtml(email)}</span>`;
+        return `<span class="email-addr-full" style="color:var(--muted2);">${escHtml(email)}</span>`;
       }
-      const name = displayName || email;
-      return `<span>${escHtml(name)}</span>`;
+      const name = (displayName || '').trim();
+      if (name && name !== email) {
+        return `<span class="email-addr-full">${escHtml(name)} &lt;${escHtml(email)}&gt;</span>`;
+      }
+      return `<span class="email-addr-full">${escHtml(email)}</span>`;
     }
 
     // ── renderRecipientCell (sent) ────────────────────────────────────────────
@@ -13013,18 +13369,16 @@ Best regards,<br>
     function renderRecipientCell(toAddresses, ccAddresses) {
       const all = [...(toAddresses || []), ...(ccAddresses || [])];
       if (!all.length) return `<span style="color:var(--muted);">—</span>`;
-      const shown = all.slice(0, 2);
-      const extra = all.length - shown.length;
-      const parts = shown.map(addr => {
+      const parts = all.map(addr => {
         const email = addr?.emailAddress?.address || addr?.address || (typeof addr === 'string' ? addr : '');
         const dn = addr?.emailAddress?.name || addr?.name || '';
         if (!email) return '';
         if (ContactResolver.isUnknownSender(email)) {
-          return `<span style="color:var(--muted2);">${escHtml(email)}</span>`;
+          return `<span class="email-addr-full" style="color:var(--muted2);">${escHtml(email)}</span>`;
         }
-        return `<span>${escHtml(dn || email)}</span>`;
+        const label = dn && dn !== email ? `${escHtml(dn)} &lt;${escHtml(email)}&gt;` : escHtml(email);
+        return `<span class="email-addr-full">${label}</span>`;
       }).filter(Boolean);
-      if (extra > 0) parts.push(`<span style="color:var(--muted);font-size:10.5px;">+${extra} more</span>`);
       return parts.join(`<span style="color:var(--muted);margin:0 3px;">·</span>`);
     }
 
@@ -16424,7 +16778,9 @@ Best regards,<br>
         '<base target="_blank" rel="noopener noreferrer">' +
         '<style>' +
         'html,body{height:100%;margin:0;padding:12px;box-sizing:border-box;background:#ffffff!important;color:#1a1a1a;' +
-        'font-family:\'Segoe UI\',Outfit,sans-serif;font-size:13px;line-height:1.65;overflow-x:hidden;overflow-y:auto;-webkit-overflow-scrolling:touch;}' +
+        'font-family:\'Segoe UI\',Outfit,sans-serif;font-size:13px;line-height:1.65;overflow-x:hidden;overflow-y:auto;-webkit-overflow-scrolling:touch;word-wrap:break-word;overflow-wrap:break-word;word-break:break-word;}' +
+        '*{word-wrap:break-word!important;overflow-wrap:break-word!important;word-break:break-word!important;max-width:100vw!important;}' +
+        'pre{white-space:pre-wrap!important;}' +
         'img{max-width:100%;height:auto;}' +
         'a,a img,a picture{cursor:pointer;}' +
         'a img{pointer-events:auto;}' +
@@ -16700,15 +17056,113 @@ Best regards,<br>
       }
     }
 
-    function updateThreadGrowClass(currentId) {
-      document.querySelectorAll('.thread-msg-item').forEach(el => el.classList.remove('thread-msg-grow'));
-      const id = currentId || '';
-      let target = id ? document.getElementById(`tmsg-${outlookEscapeAttr(id)}`) : null;
-      if (!target) {
-        const items = document.querySelectorAll('.thread-msg-item');
-        target = items.length ? items[items.length - 1] : null;
+    function fitThreadLastBody() {
+      const pane = document.getElementById('email-thread-last');
+      if (!pane) return;
+      const item = pane.querySelector('.thread-msg-item');
+      const body = item?.querySelector('.thread-msg-body');
+      const content = item?.querySelector('[id^="tbody-content-"]');
+      if (!body || !content) return;
+      let aboveContent = 0;
+      body.querySelectorAll(':scope > *').forEach((el) => {
+        if (!String(el.id || '').startsWith('tbody-content-') && el.style.display !== 'none') {
+          aboveContent += el.offsetHeight;
+        }
+      });
+      const contentH = Math.max(120, body.clientHeight - aboveContent);
+      content.style.minHeight = contentH + 'px';
+      content.style.maxHeight = contentH + 'px';
+      const scrollTarget = content.querySelector('.thread-body-iframe, .thread-body-plain');
+      let innerFixed = 0;
+      content.querySelectorAll(':scope > *').forEach((el) => {
+        if (el !== scrollTarget && el.style.display !== 'none') innerFixed += el.offsetHeight;
+      });
+      const scrollH = Math.max(100, contentH - innerFixed);
+      if (scrollTarget) scrollTarget.style.height = scrollH + 'px';
+    }
+
+    let threadLastBodyResizeTimer;
+    function scheduleFitThreadLastBody() {
+      clearTimeout(threadLastBodyResizeTimer);
+      threadLastBodyResizeTimer = setTimeout(fitThreadLastBody, 50);
+    }
+
+    if (!window._threadLastBodyResizeBound) {
+      window._threadLastBodyResizeBound = true;
+      window.addEventListener('resize', scheduleFitThreadLastBody);
+    }
+
+    function renderThreadMsgItem(m, opts) {
+      const { expanded } = opts;
+      const from = m.from?.emailAddress?.name || m.from?.emailAddress?.address || 'Unknown';
+      const fromAddr = m.from?.emailAddress?.address || '';
+      function _renderThreadAddr(recipients) {
+        return (recipients || []).map(r => {
+          const n = r.emailAddress?.name || ''; const a = r.emailAddress?.address || '';
+          if (!a) return '';
+          if (ContactResolver.isUnknownSender(a)) {
+            const { label, badgeClass } = ContactResolver.getProviderCategory(a);
+            const safeA = a.replace(/'/g, "\\'");
+                return `<span style="display:inline-flex;align-items:center;gap:3px;margin-right:4px;flex-wrap:wrap;">` +
+                  `<span class="email-addr-full">${escHtml(a)}</span>` +
+                  `<span class="badge ${badgeClass}" style="font-size:9px;">${escHtml(label)}</span>` +
+                  `<button class="btn btn-xs btn-gold" style="font-size:10px;padding:1px 6px;" onclick="openQuickSaveModal('${safeA}')" title="Add to Contacts"><i class="fa fa-user-plus"></i></button>` +
+                  `</span>`;
+          }
+              return `<span class="email-addr-full" style="margin-right:4px;display:inline-block;">${escHtml(n && n !== a ? n + ' <' + a + '>' : a)}</span>`;
+        }).filter(Boolean).join('');
       }
-      if (target) target.classList.add('thread-msg-grow');
+      const toList = _renderThreadAddr(m.toRecipients);
+      const ccList = _renderThreadAddr(m.ccRecipients);
+      const time = outlookFormatMessageDate(m.receivedDateTime || m.sentDateTime || m.createdDateTime);
+      const preview = (m.bodyPreview || '').slice(0, 120);
+      const threadAttachIcon = m.hasAttachments
+        ? '<i class="fas fa-paperclip" style="font-size:10px;color:var(--muted);margin-left:4px;" title="Has attachments"></i>'
+        : '';
+      const initials = getInitials(from);
+      const bgColor = avatarColor(from);
+      const msgId = outlookEscapeAttr(m.id);
+      const msgMeta = JSON.stringify({
+        id: m.id,
+        subject: m.subject || '',
+        receivedDateTime: m.receivedDateTime || m.sentDateTime || m.createdDateTime || '',
+        fromName: m.from?.emailAddress?.name || '',
+        fromAddr: m.from?.emailAddress?.address || '',
+        toRecipients: (m.toRecipients || []).map(r => r.emailAddress?.address || '').filter(Boolean),
+        ccRecipients: (m.ccRecipients || []).map(r => r.emailAddress?.address || '').filter(Boolean),
+        bodyPreview: m.bodyPreview || '',
+      });
+      const metaAttr = msgMeta.replace(/"/g, '&quot;');
+      return `<div class="thread-msg-item" id="tmsg-${msgId}" style="border-bottom:1px solid var(--border);">
+        <div class="thread-msg-header" onclick="toggleThreadMsg('${msgId}')" style="display:flex;align-items:center;gap:10px;padding:10px 16px;cursor:pointer;transition:background 0.1s;justify-content:space-between;" onmouseover="this.style.background='rgba(255,255,255,0.03)'" onmouseout="this.style.background=''">
+          <div style="display:flex;align-items:center;gap:10px;flex:1;min-width:0;">
+            <div style="width:32px;height:32px;border-radius:50%;background:${bgColor};display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:#fff;flex-shrink:0;">${initials}</div>
+            <div style="flex:1;min-width:0;">
+              <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;">
+                <span class="email-addr-full" style="font-size:12.5px;font-weight:700;color:var(--text);flex:1;min-width:0;">${fromAddr && fromAddr !== from ? escHtml(from) + ' <span style="font-weight:400;color:var(--muted);">&lt;' + escHtml(fromAddr) + '&gt;</span>' : escHtml(fromAddr || from)}${threadAttachIcon}</span>
+                <span style="font-size:10.5px;color:var(--muted);flex-shrink:0;">${time}</span>
+              </div>
+              <div class="thread-msg-preview" style="font-size:11.5px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;${expanded ? 'display:none;' : ''}">${escHtml(preview)}</div>
+            </div>
+          </div>
+          <div class="msg-actions" style="display:flex;gap:4px;align-items:center;flex-shrink:0;" onclick="event.stopPropagation();">
+            <button class="btn btn-ghost btn-xs" onclick="openReplyFromThread(${metaAttr},false)" title="Reply to this message"><i class="fas fa-reply"></i></button>
+            <button class="btn btn-ghost btn-xs" onclick="openReplyFromThread(${metaAttr},true)" title="Reply All to this message"><i class="fas fa-reply-all"></i></button>
+            <button class="btn btn-ghost btn-xs" onclick="forwardFromThread(${metaAttr})" title="Forward this message"><i class="fas fa-share"></i></button>
+            <button class="btn btn-blue btn-xs" onclick="sendAgainFromThread(${metaAttr})" title="Send Again"><i class="fas fa-paper-plane"></i></button>
+            <button class="btn btn-gold btn-xs" onclick="activeMailMessage=${metaAttr};openTaskModal()" title="Assign Task"><i class="fas fa-user-check"></i></button>
+            <button class="btn btn-ghost btn-xs" onclick="toggleMoreMenu(event,this,${metaAttr})" title="More options"><i class="fas fa-ellipsis-h"></i></button>
+          </div>
+          <i class="fas fa-chevron-${expanded ? 'up' : 'down'} thread-msg-chevron" style="font-size:10px;color:var(--muted);flex-shrink:0;"></i>
+        </div>
+        <div class="thread-msg-body" id="tbody-${msgId}" style="${expanded ? '' : 'display:none;'}">
+          ${(toList || ccList) ? `<div class="thread-msg-meta custom-scroll" style="padding:4px 16px 6px 58px;font-size:11.5px;color:var(--muted);border-bottom:1px solid rgba(255,255,255,0.04);max-height:85px;overflow-y:auto;">
+            ${toList ? `<div style="display:flex;align-items:baseline;gap:4px;flex-wrap:wrap;"><span style="font-weight:700;text-transform:uppercase;font-size:10px;letter-spacing:0.05em;margin-right:6px;flex-shrink:0;">To</span>${toList}</div>` : ''}
+            ${ccList ? `<div style="display:flex;align-items:baseline;gap:4px;flex-wrap:wrap;"><span style="font-weight:700;text-transform:uppercase;font-size:10px;letter-spacing:0.05em;margin-right:6px;flex-shrink:0;">Cc</span>${ccList}</div>` : ''}
+          </div>` : ''}
+          <div id="tbody-content-${msgId}" style="min-height:60px;"><div style="text-align:center;padding:16px;"><div class="spin-loader" style="margin:0 auto;"></div></div></div>
+        </div>
+      </div>`;
     }
 
     // ── Outlook-style conversation thread renderer ────────────────────────────
@@ -16821,7 +17275,8 @@ Best regards,<br>
       const oldWrap = document.getElementById('email-thread-wrap');
       if (oldWrap) oldWrap.style.display = 'none';
       const threadConv = document.getElementById('email-thread-conversation');
-      const threadMsgs = document.getElementById('email-thread-messages');
+      const threadOlder = document.getElementById('email-thread-older');
+      const threadLast = document.getElementById('email-thread-last');
       const singleView = document.getElementById('email-single-view');
 
       if (!conversationId) {
@@ -16842,93 +17297,17 @@ Best regards,<br>
 
         if (singleView) singleView.style.display = 'none';
         if (threadConv) threadConv.style.display = 'flex';
-        if (!threadMsgs) return;
+        if (!threadOlder || !threadLast) return;
 
-        threadMsgs.innerHTML = msgs.map((m, idx) => {
-          const isLast = idx === msgs.length - 1;
-          const isCur = m.id === currentId;
-          const expanded = isLast || isCur;
-          const from = m.from?.emailAddress?.name || m.from?.emailAddress?.address || 'Unknown';
-          const fromAddr = m.from?.emailAddress?.address || '';
-          const fromDisp = from + (fromAddr && fromAddr !== from ? ' <' + fromAddr + '>' : '');
-          function _renderThreadAddr(recipients) {
-            return (recipients || []).map(r => {
-              const n = r.emailAddress?.name || ''; const a = r.emailAddress?.address || '';
-              if (!a) return '';
-              if (ContactResolver.isUnknownSender(a)) {
-                const { label, badgeClass } = ContactResolver.getProviderCategory(a);
-                const safeA = a.replace(/'/g, "\\'");
-                return `<span style="display:inline-flex;align-items:center;gap:3px;margin-right:4px;">` +
-                  `<span>${escHtml(a)}</span>` +
-                  `<span class="badge ${badgeClass}" style="font-size:9px;">${escHtml(label)}</span>` +
-                  `<button class="btn btn-xs btn-gold" style="font-size:10px;padding:1px 6px;" onclick="openQuickSaveModal('${safeA}')" title="Add to Contacts"><i class="fa fa-user-plus"></i></button>` +
-                  `</span>`;
-              }
-              return `<span style="margin-right:4px;">${escHtml(n && n !== a ? n + ' <' + a + '>' : a)}</span>`;
-            }).filter(Boolean).join('');
-          }
-          const toList = _renderThreadAddr(m.toRecipients);
-          const ccList = _renderThreadAddr(m.ccRecipients);
-          const time = outlookFormatMessageDate(m.receivedDateTime || m.sentDateTime || m.createdDateTime);
-          const preview = (m.bodyPreview || '').slice(0, 120);
-          const threadAttachIcon = m.hasAttachments
-            ? '<i class="fas fa-paperclip" style="font-size:10px;color:var(--muted);margin-left:4px;" title="Has attachments"></i>'
-            : '';
-          const initials = getInitials(from);
-          const bgColor = avatarColor(from);
-          const msgId = outlookEscapeAttr(m.id);
-
-          // Encode message metadata for per-message reply buttons (JSON in data attribute)
-          const msgMeta = JSON.stringify({
-            id: m.id,
-            subject: m.subject || '',
-            receivedDateTime: m.receivedDateTime || m.sentDateTime || m.createdDateTime || '',
-            fromName: m.from?.emailAddress?.name || '',
-            fromAddr: m.from?.emailAddress?.address || '',
-            toRecipients: (m.toRecipients || []).map(r => r.emailAddress?.address || '').filter(Boolean),
-            ccRecipients: (m.ccRecipients || []).map(r => r.emailAddress?.address || '').filter(Boolean),
-            bodyPreview: m.bodyPreview || '',
-          });
-          const metaAttr = msgMeta.replace(/"/g, '&quot;');
-
-          return `<div class="thread-msg-item" id="tmsg-${msgId}" style="border-bottom:1px solid var(--border);">
-        <div class="thread-msg-header" onclick="toggleThreadMsg('${msgId}')" style="display:flex;align-items:center;gap:10px;padding:10px 16px;cursor:pointer;transition:background 0.1s;justify-content:space-between;" onmouseover="this.style.background='rgba(255,255,255,0.03)'" onmouseout="this.style.background=''">
-          <div style="display:flex;align-items:center;gap:10px;flex:1;min-width:0;">
-            <div style="width:32px;height:32px;border-radius:50%;background:${bgColor};display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:#fff;flex-shrink:0;">${initials}</div>
-            <div style="flex:1;min-width:0;">
-              <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;">
-                <span style="font-size:12.5px;font-weight:700;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:260px;">${escHtml(from)}${fromAddr && fromAddr !== from ? ' <span style="font-weight:400;color:var(--muted);">&lt;' + escHtml(fromAddr) + '&gt;</span>' : ''}${threadAttachIcon}</span>
-                <span style="font-size:10.5px;color:var(--muted);flex-shrink:0;">${time}</span>
-              </div>
-              <div class="thread-msg-preview" style="font-size:11.5px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;${expanded ? 'display:none;' : ''}">${escHtml(preview)}</div>
-            </div>
-          </div>
-          <div class="msg-actions" style="display:flex;gap:4px;align-items:center;flex-shrink:0;" onclick="event.stopPropagation();">
-            <button class="btn btn-ghost btn-xs" onclick="openReplyFromThread(${metaAttr},false)" title="Reply to this message"><i class="fas fa-reply"></i></button>
-            <button class="btn btn-ghost btn-xs" onclick="openReplyFromThread(${metaAttr},true)" title="Reply All to this message"><i class="fas fa-reply-all"></i></button>
-            <button class="btn btn-ghost btn-xs" onclick="forwardFromThread(${metaAttr})" title="Forward this message"><i class="fas fa-share"></i></button>
-            <button class="btn btn-blue btn-xs" onclick="sendAgainFromThread(${metaAttr})" title="Send Again"><i class="fas fa-paper-plane"></i></button>
-            <button class="btn btn-gold btn-xs" onclick="activeMailMessage=${metaAttr};openTaskModal()" title="Assign Task"><i class="fas fa-user-check"></i></button>
-            <button class="btn btn-ghost btn-xs" onclick="toggleMoreMenu(event,this,${metaAttr})" title="More options"><i class="fas fa-ellipsis-h"></i></button>
-          </div>
-          <i class="fas fa-chevron-${expanded ? 'up' : 'down'} thread-msg-chevron" style="font-size:10px;color:var(--muted);flex-shrink:0;"></i>
-        </div>
-        <div class="thread-msg-body" id="tbody-${msgId}" style="${expanded ? '' : 'display:none;'}">
-          ${(toList || ccList) ? `<div style="padding:4px 16px 6px 58px;font-size:11.5px;color:var(--muted);border-bottom:1px solid rgba(255,255,255,0.04);">
-            ${toList ? `<div style="display:flex;align-items:baseline;gap:4px;flex-wrap:wrap;"><span style="font-weight:700;text-transform:uppercase;font-size:10px;letter-spacing:0.05em;margin-right:6px;flex-shrink:0;">To</span>${toList}</div>` : ''}
-            ${ccList ? `<div style="display:flex;align-items:baseline;gap:4px;flex-wrap:wrap;"><span style="font-weight:700;text-transform:uppercase;font-size:10px;letter-spacing:0.05em;margin-right:6px;flex-shrink:0;">Cc</span>${ccList}</div>` : ''}
-          </div>` : ''}
-          <div id="tbody-content-${msgId}" style="padding:0 16px 0 58px;min-height:60px;"><div style="text-align:center;padding:16px;"><div class="spin-loader" style="margin:0 auto;"></div></div></div>
-        </div>
-      </div>`;
-        }).join('');
+        const olderMsgs = msgs.slice(0, -1);
+        const lastMsg = msgs[msgs.length - 1];
+        threadOlder.innerHTML = olderMsgs.map((m) => renderThreadMsgItem(m, {
+          expanded: m.id === currentId,
+        })).join('');
+        threadLast.innerHTML = renderThreadMsgItem(lastMsg, { expanded: true });
 
         msgs.forEach((m, idx) => { if (idx === msgs.length - 1 || m.id === currentId) loadThreadMsgBody(m.id); });
-        updateThreadGrowClass(currentId || msgs[msgs.length - 1]?.id);
-        setTimeout(() => {
-          const t = document.getElementById(`tmsg-${outlookEscapeAttr(currentId || msgs[msgs.length - 1].id)}`);
-          if (t) t.scrollIntoView({ behavior: 'smooth', block: 'start' });
-        }, 150);
+        scheduleFitThreadLastBody();
       } catch (err) {
         console.error('[Thread] Error:', err.message);
         if (threadConv) threadConv.style.display = 'none';
@@ -16947,7 +17326,7 @@ Best regards,<br>
       if (preview) preview.style.display = isOpen ? '' : 'none';
       if (chevron) { chevron.classList.toggle('fa-chevron-down', isOpen); chevron.classList.toggle('fa-chevron-up', !isOpen); }
       if (!isOpen) loadThreadMsgBody(msgId);
-      if (!isOpen) updateThreadGrowClass(msgId);
+      if (document.getElementById('email-thread-last')?.contains(item)) scheduleFitThreadLastBody();
     }
 
     async function loadThreadMsgBody(msgId) {
@@ -16976,13 +17355,23 @@ Best regards,<br>
           const wrapped = outlookWrapEmailBodyDocument(htmlSrc);
           const blob = new Blob([wrapped], { type: 'text/html;charset=utf-8' });
           const blobUrl = URL.createObjectURL(blob);
-          el.innerHTML = attHtml + `<iframe class="email-body-iframe" sandbox="${OUTLOOK_EMAIL_BODY_SANDBOX}" src="${blobUrl}" title="Email body"></iframe>`;
+          const iframe = document.createElement('iframe');
+          iframe.className = 'email-body-iframe thread-body-iframe';
+          iframe.sandbox = OUTLOOK_EMAIL_BODY_SANDBOX;
+          iframe.title = 'Email body';
+          iframe.src = blobUrl;
+          iframe.addEventListener('load', scheduleFitThreadLastBody);
+          el.innerHTML = attHtml;
+          el.appendChild(iframe);
         } else {
-          el.innerHTML = attHtml + `<pre style="white-space:pre-wrap;font-family:'Outfit',sans-serif;font-size:13px;color:var(--text);margin:12px 0;flex:1;overflow-y:auto;">${escHtml(raw)}</pre>`;
+          el.innerHTML = attHtml + `<pre class="thread-body-plain" style="white-space:pre-wrap;font-family:'Outfit',sans-serif;font-size:13px;color:var(--text);margin:12px 0;flex:1;overflow-y:auto;">${escHtml(raw)}</pre>`;
         }
         const attBar = document.getElementById(attBarId);
         if (attBar) renderOutlookThreadAttachments(attBar, msg.id, msg.attachments || []);
-        updateThreadGrowClass(msgId);
+        if (document.getElementById('email-thread-last')?.contains(el)) {
+          scheduleFitThreadLastBody();
+          setTimeout(scheduleFitThreadLastBody, 200);
+        }
       } catch (err) {
         el.innerHTML = `<div style="color:var(--red2);padding:12px;font-size:12px;">${err.message}</div>`;
       }
@@ -18335,12 +18724,12 @@ ${plainText}`;
                 const { label, badgeClass } = ContactResolver.getProviderCategory(addr);
                 const safeE = addr.replace(/'/g, "\\'");
                 return `<span style="display:inline-flex;align-items:center;gap:4px;flex-wrap:wrap;margin-right:6px;">` +
-                  `<span>${escHtml(addr)}</span>` +
+                  `<span class="email-addr-full">${escHtml(addr)}</span>` +
                   `<span class="badge ${badgeClass}" style="font-size:9px;">${escHtml(label)}</span>` +
                   `<button class="btn btn-xs btn-gold" style="font-size:10px;padding:2px 7px;" onclick="openQuickSaveModal('${safeE}')" title="Add to Outlook Contacts"><i class="fa fa-user-plus"></i></button>` +
                   `</span>`;
               }
-              return `<span style="margin-right:6px;">${escHtml(name && name !== addr ? name + ' <' + addr + '>' : addr)}</span>`;
+              return `<span class="email-addr-full" style="margin-right:6px;">${escHtml(name && name !== addr ? name + ' <' + addr + '>' : addr)}</span>`;
             }).filter(Boolean).join('');
           }
 
