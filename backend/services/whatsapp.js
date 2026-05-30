@@ -63,6 +63,26 @@ function hasSavedSession() {
   return fs.existsSync(path.join(AUTH_DIR, 'creds.json'));
 }
 
+function normalizeAccountPhone(value) {
+  return String(value || '').split('_')[0].split('@')[0].split(':')[0].replace(/\D/g, '');
+}
+
+function clearContactsStore() {
+  for (const key of Object.keys(contactsStore)) delete contactsStore[key];
+}
+
+function setActiveAccountPhone(value) {
+  const nextPhone = normalizeAccountPhone(value);
+  if (!nextPhone) return false;
+  if (phoneNumber && phoneNumber !== nextPhone) {
+    clearContactsStore();
+    importedLastTsMap = {};
+    groupMetadataCache.clear();
+  }
+  phoneNumber = nextPhone;
+  return true;
+}
+
 function setIO(socketIO) { io = socketIO; }
 
 function emit(event, data) {
@@ -327,14 +347,6 @@ async function ensureTables(retries = 3) {
         await pool.query(`ALTER TABLE wa_messages ADD PRIMARY KEY (id, chat_id, account_phone)`);
       } catch(e) {}
 
-      // Load imported checkpoints into memory
-      try {
-        const res = await pool.query(`SELECT id, imported_last_ts FROM wa_chats WHERE imported_last_ts IS NOT NULL`);
-        for (const r of res.rows) {
-          importedLastTsMap[r.id] = new Date(r.imported_last_ts).getTime();
-        }
-      } catch (e) { }
-
       return; // Success
     } catch (err) {
       console.warn(`[WA] Table ensure attempt ${i + 1} failed: ${err.message}`);
@@ -376,7 +388,8 @@ async function saveChat(rawJid, name, lastMsg, lastTime, unread, isGroup) {
     : (cleanName || null);
   const ts = lastTime instanceof Date ? lastTime : toDate(lastTime);
   try {
-    const accPhone = phoneNumber || 'unknown';
+    const accPhone = phoneNumber;
+    if (!accPhone) return;
     await pool.query(`
       INSERT INTO wa_chats (id, account_phone, name, phone, is_group, last_message, last_time, unread)
       VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
@@ -397,13 +410,15 @@ async function saveChat(rawJid, name, lastMsg, lastTime, unread, isGroup) {
 // ── SAVE / UPDATE CONTACT ──────────────────────────────────────────────────────────────
 async function saveContact(contact) {
   if (!contact?.id) return;
+  const accPhone = phoneNumber;
+  if (!accPhone) return;
   const jid = contact.id;
   let phone = jid.split('@')[0].split(':')[0];
   const name = contact.name || contact.verifiedName || null;
   const notify = contact.notify || null;
 
   // Update in-memory store
-  contactsStore[jid] = { name, notify };
+  contactsStore[jid] = { id: jid, name, notify };
 
   // Identity Mapping: If this is an LID, extract the real phone number
   if (jid.endsWith('@lid') && contact.phoneNumber) {
@@ -415,7 +430,6 @@ async function saveContact(contact) {
   }
 
   try {
-    const accPhone = phoneNumber || 'unknown';
     await pool.query(`
       INSERT INTO wa_contacts (jid, account_phone, name, notify, phone)
       VALUES ($1,$2,$3,$4,$5)
@@ -439,8 +453,8 @@ async function saveMessage(msg) {
 
     // LID to Phone resolution (from memory or DB)
     if (jid.endsWith('@lid')) {
-      const mapped = Object.values(contactsStore).find(c => c.id === jid && c.phoneJid);
-      if (mapped) jid = mapped.phoneJid;
+      const mapped = contactsStore[jid];
+      if (mapped?.phoneJid) jid = mapped.phoneJid;
     }
 
     const ts = toDate(msg.messageTimestamp);
@@ -517,7 +531,8 @@ async function saveMessage(msg) {
                 '[Media]');
       }
     } catch (e) { }
-    const accPhone = phoneNumber || 'unknown';
+    const accPhone = phoneNumber;
+    if (!accPhone) return null;
     await pool.query(`
       INSERT INTO wa_messages (id, chat_id, account_phone, from_me, sender, sender_name, body, msg_type, timestamp, is_read, quoted_body, is_reply, reply_to_msg_id, media_path)
       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)
@@ -534,11 +549,16 @@ async function saveMessage(msg) {
 // ── LOAD CONTACTS FROM DB INTO MEMORY ──────────────────────────────────────────────────
 async function loadContactsFromDB() {
   try {
-    const accPhone = phoneNumber || 'unknown';
+    const accPhone = phoneNumber;
+    clearContactsStore();
+    if (!accPhone) {
+      console.log('[WA] Skipping contact preload until connected account is known');
+      return;
+    }
     // Include phone so LID entries get their phoneJid pre-populated for group msg rendering
     const res = await pool.query(`SELECT jid, name, notify, phone FROM wa_contacts WHERE account_phone=$1`, [accPhone]);
     res.rows.forEach(r => {
-      const entry = { name: r.name, notify: r.notify };
+      const entry = { id: r.jid, name: r.name, notify: r.notify };
       // Pre-populate phoneJid for @lid contacts so saveMessage can resolve senders immediately
       if (r.jid.endsWith('@lid') && r.phone) {
         entry.phoneJid = r.phone + '@s.whatsapp.net';
@@ -547,7 +567,7 @@ async function loadContactsFromDB() {
       // Also index by phone number for cross-format lookup
       const phone = r.jid.split('@')[0].split(':')[0];
       if (phone && !contactsStore[phone]) {
-        contactsStore[phone] = { name: r.name, notify: r.notify };
+        contactsStore[phone] = { id: r.jid, name: r.name, notify: r.notify };
       }
     });
     const lidCount = res.rows.filter(r => r.jid.endsWith('@lid') && r.phone).length;
@@ -560,14 +580,15 @@ async function loadContactsFromDB() {
 // for live Baileys contact events (which may not fire on reconnect).
 async function loadLidPhoneMapFromDB() {
   try {
-    const accPhone = phoneNumber || 'unknown';
+    const accPhone = phoneNumber;
+    if (!accPhone) return;
     const res = await pool.query(
       `SELECT jid, phone FROM wa_contacts WHERE account_phone=$1 AND jid LIKE '%@lid' AND phone IS NOT NULL AND phone != ''`,
       [accPhone]
     );
     let mapped = 0;
     for (const r of res.rows) {
-      if (!contactsStore[r.jid]) contactsStore[r.jid] = {};
+      if (!contactsStore[r.jid]) contactsStore[r.jid] = { id: r.jid };
       contactsStore[r.jid].phoneJid = r.phone + '@s.whatsapp.net';
       mapped++;
     }
@@ -594,9 +615,6 @@ async function startWA(options = {}) {
   startInProgress = true;
   const generation = ++socketGeneration;
   await ensureTables();
-  await loadContactsFromDB();
-  // Update chat names from contacts on every startup
-  await updateChatNames();
 
   if (!allowQrGeneration && !hasSavedSession()) {
     console.log('[WA] No saved session. WhatsApp will stay idle until QR is requested from WhatsApp Biz.');
@@ -610,10 +628,14 @@ async function startWA(options = {}) {
   // Initialize phoneNumber early from existing credentials to prevent 'unknown'
   if (state.creds && state.creds.me && state.creds.me.id) {
     const rawId = state.creds.me.id;
-    const idPart = rawId.split('_')[0].split('@')[0].split(':')[0];
-    phoneNumber = idPart || rawId;
+    setActiveAccountPhone(rawId);
     userJid = rawId;
   }
+
+  await loadContactsFromDB();
+  await loadImportedCheckpointsFromDB();
+  // Update chat names from contacts on every startup, scoped to the active account.
+  await updateChatNames();
 
   let version = [2, 3000, 1017539718]; // Updated fallback to a more recent version
   try {
@@ -638,9 +660,10 @@ async function startWA(options = {}) {
     syncFullHistory: true,  // true = ensures full history is downloaded (faster, prevents sync stuck)
     logger: require('pino')({ level: 'info' }), // Enabled info level to see Baileys internal logs
     getMessage: async (key) => {
+      if (!phoneNumber) return { conversation: '' };
       const res = await pool.query(
         `SELECT body FROM wa_messages WHERE id=$1 AND chat_id=$2 AND account_phone=$3`,
-        [key.id, key.remoteJid, phoneNumber || 'unknown']
+        [key.id, key.remoteJid, phoneNumber]
       );
       return res.rows[0] ? { conversation: res.rows[0].body } : { conversation: '' };
     },
@@ -695,10 +718,12 @@ async function startWA(options = {}) {
 
       // sock.user.id can be "919545073545:48@s.whatsapp.net" or LID "49868...@lid"
       // Extract real phone: take part before ':' or '@'
-      const idPart = rawId.split('@')[0].split(':')[0];
-      phoneNumber = idPart || rawId;
+      setActiveAccountPhone(rawId);
+      userJid = rawId;
       console.log(`[WA] Connected as ${phoneNumber} | raw id: ${rawId} | reconnect: ${isReconnect}`);
-      await adoptUnknownAccountRows(phoneNumber);
+      await loadContactsFromDB();
+      await loadImportedCheckpointsFromDB();
+      await updateChatNames();
       emit('wa:connected', { phone: phoneNumber, name: sock.user?.name });
 
       // Immediately refresh LID→phone map so group msg senders resolve on reconnect
@@ -728,6 +753,9 @@ async function startWA(options = {}) {
         console.log('[WA] Logged out - clearing session');
         phoneNumber = null;
         userJid = null;
+        clearContactsStore();
+        importedLastTsMap = {};
+        groupMetadataCache.clear();
         clearSession();
         reconnectAttempts = 0; // Reset attempts for a fresh start
         if (allowQrGeneration) scheduleReconnect('logged out');
@@ -744,12 +772,17 @@ async function startWA(options = {}) {
       } else if (code === 401) {
         // Unauthorized - session invalid
         console.log('[WA] Unauthorized - clearing session');
+        phoneNumber = null;
+        userJid = null;
+        clearContactsStore();
+        importedLastTsMap = {};
+        groupMetadataCache.clear();
         clearSession();
         reconnectAttempts = 0;
         if (allowQrGeneration) scheduleReconnect('unauthorized');
-      } else if (code === 500 || code === 503 || !code) {
-        // Server error or network issue - retry with exponential backoff
-        scheduleReconnect('server error or network issue');
+      } else if (code === 500 || code === 503 || !code || hasSavedSession()) {
+        // Server, network, or unclassified close: retry with exponential backoff.
+        scheduleReconnect(`disconnect ${code || 'unknown'}`);
       } else {
         // Unknown error - log and don't reconnect automatically
         console.log('[WA] Unknown disconnect code:', code, '- NOT auto-reconnecting');
@@ -968,7 +1001,8 @@ async function startWA(options = {}) {
       if (update.status) {
         const statusMap = { 1: 'sent', 2: 'delivered', 3: 'read', 4: 'played' };
         const status = statusMap[update.status] || 'sent';
-        const accPhone = phoneNumber || 'unknown';
+        const accPhone = phoneNumber;
+        if (!accPhone) continue;
         await pool.query(
           `UPDATE wa_messages SET status=$1 WHERE id=$2 AND chat_id=$3 AND account_phone=$4`,
           [status, key.id, key.remoteJid, accPhone]
@@ -981,21 +1015,23 @@ async function startWA(options = {}) {
   // ── GROUP METADATA ──────────────────────────────────────────────────────────────────
   sock.ev.on('groups.upsert', async (groups) => {
     for (const g of groups) {
-      const accPhone = phoneNumber || 'unknown';
+      const accPhone = phoneNumber;
+      if (!accPhone) continue;
       await pool.query(
         `UPDATE wa_chats SET name=COALESCE($1, name) WHERE id=$2 AND account_phone=$3`,
         [g.subject || null, g.id, accPhone]
       );
-      contactsStore[g.id] = { name: g.subject };
+      contactsStore[g.id] = { id: g.id, name: g.subject };
     }
   });
 
   sock.ev.on('groups.update', async (updates) => {
     for (const g of updates) {
       if (g.subject) {
-        const accPhone = phoneNumber || 'unknown';
+        const accPhone = phoneNumber;
+        if (!accPhone) continue;
         await pool.query(`UPDATE wa_chats SET name=$1 WHERE id=$2 AND account_phone=$3`, [g.subject, g.id, accPhone]);
-        contactsStore[g.id] = { name: g.subject };
+        contactsStore[g.id] = { id: g.id, name: g.subject };
       }
     }
   });
@@ -1007,7 +1043,8 @@ async function startWA(options = {}) {
 async function updateChatNames() {
   try {
     // Step 1: Update names from contactsStore (in-memory)
-    const accPhone = phoneNumber || 'unknown';
+    const accPhone = phoneNumber;
+    if (!accPhone) return;
     const chats = await pool.query(`SELECT id, phone, name, is_group FROM wa_chats WHERE account_phone=$1`, [accPhone]);
     let updated = 0;
     for (const chat of chats.rows) {
@@ -1071,7 +1108,8 @@ async function syncAllGroupParticipants() {
   }
   groupParticipantSyncing = true;
   try {
-    const accPhone = phoneNumber || 'unknown';
+    const accPhone = phoneNumber;
+    if (!accPhone) return;
     const groups = await pool.query(`SELECT id FROM wa_chats WHERE is_group = true AND account_phone=$1`, [accPhone]);
     if (groups.rows.length === 0) return;
     console.log(`[WA] Syncing participants for ${groups.rows.length} groups...`);
@@ -1163,7 +1201,8 @@ async function adoptUnknownAccountRows(accPhone) {
 async function sendMessage(jid, text, quotedMsgId) {
   if (!sock || !isConnected) throw new Error('WhatsApp not connected');
   const formattedJid = formatJid(jid);
-  const accPhone = phoneNumber || 'unknown';
+  const accPhone = phoneNumber;
+  if (!accPhone) throw new Error('Connected WhatsApp account is not known yet');
 
   let sendContent = { text };
   let sendOptions = {};
@@ -1297,7 +1336,8 @@ async function sendPreparedMedia(formattedJid, msgType, buffer, mimetype, filena
 async function sendMediaMessage(jid, media, quotedMsgId) {
   if (!sock || !isConnected) throw new Error('WhatsApp not connected');
   const formattedJid = formatJid(jid);
-  const accPhone = phoneNumber || 'unknown';
+  const accPhone = phoneNumber;
+  if (!accPhone) throw new Error('Connected WhatsApp account is not known yet');
   const buffer = Buffer.isBuffer(media?.buffer) ? media.buffer : Buffer.from(media?.buffer || '');
   if (!buffer.length) throw new Error('Media file is empty');
 
@@ -1501,6 +1541,10 @@ async function logout() {
     isConnected = false;
     qrString = null;
     phoneNumber = null;
+    userJid = null;
+    clearContactsStore();
+    importedLastTsMap = {};
+    groupMetadataCache.clear();
     reconnectAttempts = 0;
   }
   clearSession();
@@ -1535,15 +1579,33 @@ async function requestQR() {
 }
 
 function getConnectedPhone() {
-  if (!isConnected) return null;
+  if (!isConnected || currentState !== 'CONNECTED') return null;
   return phoneNumber;
+}
+
+async function loadImportedCheckpointsFromDB() {
+  try {
+    importedLastTsMap = {};
+    const accPhone = phoneNumber;
+    if (!accPhone) return;
+    const res = await pool.query(
+      `SELECT id, imported_last_ts FROM wa_chats WHERE account_phone=$1 AND imported_last_ts IS NOT NULL`,
+      [accPhone]
+    );
+    for (const r of res.rows) {
+      importedLastTsMap[r.id] = new Date(r.imported_last_ts).getTime();
+    }
+  } catch (err) {
+    console.warn('[WA] Imported checkpoint preload skipped:', err.message);
+  }
 }
 
 // ── IMPORT ────────────────────────────────────────────────────────────────────
 async function importExportedChat(chatText, chatJid, mediaFiles, clearOld) {
   if (!chatJid) throw new Error("A valid chat must be selected.");
   await ensureTables();
-  const accPhone = phoneNumber || 'unknown';
+  const accPhone = phoneNumber;
+  if (!accPhone) throw new Error('WhatsApp must be connected before importing a chat.');
   const existing = await pool.query(`SELECT id, name FROM wa_chats WHERE id=$1 AND account_phone=$2`, [chatJid, accPhone]);
   if (existing.rows.length === 0) throw new Error("Chat not found.");
   const displayChatName = existing.rows[0].name;

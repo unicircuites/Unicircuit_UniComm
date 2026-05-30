@@ -1,6 +1,7 @@
 const express = require('express');
 const pool = require('../db/pool');
 const { authenticate } = require('../middleware/auth');
+const wa = require('../services/whatsapp');
 
 const router = express.Router();
 router.use(authenticate);
@@ -25,11 +26,14 @@ async function countSyncedEmails() {
 }
 
 async function countWaChats() {
+  const accountPhone = wa.getConnectedPhone();
+  if (!accountPhone) return { total: 0, unread: 0 };
   const r = await safeQuery(`
     SELECT COUNT(*)::int AS total,
            COALESCE(SUM(unread), 0)::int AS unread
     FROM wa_chats
-  `);
+    WHERE account_phone = $1
+  `, [accountPhone]);
   return {
     total: parseInt(r.rows[0]?.total || 0, 10),
     unread: parseInt(r.rows[0]?.unread || 0, 10),
@@ -113,6 +117,7 @@ router.get('/stats', async (req, res) => {
 // GET /api/dashboard/overview
 router.get('/overview', async (req, res) => {
   try {
+    const waAccountPhone = wa.getConnectedPhone();
     const liveCallsRes = await safeQuery(`
       SELECT
         cl.id,
@@ -161,9 +166,9 @@ router.get('/overview', async (req, res) => {
     const activityRes = await safeQuery(`
       SELECT
         (SELECT COUNT(*)::int FROM call_logs WHERE created_at >= NOW() - INTERVAL '7 days') AS calls,
-        (SELECT COUNT(*)::int FROM wa_messages WHERE timestamp >= NOW() - INTERVAL '7 days') AS whatsapp,
+        (SELECT COUNT(*)::int FROM wa_messages WHERE timestamp >= NOW() - INTERVAL '7 days' AND account_phone = $1) AS whatsapp,
         (SELECT COUNT(*)::int FROM outlook_emails_cache) AS email
-    `);
+    `, [waAccountPhone || '__no_connected_wa__']);
 
     const pipelineRes = await safeQuery(`
       SELECT
@@ -178,6 +183,7 @@ router.get('/overview', async (req, res) => {
       WITH latest_chat AS (
         SELECT id, name, account_phone
         FROM wa_chats
+        WHERE account_phone = $1
         ORDER BY COALESCE(last_time, updated_at) DESC NULLS LAST
         LIMIT 1
       )
@@ -191,7 +197,7 @@ router.get('/overview', async (req, res) => {
         LIMIT 3
       ) m ON true
       ORDER BY m.timestamp ASC NULLS LAST
-    `);
+    `, [waAccountPhone || '__no_connected_wa__']);
     if (waThreadQ.rows.length) {
       latestWaThread = {
         chat_name: waThreadQ.rows[0].chat_name || null,

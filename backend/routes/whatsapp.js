@@ -8,6 +8,15 @@ const { authenticate } = require('../middleware/auth');
 
 const router = express.Router();
 
+function connectedAccount(res) {
+  const accountPhone = wa.getConnectedPhone();
+  if (!accountPhone) {
+    res.status(409).json({ error: 'WhatsApp not connected' });
+    return null;
+  }
+  return accountPhone;
+}
+
 // -- PUBLIC (no auth) -------------------------------------------------------
 router.get('/qr',     async (req, res) => { res.json({ qr: await wa.requestQR() || null }); });
 router.get('/status', (req, res)       => { res.json(wa.getStatus()); });
@@ -21,6 +30,8 @@ router.post('/logout', authenticate, async (req, res) => {
 // GET /api/wa/lid-map - returns LID number -> {name, phone} map for @mention replacement
 router.get('/lid-map', authenticate, async (req, res) => {
   try {
+    const accountPhone = connectedAccount(res);
+    if (!accountPhone) return;
     // Merge wa_chats + wa_contacts to cover ALL LID contacts:
     // - wa_chats: LIDs that have a direct chat
     // - wa_contacts: LIDs that are group-only members, never had a direct chat
@@ -46,7 +57,7 @@ router.get('/lid-map', authenticate, async (req, res) => {
           AND phone ~ '^[0-9]'
           AND account_phone = $1
       ) combined
-    `, [wa.getConnectedPhone() || 'unknown']);
+    `, [accountPhone]);
     const map = {};
     result.rows.forEach(r => {
       // Format phone for display if it's raw digits
@@ -66,6 +77,8 @@ router.get('/lid-map', authenticate, async (req, res) => {
 
 router.get('/chats', authenticate, async (req, res) => {
   try {
+    const accountPhone = connectedAccount(res);
+    if (!accountPhone) return;
     const result = await pool.query(`
       SELECT
         c.id,
@@ -119,7 +132,7 @@ router.get('/chats', authenticate, async (req, res) => {
         c.id LIKE 'import_%'
       )
       ORDER BY last_time DESC NULLS LAST LIMIT 300
-    `, [wa.getConnectedPhone() || 'unknown']);
+    `, [accountPhone]);
     res.json(result.rows);
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
@@ -127,6 +140,8 @@ router.get('/chats', authenticate, async (req, res) => {
 router.post('/sync', authenticate, async (req, res) => {
   if (!wa.getStatus().connected) return res.status(400).json({ error: 'WhatsApp not connected' });
   try {
+    const accountPhone = connectedAccount(res);
+    if (!accountPhone) return;
     const stats = await pool.query(`
       SELECT
         COUNT(*) FILTER (WHERE is_group) AS groups,
@@ -137,7 +152,7 @@ router.post('/sync', authenticate, async (req, res) => {
         COALESCE(SUM(unread) FILTER (WHERE is_group), 0) AS unread_groups
       FROM wa_chats
       WHERE account_phone = $1
-    `, [wa.getConnectedPhone() || 'unknown']);
+    `, [accountPhone]);
     res.json({ success: true, stats: stats.rows[0] });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
@@ -156,12 +171,14 @@ router.get('/messages/:jid', authenticate, async (req, res) => {
   const limit = Math.min(Math.max(parseInt(req.query.limit || '100', 10) || 100, 1), 200);
   const before = req.query.before ? new Date(String(req.query.before)) : null;
   try {
+    const accountPhone = connectedAccount(res);
+    if (!accountPhone) return;
     // If this is a group chat, populate LID phone numbers from group metadata first
     if (jid.endsWith('@g.us')) {
       try {
         const groupMeta = await wa.getGroupMetadata(jid);
         let updated = 0;
-        const accPhone = wa.getConnectedPhone() || 'unknown';
+        const accPhone = accountPhone;
         for (const p of groupMeta.participants) {
           if (p.jid && p.jid.endsWith('@lid') && p.phone) {
             const realPhone = p.phone.replace(/[^0-9]/g, '');
@@ -220,9 +237,9 @@ router.get('/messages/:jid', authenticate, async (req, res) => {
        ) m
        LEFT JOIN wa_contacts c ON c.jid = m.sender AND c.account_phone=$4
        ORDER BY m.timestamp ASC`,
-      [jid, limit, lidNum, wa.getConnectedPhone() || 'unknown', beforeIsValid ? before.toISOString() : null]
+      [jid, limit, lidNum, accountPhone, beforeIsValid ? before.toISOString() : null]
     );
-    const accPhone = wa.getConnectedPhone() || 'unknown';
+    const accPhone = accountPhone;
     await pool.query(`UPDATE wa_messages SET is_read=true WHERE chat_id=$1 AND account_phone=$2 AND from_me=false`, [jid, accPhone]);
     await pool.query(`UPDATE wa_chats SET unread=0 WHERE id=$1 AND account_phone=$2`, [jid, accPhone]);
     res.json(result.rows);
