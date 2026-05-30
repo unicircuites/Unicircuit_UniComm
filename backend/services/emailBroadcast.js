@@ -3,6 +3,11 @@
  * Sends bulk emails with rate limiting to avoid spam filters
  */
 const nodemailer = require('nodemailer');
+const {
+  normalizeFieldDefs,
+  buildRecipientMap,
+  substitute,
+} = require('./emailTemplateVars');
 
 // ── TRANSPORTER ───────────────────────────────────────────────────────────
 function createTransporter() {
@@ -93,7 +98,8 @@ async function reportProgress(onProgress, results, email) {
 // ── SEND BROADCAST ────────────────────────────────────────────────────────
 // recipients: [{email, name}] or ['email1', 'email2']
 // onProgress: callback(sent, failed, current) for real-time updates
-async function sendBroadcast(recipients, subject, html, onProgress, delayMs = 2000, attachments = [], batchSize = 1) {
+async function sendBroadcast(recipients, subject, html, onProgress, delayMs = 2000, attachments = [], batchSize = 1, variableFields = []) {
+  const fieldDefs = normalizeFieldDefs(variableFields);
   const results = { sent: 0, failed: 0, errors: [], deliveries: [] };
   const safeBatchSize = Math.max(1, parseInt(batchSize || 1, 10) || 1);
 
@@ -110,15 +116,12 @@ async function sendBroadcast(recipients, subject, html, onProgress, delayMs = 20
       continue;
     }
 
-    // Personalise HTML — replace {{name}} and {{company}} placeholders
-    const company = (typeof r === 'object' && r.company) ? r.company : email.split('@')[1] || '';
-    const displayName = name || email.split('@')[0];
-    const personalize = (value) => String(value || '')
-      .replace(/\{\{name\}\}/gi, displayName)
-      .replace(/\{\{company\}\}/gi, company);
-
-    const personalSubject = personalize(subject);
-    const personalHtml = appendUnsubscribeFooter(personalize(html), email);
+    const recipientObj = typeof r === 'object'
+      ? { email, name, company: r.company || '' }
+      : { email, name: '', company: '' };
+    const varMap = buildRecipientMap(recipientObj, fieldDefs);
+    const personalSubject = substitute(subject, varMap);
+    const personalHtml = appendUnsubscribeFooter(substitute(html, varMap), email);
 
     const sentAt = new Date().toISOString();
     try {

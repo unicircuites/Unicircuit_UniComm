@@ -6652,6 +6652,24 @@
           class="fas fa-check"></i> Apply</button>
     </div>
 
+    <div id="bc-variables-section"
+      style="display:none;margin-bottom:10px;border:1px solid rgba(34,197,94,0.2);border-radius:8px;overflow:hidden;background:rgba(34,197,94,0.04);">
+      <div
+        style="display:flex;justify-content:space-between;align-items:center;padding:8px 12px;background:rgba(34,197,94,0.08);border-bottom:1px solid rgba(34,197,94,0.15);">
+        <span style="font-size:11px;font-weight:700;color:var(--green2);text-transform:uppercase;letter-spacing:0.5px;">
+          <i class="fas fa-brackets-curly"></i> Variable Fields (values sent in email)
+        </span>
+        <button type="button" class="btn btn-ghost btn-xs" onclick="bcAddCustomVariable()"><i class="fas fa-plus"></i> Add
+          Field</button>
+      </div>
+      <div id="bc-variables-hint" style="font-size:11px;color:var(--muted);padding:8px 12px;border-bottom:1px solid var(--border);">
+        Apply a template to configure variable values before sending.
+      </div>
+      <div id="bc-variables-list" style="max-height:200px;overflow-y:auto;"></div>
+    </div>
+
+    <div id="bc-banner-panel-wrap"></div>
+
     <div class="form-group">
       <label class="form-label">Channel</label>
       <div style="display:flex;gap:8px;flex-wrap:wrap;">
@@ -6868,6 +6886,9 @@
 ⚠️ Note: Grid/flex layouts preserved but properties removed - use tables for Outlook"><i class="fas fa-code"></i>
           HTML</button>
         <button type="button" class="btn btn-ghost btn-xs" onmousedown="event.preventDefault()"
+          onclick="msgBannerMountPanel('bc');var b=document.getElementById('bc-banner-body');if(b)b.style.display='block';"
+          title="Header banner settings"><i class="fas fa-image"></i> Banner</button>
+        <button type="button" class="btn btn-ghost btn-xs" onmousedown="event.preventDefault()"
           onclick="previewEditorContent('bc-html')" title="Preview email full-screen"><i
             class="fas fa-eye"></i> Preview</button>
       </div>
@@ -7043,6 +7064,8 @@
           </select>
         </div>
       </div>
+
+      <div id="nc-banner-panel-wrap" style="margin-top:8px;"></div>
 
       <!-- A/B Subject Line Testing -->
       <div style="margin-top:8px;padding:10px 12px;border:1px solid var(--border2);border-radius:8px;background:rgba(59,130,246,0.03);">
@@ -7284,6 +7307,9 @@ Always write in a professional yet warm Indian B2B communication style. Use form
       if (id === 'compose-email-modal') {
         setTimeout(() => initializeComposeDraft(), 100);
       }
+      if (id === 'broadcast-modal') msgBannerMountPanel('bc');
+      if (id === 'email-templates-modal') msgBannerMountPanel('et');
+      if (id === 'campaign-modal') msgBannerMountPanel('nc');
 
       // Note: outside-click-to-close is intentionally disabled for all modals.
     }
@@ -10180,6 +10206,8 @@ Keep it concise and professional.`;
       if (contactsBtn) contactsBtn.style.display = isWa ? 'none' : '';
       var testWrap = document.getElementById('bc-test-email-wrap');
       if (testWrap) testWrap.style.display = isWa ? 'none' : '';
+      var bcImgWrap = document.getElementById('bc-banner-image-wrap');
+      if (bcImgWrap) bcImgWrap.style.display = isWa ? 'none' : '';
       var textarea = document.getElementById('bc-recipients');
       if (textarea) {
         textarea.placeholder = isWa ? '919820000000@s.whatsapp.net\n120363000000000000@g.us' : 'john@company.com\nJane Doe <jane@company.com>\nsales@client.in';
@@ -10723,7 +10751,9 @@ Keep it concise and professional.`;
         var payload = await getEmailPayloadWithMediaAttachments(bcEl, true);
         html = payload.body;
         var attachments = payload.attachments || [];
-        var res = await fetch(API_BASE + '/broadcast/test', { method: 'POST', headers: getAuthHeaders(), body: JSON.stringify({ to, subject, html, attachments }) });
+        bcRefreshVariablesPanel();
+        var variable_fields = emailNormalizeVariableFields(bcVariableFields);
+        var res = await fetch(API_BASE + '/broadcast/test', { method: 'POST', headers: getAuthHeaders(), body: JSON.stringify({ to, subject, html, attachments, variable_fields }) });
         var data = await res.json();
         if (statusEl) statusEl.innerHTML = res.ok ? '<span style="color:var(--green2);"><i class="fas fa-check"></i> Test sent to ' + to + '</span>' : '<span style="color:var(--red2);">' + (data.error || 'Failed') + '</span>';
       } catch (err) { if (statusEl) statusEl.innerHTML = '<span style="color:var(--red2);">' + err.message + '</span>'; }
@@ -10747,7 +10777,9 @@ Keep it concise and professional.`;
         if (statusEl) statusEl.innerHTML = '<span class="spin-loader"></span> Queuing ' + waRecipients.length + ' WhatsApp sends...';
         try {
           var waPayload = await getEmailPayloadWithMediaAttachments(bcEl, true);
-          var waMessage = bcHtmlToWhatsAppText(waPayload.body || htmlBody);
+          var waBannerCfg = msgBannerReadForm('bc');
+          var waBodyText = bcHtmlToWhatsAppText(waPayload.body || htmlBody);
+          var waMessage = msgBannerBuildWhatsAppText(waBannerCfg) + waBodyText;
           var waAttachments = waPayload.attachments || [];
           var resWa = await fetch(API_BASE + '/wa/broadcast', { method: 'POST', headers: getAuthHeaders(), body: JSON.stringify({ recipients: waRecipients, message: waMessage, delay_ms: delay, attachments: waAttachments }) });
           var dataWa = await resWa.json();
@@ -10770,7 +10802,16 @@ Keep it concise and professional.`;
         var payload = await getEmailPayloadWithMediaAttachments(bcEl, true);
         htmlBody = payload.body;
         var attachments = payload.attachments || [];
-        var res = await fetch(API_BASE + '/broadcast/send', { method: 'POST', headers: getAuthHeaders(), body: JSON.stringify({ subject, html: htmlBody, recipients, delay_ms: delay, attachments }) });
+        bcRefreshVariablesPanel();
+        var variable_fields = emailNormalizeVariableFields(bcVariableFields);
+        var unmapped = variable_fields.filter(function (f) {
+          return f.source !== 'recipient' && !String(f.value || '').trim() && emailExtractPlaceholders(htmlBody, subject).indexOf(f.key) !== -1;
+        });
+        if (unmapped.length) {
+          if (statusEl) statusEl.innerHTML = '<span style="color:var(--red2);">Map all variable fields before sending (' + unmapped.map(function (f) { return '{{' + f.key + '}}'; }).join(', ') + ')</span>';
+          return;
+        }
+        var res = await fetch(API_BASE + '/broadcast/send', { method: 'POST', headers: getAuthHeaders(), body: JSON.stringify({ subject, html: htmlBody, recipients, delay_ms: delay, attachments, variable_fields }) });
         var data = await res.json();
         if (res.ok) {
           if (statusEl) statusEl.innerHTML = '<span style="color:var(--green2);"><i class="fas fa-check"></i> Broadcast started! #' + data.broadcast_id + ' — ' + data.total + ' emails queued</span>';
@@ -11319,7 +11360,14 @@ Keep it concise and professional.`;
           var body = document.getElementById('bc-html');
           if (subj && t.subject) subj.value = t.subject;
           if (body && t.html_body) body.innerHTML = t.html_body;
-          notify('Template applied', t.name, 'var(--blue)', 'fas fa-file-alt');
+          bcVariableFields = emailNormalizeVariableFields(t.variable_fields || []);
+          bcRefreshVariablesPanel();
+          if (t.banner_config) {
+            msgBannerMountPanel('bc');
+            msgBannerWriteForm('bc', t.banner_config);
+            msgBannerApplyToEditor('bc');
+          }
+          notify('Template applied', 'Set variable values and banner below before sending', 'var(--blue)', 'fas fa-file-alt');
         }).catch(function () { });
     }
 
@@ -11701,6 +11749,7 @@ Keep it concise and professional.`;
           setTimeout(() => el.style.width = w, 50);
         });
         startPbxWatchdog();
+        try { msgBannerInitAllPanels(); } catch (_) { }
       }, 200);
     });
 
@@ -12262,6 +12311,7 @@ Best regards,<br>
             <span><i class="fas fa-paper-plane" style="color:var(--blue2);margin-right:8px;"></i>Launch Campaign — ${escHtml(name)}</span>
             <i class="fas fa-times modal-close" onclick="document.getElementById('camp-launch-overlay').style.display='none'"></i>
           </div>
+          <div id="cl-banner-panel-wrap" style="margin-bottom:10px;"></div>
           <div
             style="display:flex;gap:8px;align-items:center;padding:8px 10px;background:rgba(59,130,246,0.06);border:1px solid rgba(59,130,246,0.15);border-radius:8px;margin-bottom:10px;">
             <i class="fas fa-file-alt" style="color:var(--blue2);font-size:12px;flex-shrink:0;"></i>
@@ -12389,6 +12439,12 @@ Best regards,<br>
         </div>`;
       renderComposeAttachmentsList();
       clLoadTemplates();
+      msgBannerMountPanel('cl');
+      var ncBanner = msgBannerLoadSaved('nc');
+      if (ncBanner.enabled) {
+        msgBannerWriteForm('cl', ncBanner);
+        setTimeout(function () { msgBannerApplyToEditor('cl'); }, 50);
+      }
     }
 
     // ── CAMPAIGN SEND ─────────────────────────────────────────────────────────────
@@ -22030,9 +22086,515 @@ ${plainText}`;
     var etQuill = null; // kept for compat but unused — editor is now contenteditable
     var etCurrentId = null;
     var etAllTemplates = [];
+    var etVariableFields = [];
+    var bcVariableFields = [];
+
+    var EMAIL_VAR_OPTION_PRESETS = {
+      recipient_name: ['Dr. Mehta', 'Sir/Madam', 'Team', 'Dear Colleague'],
+      name: ['Dr. Mehta', 'Sir/Madam', 'Team'],
+      company: ['Acme Healthcare', 'City Hospital', 'Metro Diagnostics'],
+      meeting_window: ['this week', 'next week', 'in the coming days', 'at your convenience', 'early next month'],
+      sender_name: ['Nidhisha Badhel', 'Rahul Sharma', 'Sales Team'],
+      sender_designation: ['Sales Executive', 'Business Development Manager', 'Regional Sales Manager', 'Key Account Manager'],
+      sender_phone: ['+91 93594 75770', '+91 712 2996167 Ext. 21', 'M 09359475770 | P +91 712 2996167 Ext. 21'],
+      sender_email: ['sales@unicircuites.com', 'noreply@unicircuites.live'],
+      company_website: ['www.unicircuites.com', 'unicircuites.com', 'https://www.unicircuites.com']
+    };
+
+    function emailExtractPlaceholders(html, subject) {
+      var keys = {};
+      var re = /\{\{\s*([a-zA-Z0-9_]+)\s*\}\}/g;
+      [html, subject].forEach(function (src) {
+        var m;
+        var s = String(src || '');
+        re.lastIndex = 0;
+        while ((m = re.exec(s))) keys[m[1].toLowerCase()] = true;
+      });
+      return Object.keys(keys);
+    }
+
+    function emailNewVariableField(key) {
+      key = String(key || '').toLowerCase().replace(/[^a-z0-9_]/g, '');
+      var presets = EMAIL_VAR_OPTION_PRESETS[key] || [];
+      var recipientKeys = { recipient_name: 1, name: 1, company: 1, email: 1 };
+      return {
+        key: key,
+        label: key.replace(/_/g, ' ').replace(/\b\w/g, function (c) { return c.toUpperCase(); }),
+        required: true,
+        source: recipientKeys[key] ? 'recipient' : 'static',
+        value: presets[0] || '',
+        example: presets[0] || '',
+        options: presets.slice()
+      };
+    }
+
+    function emailNormalizeVariableFields(fields) {
+      if (!Array.isArray(fields)) return [];
+      return fields.map(function (f) {
+        if (!f || !f.key) return null;
+        var key = String(f.key).toLowerCase().replace(/[^a-z0-9_]/g, '');
+        var presets = (f.options && f.options.length) ? f.options : (EMAIL_VAR_OPTION_PRESETS[key] || []);
+        return {
+          key: key,
+          label: f.label || key,
+          required: f.required !== false,
+          source: f.source === 'recipient' ? 'recipient' : 'static',
+          value: f.value != null ? String(f.value) : '',
+          example: f.example != null ? String(f.example) : (presets[0] || ''),
+          options: presets
+        };
+      }).filter(Boolean);
+    }
+
+    function emailSyncFieldsWithPlaceholders(fields, placeholders) {
+      fields = emailNormalizeVariableFields(fields || []);
+      placeholders.forEach(function (key) {
+        if (!fields.find(function (f) { return f.key === key; })) fields.push(emailNewVariableField(key));
+      });
+      return fields;
+    }
+
+    function emailFieldMappingStatus(field, inTemplate) {
+      if (!inTemplate) return { code: 'unused', label: 'Not in template', color: 'var(--muted)' };
+      if (field.source === 'recipient') return { code: 'mapped', label: 'Mapped (per recipient)', color: 'var(--green2)' };
+      var val = String(field.value || '').trim();
+      if (!val) return { code: 'unmapped', label: 'Missing value', color: 'var(--red2)' };
+      return { code: 'mapped', label: 'Mapped', color: 'var(--green2)' };
+    }
+
+    function emailResolvedPreview(field) {
+      if (field.source === 'recipient') return '(recipient name from each contact)';
+      var val = String(field.value || '').trim();
+      return val || field.example || '—';
+    }
+
+    function emailBuildPreviewMap(fields, sampleName) {
+      var map = {};
+      (fields || []).forEach(function (f) {
+        if (!f.key) return;
+        if (f.source === 'recipient') {
+          map[f.key] = sampleName || f.example || 'Dr. Sample';
+        } else {
+          map[f.key] = String(f.value || '').trim() || f.example || '';
+        }
+      });
+      map.name = map.name || map.recipient_name || sampleName || 'Dr. Sample';
+      map.recipient_name = map.recipient_name || map.name;
+      map.company = map.company || 'Sample Hospital';
+      return map;
+    }
+
+    function emailSubstitute(text, map) {
+      return String(text || '').replace(/\{\{\s*([a-zA-Z0-9_]+)\s*\}\}/gi, function (full, key) {
+        var k = String(key || '').toLowerCase();
+        if (map[k] !== undefined && map[k] !== null && String(map[k]).trim() !== '') return String(map[k]);
+        return full;
+      });
+    }
+
+    function emailCollectVariableFields(prefix) {
+      return prefix === 'bc' ? bcVariableFields : etVariableFields;
+    }
+
+    function emailSetFieldValue(prefix, idx, value) {
+      var fields = emailCollectVariableFields(prefix);
+      if (!fields[idx]) return;
+      fields[idx].value = value;
+      if (prefix === 'et') etVariableFields = fields;
+      else bcVariableFields = fields;
+      emailRenderVariablesPanel(prefix);
+    }
+
+    function emailSetFieldKey(prefix, idx, key) {
+      var fields = emailCollectVariableFields(prefix);
+      if (!fields[idx]) return;
+      var normalized = emailNewVariableField(key);
+      fields[idx] = Object.assign({}, normalized, { value: fields[idx].value || normalized.value });
+      if (prefix === 'et') etVariableFields = fields;
+      else bcVariableFields = fields;
+      emailRenderVariablesPanel(prefix);
+    }
+
+    function emailSetFieldSource(prefix, idx, source) {
+      var fields = emailCollectVariableFields(prefix);
+      if (!fields[idx]) return;
+      fields[idx].source = source === 'recipient' ? 'recipient' : 'static';
+      if (prefix === 'et') etVariableFields = fields;
+      else bcVariableFields = fields;
+      emailRenderVariablesPanel(prefix);
+    }
+
+    function emailRemoveVariableField(prefix, idx) {
+      var fields = emailCollectVariableFields(prefix);
+      fields.splice(idx, 1);
+      if (prefix === 'et') etVariableFields = fields;
+      else bcVariableFields = fields;
+      emailRenderVariablesPanel(prefix);
+    }
+
+    function emailRenderValueControl(prefix, idx, field) {
+      if (field.source === 'recipient') {
+        return '<span style="font-size:11px;color:var(--muted2);"><i class="fas fa-user"></i> Uses each recipient\'s name when sending</span>';
+      }
+      var opts = (field.options && field.options.length) ? field.options.slice() : (EMAIL_VAR_OPTION_PRESETS[field.key] || []).slice();
+      var cur = String(field.value || '').trim() || field.example || '';
+      if (cur && opts.indexOf(cur) === -1) opts.unshift(cur);
+      var html = '';
+      if (opts.length) {
+        html += '<select class="inp" style="font-size:11px;padding:4px 6px;width:100%;" onchange="emailSetFieldValue(\'' + prefix + '\',' + idx + ',this.value)">';
+        html += '<option value="">— Select preset —</option>';
+        opts.forEach(function (o) {
+          html += '<option value="' + escAttr(o) + '"' + (o === cur ? ' selected' : '') + '>' + escHtml(o) + '</option>';
+        });
+        html += '</select>';
+      }
+      html += '<input class="inp" style="font-size:11px;padding:4px 6px;width:100%;margin-top:' + (opts.length ? '4' : '0') + 'px;" placeholder="Value to render" value="' + escAttr(cur) + '" oninput="emailSetFieldValue(\'' + prefix + '\',' + idx + ',this.value)" />';
+      return html;
+    }
+
+    function emailRenderVariablesPanel(prefix, fields, html, subject) {
+      var listEl = document.getElementById(prefix + '-variables-list');
+      var hintEl = document.getElementById(prefix + '-variables-hint');
+      var sectionEl = document.getElementById(prefix + '-variables-section');
+      if (!listEl) return;
+      fields = emailNormalizeVariableFields(fields || []);
+      var placeholders = emailExtractPlaceholders(html, subject);
+      fields = emailSyncFieldsWithPlaceholders(fields, placeholders);
+      if (prefix === 'et') etVariableFields = fields;
+      else bcVariableFields = fields;
+
+      if (sectionEl && prefix === 'bc') sectionEl.style.display = fields.length || placeholders.length ? 'block' : 'none';
+
+      if (!fields.length && !placeholders.length) {
+        listEl.innerHTML = '<div style="padding:14px;text-align:center;color:var(--muted);font-size:12px;">No <code>{{variables}}</code> found in subject or body yet.</div>';
+        if (hintEl) hintEl.innerHTML = 'Use placeholders like <code>{{recipient_name}}</code> in your template text.';
+        return;
+      }
+
+      var unmapped = 0;
+      var rows = fields.map(function (field, idx) {
+        var inTemplate = placeholders.indexOf(field.key) !== -1;
+        var status = emailFieldMappingStatus(field, inTemplate);
+        if (status.code === 'unmapped') unmapped++;
+        return '<div style="display:grid;grid-template-columns:minmax(120px,1fr) minmax(160px,1.4fr) 110px 28px;gap:8px;align-items:start;padding:8px 12px;border-bottom:1px solid var(--border);font-size:11.5px;">' +
+          '<div><div style="font-family:monospace;color:var(--gold2);font-weight:600;">{{' + escHtml(field.key) + '}}</div>' +
+          '<div style="font-size:10px;color:var(--muted);margin-top:2px;">' + escHtml(field.label || field.key) + '</div></div>' +
+          '<div>' + emailRenderValueControl(prefix, idx, field) +
+          '<div style="font-size:10px;color:var(--muted);margin-top:4px;">Renders as: <strong style="color:var(--text);">' + escHtml(emailResolvedPreview(field)) + '</strong></div></div>' +
+          '<div><span style="font-size:10px;font-weight:700;color:' + status.color + ';">' + escHtml(status.label) + '</span>' +
+          '<select class="inp" style="font-size:10px;padding:2px 4px;margin-top:4px;width:100%;" onchange="emailSetFieldSource(\'' + prefix + '\',' + idx + ',this.value)">' +
+          '<option value="static"' + (field.source !== 'recipient' ? ' selected' : '') + '>Fixed value</option>' +
+          '<option value="recipient"' + (field.source === 'recipient' ? ' selected' : '') + '>Per recipient</option>' +
+          '</select></div>' +
+          '<button type="button" title="Remove" onclick="emailRemoveVariableField(\'' + prefix + '\',' + idx + ')" style="background:none;border:none;color:var(--muted);cursor:pointer;padding:4px;"><i class="fas fa-times"></i></button>' +
+          '</div>';
+      }).join('');
+
+      listEl.innerHTML = '<div style="display:grid;grid-template-columns:minmax(120px,1fr) minmax(160px,1.4fr) 110px 28px;gap:8px;padding:6px 12px;background:rgba(255,255,255,0.03);font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;">' +
+        '<span>Variable</span><span>Value</span><span>Status</span><span></span></div>' + rows;
+
+      if (hintEl) {
+        hintEl.innerHTML = placeholders.length + ' placeholder(s) in template · ' +
+          (unmapped ? '<span style="color:var(--red2);font-weight:600;">' + unmapped + ' need a value before send</span>' : '<span style="color:var(--green2);">All required fields mapped</span>');
+      }
+    }
+
+    function etRefreshVariablesPanel() {
+      var subjectEl = document.getElementById('et-subject');
+      emailRenderVariablesPanel('et', etVariableFields, etGetHTML(), subjectEl ? subjectEl.value : '');
+    }
+
+    function bcRefreshVariablesPanel() {
+      var subj = document.getElementById('bc-subject');
+      var body = document.getElementById('bc-html');
+      emailRenderVariablesPanel('bc', bcVariableFields, body ? body.innerHTML : '', subj ? subj.value : '');
+    }
+
+    function etAddCustomVariable() {
+      var key = prompt('Variable key (without braces):', 'custom_field');
+      if (!key) return;
+      etVariableFields.push(emailNewVariableField(key));
+      etRefreshVariablesPanel();
+    }
+
+    function bcAddCustomVariable() {
+      var key = prompt('Variable key (without braces):', 'custom_field');
+      if (!key) return;
+      bcVariableFields.push(emailNewVariableField(key));
+      bcRefreshVariablesPanel();
+    }
+
+    // ── MESSAGE BANNER (Email HTML + WhatsApp header) ─────────────────────────
+    var MSG_BANNER_STORAGE_PREFIX = 'unicomm_banner_';
+    var MSG_BANNER_EDITORS = { bc: 'bc-html', et: 'et-html-editor', cl: 'cl-body-editor' };
+    var MSG_BANNER_PRESETS = {
+      none: { id: 'none', label: 'No banner', enabled: false, headline: '', subheadline: '', footerLine: '', accentColor: '#0d9488', imageUrl: '' },
+      healthcare: {
+        id: 'healthcare', label: 'Healthcare', enabled: true,
+        headline: 'Smart Healthcare Infrastructure',
+        subheadline: 'Patient Care · Safety · Operational Efficiency',
+        footerLine: 'Unicircuit Engineering Services LLP · Healthcare ELV & Digital Solutions',
+        accentColor: '#0d9488', imageUrl: ''
+      },
+      brand: {
+        id: 'brand', label: 'Unicircuit Brand', enabled: true,
+        headline: 'Unicircuit Engineering Services LLP',
+        subheadline: 'Switchgear · ELV · Smart Building · Industrial Automation',
+        footerLine: 'Your partner for turnkey electrical & ELV projects across India',
+        accentColor: '#e8820a', imageUrl: ''
+      },
+      custom: {
+        id: 'custom', label: 'Custom', enabled: true,
+        headline: 'Your headline', subheadline: 'Your subheadline', footerLine: '',
+        accentColor: '#2563eb', imageUrl: ''
+      }
+    };
+
+    function msgBannerStorageKey(scope) { return MSG_BANNER_STORAGE_PREFIX + scope; }
+
+    function msgBannerNormalizeConfig(cfg) {
+      cfg = cfg || {};
+      var preset = MSG_BANNER_PRESETS[cfg.preset] || MSG_BANNER_PRESETS.custom;
+      return {
+        enabled: cfg.enabled !== undefined ? !!cfg.enabled : !!preset.enabled,
+        preset: cfg.preset || preset.id || 'custom',
+        headline: cfg.headline != null ? String(cfg.headline) : (preset.headline || ''),
+        subheadline: cfg.subheadline != null ? String(cfg.subheadline) : (preset.subheadline || ''),
+        footerLine: cfg.footerLine != null ? String(cfg.footerLine) : (preset.footerLine || ''),
+        accentColor: cfg.accentColor || preset.accentColor || '#0d9488',
+        imageUrl: cfg.imageUrl != null ? String(cfg.imageUrl) : (preset.imageUrl || '')
+      };
+    }
+
+    function msgBannerLoadSaved(scope) {
+      try {
+        var raw = localStorage.getItem(msgBannerStorageKey(scope));
+        if (raw) return msgBannerNormalizeConfig(JSON.parse(raw));
+      } catch (_) { }
+      return msgBannerNormalizeConfig({ preset: 'none', enabled: false });
+    }
+
+    function msgBannerSaveSaved(scope, cfg) {
+      try { localStorage.setItem(msgBannerStorageKey(scope), JSON.stringify(msgBannerNormalizeConfig(cfg))); } catch (_) { }
+    }
+
+    function msgBannerBuildHtml(cfg) {
+      cfg = msgBannerNormalizeConfig(cfg);
+      if (!cfg.enabled) return '';
+      var headline = escHtml(cfg.headline || '');
+      var sub = escHtml(cfg.subheadline || '');
+      var footer = escHtml(cfg.footerLine || '');
+      var accent = cfg.accentColor || '#0d9488';
+      var imageUrl = String(cfg.imageUrl || '').trim();
+      var imageRow = '';
+      if (imageUrl) {
+        imageRow = '<tr><td style="padding:0;line-height:0;font-size:0;"><img src="' + escAttr(imageUrl) + '" alt="" width="600" style="display:block;width:100%;max-width:600px;height:auto;border:0;border-radius:8px 8px 0 0;" /></td></tr>';
+      }
+      var headlineRadius = imageUrl ? '0' : '8px 8px 0 0';
+      return '<div data-uc-banner="1" contenteditable="false" style="margin:0 0 14px 0;font-family:Arial,Helvetica,sans-serif;">'
+        + '<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="border-collapse:collapse;max-width:600px;">'
+        + imageRow
+        + '<tr><td style="background:' + escAttr(accent) + ';padding:18px 22px;border-radius:' + headlineRadius + ';">'
+        + '<div style="font-size:20px;font-weight:800;color:#ffffff;line-height:1.25;">' + headline + '</div>'
+        + (sub ? '<div style="font-size:13px;color:#e0f2fe;margin-top:6px;line-height:1.45;">' + sub + '</div>' : '')
+        + '</td></tr>'
+        + (footer ? '<tr><td style="background:#f8fafc;padding:8px 22px;border:1px solid #e2e8f0;border-top:none;border-radius:0 0 8px 8px;font-size:11px;color:#475569;">' + footer + '</td></tr>' : '')
+        + '</table></div>';
+    }
+
+    function msgBannerBuildWhatsAppText(cfg) {
+      cfg = msgBannerNormalizeConfig(cfg);
+      if (!cfg.enabled) return '';
+      var lines = [];
+      if (cfg.headline) lines.push('*' + String(cfg.headline).trim() + '*');
+      if (cfg.subheadline) lines.push(String(cfg.subheadline).trim());
+      if (cfg.footerLine) lines.push('_' + String(cfg.footerLine).trim() + '_');
+      if (!lines.length) return '';
+      return lines.join('\n') + '\n────────────────\n\n';
+    }
+
+    function msgBannerStripHtml(html) {
+      var div = document.createElement('div');
+      div.innerHTML = String(html || '');
+      div.querySelectorAll('[data-uc-banner]').forEach(function (n) { n.remove(); });
+      return div.innerHTML.replace(/^\s*<br\s*\/?>\s*/i, '');
+    }
+
+    function msgBannerGetEditorId(scope) {
+      if (scope === 'bc' && _bcChannel === 'whatsapp') return 'bc-html';
+      return MSG_BANNER_EDITORS[scope] || null;
+    }
+
+    function msgBannerPanelHtml(scope) {
+      var s = scope;
+      return '<div class="msg-banner-panel" data-banner-scope="' + s + '" style="border:1px solid var(--border2);border-radius:8px;overflow:hidden;margin-bottom:10px;background:rgba(13,148,136,0.04);">'
+        + '<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 12px;background:rgba(13,148,136,0.1);border-bottom:1px solid var(--border);cursor:pointer;" onclick="msgBannerTogglePanel(\'' + s + '\')">'
+        + '<span style="font-size:11px;font-weight:700;color:#14b8a6;text-transform:uppercase;letter-spacing:0.5px;"><i class="fas fa-image"></i> Header Banner</span>'
+        + '<span style="font-size:10px;color:var(--muted);"><i class="fas fa-chevron-down" id="' + s + '-banner-chevron"></i></span></div>'
+        + '<div id="' + s + '-banner-body" style="padding:10px 12px;display:block;">'
+        + '<label style="display:flex;align-items:center;gap:8px;font-size:12px;margin-bottom:8px;cursor:pointer;">'
+        + '<input type="checkbox" id="' + s + '-banner-enabled" onchange="msgBannerOnEnabledChange(\'' + s + '\')" /> Enable header banner</label>'
+        + '<div id="' + s + '-banner-fields">'
+        + '<div class="form-row" style="gap:8px;margin-bottom:8px;">'
+        + '<div style="flex:1;"><label class="form-label">Preset</label>'
+        + '<select class="inp" id="' + s + '-banner-preset" style="font-size:12px;" onchange="msgBannerOnPresetChange(\'' + s + '\')">'
+        + '<option value="none">No banner</option><option value="healthcare">Healthcare</option><option value="brand">Unicircuit Brand</option><option value="custom">Custom</option>'
+        + '</select></div>'
+        + '<div style="width:90px;"><label class="form-label">Accent</label>'
+        + '<input type="color" class="inp" id="' + s + '-banner-accent" style="height:36px;padding:2px;" onchange="msgBannerOnFieldChange(\'' + s + '\')" /></div></div>'
+        + '<div class="form-group" style="margin-bottom:6px;"><label class="form-label">Headline</label>'
+        + '<input class="inp" id="' + s + '-banner-headline" style="font-size:12px;" oninput="msgBannerOnFieldChange(\'' + s + '\')" /></div>'
+        + '<div class="form-group" style="margin-bottom:6px;"><label class="form-label">Subheadline</label>'
+        + '<input class="inp" id="' + s + '-banner-subheadline" style="font-size:12px;" oninput="msgBannerOnFieldChange(\'' + s + '\')" /></div>'
+        + '<div class="form-group" style="margin-bottom:6px;"><label class="form-label">Footer line</label>'
+        + '<input class="inp" id="' + s + '-banner-footer" style="font-size:12px;" oninput="msgBannerOnFieldChange(\'' + s + '\')" /></div>'
+        + '<div class="form-group" id="' + s + '-banner-image-wrap" style="margin-bottom:8px;"><label class="form-label">Banner image URL <span style="font-weight:400;color:var(--muted);">(email only)</span></label>'
+        + '<input class="inp" id="' + s + '-banner-image" placeholder="https://…/banner.jpg" style="font-size:12px;" oninput="msgBannerOnFieldChange(\'' + s + '\')" /></div>'
+        + '<div id="' + s + '-banner-preview" style="margin-bottom:8px;border:1px solid var(--border);border-radius:6px;overflow:hidden;background:#fff;"></div>'
+        + '<div style="display:flex;gap:6px;flex-wrap:wrap;">'
+        + '<button type="button" class="btn btn-gold btn-xs" onclick="msgBannerApplyToEditor(\'' + s + '\')"><i class="fas fa-check"></i> Apply to message</button>'
+        + '<button type="button" class="btn btn-ghost btn-xs" onclick="msgBannerRemoveFromEditor(\'' + s + '\')"><i class="fas fa-times"></i> Remove banner</button>'
+        + '<button type="button" class="btn btn-ghost btn-xs" onclick="msgBannerSaveDefaults(\'' + s + '\')"><i class="fas fa-save"></i> Save as my default</button>'
+        + '</div></div></div></div>';
+    }
+
+    function msgBannerMountPanel(scope) {
+      var wrapId = scope + '-banner-panel-wrap';
+      if (scope === 'bc') wrapId = 'bc-banner-panel-wrap';
+      if (scope === 'et') wrapId = 'et-banner-panel-wrap';
+      if (scope === 'nc') wrapId = 'nc-banner-panel-wrap';
+      var wrap = document.getElementById(wrapId);
+      if (!wrap || wrap.dataset.mounted === '1') {
+        if (wrap && wrap.dataset.mounted === '1') msgBannerWriteForm(scope, msgBannerLoadSaved(scope));
+        return;
+      }
+      wrap.innerHTML = msgBannerPanelHtml(scope);
+      wrap.dataset.mounted = '1';
+      msgBannerWriteForm(scope, msgBannerLoadSaved(scope));
+    }
+
+    function msgBannerTogglePanel(scope) {
+      var body = document.getElementById(scope + '-banner-body');
+      var chev = document.getElementById(scope + '-banner-chevron');
+      if (!body) return;
+      var open = body.style.display !== 'none';
+      body.style.display = open ? 'none' : 'block';
+      if (chev) chev.className = open ? 'fas fa-chevron-right' : 'fas fa-chevron-down';
+    }
+
+    function msgBannerReadForm(scope) {
+      var enabledEl = document.getElementById(scope + '-banner-enabled');
+      var presetEl = document.getElementById(scope + '-banner-preset');
+      return msgBannerNormalizeConfig({
+        enabled: enabledEl ? enabledEl.checked : false,
+        preset: presetEl ? presetEl.value : 'none',
+        headline: (document.getElementById(scope + '-banner-headline') || {}).value,
+        subheadline: (document.getElementById(scope + '-banner-subheadline') || {}).value,
+        footerLine: (document.getElementById(scope + '-banner-footer') || {}).value,
+        accentColor: (document.getElementById(scope + '-banner-accent') || {}).value,
+        imageUrl: (document.getElementById(scope + '-banner-image') || {}).value
+      });
+    }
+
+    function msgBannerWriteForm(scope, cfg) {
+      cfg = msgBannerNormalizeConfig(cfg);
+      var enabledEl = document.getElementById(scope + '-banner-enabled');
+      var presetEl = document.getElementById(scope + '-banner-preset');
+      var fields = document.getElementById(scope + '-banner-fields');
+      if (enabledEl) enabledEl.checked = cfg.enabled;
+      if (presetEl) presetEl.value = cfg.preset || 'none';
+      var h = document.getElementById(scope + '-banner-headline');
+      var sub = document.getElementById(scope + '-banner-subheadline');
+      var foot = document.getElementById(scope + '-banner-footer');
+      var acc = document.getElementById(scope + '-banner-accent');
+      var img = document.getElementById(scope + '-banner-image');
+      if (h) h.value = cfg.headline || '';
+      if (sub) sub.value = cfg.subheadline || '';
+      if (foot) foot.value = cfg.footerLine || '';
+      if (acc) acc.value = cfg.accentColor || '#0d9488';
+      if (img) img.value = cfg.imageUrl || '';
+      if (fields) fields.style.opacity = cfg.enabled ? '1' : '0.55';
+      msgBannerUpdatePreview(scope);
+    }
+
+    function msgBannerUpdatePreview(scope) {
+      var el = document.getElementById(scope + '-banner-preview');
+      if (!el) return;
+      var cfg = msgBannerReadForm(scope);
+      el.innerHTML = cfg.enabled ? msgBannerBuildHtml(cfg) : '<div style="padding:12px;font-size:11px;color:#999;text-align:center;">Banner disabled</div>';
+    }
+
+    function msgBannerOnEnabledChange(scope) {
+      var cfg = msgBannerReadForm(scope);
+      var fields = document.getElementById(scope + '-banner-fields');
+      if (fields) fields.style.opacity = cfg.enabled ? '1' : '0.55';
+      msgBannerUpdatePreview(scope);
+    }
+
+    function msgBannerOnPresetChange(scope) {
+      var presetId = (document.getElementById(scope + '-banner-preset') || {}).value || 'none';
+      var preset = MSG_BANNER_PRESETS[presetId] || MSG_BANNER_PRESETS.custom;
+      var enabledEl = document.getElementById(scope + '-banner-enabled');
+      if (enabledEl) enabledEl.checked = presetId !== 'none';
+      msgBannerWriteForm(scope, Object.assign({}, preset, { preset: presetId, enabled: presetId !== 'none' }));
+    }
+
+    function msgBannerOnFieldChange(scope) {
+      var presetEl = document.getElementById(scope + '-banner-preset');
+      if (presetEl && presetEl.value !== 'custom') presetEl.value = 'custom';
+      msgBannerUpdatePreview(scope);
+    }
+
+    function msgBannerApplyToEditor(scope) {
+      var cfg = msgBannerReadForm(scope);
+      var editorId = msgBannerGetEditorId(scope);
+      var ed = editorId ? document.getElementById(editorId) : null;
+      if (!ed) {
+        if (scope === 'nc') { msgBannerSaveSaved('nc', cfg); notify('Banner saved', 'Will apply when you launch the campaign email', 'var(--green)', 'fas fa-image'); return; }
+        notify('Editor not found', '', 'var(--red)', 'fas fa-exclamation-circle');
+        return;
+      }
+      var body = msgBannerStripHtml(ed.innerHTML);
+      if (cfg.enabled) {
+        var bannerHtml = msgBannerBuildHtml(cfg);
+        ed.innerHTML = bannerHtml + (body.trim() ? '<br>' + body : '');
+      } else {
+        ed.innerHTML = body;
+      }
+      msgBannerSaveSaved(scope, cfg);
+      notify(cfg.enabled ? 'Banner applied' : 'Banner removed', '', 'var(--green)', 'fas fa-image');
+    }
+
+    function msgBannerRemoveFromEditor(scope) {
+      var enabledEl = document.getElementById(scope + '-banner-enabled');
+      if (enabledEl) enabledEl.checked = false;
+      msgBannerOnEnabledChange(scope);
+      msgBannerApplyToEditor(scope);
+    }
+
+    function msgBannerSaveDefaults(scope) {
+      var cfg = msgBannerReadForm(scope);
+      msgBannerSaveSaved(scope, cfg);
+      notify('Banner defaults saved', 'Loaded automatically next time you open this editor', 'var(--green)', 'fas fa-save');
+    }
+
+    function msgBannerCopyConfig(fromScope, toScope) {
+      msgBannerMountPanel(fromScope);
+      msgBannerMountPanel(toScope);
+      var cfg = document.getElementById(fromScope + '-banner-enabled')
+        ? msgBannerReadForm(fromScope)
+        : msgBannerLoadSaved(fromScope);
+      msgBannerWriteForm(toScope, cfg);
+      msgBannerSaveSaved(toScope, cfg);
+    }
+
+    function msgBannerInitAllPanels() {
+      ['bc', 'et', 'nc'].forEach(function (s) { msgBannerMountPanel(s); });
+    }
 
     function openEmailTemplates() {
       etLoadTemplates();
+      msgBannerMountPanel('et');
       openModal('email-templates-modal');
       // Focus editor after modal opens
       setTimeout(function () {
@@ -22201,6 +22763,16 @@ ${plainText}`;
         document.getElementById('et-subject').value = t.subject || '';
         document.getElementById('et-category').value = t.category || 'General';
         etSetHTML(t.html_body || '');
+        etVariableFields = emailNormalizeVariableFields(t.variable_fields || []);
+        etRefreshVariablesPanel();
+        if (t.banner_config) {
+          msgBannerMountPanel('et');
+          msgBannerWriteForm('et', t.banner_config);
+          msgBannerSaveSaved('et', t.banner_config);
+        } else if ((t.html_body || '').indexOf('data-uc-banner') !== -1) {
+          msgBannerMountPanel('et');
+          msgBannerWriteForm('et', msgBannerNormalizeConfig({ preset: 'healthcare', enabled: true }));
+        }
         var delBtn = document.getElementById('et-delete-btn');
         if (delBtn) delBtn.style.display = 'inline-flex';
         document.querySelectorAll('.template-card').forEach(function (c) { c.style.borderColor = ''; });
@@ -22215,6 +22787,8 @@ ${plainText}`;
       document.getElementById('et-subject').value = '';
       document.getElementById('et-category').value = 'General';
       etSetHTML('');
+      etVariableFields = [];
+      etRefreshVariablesPanel();
       var delBtn = document.getElementById('et-delete-btn');
       if (delBtn) delBtn.style.display = 'none';
       document.querySelectorAll('.template-card').forEach(function (c) { c.style.borderColor = ''; });
@@ -22231,7 +22805,10 @@ ${plainText}`;
       try {
         var url = etCurrentId ? API_BASE + '/templates/' + etCurrentId : API_BASE + '/templates';
         var method = etCurrentId ? 'PUT' : 'POST';
-        var res = await fetch(url, { method: method, headers: getAuthHeaders(), body: JSON.stringify({ name, subject, html_body, category }) });
+        etRefreshVariablesPanel();
+        var variable_fields = emailNormalizeVariableFields(etVariableFields);
+        var banner_config = msgBannerReadForm('et');
+        var res = await fetch(url, { method: method, headers: getAuthHeaders(), body: JSON.stringify({ name, subject, html_body, category, variable_fields, banner_config }) });
         var data = await res.json();
         if (res.ok) {
           etCurrentId = data.id;
@@ -23421,13 +23998,17 @@ ${plainText}`;
     function etPreviewTemplate() {
       var html_body = etGetHTML();
       var subject = document.getElementById('et-subject').value;
+      etRefreshVariablesPanel();
+      var previewMap = emailBuildPreviewMap(etVariableFields, 'Dr. Mehta');
+      var renderedSubject = emailSubstitute(subject, previewMap);
+      var renderedBody = emailSubstitute(html_body, previewMap);
       var subEl = document.getElementById('et-preview-subject');
-      if (subEl) subEl.textContent = 'Subject: ' + (subject || '(no subject)');
+      if (subEl) subEl.textContent = 'Subject: ' + (renderedSubject || '(no subject)');
       var iframeEl = document.getElementById('et-preview-iframe');
       if (iframeEl) {
         var doc = iframeEl.contentDocument || iframeEl.contentWindow.document;
         doc.open();
-        doc.write('<!DOCTYPE html><html><head><meta charset="UTF-8"><style>html,body{background:#fff;color:#222;font-family:Arial,sans-serif;padding:20px;margin:0;font-size:14px;line-height:1.6;}a{color:#0066cc;}table{border-collapse:collapse;}td{border:1px solid #ccc;padding:8px;}</style></head><body>' + html_body + '</body></html>');
+        doc.write('<!DOCTYPE html><html><head><meta charset="UTF-8"><style>html,body{background:#fff;color:#222;font-family:Arial,sans-serif;padding:20px;margin:0;font-size:14px;line-height:1.6;}a{color:#0066cc;}table{border-collapse:collapse;}td{border:1px solid #ccc;padding:8px;}</style></head><body>' + renderedBody + '</body></html>');
         doc.close();
         setTimeout(function () { try { iframeEl.style.height = Math.max(300, iframeEl.contentDocument.body.scrollHeight + 20) + 'px'; } catch (_) { } }, 150);
       }
@@ -23437,15 +24018,22 @@ ${plainText}`;
     function etUseInBroadcast() {
       var html_body = etGetHTML();
       var subject = document.getElementById('et-subject').value;
+      var fields = emailNormalizeVariableFields(etVariableFields);
       closeModal('email-templates-modal');
       closeModal('et-preview-modal');
       setTimeout(function () {
         openModal('broadcast-modal');
+        bcLoadTemplates();
         var subEl = document.getElementById('bc-subject');
         var bodyEl = document.getElementById('bc-html');
         if (subEl && subject) subEl.value = subject;
         if (bodyEl) bodyEl.innerHTML = html_body;
-        notify('Template loaded into broadcast', '', 'var(--gold)', 'fas fa-check');
+        bcVariableFields = fields.slice();
+        bcRefreshVariablesPanel();
+        msgBannerMountPanel('bc');
+        msgBannerCopyConfig('et', 'bc');
+        msgBannerApplyToEditor('bc');
+        notify('Template loaded into broadcast', 'Review variable values and banner before sending', 'var(--gold)', 'fas fa-check');
       }, 300);
     }
 
@@ -27879,7 +28467,8 @@ ${plainText}`;
             </div>
             <div>
               <label class="form-label">Subject</label>
-              <input class="inp" id="et-subject" placeholder="Email subject line" style="font-size:12.5px;" />
+              <input class="inp" id="et-subject" placeholder="Email subject line" style="font-size:12.5px;"
+                oninput="etRefreshVariablesPanel()" />
             </div>
             <div>
               <label class="form-label">Category</label>
@@ -28026,6 +28615,8 @@ ${plainText}`;
 ✓ Converts: grid→table, flex→table, CSS vars→colors
 ✗ Removes: box-shadow, border-radius, animations, JavaScript
 Preview shows final Outlook-compatible version"><i class="fas fa-code"></i> HTML</button>
+            <button class="btn btn-ghost btn-xs" onmousedown="event.preventDefault()" onclick="msgBannerMountPanel('et');document.getElementById('et-banner-body').style.display='block';"
+              title="Header banner settings"><i class="fas fa-image"></i> Banner</button>
             <button class="btn btn-ghost btn-xs" onmousedown="event.preventDefault()" onclick="etPreviewTemplate()"
               title="Preview"><i class="fas fa-eye"></i> Preview</button>
             <button class="btn btn-ghost btn-xs" onmousedown="event.preventDefault()" onclick="etUseInBroadcast()"
@@ -28034,8 +28625,27 @@ Preview shows final Outlook-compatible version"><i class="fas fa-code"></i> HTML
 
           <!-- contenteditable editor — replaces Quill, supports all HTML -->
           <div id="et-html-editor" contenteditable="true"
-            style="flex:1;min-height:320px;background:#fff;color:#222;font-family:Arial,sans-serif;font-size:14px;line-height:1.6;padding:14px 16px;border:1px solid var(--border2);border-radius:0 0 8px 8px;overflow-y:auto;outline:none;"
-            oninput="etMarkDirty()" onkeydown="etHandleEditorKey(event)">
+            style="flex:1;min-height:320px;background:#fff;color:#222;font-family:Arial,sans-serif;font-size:14px;line-height:1.6;padding:14px 16px;border:1px solid var(--border2);border-radius:0;border-bottom:none;overflow-y:auto;outline:none;"
+            oninput="etMarkDirty();etRefreshVariablesPanel()" onkeydown="etHandleEditorKey(event)">
+          </div>
+
+          <div id="et-banner-panel-wrap" style="margin-bottom:10px;"></div>
+
+          <div id="et-variables-section"
+            style="border:1px solid var(--border2);border-radius:8px;overflow:hidden;margin-bottom:10px;">
+            <div
+              style="display:flex;justify-content:space-between;align-items:center;padding:8px 12px;background:var(--card2);border-bottom:1px solid var(--border);">
+              <span style="font-size:11px;font-weight:700;color:var(--gold);text-transform:uppercase;letter-spacing:0.5px;">
+                <i class="fas fa-brackets-curly"></i> Variable Fields &amp; Render Preview
+              </span>
+              <button type="button" class="btn btn-ghost btn-xs" onclick="etAddCustomVariable()"><i class="fas fa-plus"></i> Add
+                Field</button>
+            </div>
+            <div id="et-variables-hint"
+              style="font-size:11px;color:var(--muted);padding:8px 12px;border-bottom:1px solid var(--border);">
+              Load or edit a template to see each <code>{{variable}}</code>, the value that will render, and whether it is mapped.
+            </div>
+            <div id="et-variables-list" style="max-height:240px;overflow-y:auto;"></div>
           </div>
 
           <!-- Save buttons -->

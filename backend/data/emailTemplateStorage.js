@@ -1,3 +1,7 @@
+const { getBannerPreset, buildMessageBannerHtml } = require('./messageBanners');
+
+const healthcareBannerConfig = getBannerPreset('healthcare');
+
 const seedEmailTemplates = [
   {
     slug: 'healthcare-private-introduction',
@@ -5,15 +9,74 @@ const seedEmailTemplates = [
     category: 'Healthcare',
     subject: 'Smart Infrastructure to Enhance Patient Care, Safety, and Operational Efficiency',
     variable_fields: [
-      { key: 'recipient_name', label: 'Recipient Name', required: true, example: 'Dr. Mehta' },
-      { key: 'meeting_window', label: 'Meeting Window', required: true, example: 'next week' },
-      { key: 'sender_name', label: 'Sender Name', required: true, example: 'Your Name' },
-      { key: 'sender_designation', label: 'Sender Designation', required: true, example: 'Business Development Manager' },
-      { key: 'sender_phone', label: 'Sender Phone', required: true, example: '+91 98765 43210' },
-      { key: 'sender_email', label: 'Sender Email', required: true, example: 'name@unicircuit.in' },
-      { key: 'company_website', label: 'Company Website', required: false, example: 'www.unicircuit.in' }
+      {
+        key: 'recipient_name',
+        label: 'Recipient Name',
+        required: true,
+        source: 'recipient',
+        value: '',
+        example: 'Dr. Mehta',
+        options: ['Dr. Mehta', 'Sir/Madam', 'Team', 'Dear Colleague']
+      },
+      {
+        key: 'meeting_window',
+        label: 'Meeting Window',
+        required: true,
+        source: 'static',
+        value: 'next week',
+        example: 'next week',
+        options: ['this week', 'next week', 'in the coming days', 'at your convenience', 'early next month']
+      },
+      {
+        key: 'sender_name',
+        label: 'Sender Name',
+        required: true,
+        source: 'static',
+        value: 'Nidhisha Badhel',
+        example: 'Nidhisha Badhel',
+        options: ['Nidhisha Badhel', 'Rahul Sharma', 'Sales Team']
+      },
+      {
+        key: 'sender_designation',
+        label: 'Sender Designation',
+        required: true,
+        source: 'static',
+        value: 'Sales Executive',
+        example: 'Sales Executive',
+        options: ['Sales Executive', 'Business Development Manager', 'Regional Sales Manager', 'Key Account Manager']
+      },
+      {
+        key: 'sender_phone',
+        label: 'Sender Phone',
+        required: true,
+        source: 'static',
+        value: '+91 93594 75770',
+        example: '+91 93594 75770',
+        options: ['+91 93594 75770', '+91 712 2996167 Ext. 21', 'M 09359475770 | P +91 712 2996167 Ext. 21']
+      },
+      {
+        key: 'sender_email',
+        label: 'Sender Email',
+        required: true,
+        source: 'static',
+        value: 'sales@unicircuites.com',
+        example: 'sales@unicircuites.com',
+        options: ['sales@unicircuites.com', 'noreply@unicircuites.live']
+      },
+      {
+        key: 'company_website',
+        label: 'Company Website',
+        required: false,
+        source: 'static',
+        value: 'www.unicircuites.com',
+        example: 'www.unicircuites.com',
+        options: ['www.unicircuites.com', 'unicircuites.com', 'https://www.unicircuites.com']
+      }
     ],
+    banner_config: healthcareBannerConfig,
     html_body: `
+      ${buildMessageBannerHtml(healthcareBannerConfig)}
+      <br>
       <p>Dear {{recipient_name}},</p>
 
       <p>I am writing to introduce Unicircuit Engineering Services LLP, a digital transformation and ELV solutions partner working with private hospitals, multi-specialty chains, and diagnostic networks across India.</p>

@@ -19,6 +19,7 @@ async function ensureTable() {
       html_body   TEXT NOT NULL,
       category    VARCHAR(100) DEFAULT 'General',
       variable_fields JSONB DEFAULT '[]'::jsonb,
+      banner_config   JSONB DEFAULT NULL,
       created_at  TIMESTAMPTZ DEFAULT NOW(),
       updated_at  TIMESTAMPTZ DEFAULT NOW()
     )
@@ -26,6 +27,7 @@ async function ensureTable() {
 
   await pool.query(`ALTER TABLE email_templates ADD COLUMN IF NOT EXISTS slug VARCHAR(180)`);
   await pool.query(`ALTER TABLE email_templates ADD COLUMN IF NOT EXISTS variable_fields JSONB DEFAULT '[]'::jsonb`);
+  await pool.query(`ALTER TABLE email_templates ADD COLUMN IF NOT EXISTS banner_config JSONB DEFAULT NULL`);
   await pool.query(`UPDATE email_templates SET variable_fields='[]'::jsonb WHERE variable_fields IS NULL`);
   await pool.query(`
     CREATE UNIQUE INDEX IF NOT EXISTS email_templates_slug_idx
@@ -39,14 +41,15 @@ async function ensureTable() {
 async function seedDefaultTemplates() {
   for (const tpl of seedEmailTemplates) {
     await pool.query(
-      `INSERT INTO email_templates (slug, name, subject, html_body, category, variable_fields)
-       VALUES ($1,$2,$3,$4,$5,$6::jsonb)
+      `INSERT INTO email_templates (slug, name, subject, html_body, category, variable_fields, banner_config)
+       VALUES ($1,$2,$3,$4,$5,$6::jsonb,$7::jsonb)
        ON CONFLICT (slug) WHERE slug IS NOT NULL DO UPDATE SET
          name = EXCLUDED.name,
          subject = EXCLUDED.subject,
          html_body = EXCLUDED.html_body,
          category = EXCLUDED.category,
          variable_fields = EXCLUDED.variable_fields,
+         banner_config = EXCLUDED.banner_config,
          updated_at = NOW()`,
       [
         tpl.slug,
@@ -54,7 +57,8 @@ async function seedDefaultTemplates() {
         tpl.subject || '',
         tpl.html_body,
         tpl.category || 'General',
-        JSON.stringify(tpl.variable_fields || [])
+        JSON.stringify(tpl.variable_fields || []),
+        tpl.banner_config ? JSON.stringify(tpl.banner_config) : null
       ]
     );
   }
@@ -81,12 +85,12 @@ router.get('/:id', async (req, res) => {
 
 // POST create template
 router.post('/', async (req, res) => {
-  const { name, subject, html_body, category, variable_fields } = req.body;
+  const { name, subject, html_body, category, variable_fields, banner_config } = req.body;
   if (!name || !html_body) return res.status(400).json({ error: 'name and html_body required' });
   try {
     const r = await pool.query(
-      `INSERT INTO email_templates (name, subject, html_body, category, variable_fields) VALUES ($1,$2,$3,$4,$5::jsonb) RETURNING *`,
-      [name, subject||'', html_body, category||'General', JSON.stringify(variable_fields || [])]
+      `INSERT INTO email_templates (name, subject, html_body, category, variable_fields, banner_config) VALUES ($1,$2,$3,$4,$5::jsonb,$6::jsonb) RETURNING *`,
+      [name, subject||'', html_body, category||'General', JSON.stringify(variable_fields || []), banner_config ? JSON.stringify(banner_config) : null]
     );
     res.json(r.rows[0]);
   } catch (err) { res.status(500).json({ error: err.message }); }
@@ -94,14 +98,17 @@ router.post('/', async (req, res) => {
 
 // PUT update template
 router.put('/:id', async (req, res) => {
-  const { name, subject, html_body, category, variable_fields } = req.body;
+  const { name, subject, html_body, category, variable_fields, banner_config } = req.body;
   const variableFieldsJson = Object.prototype.hasOwnProperty.call(req.body, 'variable_fields')
     ? JSON.stringify(variable_fields || [])
     : null;
+  const bannerConfigJson = Object.prototype.hasOwnProperty.call(req.body, 'banner_config')
+    ? (banner_config ? JSON.stringify(banner_config) : null)
+    : null;
   try {
     const r = await pool.query(
-      `UPDATE email_templates SET name=$1, subject=$2, html_body=$3, category=$4, variable_fields=COALESCE($5::jsonb, variable_fields), updated_at=NOW() WHERE id=$6 RETURNING *`,
-      [name, subject||'', html_body, category||'General', variableFieldsJson, req.params.id]
+      `UPDATE email_templates SET name=$1, subject=$2, html_body=$3, category=$4, variable_fields=COALESCE($5::jsonb, variable_fields), banner_config=COALESCE($6::jsonb, banner_config), updated_at=NOW() WHERE id=$7 RETURNING *`,
+      [name, subject||'', html_body, category||'General', variableFieldsJson, bannerConfigJson, req.params.id]
     );
     if (!r.rows.length) return res.status(404).json({ error: 'Not found' });
     res.json(r.rows[0]);

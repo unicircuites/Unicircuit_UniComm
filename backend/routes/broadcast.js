@@ -4,6 +4,11 @@
 const express  = require('express');
 const pool     = require('../db/pool');
 const eb       = require('../services/emailBroadcast');
+const {
+  normalizeFieldDefs,
+  buildRecipientMap,
+  substitute,
+} = require('../services/emailTemplateVars');
 const { authenticate } = require('../middleware/auth');
 
 const router = express.Router();
@@ -58,11 +63,15 @@ router.get('/:id', async (req, res) => {
 
 // ── POST /api/broadcast/test — send test email ────────────────────────────
 router.post('/test', async (req, res) => {
-  const { to, subject, html, attachments } = req.body;
+  const { to, subject, html, attachments, variable_fields } = req.body;
   if (!to || !subject || !html)
     return res.status(400).json({ error: 'to, subject, html required' });
   try {
-    await eb.sendOne(to, subject, html, null, attachments);
+    const fieldDefs = normalizeFieldDefs(variable_fields);
+    const varMap = buildRecipientMap({ email: to, name: to.split('@')[0] || '' }, fieldDefs);
+    const finalSubject = substitute(subject, varMap);
+    const finalHtml = substitute(html, varMap);
+    await eb.sendOne(to, finalSubject, finalHtml, null, attachments);
     res.json({ success: true, message: `Test email sent to ${to}`, attachments: Array.isArray(attachments) ? attachments.length : 0 });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
@@ -78,7 +87,7 @@ router.post('/verify', async (req, res) => {
 // ── POST /api/broadcast/send — create + send broadcast ───────────────────
 // Body: { subject, html, recipients: [{email,name}] or ['email'], delay_ms }
 router.post('/send', async (req, res) => {
-  const { subject, html, recipients, delay_ms, attachments, batch_size } = req.body;
+  const { subject, html, recipients, delay_ms, attachments, batch_size, variable_fields } = req.body;
   if (!subject || !html || !Array.isArray(recipients) || !recipients.length)
     return res.status(400).json({ error: 'subject, html, recipients[] required' });
 
@@ -123,7 +132,7 @@ router.post('/send', async (req, res) => {
       `UPDATE email_broadcasts SET sent=$1, failed=$2, errors=$3, deliveries=$4 WHERE id=$5`,
       [sent, failed, JSON.stringify(results.errors), JSON.stringify(mergedDeliveries), broadcastId]
     );
-  }, delay, attachments, batchSize)
+  }, delay, attachments, batchSize, variable_fields)
     .then(async (results) => {
       try {
         await pool.query(
