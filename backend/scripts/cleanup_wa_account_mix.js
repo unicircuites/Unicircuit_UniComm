@@ -14,6 +14,20 @@ function phoneVariants(value) {
   return Array.from(set);
 }
 
+async function ensureBackupTable(client) {
+  await client.query(`
+    CREATE TABLE IF NOT EXISTS wa_account_cleanup_backup (
+      id BIGSERIAL PRIMARY KEY,
+      batch_id TEXT NOT NULL,
+      source_accounts TEXT[] NOT NULL,
+      target_accounts TEXT[] NOT NULL,
+      table_name TEXT NOT NULL,
+      row_data JSONB NOT NULL,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )
+  `);
+}
+
 async function countDuplicates(client, table, keyColumns, sourceAccounts, targetAccounts) {
   const join = keyColumns.map(col => `src.${col} = tgt.${col}`).join(' AND ');
   const sql = `
@@ -29,6 +43,24 @@ async function countDuplicates(client, table, keyColumns, sourceAccounts, target
   `;
   const result = await client.query(sql, [sourceAccounts, targetAccounts]);
   return result.rows[0]?.count || 0;
+}
+
+async function backupDuplicates(client, batchId, table, keyColumns, sourceAccounts, targetAccounts) {
+  const join = keyColumns.map(col => `src.${col} = tgt.${col}`).join(' AND ');
+  const sql = `
+    INSERT INTO wa_account_cleanup_backup (batch_id, source_accounts, target_accounts, table_name, row_data)
+    SELECT $3, $1::text[], $2::text[], $4, to_jsonb(tgt)
+    FROM ${table} tgt
+    WHERE tgt.account_phone = ANY($2::text[])
+      AND EXISTS (
+        SELECT 1
+        FROM ${table} src
+        WHERE src.account_phone = ANY($1::text[])
+          AND ${join}
+      )
+  `;
+  const result = await client.query(sql, [sourceAccounts, targetAccounts, batchId, table]);
+  return result.rowCount || 0;
 }
 
 async function deleteDuplicates(client, table, keyColumns, sourceAccounts, targetAccounts) {
@@ -51,6 +83,7 @@ async function main() {
   const sourceAccounts = phoneVariants(arg('source'));
   const targetAccounts = phoneVariants(arg('target'));
   const apply = process.argv.includes('--apply');
+  const batchId = new Date().toISOString().replace(/[:.]/g, '-');
 
   if (!sourceAccounts.length || !targetAccounts.length) {
     throw new Error('Usage: node backend/scripts/cleanup_wa_account_mix.js --source 9545073545 --target 9359475770 [--apply]');
@@ -66,10 +99,15 @@ async function main() {
   try {
     await client.query('BEGIN');
     const report = {};
+    const backups = {};
+    if (apply) await ensureBackupTable(client);
     for (const [table, keys] of tables) {
-      report[table] = apply
-        ? await deleteDuplicates(client, table, keys, sourceAccounts, targetAccounts)
-        : await countDuplicates(client, table, keys, sourceAccounts, targetAccounts);
+      if (apply) {
+        backups[table] = await backupDuplicates(client, batchId, table, keys, sourceAccounts, targetAccounts);
+        report[table] = await deleteDuplicates(client, table, keys, sourceAccounts, targetAccounts);
+      } else {
+        report[table] = await countDuplicates(client, table, keys, sourceAccounts, targetAccounts);
+      }
     }
     if (apply) await client.query('COMMIT');
     else await client.query('ROLLBACK');
@@ -78,6 +116,8 @@ async function main() {
       mode: apply ? 'applied' : 'dry-run',
       sourceAccounts,
       targetAccounts,
+      backupBatchId: apply ? batchId : null,
+      backedUpRows: backups,
       duplicates: report,
     }, null, 2));
   } catch (err) {
