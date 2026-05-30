@@ -1,6 +1,8 @@
 /**
- * Outlook-compatible email banners — simple bar, hero image overlay, or full header stack.
+ * Outlook-compatible email frames: banner + body + footer in one 600px bordered table.
  */
+
+const EMAIL_FRAME_WIDTH = 600;
 
 const BANNER_PRESETS = {
   none: { id: 'none', label: 'No banner', enabled: false, layout: 'simple' },
@@ -105,7 +107,7 @@ function resolveImage(cfg) {
 
 function buildTopBarHtml(cfg) {
   if (!cfg.showTopBar) return '';
-  return '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;max-width:600px;">'
+  return '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;width:100%;">'
     + '<tr><td style="background:#0f172a;padding:6px 16px;font-size:10px;color:#94a3b8;text-align:center;">'
     + escapeHtml(cfg.topBarText)
     + '</td></tr></table>';
@@ -122,7 +124,7 @@ function buildHeaderBarHtml(cfg) {
     ? nav.map((link) => '<a href="#" style="color:#ffffff;font-size:12px;text-decoration:none;margin-left:14px;">' + escapeHtml(link) + '</a>').join('')
     : '';
 
-  return '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;max-width:600px;">'
+  return '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;width:100%;">'
     + '<tr><td style="background:' + bg + ';padding:14px 20px;">'
     + '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tr>'
     + '<td valign="middle" style="white-space:nowrap;">'
@@ -159,12 +161,12 @@ function buildHeroBannerHtml(cfg) {
     : 'background-color:' + (cfg.accentColor || overlay) + ';';
 
   const vmlStart = img
-    ? '<!--[if gte mso 9]><v:rect xmlns:v="urn:schemas-microsoft-com:vml" fill="true" stroke="false" style="width:600px;height:'
+    ? '<!--[if gte mso 9]><v:rect xmlns:v="urn:schemas-microsoft-com:vml" fill="true" stroke="false" style="width:' + EMAIL_FRAME_WIDTH + 'px;height:'
       + h + 'px;"><v:fill type="frame" src="' + escapeHtml(img) + '" color="' + overlay + '" /><v:textbox inset="0,0,0,0"><![endif]-->'
     : '';
   const vmlEnd = img ? '<!--[if gte mso 9]></v:textbox></v:rect><![endif]-->' : '';
 
-  return '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;max-width:600px;">'
+  return '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;width:100%;">'
     + '<tr><td' + bgAttr + ' bgcolor="' + overlay + '" height="' + h + '" valign="middle" style="' + bgStyle + 'height:'
     + h + 'px;min-height:' + h + 'px;padding:0;mso-line-height-rule:exactly;">'
     + vmlStart
@@ -176,57 +178,89 @@ function buildHeroBannerHtml(cfg) {
     + ctaHtml
     + '</td><td width="42%" style="font-size:0;line-height:0;">&nbsp;</td></tr></table>'
     + vmlEnd
-    + '</td></tr>'
-    + (cfg.footerLine
-      ? '<tr><td style="background:#f8fafc;padding:10px 22px;border:1px solid #e2e8f0;font-size:11px;color:#64748b;text-align:center;">' + escapeHtml(cfg.footerLine) + '</td></tr>'
-      : '')
-    + '</table>';
+    + '</td></tr></table>';
 }
 
 function buildSimpleBannerHtml(cfg) {
   const headline = escapeHtml(cfg.headline || '');
   const sub = escapeHtml(cfg.subheadline || '');
-  const footer = escapeHtml(cfg.footerLine || '');
   const accent = cfg.accentColor || '#0d9488';
   const img = resolveImage(cfg);
 
   let imageRow = '';
   if (img) {
     imageRow = '<tr><td style="padding:0;line-height:0;font-size:0;">'
-      + '<img src="' + escapeHtml(img) + '" alt="" width="600" style="display:block;width:100%;max-width:600px;height:auto;border:0;border-radius:8px 8px 0 0;" />'
+      + '<img src="' + escapeHtml(img) + '" alt="" width="' + EMAIL_FRAME_WIDTH + '" style="display:block;width:100%;height:auto;border:0;" />'
       + '</td></tr>';
   }
-  const headlineRadius = img ? '0' : '8px 8px 0 0';
 
-  return '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;max-width:600px;">'
+  return '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;width:100%;">'
     + imageRow
-    + '<tr><td style="background:' + accent + ';padding:18px 22px;border-radius:' + headlineRadius + ';">'
+    + '<tr><td style="background:' + accent + ';padding:18px 22px;">'
     + '<div style="font-size:20px;font-weight:800;color:#ffffff;line-height:1.25;">' + headline + '</div>'
     + (sub ? '<div style="font-size:13px;color:#e0f2fe;margin-top:6px;line-height:1.45;">' + sub + '</div>' : '')
-    + '</td></tr>'
-    + (footer
-      ? '<tr><td style="background:#f8fafc;padding:8px 22px;border:1px solid #e2e8f0;border-top:none;border-radius:0 0 8px 8px;font-size:11px;color:#475569;">' + footer + '</td></tr>'
-      : '')
-    + '</table>';
+    + '</td></tr></table>';
 }
 
-function buildMessageBannerHtml(cfg) {
+function buildBannerStackHtml(cfg) {
   const c = normalizeBannerConfig(cfg);
-  if (!c.enabled) return '';
-
   const parts = [];
   if (c.showTopBar) parts.push(buildTopBarHtml(c));
   if (c.showHeader) parts.push(buildHeaderBarHtml(c));
-
   if (c.layout === 'hero' || c.layout === 'full') {
     parts.push(buildHeroBannerHtml(c));
   } else {
     parts.push(buildSimpleBannerHtml(c));
   }
-
-  return '<div data-uc-banner="1" contenteditable="false" style="margin:0 0 16px 0;font-family:Arial,Helvetica,sans-serif;max-width:600px;">'
+  if (!parts.length) return '';
+  return '<div data-uc-banner="1" contenteditable="false" style="margin:0;padding:0;line-height:0;font-size:0;">'
     + parts.join('')
     + '</div>';
+}
+
+function buildTemplateFooterHtml(cfg) {
+  const line = String(cfg.footerLine || '').trim();
+  if (!line) return '';
+  return '<div data-uc-template-footer="1" contenteditable="false" style="margin:0;padding:0;">'
+    + '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;width:100%;">'
+    + '<tr><td style="background:#ffffff;padding:10px 22px;border-top:1px solid #e2e8f0;font-size:11px;color:#64748b;text-align:center;line-height:1.4;mso-line-height-rule:exactly;">'
+    + escapeHtml(line)
+    + '</td></tr></table></div>';
+}
+
+function buildFramedEmailHtml(cfg, bodyHtml) {
+  const c = normalizeBannerConfig(cfg);
+  const body = String(bodyHtml || '').trim() || '<p style="margin:0;font-size:14px;line-height:1.6;color:#334155;">&nbsp;</p>';
+
+  if (!c.enabled) {
+    return body;
+  }
+
+  const banner = buildBannerStackHtml(c);
+  const footer = buildTemplateFooterHtml(c);
+  const w = EMAIL_FRAME_WIDTH;
+
+  let rows = '';
+  if (banner) {
+    rows += '<tr><td style="padding:0;margin:0;line-height:0;font-size:0;vertical-align:top;" contenteditable="false">'
+      + banner + '</td></tr>';
+  }
+  rows += '<tr><td data-uc-email-body="1" style="padding:20px 22px;background:#ffffff;color:#222222;font-family:Arial,Helvetica,sans-serif;font-size:14px;line-height:1.6;vertical-align:top;">'
+    + body + '</td></tr>';
+  if (footer) {
+    rows += '<tr><td style="padding:0;vertical-align:top;" contenteditable="false">' + footer + '</td></tr>';
+  }
+
+  return '<table data-uc-email-frame="1" role="presentation" width="' + w + '" cellpadding="0" cellspacing="0" border="0" '
+    + 'style="border-collapse:collapse;width:' + w + 'px;max-width:' + w + 'px;margin:0 auto 16px auto;'
+    + 'border:1px solid #cbd5e1;font-family:Arial,Helvetica,sans-serif;mso-table-lspace:0pt;mso-table-rspace:0pt;">'
+    + rows
+    + '</table>';
+}
+
+/** @deprecated Use buildFramedEmailHtml — kept for callers that only need banner block */
+function buildMessageBannerHtml(cfg, bodyHtml) {
+  return buildFramedEmailHtml(cfg, bodyHtml || '');
 }
 
 function buildWhatsAppBannerText(cfg) {
@@ -237,7 +271,7 @@ function buildWhatsAppBannerText(cfg) {
   if (c.headline) lines.push('*' + String(c.headline).trim() + '*');
   if (c.subheadline) lines.push(String(c.subheadline).trim());
   if (c.footerLine) lines.push('_' + String(c.footerLine).trim() + '_');
-  if (c.showCta && c.ctaText) lines.push('👉 ' + String(c.ctaText).trim() + (c.ctaUrl && c.ctaUrl !== '#' ? ': ' + c.ctaUrl : ''));
+  if (c.showCta && c.ctaText) lines.push('👉 ' + String(c.ctaText).trim());
   if (!lines.length) return '';
   return lines.join('\n') + '\n────────────────\n\n';
 }
@@ -247,8 +281,12 @@ function getBannerPreset(presetId) {
 }
 
 module.exports = {
+  EMAIL_FRAME_WIDTH,
   BANNER_PRESETS,
   normalizeBannerConfig,
+  buildBannerStackHtml,
+  buildTemplateFooterHtml,
+  buildFramedEmailHtml,
   buildMessageBannerHtml,
   buildWhatsAppBannerText,
   getBannerPreset,

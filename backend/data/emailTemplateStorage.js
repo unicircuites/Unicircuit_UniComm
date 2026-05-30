@@ -1,6 +1,29 @@
-const { getBannerPreset, buildMessageBannerHtml } = require('./messageBanners');
+const { getBannerPreset, buildFramedEmailHtml } = require('./messageBanners');
 
 const healthcareBannerConfig = getBannerPreset('healthcare');
+
+const healthcareBodyHtml = `
+      <p>Dear {{recipient_name}},</p>
+
+      <p>I am writing to introduce Unicircuit Engineering Services LLP, a digital transformation and ELV solutions partner working with private hospitals, multi-specialty chains, and diagnostic networks across India.</p>
+
+      <p>Modern healthcare institutions face a complex balancing act: ensuring patient safety, maintaining uptime of life-critical equipment, securing sensitive zones such as ICUs and pharmacies, and managing energy and operational costs, all while meeting NABH and JCI accreditation standards. Our integrated portfolio is designed to address exactly these challenges:</p>
+
+      <ul>
+        <li><strong>Smart Building Ecosystem</strong> - BMS, HVAC controls, and energy management for OTs, ICUs, and wards, with pressure-controlled environments and continuous compliance logging.</li>
+        <li><strong>Physical Security &amp; Surveillance</strong> - AI-enabled CCTV, access control, infant tracking, queue analytics, and panic-response systems.</li>
+        <li><strong>Industrial Asset Management</strong> - RFID-based tracking of medical equipment, beds, linen, and consumables to reduce loss and improve utilisation.</li>
+        <li><strong>Digital Infrastructure &amp; Connectivity</strong> - Structured cabling, high-density Wi-Fi, and data centre solutions to power HIMS / EMR / PACS reliably.</li>
+        <li><strong>ELV Turnkey Projects</strong> - Single-window execution from design to commissioning, on time and on budget.</li>
+      </ul>
+
+      <p>I would value 20 minutes to understand your priorities for the coming year and explore where we can add measurable value, whether for a new facility, an expansion, or modernisation of an existing site. Could we connect for a brief introductory call {{meeting_window}}?</p>
+
+      <p>Warm regards,<br>
+      {{sender_name}}<br>
+      {{sender_designation}} | Unicircuit Engineering Services LLP<br>
+      {{sender_phone}} | {{sender_email}} | {{company_website}}</p>
+    `.trim();
 
 const seedEmailTemplates = [
   {
@@ -74,30 +97,7 @@ const seedEmailTemplates = [
       }
     ],
     banner_config: healthcareBannerConfig,
-    html_body: `
-      ${buildMessageBannerHtml(healthcareBannerConfig)}
-      <br>
-      <p>Dear {{recipient_name}},</p>
-
-      <p>I am writing to introduce Unicircuit Engineering Services LLP, a digital transformation and ELV solutions partner working with private hospitals, multi-specialty chains, and diagnostic networks across India.</p>
-
-      <p>Modern healthcare institutions face a complex balancing act: ensuring patient safety, maintaining uptime of life-critical equipment, securing sensitive zones such as ICUs and pharmacies, and managing energy and operational costs, all while meeting NABH and JCI accreditation standards. Our integrated portfolio is designed to address exactly these challenges:</p>
-
-      <ul>
-        <li><strong>Smart Building Ecosystem</strong> - BMS, HVAC controls, and energy management for OTs, ICUs, and wards, with pressure-controlled environments and continuous compliance logging.</li>
-        <li><strong>Physical Security &amp; Surveillance</strong> - AI-enabled CCTV, access control, infant tracking, queue analytics, and panic-response systems.</li>
-        <li><strong>Industrial Asset Management</strong> - RFID-based tracking of medical equipment, beds, linen, and consumables to reduce loss and improve utilisation.</li>
-        <li><strong>Digital Infrastructure &amp; Connectivity</strong> - Structured cabling, high-density Wi-Fi, and data centre solutions to power HIMS / EMR / PACS reliably.</li>
-        <li><strong>ELV Turnkey Projects</strong> - Single-window execution from design to commissioning, on time and on budget.</li>
-      </ul>
-
-      <p>I would value 20 minutes to understand your priorities for the coming year and explore where we can add measurable value, whether for a new facility, an expansion, or modernisation of an existing site. Could we connect for a brief introductory call {{meeting_window}}?</p>
-
-      <p>Warm regards,<br>
-      {{sender_name}}<br>
-      {{sender_designation}} | Unicircuit Engineering Services LLP<br>
-      {{sender_phone}} | {{sender_email}} | {{company_website}}</p>
-    `.trim()
+    html_body: buildFramedEmailHtml(healthcareBannerConfig, healthcareBodyHtml)
   }
 ];
 

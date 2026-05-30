@@ -3048,6 +3048,14 @@
       pointer-events: none;
     }
 
+    #bc-html table[data-uc-email-frame],
+    #et-html-editor table[data-uc-email-frame],
+    #cl-body-editor table[data-uc-email-frame] {
+      display: table;
+      margin-left: auto;
+      margin-right: auto;
+    }
+
     #bc-html ol,
     #bc-html ul {
       padding-left: 24px;
@@ -22326,7 +22334,8 @@ ${plainText}`;
 
     // ── MESSAGE BANNER (hero image + overlay, header bar, CTA — like MediCare-style emails) ──
     var MSG_BANNER_STORAGE_PREFIX = 'unicomm_banner_v2_';
-    var MSG_BANNER_PANEL_VERSION = '3';
+    var MSG_BANNER_PANEL_VERSION = '4';
+    var EMAIL_FRAME_WIDTH = 600;
     var _msgBannerImageDataCache = {};
     var MSG_BANNER_EDITORS = { bc: 'bc-html', et: 'et-html-editor', cl: 'cl-body-editor' };
     var MSG_BANNER_PRESETS = {
@@ -22419,7 +22428,7 @@ ${plainText}`;
 
     function msgBannerBuildTopBar(cfg) {
       if (!cfg.showTopBar) return '';
-      return '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;max-width:600px;"><tr><td style="background:#0f172a;padding:6px 16px;font-size:10px;color:#94a3b8;text-align:center;">' + escHtml(cfg.topBarText) + '</td></tr></table>';
+      return '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;width:100%;"><tr><td style="background:#0f172a;padding:6px 16px;font-size:10px;color:#94a3b8;text-align:center;">' + escHtml(cfg.topBarText) + '</td></tr></table>';
     }
 
     function msgBannerBuildHeader(cfg) {
@@ -22432,7 +22441,7 @@ ${plainText}`;
       var navHtml = nav.map(function (link) {
         return '<a href="#" style="color:#fff;font-size:12px;text-decoration:none;margin-left:14px;">' + escHtml(link) + '</a>';
       }).join('');
-      return '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;max-width:600px;"><tr><td style="background:' + escAttr(bg) + ';padding:14px 20px;">'
+      return '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;width:100%;"><tr><td style="background:' + escAttr(bg) + ';padding:14px 20px;">'
         + '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tr>'
         + '<td valign="middle"><table role="presentation" cellpadding="0" cellspacing="0" border="0"><tr>'
         + '<td valign="middle" style="padding-right:10px;">' + logoImg + '</td><td valign="middle">'
@@ -22454,9 +22463,9 @@ ${plainText}`;
       }
       var bgAttr = img ? ' background="' + escAttr(img) + '"' : '';
       var bgStyle = img ? 'background-image:url(\'' + img.replace(/'/g, '%27') + '\');background-size:cover;background-position:center;background-repeat:no-repeat;' : 'background-color:' + escAttr(cfg.accentColor || overlay) + ';';
-      var vmlStart = img ? '<!--[if gte mso 9]><v:rect xmlns:v="urn:schemas-microsoft-com:vml" fill="true" stroke="false" style="width:600px;height:' + h + 'px;"><v:fill type="frame" src="' + escAttr(img) + '" color="' + escAttr(overlay) + '" /><v:textbox inset="0,0,0,0"><![endif]-->' : '';
+      var vmlStart = img ? '<!--[if gte mso 9]><v:rect xmlns:v="urn:schemas-microsoft-com:vml" fill="true" stroke="false" style="width:' + EMAIL_FRAME_WIDTH + 'px;height:' + h + 'px;"><v:fill type="frame" src="' + escAttr(img) + '" color="' + escAttr(overlay) + '" /><v:textbox inset="0,0,0,0"><![endif]-->' : '';
       var vmlEnd = img ? '<!--[if gte mso 9]></v:textbox></v:rect><![endif]-->' : '';
-      return '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;max-width:600px;"><tr><td' + bgAttr + ' bgcolor="' + escAttr(overlay) + '" height="' + h + '" valign="middle" style="' + bgStyle + 'height:' + h + 'px;padding:0;">'
+      return '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;width:100%;"><tr><td' + bgAttr + ' bgcolor="' + escAttr(overlay) + '" height="' + h + '" valign="middle" style="' + bgStyle + 'height:' + h + 'px;padding:0;">'
         + vmlStart
         + '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tr>'
         + '<td width="58%" bgcolor="' + escAttr(overlay) + '" valign="middle" style="background-color:' + escAttr(overlay) + ';padding:28px 24px;text-align:' + align + ';">'
@@ -22465,7 +22474,6 @@ ${plainText}`;
         + (cfg.subheadline ? '<div style="font-size:14px;color:#dbeafe;margin-top:10px;line-height:1.45;">' + escHtml(cfg.subheadline) + '</div>' : '')
         + ctaHtml + '</td><td width="42%" style="font-size:0;line-height:0;">&nbsp;</td></tr></table>'
         + vmlEnd + '</td></tr>'
-        + (cfg.footerLine ? '<tr><td style="background:#f8fafc;padding:10px 22px;border:1px solid #e2e8f0;font-size:11px;color:#64748b;text-align:center;">' + escHtml(cfg.footerLine) + '</td></tr>' : '')
         + '</table>';
     }
 
@@ -22478,19 +22486,52 @@ ${plainText}`;
         + '<tr><td style="background:' + escAttr(accent) + ';padding:18px 22px;border-radius:' + radius + ';">'
         + '<div style="font-size:20px;font-weight:800;color:#fff;line-height:1.25;">' + escHtml(cfg.headline) + '</div>'
         + (cfg.subheadline ? '<div style="font-size:13px;color:#e0f2fe;margin-top:6px;">' + escHtml(cfg.subheadline) + '</div>' : '')
-        + '</td></tr>'
-        + (cfg.footerLine ? '<tr><td style="background:#f8fafc;padding:8px 22px;border:1px solid #e2e8f0;font-size:11px;color:#475569;">' + escHtml(cfg.footerLine) + '</td></tr>' : '')
-        + '</table>';
+        + '</td></tr></table>';
     }
 
-    function msgBannerBuildHtml(cfg) {
+    function msgBannerBuildBannerStack(cfg) {
       cfg = msgBannerNormalizeConfig(cfg);
-      if (!cfg.enabled) return '';
       var parts = [];
       if (cfg.showTopBar) parts.push(msgBannerBuildTopBar(cfg));
       if (cfg.showHeader) parts.push(msgBannerBuildHeader(cfg));
       parts.push((cfg.layout === 'hero' || cfg.layout === 'full') ? msgBannerBuildHero(cfg) : msgBannerBuildSimple(cfg));
-      return '<div data-uc-banner="1" contenteditable="false" style="margin:0 0 16px 0;font-family:Arial,Helvetica,sans-serif;max-width:600px;">' + parts.join('') + '</div>';
+      if (!parts.length) return '';
+      return '<div data-uc-banner="1" contenteditable="false" style="margin:0;padding:0;line-height:0;font-size:0;">' + parts.join('') + '</div>';
+    }
+
+    function msgBannerBuildTemplateFooter(cfg) {
+      cfg = msgBannerNormalizeConfig(cfg);
+      var line = String(cfg.footerLine || '').trim();
+      if (!line) return '';
+      return '<div data-uc-template-footer="1" contenteditable="false" style="margin:0;padding:0;">'
+        + '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;width:100%;">'
+        + '<tr><td style="background:#ffffff;padding:10px 22px;border-top:1px solid #e2e8f0;font-size:11px;color:#64748b;text-align:center;line-height:1.4;">'
+        + escHtml(line) + '</td></tr></table></div>';
+    }
+
+    function msgBannerBuildFramedEmail(cfg, bodyHtml) {
+      cfg = msgBannerNormalizeConfig(cfg);
+      var body = String(bodyHtml || '').trim() || '<p style="margin:0;">&nbsp;</p>';
+      if (!cfg.enabled) return body;
+      var banner = msgBannerBuildBannerStack(cfg);
+      var footer = msgBannerBuildTemplateFooter(cfg);
+      var w = EMAIL_FRAME_WIDTH;
+      var rows = '';
+      if (banner) {
+        rows += '<tr><td style="padding:0;line-height:0;font-size:0;vertical-align:top;" contenteditable="false">' + banner + '</td></tr>';
+      }
+      rows += '<tr><td data-uc-email-body="1" style="padding:20px 22px;background:#ffffff;color:#222222;font-family:Arial,Helvetica,sans-serif;font-size:14px;line-height:1.6;vertical-align:top;">'
+        + body + '</td></tr>';
+      if (footer) {
+        rows += '<tr><td style="padding:0;vertical-align:top;" contenteditable="false">' + footer + '</td></tr>';
+      }
+      return '<table data-uc-email-frame="1" role="presentation" width="' + w + '" cellpadding="0" cellspacing="0" border="0" '
+        + 'style="border-collapse:collapse;width:' + w + 'px;max-width:' + w + 'px;margin:0 auto 16px auto;border:1px solid #cbd5e1;font-family:Arial,Helvetica,sans-serif;">'
+        + rows + '</table>';
+    }
+
+    function msgBannerBuildHtml(cfg, bodyHtml) {
+      return msgBannerBuildFramedEmail(cfg, bodyHtml || '');
     }
 
     function msgBannerBuildWhatsAppText(cfg) {
@@ -22506,11 +22547,70 @@ ${plainText}`;
       return lines.join('\n') + '\n────────────────\n\n';
     }
 
-    function msgBannerStripHtml(html) {
+    function msgBannerExtractBody(html) {
       var div = document.createElement('div');
       div.innerHTML = String(html || '');
-      div.querySelectorAll('[data-uc-banner]').forEach(function (n) { n.remove(); });
-      return div.innerHTML.replace(/^\s*<br\s*\/?>\s*/i, '');
+      var frame = div.querySelector('[data-uc-email-frame]');
+      if (frame) {
+        var bodyCell = frame.querySelector('[data-uc-email-body]');
+        if (bodyCell) return bodyCell.innerHTML.trim();
+        var clone = frame.cloneNode(true);
+        clone.querySelectorAll('[data-uc-banner], [data-uc-template-footer]').forEach(function (n) { n.remove(); });
+        return clone.innerHTML.trim();
+      }
+      div.querySelectorAll('[data-uc-banner], [data-uc-template-footer], [data-uc-email-frame]').forEach(function (n) { n.remove(); });
+      return div.innerHTML.replace(/^\s*<br\s*\/?>\s*/i, '').trim();
+    }
+
+    function msgBannerStripHtml(html) {
+      return msgBannerExtractBody(html);
+    }
+
+    function msgBannerGetBodyCell(ed) {
+      if (!ed) return null;
+      return ed.querySelector('[data-uc-email-body]');
+    }
+
+    function msgBannerInsertFooterAtCursor(scope) {
+      var cfg = msgBannerReadForm(scope);
+      var line = String(cfg.footerLine || '').trim();
+      if (!line) {
+        notify('Footer line empty', 'Enter text in Template footer field first', 'var(--gold)', 'fas fa-info-circle');
+        return;
+      }
+      var editorId = msgBannerGetEditorId(scope);
+      var ed = editorId ? document.getElementById(editorId) : null;
+      if (!ed) return;
+      var inlineFooter = '<div data-uc-template-footer-inline="1" contenteditable="false" style="margin-top:14px;padding-top:10px;border-top:1px solid #e2e8f0;font-size:11px;color:#64748b;text-align:center;line-height:1.4;">'
+        + escHtml(line) + '</div>';
+      var bodyCell = msgBannerGetBodyCell(ed);
+      if (bodyCell) {
+        bodyCell.focus();
+        var sel = window.getSelection();
+        if (!sel.rangeCount || !bodyCell.contains(sel.getRangeAt(0).commonAncestorContainer)) {
+          var r = document.createRange();
+          r.selectNodeContents(bodyCell);
+          r.collapse(false);
+          sel.removeAllRanges();
+          sel.addRange(r);
+        }
+      } else {
+        ed.focus();
+      }
+      document.execCommand('insertHTML', false, inlineFooter);
+      notify('Footer inserted', 'Added just below cursor in the body', 'var(--green)', 'fas fa-level-down-alt');
+    }
+
+    function msgBannerRefreshFrameFooter(scope) {
+      var cfg = msgBannerReadForm(scope);
+      var ed = document.getElementById(msgBannerGetEditorId(scope));
+      if (!ed || !ed.querySelector('[data-uc-email-frame]')) {
+        notify('No framed template', 'Apply banner first to use the template footer row', 'var(--gold)', 'fas fa-info-circle');
+        return;
+      }
+      var body = msgBannerExtractBody(ed.innerHTML);
+      ed.innerHTML = msgBannerBuildFramedEmail(cfg, body);
+      notify('Footer updated', 'Template footer row refreshed below body', 'var(--green)', 'fas fa-check');
     }
 
     function msgBannerGetEditorId(scope) {
@@ -22545,7 +22645,11 @@ ${plainText}`;
         + '<div class="form-row" style="gap:8px;margin-bottom:6px;"><div style="flex:1;"><label class="form-label">Overlay color</label><input type="color" class="inp" id="' + s + '-banner-overlay" style="height:36px;padding:2px;" onchange="msgBannerOnFieldChange(\'' + s + '\')" /></div>'
         + '<div style="flex:1;"><label class="form-label">Accent / fallback</label><input type="color" class="inp" id="' + s + '-banner-accent" style="height:36px;padding:2px;" onchange="msgBannerOnFieldChange(\'' + s + '\')" /></div>'
         + '<div style="width:100px;"><label class="form-label">Text align</label><select class="inp" id="' + s + '-banner-align" style="font-size:12px;" onchange="msgBannerOnFieldChange(\'' + s + '\')"><option value="left">Left</option><option value="center">Center</option><option value="right">Right</option></select></div></div>'
-        + '<div class="form-group" style="margin-bottom:6px;"><label class="form-label">Footer line</label><input class="inp" id="' + s + '-banner-footer" style="font-size:12px;" oninput="msgBannerOnFieldChange(\'' + s + '\')" /></div>'
+        + '<div class="form-group" style="margin-bottom:6px;"><label class="form-label">Template footer <span style="font-weight:400;color:var(--muted);">(below body, inside border)</span></label>'
+        + '<input class="inp" id="' + s + '-banner-footer" style="font-size:12px;" oninput="msgBannerOnFieldChange(\'' + s + '\')" /></div>'
+        + '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px;">'
+        + '<button type="button" class="btn btn-ghost btn-xs" onclick="msgBannerInsertFooterAtCursor(\'' + s + '\')"><i class="fas fa-level-down-alt"></i> Insert at cursor</button>'
+        + '<button type="button" class="btn btn-ghost btn-xs" onclick="msgBannerRefreshFrameFooter(\'' + s + '\')"><i class="fas fa-sync-alt"></i> Update footer row</button></div>'
         + '<div style="border-top:1px solid var(--border);padding-top:8px;margin-bottom:8px;">'
         + '<label style="display:flex;align-items:center;gap:8px;font-size:11.5px;margin-bottom:6px;cursor:pointer;"><input type="checkbox" id="' + s + '-banner-cta" onchange="msgBannerOnFieldChange(\'' + s + '\')" /> CTA button</label>'
         + '<div id="' + s + '-banner-cta-fields" class="form-row" style="gap:6px;display:none;"><input class="inp" id="' + s + '-banner-cta-text" placeholder="Book Now" style="font-size:12px;flex:1;" oninput="msgBannerOnFieldChange(\'' + s + '\')" />'
@@ -22705,7 +22809,9 @@ ${plainText}`;
       var el = document.getElementById(scope + '-banner-preview');
       if (!el) return;
       var cfg = msgBannerReadForm(scope);
-      el.innerHTML = cfg.enabled ? msgBannerBuildHtml(cfg) : '<div style="padding:12px;font-size:11px;color:#999;text-align:center;">Banner disabled</div>';
+      el.innerHTML = cfg.enabled
+        ? msgBannerBuildFramedEmail(cfg, '<p style="margin:0;color:#64748b;font-size:13px;">Your email body appears here…</p>')
+        : '<div style="padding:12px;font-size:11px;color:#999;text-align:center;">Banner disabled — no border</div>';
     }
 
     function msgBannerOnEnabledChange(scope) {
@@ -22738,15 +22844,14 @@ ${plainText}`;
         notify('Editor not found', '', 'var(--red)', 'fas fa-exclamation-circle');
         return;
       }
-      var body = msgBannerStripHtml(ed.innerHTML);
+      var body = msgBannerExtractBody(ed.innerHTML);
       if (cfg.enabled) {
-        var bannerHtml = msgBannerBuildHtml(cfg);
-        ed.innerHTML = bannerHtml + (body.trim() ? '<br>' + body : '');
+        ed.innerHTML = msgBannerBuildFramedEmail(cfg, body);
       } else {
         ed.innerHTML = body;
       }
       msgBannerSaveSaved(scope, cfg);
-      notify(cfg.enabled ? 'Banner applied' : 'Banner removed', '', 'var(--green)', 'fas fa-image');
+      notify(cfg.enabled ? 'Banner applied' : 'Banner removed — no border', '', 'var(--green)', 'fas fa-image');
     }
 
     function msgBannerRemoveFromEditor(scope) {
