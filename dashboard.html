@@ -22324,33 +22324,44 @@ ${plainText}`;
       bcRefreshVariablesPanel();
     }
 
-    // ── MESSAGE BANNER (Email HTML + WhatsApp header) ─────────────────────────
-    var MSG_BANNER_STORAGE_PREFIX = 'unicomm_banner_';
+    // ── MESSAGE BANNER (hero image + overlay, header bar, CTA — like MediCare-style emails) ──
+    var MSG_BANNER_STORAGE_PREFIX = 'unicomm_banner_v2_';
+    var MSG_BANNER_PANEL_VERSION = '3';
+    var _msgBannerImageDataCache = {};
     var MSG_BANNER_EDITORS = { bc: 'bc-html', et: 'et-html-editor', cl: 'cl-body-editor' };
     var MSG_BANNER_PRESETS = {
-      none: { id: 'none', label: 'No banner', enabled: false, headline: '', subheadline: '', footerLine: '', accentColor: '#0d9488', imageUrl: '' },
+      none: { id: 'none', label: 'No banner', enabled: false, layout: 'simple' },
       healthcare: {
-        id: 'healthcare', label: 'Healthcare', enabled: true,
-        headline: 'Smart Healthcare Infrastructure',
-        subheadline: 'Patient Care · Safety · Operational Efficiency',
+        id: 'healthcare', label: 'Healthcare Hero', enabled: true, layout: 'hero',
+        eyebrow: 'SMART HEALTHCARE · ELV SOLUTIONS',
+        headline: 'Infrastructure Care You Can Trust',
+        subheadline: 'Patient safety, uptime, and operational excellence for modern hospitals',
         footerLine: 'Unicircuit Engineering Services LLP · Healthcare ELV & Digital Solutions',
-        accentColor: '#0d9488', imageUrl: ''
+        accentColor: '#1d4ed8', overlayColor: '#1e3a8a',
+        imageUrl: 'https://images.unsplash.com/photo-1576091160399-112ba8d25d1d?w=1200&q=80',
+        heroHeight: 280, textAlign: 'left', showHeader: true, logoText: 'Unicircuit',
+        logoSubtext: 'ENGINEERING SERVICES LLP', headerBg: '#2563eb'
       },
       brand: {
-        id: 'brand', label: 'Unicircuit Brand', enabled: true,
+        id: 'brand', label: 'Unicircuit Brand', enabled: true, layout: 'simple',
         headline: 'Unicircuit Engineering Services LLP',
         subheadline: 'Switchgear · ELV · Smart Building · Industrial Automation',
         footerLine: 'Your partner for turnkey electrical & ELV projects across India',
         accentColor: '#e8820a', imageUrl: ''
       },
       custom: {
-        id: 'custom', label: 'Custom', enabled: true,
-        headline: 'Your headline', subheadline: 'Your subheadline', footerLine: '',
-        accentColor: '#2563eb', imageUrl: ''
+        id: 'custom', label: 'Custom', enabled: true, layout: 'hero',
+        eyebrow: 'YOUR TAGLINE HERE', headline: 'Your Main Headline',
+        subheadline: 'Supporting subheadline', accentColor: '#2563eb', overlayColor: '#1e3a8a',
+        heroHeight: 260, textAlign: 'left', imageUrl: ''
       }
     };
 
     function msgBannerStorageKey(scope) { return MSG_BANNER_STORAGE_PREFIX + scope; }
+
+    function msgBannerPick(cfg, preset, key, fallback) {
+      return cfg[key] !== undefined && cfg[key] !== null ? cfg[key] : (preset[key] !== undefined ? preset[key] : fallback);
+    }
 
     function msgBannerNormalizeConfig(cfg) {
       cfg = cfg || {};
@@ -22358,12 +22369,36 @@ ${plainText}`;
       return {
         enabled: cfg.enabled !== undefined ? !!cfg.enabled : !!preset.enabled,
         preset: cfg.preset || preset.id || 'custom',
-        headline: cfg.headline != null ? String(cfg.headline) : (preset.headline || ''),
-        subheadline: cfg.subheadline != null ? String(cfg.subheadline) : (preset.subheadline || ''),
-        footerLine: cfg.footerLine != null ? String(cfg.footerLine) : (preset.footerLine || ''),
-        accentColor: cfg.accentColor || preset.accentColor || '#0d9488',
-        imageUrl: cfg.imageUrl != null ? String(cfg.imageUrl) : (preset.imageUrl || '')
+        layout: msgBannerPick(cfg, preset, 'layout', 'hero'),
+        eyebrow: String(msgBannerPick(cfg, preset, 'eyebrow', '')),
+        headline: String(msgBannerPick(cfg, preset, 'headline', '')),
+        subheadline: String(msgBannerPick(cfg, preset, 'subheadline', '')),
+        footerLine: String(msgBannerPick(cfg, preset, 'footerLine', '')),
+        accentColor: msgBannerPick(cfg, preset, 'accentColor', '#2563eb'),
+        overlayColor: msgBannerPick(cfg, preset, 'overlayColor', '#1e3a8a'),
+        imageUrl: String(msgBannerPick(cfg, preset, 'imageUrl', '')),
+        imageDataUrl: String(msgBannerPick(cfg, preset, 'imageDataUrl', '')),
+        heroHeight: Math.max(180, Math.min(480, parseInt(msgBannerPick(cfg, preset, 'heroHeight', 280), 10) || 280)),
+        textAlign: ['left', 'center', 'right'].indexOf(cfg.textAlign) >= 0 ? cfg.textAlign : (preset.textAlign || 'left'),
+        showCta: !!msgBannerPick(cfg, preset, 'showCta', false),
+        ctaText: String(msgBannerPick(cfg, preset, 'ctaText', 'Learn More')),
+        ctaUrl: String(msgBannerPick(cfg, preset, 'ctaUrl', '#')),
+        ctaColor: msgBannerPick(cfg, preset, 'ctaColor', '#ffffff'),
+        ctaTextColor: msgBannerPick(cfg, preset, 'ctaTextColor', '#1d4ed8'),
+        showHeader: !!msgBannerPick(cfg, preset, 'showHeader', false),
+        showTopBar: !!msgBannerPick(cfg, preset, 'showTopBar', false),
+        topBarText: String(msgBannerPick(cfg, preset, 'topBarText', 'View this email in your browser')),
+        logoUrl: String(msgBannerPick(cfg, preset, 'logoUrl', '')),
+        logoText: String(msgBannerPick(cfg, preset, 'logoText', 'Unicircuit')),
+        logoSubtext: String(msgBannerPick(cfg, preset, 'logoSubtext', '')),
+        headerBg: msgBannerPick(cfg, preset, 'headerBg', '#2563eb'),
+        navLinks: String(msgBannerPick(cfg, preset, 'navLinks', 'Services, Contact'))
       };
+    }
+
+    function msgBannerResolveImage(cfg) {
+      var data = String(cfg.imageDataUrl || '').trim();
+      return data || String(cfg.imageUrl || '').trim();
     }
 
     function msgBannerLoadSaved(scope) {
@@ -22375,40 +22410,98 @@ ${plainText}`;
     }
 
     function msgBannerSaveSaved(scope, cfg) {
-      try { localStorage.setItem(msgBannerStorageKey(scope), JSON.stringify(msgBannerNormalizeConfig(cfg))); } catch (_) { }
+      cfg = msgBannerNormalizeConfig(cfg);
+      if (_msgBannerImageDataCache[scope]) cfg.imageDataUrl = _msgBannerImageDataCache[scope];
+      var toStore = Object.assign({}, cfg);
+      if (toStore.imageDataUrl && toStore.imageDataUrl.length > 180000) delete toStore.imageDataUrl;
+      try { localStorage.setItem(msgBannerStorageKey(scope), JSON.stringify(toStore)); } catch (_) { }
+    }
+
+    function msgBannerBuildTopBar(cfg) {
+      if (!cfg.showTopBar) return '';
+      return '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;max-width:600px;"><tr><td style="background:#0f172a;padding:6px 16px;font-size:10px;color:#94a3b8;text-align:center;">' + escHtml(cfg.topBarText) + '</td></tr></table>';
+    }
+
+    function msgBannerBuildHeader(cfg) {
+      if (!cfg.showHeader) return '';
+      var bg = cfg.headerBg || cfg.accentColor || '#2563eb';
+      var logoImg = cfg.logoUrl
+        ? '<img src="' + escAttr(cfg.logoUrl) + '" alt="" width="36" height="36" style="display:block;border-radius:50%;border:2px solid rgba(255,255,255,0.35);" />'
+        : '<div style="width:36px;height:36px;border-radius:50%;background:rgba(255,255,255,0.2);text-align:center;line-height:36px;font-size:16px;color:#fff;font-weight:800;">U</div>';
+      var nav = String(cfg.navLinks || '').split(',').map(function (s) { return s.trim(); }).filter(Boolean);
+      var navHtml = nav.map(function (link) {
+        return '<a href="#" style="color:#fff;font-size:12px;text-decoration:none;margin-left:14px;">' + escHtml(link) + '</a>';
+      }).join('');
+      return '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;max-width:600px;"><tr><td style="background:' + escAttr(bg) + ';padding:14px 20px;">'
+        + '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tr>'
+        + '<td valign="middle"><table role="presentation" cellpadding="0" cellspacing="0" border="0"><tr>'
+        + '<td valign="middle" style="padding-right:10px;">' + logoImg + '</td><td valign="middle">'
+        + '<div style="font-size:16px;font-weight:800;color:#fff;line-height:1.1;">' + escHtml(cfg.logoText) + '</div>'
+        + (cfg.logoSubtext ? '<div style="font-size:9px;color:#bfdbfe;letter-spacing:1px;margin-top:2px;">' + escHtml(cfg.logoSubtext) + '</div>' : '')
+        + '</td></tr></table></td><td valign="middle" align="right">' + navHtml + '</td></tr></table></td></tr></table>';
+    }
+
+    function msgBannerBuildHero(cfg) {
+      var img = msgBannerResolveImage(cfg);
+      var h = cfg.heroHeight || 280;
+      var overlay = cfg.overlayColor || '#1e3a8a';
+      var align = cfg.textAlign || 'left';
+      var ctaHtml = '';
+      if (cfg.showCta && cfg.ctaText) {
+        ctaHtml = '<table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin-top:14px;"><tr><td style="background:' + escAttr(cfg.ctaColor || '#fff') + ';border-radius:6px;padding:11px 22px;">'
+          + '<a href="' + escAttr(cfg.ctaUrl || '#') + '" style="color:' + escAttr(cfg.ctaTextColor || '#1d4ed8') + ';font-weight:700;font-size:13px;text-decoration:none;">'
+          + escHtml(cfg.ctaText) + ' &rsaquo;</a></td></tr></table>';
+      }
+      var bgAttr = img ? ' background="' + escAttr(img) + '"' : '';
+      var bgStyle = img ? 'background-image:url(\'' + img.replace(/'/g, '%27') + '\');background-size:cover;background-position:center;background-repeat:no-repeat;' : 'background-color:' + escAttr(cfg.accentColor || overlay) + ';';
+      var vmlStart = img ? '<!--[if gte mso 9]><v:rect xmlns:v="urn:schemas-microsoft-com:vml" fill="true" stroke="false" style="width:600px;height:' + h + 'px;"><v:fill type="frame" src="' + escAttr(img) + '" color="' + escAttr(overlay) + '" /><v:textbox inset="0,0,0,0"><![endif]-->' : '';
+      var vmlEnd = img ? '<!--[if gte mso 9]></v:textbox></v:rect><![endif]-->' : '';
+      return '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;max-width:600px;"><tr><td' + bgAttr + ' bgcolor="' + escAttr(overlay) + '" height="' + h + '" valign="middle" style="' + bgStyle + 'height:' + h + 'px;padding:0;">'
+        + vmlStart
+        + '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tr>'
+        + '<td width="58%" bgcolor="' + escAttr(overlay) + '" valign="middle" style="background-color:' + escAttr(overlay) + ';padding:28px 24px;text-align:' + align + ';">'
+        + (cfg.eyebrow ? '<div style="font-size:10px;font-weight:700;letter-spacing:2px;color:#93c5fd;margin-bottom:10px;text-transform:uppercase;">' + escHtml(cfg.eyebrow) + '</div>' : '')
+        + '<div style="font-size:26px;font-weight:800;color:#fff;line-height:1.2;font-family:Georgia,\'Times New Roman\',serif;">' + escHtml(cfg.headline) + '</div>'
+        + (cfg.subheadline ? '<div style="font-size:14px;color:#dbeafe;margin-top:10px;line-height:1.45;">' + escHtml(cfg.subheadline) + '</div>' : '')
+        + ctaHtml + '</td><td width="42%" style="font-size:0;line-height:0;">&nbsp;</td></tr></table>'
+        + vmlEnd + '</td></tr>'
+        + (cfg.footerLine ? '<tr><td style="background:#f8fafc;padding:10px 22px;border:1px solid #e2e8f0;font-size:11px;color:#64748b;text-align:center;">' + escHtml(cfg.footerLine) + '</td></tr>' : '')
+        + '</table>';
+    }
+
+    function msgBannerBuildSimple(cfg) {
+      var img = msgBannerResolveImage(cfg);
+      var accent = cfg.accentColor || '#0d9488';
+      var imageRow = img ? '<tr><td style="padding:0;line-height:0;font-size:0;"><img src="' + escAttr(img) + '" alt="" width="600" style="display:block;width:100%;max-width:600px;height:auto;border:0;" /></td></tr>' : '';
+      var radius = img ? '0' : '8px 8px 0 0';
+      return '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;max-width:600px;">' + imageRow
+        + '<tr><td style="background:' + escAttr(accent) + ';padding:18px 22px;border-radius:' + radius + ';">'
+        + '<div style="font-size:20px;font-weight:800;color:#fff;line-height:1.25;">' + escHtml(cfg.headline) + '</div>'
+        + (cfg.subheadline ? '<div style="font-size:13px;color:#e0f2fe;margin-top:6px;">' + escHtml(cfg.subheadline) + '</div>' : '')
+        + '</td></tr>'
+        + (cfg.footerLine ? '<tr><td style="background:#f8fafc;padding:8px 22px;border:1px solid #e2e8f0;font-size:11px;color:#475569;">' + escHtml(cfg.footerLine) + '</td></tr>' : '')
+        + '</table>';
     }
 
     function msgBannerBuildHtml(cfg) {
       cfg = msgBannerNormalizeConfig(cfg);
       if (!cfg.enabled) return '';
-      var headline = escHtml(cfg.headline || '');
-      var sub = escHtml(cfg.subheadline || '');
-      var footer = escHtml(cfg.footerLine || '');
-      var accent = cfg.accentColor || '#0d9488';
-      var imageUrl = String(cfg.imageUrl || '').trim();
-      var imageRow = '';
-      if (imageUrl) {
-        imageRow = '<tr><td style="padding:0;line-height:0;font-size:0;"><img src="' + escAttr(imageUrl) + '" alt="" width="600" style="display:block;width:100%;max-width:600px;height:auto;border:0;border-radius:8px 8px 0 0;" /></td></tr>';
-      }
-      var headlineRadius = imageUrl ? '0' : '8px 8px 0 0';
-      return '<div data-uc-banner="1" contenteditable="false" style="margin:0 0 14px 0;font-family:Arial,Helvetica,sans-serif;">'
-        + '<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="border-collapse:collapse;max-width:600px;">'
-        + imageRow
-        + '<tr><td style="background:' + escAttr(accent) + ';padding:18px 22px;border-radius:' + headlineRadius + ';">'
-        + '<div style="font-size:20px;font-weight:800;color:#ffffff;line-height:1.25;">' + headline + '</div>'
-        + (sub ? '<div style="font-size:13px;color:#e0f2fe;margin-top:6px;line-height:1.45;">' + sub + '</div>' : '')
-        + '</td></tr>'
-        + (footer ? '<tr><td style="background:#f8fafc;padding:8px 22px;border:1px solid #e2e8f0;border-top:none;border-radius:0 0 8px 8px;font-size:11px;color:#475569;">' + footer + '</td></tr>' : '')
-        + '</table></div>';
+      var parts = [];
+      if (cfg.showTopBar) parts.push(msgBannerBuildTopBar(cfg));
+      if (cfg.showHeader) parts.push(msgBannerBuildHeader(cfg));
+      parts.push((cfg.layout === 'hero' || cfg.layout === 'full') ? msgBannerBuildHero(cfg) : msgBannerBuildSimple(cfg));
+      return '<div data-uc-banner="1" contenteditable="false" style="margin:0 0 16px 0;font-family:Arial,Helvetica,sans-serif;max-width:600px;">' + parts.join('') + '</div>';
     }
 
     function msgBannerBuildWhatsAppText(cfg) {
       cfg = msgBannerNormalizeConfig(cfg);
       if (!cfg.enabled) return '';
       var lines = [];
+      if (cfg.eyebrow) lines.push('_' + String(cfg.eyebrow).trim() + '_');
       if (cfg.headline) lines.push('*' + String(cfg.headline).trim() + '*');
       if (cfg.subheadline) lines.push(String(cfg.subheadline).trim());
       if (cfg.footerLine) lines.push('_' + String(cfg.footerLine).trim() + '_');
+      if (cfg.showCta && cfg.ctaText) lines.push('👉 ' + String(cfg.ctaText).trim());
       if (!lines.length) return '';
       return lines.join('\n') + '\n────────────────\n\n';
     }
@@ -22427,50 +22520,102 @@ ${plainText}`;
 
     function msgBannerPanelHtml(scope) {
       var s = scope;
-      return '<div class="msg-banner-panel" data-banner-scope="' + s + '" style="border:1px solid var(--border2);border-radius:8px;overflow:hidden;margin-bottom:10px;background:rgba(13,148,136,0.04);">'
-        + '<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 12px;background:rgba(13,148,136,0.1);border-bottom:1px solid var(--border);cursor:pointer;" onclick="msgBannerTogglePanel(\'' + s + '\')">'
-        + '<span style="font-size:11px;font-weight:700;color:#14b8a6;text-transform:uppercase;letter-spacing:0.5px;"><i class="fas fa-image"></i> Header Banner</span>'
+      return '<div class="msg-banner-panel" data-banner-scope="' + s + '" style="border:1px solid rgba(37,99,235,0.25);border-radius:8px;overflow:hidden;margin-bottom:10px;background:rgba(37,99,235,0.04);">'
+        + '<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 12px;background:rgba(37,99,235,0.12);border-bottom:1px solid var(--border);cursor:pointer;" onclick="msgBannerTogglePanel(\'' + s + '\')">'
+        + '<span style="font-size:11px;font-weight:700;color:#60a5fa;text-transform:uppercase;letter-spacing:0.5px;"><i class="fas fa-panorama"></i> Email Banner Builder</span>'
         + '<span style="font-size:10px;color:var(--muted);"><i class="fas fa-chevron-down" id="' + s + '-banner-chevron"></i></span></div>'
-        + '<div id="' + s + '-banner-body" style="padding:10px 12px;display:block;">'
-        + '<label style="display:flex;align-items:center;gap:8px;font-size:12px;margin-bottom:8px;cursor:pointer;">'
-        + '<input type="checkbox" id="' + s + '-banner-enabled" onchange="msgBannerOnEnabledChange(\'' + s + '\')" /> Enable header banner</label>'
+        + '<div id="' + s + '-banner-body" style="padding:10px 12px;display:block;max-height:520px;overflow-y:auto;">'
+        + '<label style="display:flex;align-items:center;gap:8px;font-size:12px;margin-bottom:8px;cursor:pointer;"><input type="checkbox" id="' + s + '-banner-enabled" onchange="msgBannerOnEnabledChange(\'' + s + '\')" /> Enable banner</label>'
         + '<div id="' + s + '-banner-fields">'
-        + '<div class="form-row" style="gap:8px;margin-bottom:8px;">'
-        + '<div style="flex:1;"><label class="form-label">Preset</label>'
-        + '<select class="inp" id="' + s + '-banner-preset" style="font-size:12px;" onchange="msgBannerOnPresetChange(\'' + s + '\')">'
-        + '<option value="none">No banner</option><option value="healthcare">Healthcare</option><option value="brand">Unicircuit Brand</option><option value="custom">Custom</option>'
-        + '</select></div>'
-        + '<div style="width:90px;"><label class="form-label">Accent</label>'
-        + '<input type="color" class="inp" id="' + s + '-banner-accent" style="height:36px;padding:2px;" onchange="msgBannerOnFieldChange(\'' + s + '\')" /></div></div>'
-        + '<div class="form-group" style="margin-bottom:6px;"><label class="form-label">Headline</label>'
-        + '<input class="inp" id="' + s + '-banner-headline" style="font-size:12px;" oninput="msgBannerOnFieldChange(\'' + s + '\')" /></div>'
-        + '<div class="form-group" style="margin-bottom:6px;"><label class="form-label">Subheadline</label>'
-        + '<input class="inp" id="' + s + '-banner-subheadline" style="font-size:12px;" oninput="msgBannerOnFieldChange(\'' + s + '\')" /></div>'
-        + '<div class="form-group" style="margin-bottom:6px;"><label class="form-label">Footer line</label>'
-        + '<input class="inp" id="' + s + '-banner-footer" style="font-size:12px;" oninput="msgBannerOnFieldChange(\'' + s + '\')" /></div>'
-        + '<div class="form-group" id="' + s + '-banner-image-wrap" style="margin-bottom:8px;"><label class="form-label">Banner image URL <span style="font-weight:400;color:var(--muted);">(email only)</span></label>'
-        + '<input class="inp" id="' + s + '-banner-image" placeholder="https://…/banner.jpg" style="font-size:12px;" oninput="msgBannerOnFieldChange(\'' + s + '\')" /></div>'
-        + '<div id="' + s + '-banner-preview" style="margin-bottom:8px;border:1px solid var(--border);border-radius:6px;overflow:hidden;background:#fff;"></div>'
+        + '<div class="form-row" style="gap:8px;margin-bottom:8px;"><div style="flex:1;"><label class="form-label">Preset</label>'
+        + '<select class="inp" id="' + s + '-banner-preset" style="font-size:12px;" onchange="msgBannerOnPresetChange(\'' + s + '\')"><option value="none">No banner</option><option value="healthcare">Healthcare Hero</option><option value="brand">Brand bar</option><option value="custom">Custom</option></select></div>'
+        + '<div style="flex:1;"><label class="form-label">Layout</label>'
+        + '<select class="inp" id="' + s + '-banner-layout" style="font-size:12px;" onchange="msgBannerOnLayoutChange(\'' + s + '\')"><option value="hero">Hero image + overlay</option><option value="simple">Simple color bar</option></select></div></div>'
+        + '<div class="form-group" id="' + s + '-banner-image-wrap" style="margin-bottom:8px;"><label class="form-label">Hero background image</label>'
+        + '<div style="display:flex;gap:6px;align-items:center;"><input class="inp" id="' + s + '-banner-image" placeholder="https://…/photo.jpg" style="font-size:12px;flex:1;" oninput="msgBannerOnFieldChange(\'' + s + '\')" />'
+        + '<label class="btn btn-ghost btn-xs" style="cursor:pointer;white-space:nowrap;margin:0;"><i class="fas fa-upload"></i> Upload'
+        + '<input type="file" accept="image/*" style="display:none;" onchange="msgBannerImageUpload(\'' + s + '\',this)" /></label></div>'
+        + '<div style="font-size:10px;color:var(--muted);margin-top:4px;">Use a wide photo (1200×600+). Upload embeds in email; URL works for hosted images.</div></div>'
+        + '<div class="form-row" style="gap:8px;margin-bottom:6px;"><div style="flex:1;"><label class="form-label">Eyebrow (small caps)</label>'
+        + '<input class="inp" id="' + s + '-banner-eyebrow" placeholder="YOUR HEALTH, OUR PRIORITY" style="font-size:12px;" oninput="msgBannerOnFieldChange(\'' + s + '\')" /></div>'
+        + '<div style="width:72px;"><label class="form-label">Height</label>'
+        + '<input class="inp" id="' + s + '-banner-height" type="number" min="180" max="480" value="280" style="font-size:12px;" oninput="msgBannerOnFieldChange(\'' + s + '\')" /></div></div>'
+        + '<div class="form-group" style="margin-bottom:6px;"><label class="form-label">Headline</label><input class="inp" id="' + s + '-banner-headline" style="font-size:12px;" oninput="msgBannerOnFieldChange(\'' + s + '\')" /></div>'
+        + '<div class="form-group" style="margin-bottom:6px;"><label class="form-label">Subheadline</label><input class="inp" id="' + s + '-banner-subheadline" style="font-size:12px;" oninput="msgBannerOnFieldChange(\'' + s + '\')" /></div>'
+        + '<div class="form-row" style="gap:8px;margin-bottom:6px;"><div style="flex:1;"><label class="form-label">Overlay color</label><input type="color" class="inp" id="' + s + '-banner-overlay" style="height:36px;padding:2px;" onchange="msgBannerOnFieldChange(\'' + s + '\')" /></div>'
+        + '<div style="flex:1;"><label class="form-label">Accent / fallback</label><input type="color" class="inp" id="' + s + '-banner-accent" style="height:36px;padding:2px;" onchange="msgBannerOnFieldChange(\'' + s + '\')" /></div>'
+        + '<div style="width:100px;"><label class="form-label">Text align</label><select class="inp" id="' + s + '-banner-align" style="font-size:12px;" onchange="msgBannerOnFieldChange(\'' + s + '\')"><option value="left">Left</option><option value="center">Center</option><option value="right">Right</option></select></div></div>'
+        + '<div class="form-group" style="margin-bottom:6px;"><label class="form-label">Footer line</label><input class="inp" id="' + s + '-banner-footer" style="font-size:12px;" oninput="msgBannerOnFieldChange(\'' + s + '\')" /></div>'
+        + '<div style="border-top:1px solid var(--border);padding-top:8px;margin-bottom:8px;">'
+        + '<label style="display:flex;align-items:center;gap:8px;font-size:11.5px;margin-bottom:6px;cursor:pointer;"><input type="checkbox" id="' + s + '-banner-cta" onchange="msgBannerOnFieldChange(\'' + s + '\')" /> CTA button</label>'
+        + '<div id="' + s + '-banner-cta-fields" class="form-row" style="gap:6px;display:none;"><input class="inp" id="' + s + '-banner-cta-text" placeholder="Book Now" style="font-size:12px;flex:1;" oninput="msgBannerOnFieldChange(\'' + s + '\')" />'
+        + '<input class="inp" id="' + s + '-banner-cta-url" placeholder="https://…" style="font-size:12px;flex:1.2;" oninput="msgBannerOnFieldChange(\'' + s + '\')" />'
+        + '<input type="color" class="inp" id="' + s + '-banner-cta-bg" title="Button bg" style="width:44px;height:36px;padding:2px;" onchange="msgBannerOnFieldChange(\'' + s + '\')" />'
+        + '<input type="color" class="inp" id="' + s + '-banner-cta-fg" title="Button text" style="width:44px;height:36px;padding:2px;" onchange="msgBannerOnFieldChange(\'' + s + '\')" /></div></div>'
+        + '<div style="border-top:1px solid var(--border);padding-top:8px;margin-bottom:8px;">'
+        + '<div style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;margin-bottom:6px;">Header bar (optional)</div>'
+        + '<label style="display:flex;align-items:center;gap:8px;font-size:11.5px;margin-bottom:6px;cursor:pointer;"><input type="checkbox" id="' + s + '-banner-header" onchange="msgBannerOnFieldChange(\'' + s + '\')" /> Logo + nav bar above hero</label>'
+        + '<div id="' + s + '-banner-header-fields" style="display:none;">'
+        + '<div class="form-row" style="gap:6px;margin-bottom:6px;"><input class="inp" id="' + s + '-banner-logo-text" placeholder="Company name" style="font-size:12px;flex:1;" oninput="msgBannerOnFieldChange(\'' + s + '\')" />'
+        + '<input class="inp" id="' + s + '-banner-logo-sub" placeholder="Tagline under logo" style="font-size:12px;flex:1;" oninput="msgBannerOnFieldChange(\'' + s + '\')" /></div>'
+        + '<div class="form-row" style="gap:6px;margin-bottom:6px;"><input class="inp" id="' + s + '-banner-logo-url" placeholder="Logo image URL" style="font-size:12px;flex:1;" oninput="msgBannerOnFieldChange(\'' + s + '\')" />'
+        + '<input class="inp" id="' + s + '-banner-nav" placeholder="Nav links: Services, Contact" style="font-size:12px;flex:1;" oninput="msgBannerOnFieldChange(\'' + s + '\')" />'
+        + '<input type="color" class="inp" id="' + s + '-banner-header-bg" style="width:44px;height:36px;padding:2px;" onchange="msgBannerOnFieldChange(\'' + s + '\')" /></div></div>'
+        + '<label style="display:flex;align-items:center;gap:8px;font-size:11.5px;cursor:pointer;"><input type="checkbox" id="' + s + '-banner-topbar" onchange="msgBannerOnFieldChange(\'' + s + '\')" /> Thin top utility bar</label></div>'
+        + '<div id="' + s + '-banner-preview" style="margin:10px 0;border:1px solid var(--border);border-radius:6px;overflow:hidden;background:#fff;max-height:320px;overflow-y:auto;"></div>'
         + '<div style="display:flex;gap:6px;flex-wrap:wrap;">'
         + '<button type="button" class="btn btn-gold btn-xs" onclick="msgBannerApplyToEditor(\'' + s + '\')"><i class="fas fa-check"></i> Apply to message</button>'
-        + '<button type="button" class="btn btn-ghost btn-xs" onclick="msgBannerRemoveFromEditor(\'' + s + '\')"><i class="fas fa-times"></i> Remove banner</button>'
-        + '<button type="button" class="btn btn-ghost btn-xs" onclick="msgBannerSaveDefaults(\'' + s + '\')"><i class="fas fa-save"></i> Save as my default</button>'
+        + '<button type="button" class="btn btn-ghost btn-xs" onclick="msgBannerRemoveFromEditor(\'' + s + '\')"><i class="fas fa-times"></i> Remove</button>'
+        + '<button type="button" class="btn btn-ghost btn-xs" onclick="msgBannerSaveDefaults(\'' + s + '\')"><i class="fas fa-save"></i> Save default</button>'
         + '</div></div></div></div>';
     }
 
     function msgBannerMountPanel(scope) {
-      var wrapId = scope + '-banner-panel-wrap';
-      if (scope === 'bc') wrapId = 'bc-banner-panel-wrap';
-      if (scope === 'et') wrapId = 'et-banner-panel-wrap';
-      if (scope === 'nc') wrapId = 'nc-banner-panel-wrap';
+      var wrapId = scope === 'bc' ? 'bc-banner-panel-wrap' : scope === 'et' ? 'et-banner-panel-wrap' : scope === 'nc' ? 'nc-banner-panel-wrap' : scope + '-banner-panel-wrap';
       var wrap = document.getElementById(wrapId);
-      if (!wrap || wrap.dataset.mounted === '1') {
-        if (wrap && wrap.dataset.mounted === '1') msgBannerWriteForm(scope, msgBannerLoadSaved(scope));
+      if (!wrap) return;
+      if (wrap.dataset.bannerVersion !== MSG_BANNER_PANEL_VERSION) {
+        wrap.dataset.bannerVersion = MSG_BANNER_PANEL_VERSION;
+        wrap.dataset.mounted = '';
+      }
+      if (wrap.dataset.mounted === '1') {
+        msgBannerWriteForm(scope, msgBannerLoadSaved(scope));
         return;
       }
       wrap.innerHTML = msgBannerPanelHtml(scope);
       wrap.dataset.mounted = '1';
       msgBannerWriteForm(scope, msgBannerLoadSaved(scope));
+      msgBannerOnLayoutChange(scope);
+    }
+
+    function msgBannerImageUpload(scope, input) {
+      var file = input && input.files && input.files[0];
+      if (!file) return;
+      if (file.size > 2.5 * 1024 * 1024) {
+        notify('Image too large', 'Use under 2.5 MB or host URL instead', 'var(--red)', 'fas fa-exclamation-circle');
+        return;
+      }
+      var reader = new FileReader();
+      reader.onload = function () {
+        _msgBannerImageDataCache[scope] = reader.result;
+        var imgEl = document.getElementById(scope + '-banner-image');
+        if (imgEl) imgEl.value = '';
+        msgBannerOnFieldChange(scope);
+        notify('Image uploaded', 'Embedded in banner — click Apply to message', 'var(--green)', 'fas fa-check');
+      };
+      reader.readAsDataURL(file);
+      input.value = '';
+    }
+
+    function msgBannerOnLayoutChange(scope) {
+      var layout = (document.getElementById(scope + '-banner-layout') || {}).value || 'hero';
+      var heroFields = ['banner-eyebrow', 'banner-height', 'banner-overlay', 'banner-image-wrap'];
+      var isHero = layout === 'hero' || layout === 'full';
+      heroFields.forEach(function (suffix) {
+        var el = document.getElementById(scope + '-' + suffix);
+        if (el) el.style.display = isHero ? '' : 'none';
+      });
+      msgBannerUpdatePreview(scope);
     }
 
     function msgBannerTogglePanel(scope) {
@@ -22483,37 +22628,76 @@ ${plainText}`;
     }
 
     function msgBannerReadForm(scope) {
-      var enabledEl = document.getElementById(scope + '-banner-enabled');
-      var presetEl = document.getElementById(scope + '-banner-preset');
+      var g = function (id) { var el = document.getElementById(scope + '-' + id); return el ? el.value : ''; };
+      var c = function (id) { var el = document.getElementById(scope + '-' + id); return el ? el.checked : false; };
+      var saved = msgBannerLoadSaved(scope);
+      var imageUrl = g('banner-image');
+      var imageDataUrl = _msgBannerImageDataCache[scope] || saved.imageDataUrl || '';
       return msgBannerNormalizeConfig({
-        enabled: enabledEl ? enabledEl.checked : false,
-        preset: presetEl ? presetEl.value : 'none',
-        headline: (document.getElementById(scope + '-banner-headline') || {}).value,
-        subheadline: (document.getElementById(scope + '-banner-subheadline') || {}).value,
-        footerLine: (document.getElementById(scope + '-banner-footer') || {}).value,
-        accentColor: (document.getElementById(scope + '-banner-accent') || {}).value,
-        imageUrl: (document.getElementById(scope + '-banner-image') || {}).value
+        enabled: c('banner-enabled'),
+        preset: g('banner-preset') || 'none',
+        layout: g('banner-layout') || 'hero',
+        eyebrow: g('banner-eyebrow'),
+        headline: g('banner-headline'),
+        subheadline: g('banner-subheadline'),
+        footerLine: g('banner-footer'),
+        accentColor: g('banner-accent'),
+        overlayColor: g('banner-overlay'),
+        imageUrl: imageUrl,
+        imageDataUrl: imageDataUrl,
+        heroHeight: g('banner-height'),
+        textAlign: g('banner-align'),
+        showCta: c('banner-cta'),
+        ctaText: g('banner-cta-text'),
+        ctaUrl: g('banner-cta-url'),
+        ctaColor: g('banner-cta-bg'),
+        ctaTextColor: g('banner-cta-fg'),
+        showHeader: c('banner-header'),
+        showTopBar: c('banner-topbar'),
+        logoText: g('banner-logo-text'),
+        logoSubtext: g('banner-logo-sub'),
+        logoUrl: g('banner-logo-url'),
+        navLinks: g('banner-nav'),
+        headerBg: g('banner-header-bg')
       });
     }
 
     function msgBannerWriteForm(scope, cfg) {
       cfg = msgBannerNormalizeConfig(cfg);
-      var enabledEl = document.getElementById(scope + '-banner-enabled');
-      var presetEl = document.getElementById(scope + '-banner-preset');
+      var set = function (id, val) { var el = document.getElementById(scope + '-' + id); if (el) el.value = val != null ? val : ''; };
+      var setChk = function (id, val) { var el = document.getElementById(scope + '-' + id); if (el) el.checked = !!val; };
+      setChk('banner-enabled', cfg.enabled);
+      set('banner-preset', cfg.preset || 'none');
+      set('banner-layout', cfg.layout || 'hero');
+      set('banner-eyebrow', cfg.eyebrow);
+      set('banner-headline', cfg.headline);
+      set('banner-subheadline', cfg.subheadline);
+      set('banner-footer', cfg.footerLine);
+      set('banner-accent', cfg.accentColor || '#2563eb');
+      set('banner-overlay', cfg.overlayColor || '#1e3a8a');
+      set('banner-image', cfg.imageDataUrl ? '' : (cfg.imageUrl || ''));
+      set('banner-height', cfg.heroHeight || 280);
+      set('banner-align', cfg.textAlign || 'left');
+      setChk('banner-cta', cfg.showCta);
+      set('banner-cta-text', cfg.ctaText || 'Learn More');
+      set('banner-cta-url', cfg.ctaUrl || '#');
+      set('banner-cta-bg', cfg.ctaColor || '#ffffff');
+      set('banner-cta-fg', cfg.ctaTextColor || '#1d4ed8');
+      setChk('banner-header', cfg.showHeader);
+      setChk('banner-topbar', cfg.showTopBar);
+      set('banner-logo-text', cfg.logoText);
+      set('banner-logo-sub', cfg.logoSubtext);
+      set('banner-logo-url', cfg.logoUrl);
+      set('banner-nav', cfg.navLinks);
+      set('banner-header-bg', cfg.headerBg || '#2563eb');
       var fields = document.getElementById(scope + '-banner-fields');
-      if (enabledEl) enabledEl.checked = cfg.enabled;
-      if (presetEl) presetEl.value = cfg.preset || 'none';
-      var h = document.getElementById(scope + '-banner-headline');
-      var sub = document.getElementById(scope + '-banner-subheadline');
-      var foot = document.getElementById(scope + '-banner-footer');
-      var acc = document.getElementById(scope + '-banner-accent');
-      var img = document.getElementById(scope + '-banner-image');
-      if (h) h.value = cfg.headline || '';
-      if (sub) sub.value = cfg.subheadline || '';
-      if (foot) foot.value = cfg.footerLine || '';
-      if (acc) acc.value = cfg.accentColor || '#0d9488';
-      if (img) img.value = cfg.imageUrl || '';
       if (fields) fields.style.opacity = cfg.enabled ? '1' : '0.55';
+      var ctaFields = document.getElementById(scope + '-banner-cta-fields');
+      if (ctaFields) ctaFields.style.display = cfg.showCta ? 'flex' : 'none';
+      var headerFields = document.getElementById(scope + '-banner-header-fields');
+      if (headerFields) headerFields.style.display = cfg.showHeader ? 'block' : 'none';
+      if (cfg.imageDataUrl) _msgBannerImageDataCache[scope] = cfg.imageDataUrl;
+      msgBannerOnLayoutChange(scope);
       msgBannerUpdatePreview(scope);
     }
 
@@ -22808,7 +22992,12 @@ ${plainText}`;
         etRefreshVariablesPanel();
         var variable_fields = emailNormalizeVariableFields(etVariableFields);
         var banner_config = msgBannerReadForm('et');
-        var res = await fetch(url, { method: method, headers: getAuthHeaders(), body: JSON.stringify({ name, subject, html_body, category, variable_fields, banner_config }) });
+        var bannerToSave = Object.assign({}, banner_config);
+        if (bannerToSave.imageDataUrl && bannerToSave.imageDataUrl.length > 400000) {
+          delete bannerToSave.imageDataUrl;
+          notify('Banner image', 'Uploaded image applied in editor; use a URL to persist in saved template', 'var(--gold)', 'fas fa-info-circle');
+        }
+        var res = await fetch(url, { method: method, headers: getAuthHeaders(), body: JSON.stringify({ name, subject, html_body, category, variable_fields, banner_config: bannerToSave }) });
         var data = await res.json();
         if (res.ok) {
           etCurrentId = data.id;
