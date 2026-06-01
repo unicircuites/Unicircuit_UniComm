@@ -103,8 +103,8 @@ router.get('/chats', authenticate, async (req, res) => {
       SELECT
         c.id,
         c.account_phone,
-        c.name,
-        c.phone,
+        COALESCE(c.name, wc.name, wc.notify) AS name,
+        COALESCE(c.phone, wc.phone) AS phone,
         c.is_group,
         COALESCE(NULLIF(latest.body, ''), NULLIF(c.last_message, ''), c.last_message) AS last_message,
         COALESCE(latest.timestamp, c.last_time) AS last_time,
@@ -119,6 +119,9 @@ router.get('/chats', authenticate, async (req, res) => {
         ORDER BY m.timestamp DESC NULLS LAST
         LIMIT 1
       ) latest ON true
+      LEFT JOIN wa_contacts wc
+        ON wc.jid = c.id
+       AND wc.account_phone = c.account_phone
       WHERE c.account_phone = $1 AND (
         -- Groups: real WhatsApp groups only
         (c.id LIKE '%@g.us')
@@ -134,16 +137,13 @@ router.get('/chats', authenticate, async (req, res) => {
         -- This prevents duplicates when mobile (s.whatsapp.net) and web (LID) show same contact
         (
           c.id LIKE '%@lid'
-          AND c.name IS NOT NULL
-          AND c.name NOT LIKE '+%'
-          AND length(c.name) > 0
           AND NOT EXISTS (
             SELECT 1 FROM wa_chats c2
             WHERE c2.account_phone = $1
               AND c2.id LIKE '%@s.whatsapp.net'
               AND (
-                c2.name = c.name
-                OR (c.phone IS NOT NULL AND c2.phone = c.phone)
+                c2.name = COALESCE(c.name, wc.name, wc.notify)
+                OR (COALESCE(c.phone, wc.phone) IS NOT NULL AND c2.phone = COALESCE(c.phone, wc.phone))
               )
           )
         )
