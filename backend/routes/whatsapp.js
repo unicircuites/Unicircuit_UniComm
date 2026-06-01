@@ -7,6 +7,7 @@ const wa      = require('../services/whatsapp');
 const { authenticate } = require('../middleware/auth');
 
 const router = express.Router();
+const WA_DEBUG_ACCOUNT_SCOPE = String(process.env.WA_DEBUG_ACCOUNT_SCOPE || 'false').toLowerCase() === 'true';
 
 function connectedAccount(res) {
   const accountPhone = wa.getConnectedPhone();
@@ -91,6 +92,12 @@ router.get('/chats', authenticate, async (req, res) => {
   try {
     const accountPhone = connectedAccount(res);
     if (!accountPhone) return;
+    const totals = WA_DEBUG_ACCOUNT_SCOPE ? await pool.query(`
+      SELECT account_phone, COUNT(*)::int AS chats
+      FROM wa_chats
+      GROUP BY account_phone
+      ORDER BY chats DESC
+    `) : null;
     const result = await pool.query(`
       SELECT
         c.id,
@@ -150,6 +157,22 @@ router.get('/chats', authenticate, async (req, res) => {
       )
       ORDER BY last_time DESC NULLS LAST LIMIT 300
     `, [accountPhone]);
+    if (WA_DEBUG_ACCOUNT_SCOPE) {
+      const sample = result.rows.slice(0, 10).map(c => ({
+        id: c.id,
+        account_phone: c.account_phone,
+        name: c.name,
+        phone: c.phone,
+        is_group: c.is_group,
+        last_time: c.last_time,
+      }));
+      console.log('[WA-SCOPE] /api/wa/chats', {
+        connectedAccount: accountPhone,
+        returned: result.rowCount,
+        totalsByAccount: totals.rows,
+        sample,
+      });
+    }
     res.json(result.rows);
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
@@ -291,6 +314,27 @@ router.get('/messages/:jid', authenticate, async (req, res) => {
        ORDER BY m.timestamp ASC`,
       [jid, limit, lidNum, accountPhone, beforeIsValid ? before.toISOString() : null]
     );
+    if (WA_DEBUG_ACCOUNT_SCOPE) {
+      console.log('[WA-SCOPE] /api/wa/messages', {
+        connectedAccount: accountPhone,
+        jid,
+        returned: result.rowCount,
+        first: result.rows[0] ? {
+          id: result.rows[0].id,
+          chat_id: result.rows[0].chat_id,
+          account_phone: result.rows[0].account_phone,
+          sender: result.rows[0].sender,
+          timestamp: result.rows[0].timestamp,
+        } : null,
+        last: result.rows[result.rows.length - 1] ? {
+          id: result.rows[result.rows.length - 1].id,
+          chat_id: result.rows[result.rows.length - 1].chat_id,
+          account_phone: result.rows[result.rows.length - 1].account_phone,
+          sender: result.rows[result.rows.length - 1].sender,
+          timestamp: result.rows[result.rows.length - 1].timestamp,
+        } : null,
+      });
+    }
     const accPhone = accountPhone;
     await pool.query(`UPDATE wa_messages SET is_read=true WHERE chat_id=$1 AND account_phone=$2 AND from_me=false`, [jid, accPhone]);
     await pool.query(`UPDATE wa_chats SET unread=0 WHERE id=$1 AND account_phone=$2`, [jid, accPhone]);
