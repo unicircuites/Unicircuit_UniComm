@@ -835,15 +835,34 @@ async function startWA(options = {}) {
 
   // ── HISTORY SYNC ───────────────────────────────────────────────────────────────────────
   sock.ev.on('messaging-history.set', async ({ chats, contacts, messages, isLatest }) => {
+    const yieldEventLoop = () => new Promise(resolve => setImmediate(resolve));
+
     if (!SYNC_FULL_HISTORY) {
-      console.log('[WA] History sync chunk ignored because WA_SYNC_FULL_HISTORY is disabled');
-      if (isLatest) emit('wa:sync_complete', {});
+      console.log(`[WA] Directory sync chunk — chats=${chats.length} contacts=${contacts?.length || 0} messages skipped=${messages.length} isLatest=${isLatest}`);
+      if (contacts?.length) {
+        for (let i = 0; i < contacts.length; i++) {
+          await saveContact(contacts[i]);
+          if (i % 50 === 0) await yieldEventLoop();
+        }
+      }
+      for (let i = 0; i < chats.length; i++) {
+        const chat = chats[i];
+        if (!chat?.id || chat.id === 'status@broadcast') continue;
+        const isGroup = chat.id.endsWith('@g.us');
+        const name = isGroup
+          ? (chat.name || chat.subject || null)
+          : getContactName(chat.id, chat.name || chat.notify);
+        const ts = toDate(chat.conversationTimestamp);
+        await saveChat(chat.id, name, '', ts, 0, isGroup);
+        if (i % 50 === 0) await yieldEventLoop();
+      }
+      if (isLatest) {
+        await updateChatNames();
+        emit('wa:sync_complete', {});
+      }
       return;
     }
     console.log(`[WA] History chunk — chats=${chats.length} contacts=${contacts?.length || 0} messages=${messages.length} isLatest=${isLatest}`);
-
-    // Helper to yield the event loop to prevent blocking HTTP requests
-    const yieldEventLoop = () => new Promise(resolve => setImmediate(resolve));
 
     // 1. Save contacts FIRST (needed for name resolution)
     if (contacts?.length) {
