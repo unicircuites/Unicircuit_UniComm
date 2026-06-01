@@ -31,6 +31,7 @@ const https = require('https');
 const { Server } = require('socket.io');
 const rateLimit = require('express-rate-limit');
 const wa = require('./services/whatsapp');
+const waInventory = require('./services/whatsappInventory');
 const smdr = require('./services/matrixSmdr');
 const mktCron = require('./services/marketingCron');
 const taskNotifier = require('./services/taskNotifier');
@@ -551,6 +552,7 @@ server.listen(PORT, HOST, async () => {
 
     // 4. Maintenance & Schedulers
     mktCron.start(io);
+    waInventory.startDailyBackup(() => wa.getConnectedPhone());
     taskNotifier.start(pool);
 
     console.log('[System] ✅ All background services initialized.');

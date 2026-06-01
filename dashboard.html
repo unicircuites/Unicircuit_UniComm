@@ -5545,6 +5545,10 @@
                 Reload</button>
               <button class="btn btn-blue btn-xs" onclick="waOpenImport()" title="Import WhatsApp exported .txt chat"><i
                   class="fas fa-file-import"></i> Import Chat</button>
+              <button class="btn btn-ghost btn-xs" onclick="waCreateBackup()" title="Create a safe backup for the currently linked WhatsApp account"><i
+                  class="fas fa-archive"></i> Backup</button>
+              <button class="btn btn-ghost btn-xs" onclick="waOpenBackupInventory()" title="Load chats from a saved backup for this same WhatsApp account"><i
+                  class="fas fa-database"></i> Load DB</button>
               <button class="btn btn-red btn-xs" onclick="waLogout()"><i class="fas fa-sign-out-alt"></i>
                 Disconnect</button>
             </div>
@@ -6899,6 +6903,8 @@
         <button type="button" class="btn btn-ghost btn-xs" onmousedown="event.preventDefault()"
           onclick="previewEditorContent('bc-html')" title="Preview email full-screen"><i
             class="fas fa-eye"></i> Preview</button>
+        <button type="button" class="btn btn-ghost btn-xs" onmousedown="event.preventDefault()"
+          onclick="clearEditor('bc-html')" title="Clear editor content"><i class="fas fa-eraser"></i> Clear</button>
       </div>
       <div id="bc-html" contenteditable="true"
         style="min-height:180px;max-height:520px;overflow-y:auto;background:#fff;color:#222;font-family:Calibri,Arial,sans-serif;font-size:14px;line-height:1.6;padding:10px 12px 10px 28px;border:1px solid var(--border2);border-radius:0 0 8px 8px;outline:none;"
@@ -6976,6 +6982,7 @@
       <button class="btn btn-gold" style="flex:1;justify-content:center;" onclick="bcSendBroadcast()">
         <i class="fas fa-paper-plane"></i> Send Broadcast
       </button>
+      <button class="btn btn-ghost btn-xs" onclick="saveAsTemplate('bc-html', document.getElementById('bc-subject')?.value || '')"><i class="fas fa-file-alt"></i> Save as Template</button>
       <button class="btn btn-ghost" onclick="closeModal('broadcast-modal')">Cancel</button>
     </div>
     <div id="bc-status" style="margin-top:10px;font-size:12px;text-align:center;"></div>
@@ -11422,6 +11429,12 @@ Keep it concise and professional.`;
             bcSaveSelection();
           }
           if (sel) sel.value = '';
+          // Restore banner config if present
+          if (t.banner_config && typeof msgBannerMountPanel === 'function') {
+            msgBannerMountPanel('cl');
+            msgBannerWriteForm('cl', t.banner_config);
+            setTimeout(function () { msgBannerApplyToEditor('cl'); }, 50);
+          }
           notify('Template appended', t.name, 'var(--blue)', 'fas fa-file-alt');
         }).catch(function (err) {
           notify('Template', err.message || 'Could not append template', 'var(--red)', 'fas fa-exclamation-circle');
@@ -12423,6 +12436,7 @@ Best regards,<br>
               <button type="button" class="btn btn-ghost btn-xs" onmousedown="bcToolbarMousedown(event,'cl-body-editor')" onclick="bcInsertSignature()" title="Signature"><i class="fas fa-signature"></i> Signature</button>
               <button type="button" class="btn btn-ghost btn-xs" onmousedown="bcToolbarMousedown(event,'cl-body-editor')" onclick="openInsertHtmlModal('cl-body-editor')" title="Insert HTML"><i class="fas fa-code"></i> HTML</button>
               <button type="button" class="btn btn-ghost btn-xs" onmousedown="event.preventDefault()" onclick="previewEditorContent('cl-body-editor')" title="Preview"><i class="fas fa-eye"></i> Preview</button>
+              <button type="button" class="btn btn-ghost btn-xs" onmousedown="event.preventDefault()" onclick="clearEditor('cl-body-editor')" title="Clear editor content"><i class="fas fa-eraser"></i> Clear</button>
             </div>
             <div id="cl-body-editor" contenteditable="true"
               style="min-height:220px;max-height:520px;overflow-y:auto;background:#fff;color:#222;font-family:Calibri,Arial,sans-serif;font-size:14px;line-height:1.6;padding:10px 12px 10px 28px;border:1px solid var(--border2);border-radius:0 0 8px 8px;outline:none;"
@@ -12440,6 +12454,7 @@ Best regards,<br>
               onclick="campaignLaunchSend(${campaignId}, ${groupId ? groupId : 'null'})">
               <i class="fas fa-rocket"></i> Send Now
             </button>
+            <button class="btn btn-ghost btn-xs" onclick="saveAsTemplate('cl-body-editor', document.getElementById('cl-subject')?.value || '')"><i class="fas fa-file-alt"></i> Save as Template</button>
             <button class="btn btn-ghost" onclick="document.getElementById('camp-launch-overlay').style.display='none'">
               Cancel
             </button>
@@ -19172,6 +19187,21 @@ ${plainText}`;
 
           notify('Template applied', t.name, 'var(--blue2)', 'fas fa-file-alt');
 
+          // Restore banner config if present
+          if (t.banner_config && typeof msgBannerMountPanel === 'function') {
+            msgBannerMountPanel('bc');
+            msgBannerWriteForm('bc', t.banner_config);
+            setTimeout(function () { msgBannerApplyToEditor('bc'); }, 50);
+          }
+
+          // Restore variable fields if present
+          if (t.variable_fields && t.variable_fields.length && typeof emailNormalizeVariableFields === 'function') {
+            if (typeof bcVariableFields !== 'undefined') {
+              bcVariableFields = emailNormalizeVariableFields(t.variable_fields);
+              if (typeof bcRefreshVariablesPanel === 'function') bcRefreshVariablesPanel();
+            }
+          }
+
           // Reset dropdown
           sel.value = '';
         })
@@ -21804,6 +21834,84 @@ ${plainText}`;
       if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fas fa-sync-alt"></i> Sync'; }
     }
 
+    async function waCreateBackup() {
+      try {
+        notify('Creating WhatsApp backup...', 'Saving current account chats, messages, contacts and media', 'var(--gold)', 'fas fa-archive');
+        var res = await fetch(API_BASE + '/wa/backups/create', { method: 'POST', headers: getAuthHeaders() });
+        var data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Backup failed');
+        var c = data.counts || {};
+        notify('WhatsApp backup created', (c.chats || 0) + ' chats · ' + (c.messages || 0) + ' messages · ' + (data.mediaFiles || 0) + ' media files', 'var(--green2)', 'fas fa-check-circle');
+      } catch (err) {
+        notify('Backup failed', err.message || 'Could not create WhatsApp backup', 'var(--red)', 'fas fa-exclamation-circle');
+      }
+    }
+
+    async function waOpenBackupInventory() {
+      openModal('wa-backup-modal');
+      await waLoadBackupInventory();
+    }
+
+    function waBackupDateText(value) {
+      if (!value) return '';
+      try { return new Date(value).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' }); }
+      catch (_) { return String(value); }
+    }
+
+    async function waLoadBackupInventory() {
+      var listEl = document.getElementById('wa-backup-list');
+      var statusEl = document.getElementById('wa-backup-status');
+      if (statusEl) statusEl.textContent = '';
+      if (listEl) listEl.innerHTML = '<div style="padding:16px;color:var(--muted);font-size:12px;"><span class="spin-loader"></span> Loading backups...</div>';
+      try {
+        var res = await fetch(API_BASE + '/wa/backups?_=' + Date.now(), { headers: getAuthHeaders(), cache: 'no-store' });
+        var backups = await res.json();
+        if (!res.ok) throw new Error(backups.error || 'Could not load backups');
+        if (!Array.isArray(backups) || !backups.length) {
+          if (listEl) listEl.innerHTML = '<div style="padding:18px;color:var(--muted);font-size:12.5px;text-align:center;">No backups found for this linked WhatsApp account.</div>';
+          return;
+        }
+        if (listEl) {
+          listEl.innerHTML = backups.map(function (b) {
+            var c = b.counts || {};
+            return '<div style="padding:12px 14px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px;">' +
+              '<div style="width:34px;height:34px;border-radius:8px;background:rgba(37,211,102,0.12);display:flex;align-items:center;justify-content:center;color:#25D366;"><i class="fas fa-database"></i></div>' +
+              '<div style="flex:1;min-width:0;">' +
+              '<div style="font-size:12.5px;font-weight:700;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + escHtml(b.fileName || '') + '</div>' +
+              '<div style="font-size:11px;color:var(--muted);margin-top:2px;">' + escHtml(b.accountPhone || '') + ' · ' + waBackupDateText(b.createdAt) + ' · ' + (c.chats || 0) + ' chats · ' + (c.messages || 0) + ' messages · ' + (b.mediaFiles || 0) + ' media</div>' +
+              '</div>' +
+              '<button class="btn btn-blue btn-xs" onclick="waLoadBackupFromInventory(\'' + String(b.fileName || '').replace(/'/g, "\\'") + '\')"><i class="fas fa-upload"></i> Load</button>' +
+              '</div>';
+          }).join('');
+        }
+      } catch (err) {
+        if (listEl) listEl.innerHTML = '<div style="padding:18px;color:var(--red2);font-size:12.5px;">' + escHtml(err.message || 'Could not load backups') + '</div>';
+      }
+    }
+
+    async function waLoadBackupFromInventory(fileName) {
+      if (!fileName) return;
+      if (!confirm('Load this WhatsApp backup into the currently connected account? Current DB chats for this same account will be replaced. Backups from another account are blocked automatically.')) return;
+      var statusEl = document.getElementById('wa-backup-status');
+      if (statusEl) statusEl.innerHTML = '<span class="spin-loader"></span> Loading backup...';
+      try {
+        var res = await fetch(API_BASE + '/wa/backups/load', {
+          method: 'POST',
+          headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
+          body: JSON.stringify({ fileName: fileName })
+        });
+        var data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Load failed');
+        if (statusEl) statusEl.innerHTML = '<span style="color:var(--green2);"><i class="fas fa-check-circle"></i> Backup loaded</span>';
+        notify('WhatsApp backup loaded', (data.inserted?.wa_chats || 0) + ' chats · ' + (data.inserted?.wa_messages || 0) + ' messages', 'var(--green2)', 'fas fa-check-circle');
+        closeModal('wa-backup-modal');
+        await waLoadChats({ force: true });
+      } catch (err) {
+        if (statusEl) statusEl.innerHTML = '<span style="color:var(--red2);">' + escHtml(err.message || 'Load failed') + '</span>';
+        notify('Backup load blocked', err.message || 'Could not load backup', 'var(--red)', 'fas fa-exclamation-circle');
+      }
+    }
+
 
     async function waLogout() {
       if (!confirm('Disconnect WhatsApp? You will need to scan QR again.\n\nThis will remove the device from your phone\'s linked devices.')) return;
@@ -22351,6 +22459,17 @@ ${plainText}`;
         heroHeight: 280, textAlign: 'left', showHeader: true, logoText: 'Unicircuit',
         logoSubtext: 'ENGINEERING SERVICES LLP', headerBg: '#2563eb'
       },
+      forest: {
+        id: 'forest', label: 'Forest & Wildlife Hero', enabled: true, layout: 'hero',
+        eyebrow: 'SMART SURVEILLANCE · ANTI-POACHING · IoT',
+        headline: 'Protecting Forests. Empowering Rangers.',
+        subheadline: 'Intelligent monitoring and protection infrastructure for forest departments, tiger reserves, and environmental agencies',
+        footerLine: 'Unicircuit Engineering Services LLP · Forest & Wildlife Smart Surveillance Solutions',
+        accentColor: '#166534', overlayColor: '#14532d',
+        imageUrl: 'https://images.unsplash.com/photo-1448375240586-882707db888b?w=1200&q=80',
+        heroHeight: 280, textAlign: 'left', showHeader: true, logoText: 'Unicircuit',
+        logoSubtext: 'ENGINEERING SERVICES LLP', headerBg: '#15803d'
+      },
       brand: {
         id: 'brand', label: 'Unicircuit Brand', enabled: true, layout: 'simple',
         headline: 'Unicircuit Engineering Services LLP',
@@ -22468,11 +22587,11 @@ ${plainText}`;
       return '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;width:100%;"><tr><td' + bgAttr + ' bgcolor="' + escAttr(overlay) + '" height="' + h + '" valign="middle" style="' + bgStyle + 'height:' + h + 'px;padding:0;">'
         + vmlStart
         + '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tr>'
-        + '<td width="58%" bgcolor="' + escAttr(overlay) + '" valign="middle" style="background-color:' + escAttr(overlay) + ';padding:28px 24px;text-align:' + align + ';">'
-        + (cfg.eyebrow ? '<div style="font-size:10px;font-weight:700;letter-spacing:2px;color:#93c5fd;margin-bottom:10px;text-transform:uppercase;">' + escHtml(cfg.eyebrow) + '</div>' : '')
-        + '<div style="font-size:26px;font-weight:800;color:#fff;line-height:1.2;font-family:Georgia,\'Times New Roman\',serif;">' + escHtml(cfg.headline) + '</div>'
-        + (cfg.subheadline ? '<div style="font-size:14px;color:#dbeafe;margin-top:10px;line-height:1.45;">' + escHtml(cfg.subheadline) + '</div>' : '')
-        + ctaHtml + '</td><td width="42%" style="font-size:0;line-height:0;">&nbsp;</td></tr></table>'
+        + '<td width="348" bgcolor="' + escAttr(overlay) + '" valign="middle" style="width:348px;background-color:' + escAttr(overlay) + ';padding:28px 24px;text-align:' + align + ';">'
+        + (cfg.eyebrow ? '<div style="font-size:10px;font-weight:700;letter-spacing:1.5px;color:#93c5fd;margin-bottom:10px;text-transform:uppercase;white-space:normal;word-break:break-word;overflow-wrap:break-word;line-height:1.5;">' + escHtml(cfg.eyebrow) + '</div>' : '')
+        + '<div style="font-size:26px;font-weight:800;color:#fff;line-height:1.2;font-family:Georgia,\'Times New Roman\',serif;white-space:normal;word-break:break-word;overflow-wrap:break-word;">' + escHtml(cfg.headline) + '</div>'
+        + (cfg.subheadline ? '<div style="font-size:14px;color:#dbeafe;margin-top:10px;line-height:1.45;white-space:normal;word-break:break-word;overflow-wrap:break-word;">' + escHtml(cfg.subheadline) + '</div>' : '')
+        + ctaHtml + '</td><td style="font-size:0;line-height:0;">&nbsp;</td></tr></table>'
         + vmlEnd + '</td></tr>'
         + '</table>';
     }
@@ -22628,7 +22747,7 @@ ${plainText}`;
         + '<label style="display:flex;align-items:center;gap:8px;font-size:12px;margin-bottom:8px;cursor:pointer;"><input type="checkbox" id="' + s + '-banner-enabled" onchange="msgBannerOnEnabledChange(\'' + s + '\')" /> Enable banner</label>'
         + '<div id="' + s + '-banner-fields">'
         + '<div class="form-row" style="gap:8px;margin-bottom:8px;"><div style="flex:1;"><label class="form-label">Preset</label>'
-        + '<select class="inp" id="' + s + '-banner-preset" style="font-size:12px;" onchange="msgBannerOnPresetChange(\'' + s + '\')"><option value="none">No banner</option><option value="healthcare">Healthcare Hero</option><option value="brand">Brand bar</option><option value="custom">Custom</option></select></div>'
+        + '<select class="inp" id="' + s + '-banner-preset" style="font-size:12px;" onchange="msgBannerOnPresetChange(\'' + s + '\')"><option value="none">No banner</option><option value="healthcare">Healthcare Hero</option><option value="forest">Forest &amp; Wildlife Hero</option><option value="brand">Brand bar</option><option value="custom">Custom</option></select></div>'
         + '<div style="flex:1;"><label class="form-label">Layout</label>'
         + '<select class="inp" id="' + s + '-banner-layout" style="font-size:12px;" onchange="msgBannerOnLayoutChange(\'' + s + '\')"><option value="hero">Hero image + overlay</option><option value="simple">Simple color bar</option></select></div></div>'
         + '<div class="form-group" id="' + s + '-banner-image-wrap" style="margin-bottom:8px;"><label class="form-label">Hero background image</label>'
@@ -23083,6 +23202,93 @@ ${plainText}`;
       document.querySelectorAll('.template-card').forEach(function (c) { c.style.borderColor = ''; });
     }
 
+    // ── SAVE AS TEMPLATE (from any editor context) ────────────────────────────
+    async function saveAsTemplate(editorId, defaultSubject) {
+      var editorEl = document.getElementById(editorId);
+      if (!editorEl) { notify('Editor not found', '', 'error', 'fas fa-times-circle'); return; }
+      var html = editorEl.innerHTML || '';
+      if (!html.trim() || html.trim() === '<br>') {
+        notify('Nothing to save', 'The editor is empty.', 'warning', 'fas fa-exclamation-triangle');
+        return;
+      }
+
+      // Build a small inline prompt dialog
+      var existing = document.getElementById('sat-dialog');
+      if (existing) existing.remove();
+
+      var dialog = document.createElement('div');
+      dialog.id = 'sat-dialog';
+      dialog.style.cssText = 'position:fixed;inset:0;z-index:99999;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,0.55);';
+      dialog.innerHTML = '<div style="background:var(--card);border:1px solid var(--border2);border-radius:12px;padding:22px 24px;width:380px;max-width:94vw;box-shadow:0 8px 40px rgba(0,0,0,0.5);">'
+        + '<div style="font-size:14px;font-weight:700;color:var(--text);margin-bottom:14px;"><i class="fas fa-file-alt" style="color:var(--gold);margin-right:8px;"></i>Save as Template</div>'
+        + '<label class="form-label">Template Name *</label>'
+        + '<input id="sat-name" class="inp" placeholder="e.g. Forest Introduction Email" style="margin-bottom:10px;" value="' + (defaultSubject || '').replace(/"/g, '&quot;') + '" />'
+        + '<label class="form-label">Subject</label>'
+        + '<input id="sat-subject" class="inp" placeholder="Email subject line" style="margin-bottom:10px;" value="' + (defaultSubject || '').replace(/"/g, '&quot;') + '" />'
+        + '<label class="form-label">Category</label>'
+        + '<select id="sat-category" class="inp" style="margin-bottom:16px;">'
+        + '<option>General</option><option>Product</option><option>Follow-up</option>'
+        + '<option>Newsletter</option><option>Promotion</option><option>Announcement</option>'
+        + '<option>Healthcare</option><option>Forest &amp; Environment</option>'
+        + '</select>'
+        + '<div style="display:flex;gap:8px;">'
+        + '<button class="btn btn-gold" style="flex:1;justify-content:center;" onclick="satConfirmSave(\'' + editorId + '\')">'
+        + '<i class="fas fa-save"></i> Save</button>'
+        + '<button class="btn btn-ghost" onclick="document.getElementById(\'sat-dialog\').remove()">Cancel</button>'
+        + '</div>'
+        + '<div id="sat-status" style="font-size:11px;margin-top:8px;text-align:center;"></div>'
+        + '</div>';
+      document.body.appendChild(dialog);
+      setTimeout(function () { var n = document.getElementById('sat-name'); if (n) { n.focus(); n.select(); } }, 50);
+    }
+
+    async function satConfirmSave(editorId) {
+      var name = (document.getElementById('sat-name') || {}).value || '';
+      var subject = (document.getElementById('sat-subject') || {}).value || '';
+      var category = (document.getElementById('sat-category') || {}).value || 'General';
+      var statusEl = document.getElementById('sat-status');
+
+      name = name.trim();
+      if (!name) {
+        if (statusEl) { statusEl.style.color = 'var(--red2)'; statusEl.textContent = 'Template name is required.'; }
+        document.getElementById('sat-name').focus();
+        return;
+      }
+
+      var editorEl = document.getElementById(editorId);
+      var html = editorEl ? (editorEl.innerHTML || '') : '';
+
+      // Capture banner_config from the matching scope
+      var scopeMap = { 'bc-html': 'bc', 'cl-body-editor': 'cl', 'et-html-editor': 'et' };
+      var scope = scopeMap[editorId] || null;
+      var banner_config = null;
+      if (scope && typeof msgBannerReadForm === 'function') {
+        try { banner_config = msgBannerReadForm(scope); } catch (_) { }
+      }
+
+      if (statusEl) { statusEl.style.color = 'var(--muted)'; statusEl.textContent = 'Saving…'; }
+
+      try {
+        var resp = await fetch(API_BASE + '/templates', {
+          method: 'POST',
+          headers: getAuthHeaders(),
+          body: JSON.stringify({ name: name, subject: subject, html_body: html, category: category, banner_config: banner_config })
+        });
+        var data = await resp.json();
+        if (!resp.ok) throw new Error(data.error || 'Save failed');
+        var dialog = document.getElementById('sat-dialog');
+        if (dialog) dialog.remove();
+        notify('Template saved', '"' + name + '" added to your templates.', 'success', 'fas fa-check-circle');
+        // Refresh template pickers in all open editors
+        if (typeof loadComposeTemplates === 'function') loadComposeTemplates();
+        if (typeof bcLoadTemplates === 'function') bcLoadTemplates();
+        if (typeof clLoadTemplates === 'function') clLoadTemplates();
+        if (typeof etLoadTemplates === 'function') etLoadTemplates();
+      } catch (e) {
+        if (statusEl) { statusEl.style.color = 'var(--red2)'; statusEl.textContent = e.message || 'Error saving template.'; }
+      }
+    }
+
     async function etSaveTemplate() {
       var name = document.getElementById('et-name').value.trim();
       var subject = document.getElementById('et-subject').value.trim();
@@ -23121,32 +23327,44 @@ ${plainText}`;
     }
 
     async function etDeleteTemplate() {
-      if (!etCurrentId) return;
-      // Show styled warning modal instead of browser confirm()
-      var tname = document.getElementById('et-name') ? document.getElementById('et-name').value : 'this template';
-      document.getElementById('et-del-tname').textContent = '"' + (tname || 'this template') + '"';
+      if (!etCurrentId) {
+        notify('No template selected', 'Load a template first, then delete it.', 'var(--red2)', 'fas fa-exclamation-circle');
+        return;
+      }
+      var tname = (document.getElementById('et-name') || {}).value || 'this template';
+      var el = document.getElementById('et-del-tname');
+      if (el) el.textContent = '"' + tname + '"';
+      _etDeletePrevId = null; // deleting the loaded template, not a card
       openModal('et-delete-modal');
     }
 
     // Delete directly from card (without loading the template first)
+    var _etDeletePrevId = null; // tracks previous etCurrentId when deleting from card
     async function etDeleteFromCard(id, name) {
-      document.getElementById('et-del-tname').textContent = '"' + (name || 'this template') + '"';
-      // Temporarily set etCurrentId so etConfirmDelete works
-      var prevId = etCurrentId;
+      var el = document.getElementById('et-del-tname');
+      if (el) el.textContent = '"' + (name || 'this template') + '"';
+      _etDeletePrevId = etCurrentId; // save so we can restore on cancel
       etCurrentId = id;
       openModal('et-delete-modal');
-      // If user cancels, restore previous id
-      var cancelBtn = document.querySelector('#et-delete-modal .btn-ghost');
-      if (cancelBtn) {
-        var origCancel = cancelBtn.onclick;
-        cancelBtn.onclick = function () { etCurrentId = prevId; closeModal('et-delete-modal'); cancelBtn.onclick = origCancel; };
+    }
+
+    function etCancelDelete() {
+      // Restore previous id if we were deleting from card without loading
+      if (_etDeletePrevId !== undefined && _etDeletePrevId !== null) {
+        etCurrentId = _etDeletePrevId;
       }
+      _etDeletePrevId = null;
+      closeModal('et-delete-modal');
     }
 
     async function etConfirmDelete() {
       closeModal('et-delete-modal');
+      var idToDelete = etCurrentId;
+      _etDeletePrevId = null;
+      if (!idToDelete) return;
       try {
-        await fetch(API_BASE + '/templates/' + etCurrentId, { method: 'DELETE', headers: getAuthHeaders() });
+        var res = await fetch(API_BASE + '/templates/' + idToDelete, { method: 'DELETE', headers: getAuthHeaders() });
+        if (!res.ok) throw new Error('Delete failed');
         etNewTemplate();
         etLoadTemplates();
         notify('Template deleted', '', 'var(--red)', 'fas fa-trash');
@@ -25357,6 +25575,14 @@ ${plainText}`;
         '<body>' + content + '</body></html>';
       const overlay = document.getElementById('html-preview-modal');
       if (overlay) overlay.classList.add('open');
+    }
+
+    function clearEditor(editorId) {
+      var ed = document.getElementById(editorId);
+      if (!ed) return;
+      if (!confirm('Clear all content in this editor?')) return;
+      ed.innerHTML = '';
+      ed.focus();
     }
 
     // ── Matrix PBX Telephony Integration ─────────────────────────────────────────
@@ -28533,6 +28759,8 @@ ${plainText}`;
           <button type="button" class="btn btn-ghost btn-xs" onmousedown="event.preventDefault()"
             onclick="previewEditorContent('compose-body')" title="Preview email full-screen"><i class="fas fa-eye"></i>
             Preview</button>
+          <button type="button" class="btn btn-ghost btn-xs" onmousedown="event.preventDefault()"
+            onclick="clearEditor('compose-body')" title="Clear editor content"><i class="fas fa-eraser"></i> Clear</button>
         </div>
         <div id="compose-body" contenteditable="true" class="compose-editor-body" placeholder="Write your message…"
           onmouseup="composeSaveSelection();composeUpdateToolbarState()"
@@ -28549,6 +28777,7 @@ ${plainText}`;
               Clear</button>
             <button type="button" class="btn btn-ghost btn-xs" onclick="saveComposeDraft(true)"><i
                 class="fas fa-save"></i> Save Draft</button>
+            <button type="button" class="btn btn-ghost btn-xs" onclick="saveAsTemplate('compose-body', document.getElementById('compose-subject')?.value || '')"><i class="fas fa-file-alt"></i> Save as Template</button>
             <label class="btn btn-ghost btn-xs" style="cursor:pointer;margin:0;" title="Attach files (max 25 MB total, like Outlook)">
               <i class="fas fa-paperclip"></i> Attach
               <input type="file" id="compose-file-input" multiple accept="*/*" style="display:none;"
@@ -28773,6 +29002,8 @@ ${plainText}`;
                 <option>Newsletter</option>
                 <option>Promotion</option>
                 <option>Announcement</option>
+                <option>Healthcare</option>
+                <option>Forest &amp; Environment</option>
               </select>
             </div>
           </div>
@@ -28913,6 +29144,8 @@ Preview shows final Outlook-compatible version"><i class="fas fa-code"></i> HTML
               title="Header banner settings"><i class="fas fa-image"></i> Banner</button>
             <button class="btn btn-ghost btn-xs" onmousedown="event.preventDefault()" onclick="etPreviewTemplate()"
               title="Preview"><i class="fas fa-eye"></i> Preview</button>
+            <button class="btn btn-ghost btn-xs" onmousedown="event.preventDefault()" onclick="clearEditor('et-html-editor');etMarkDirty();"
+              title="Clear editor content"><i class="fas fa-eraser"></i> Clear</button>
             <button class="btn btn-ghost btn-xs" onmousedown="event.preventDefault()" onclick="etUseInBroadcast()"
               title="Use in Broadcast"><i class="fas fa-paper-plane"></i> Use</button>
           </div>
@@ -28971,6 +29204,26 @@ Preview shows final Outlook-compatible version"><i class="fas fa-code"></i> HTML
         <button class="btn btn-gold btn-sm" onclick="etUseInBroadcast()"><i class="fas fa-paper-plane"></i> Use in
           Broadcast</button>
         <button class="btn btn-ghost btn-sm" onclick="closeModal('et-preview-modal')">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Template Delete Confirm Modal -->
+  <div class="modal-overlay" id="et-delete-modal">
+    <div class="modal" style="max-width:420px;">
+      <div class="modal-title">
+        <span><i class="fas fa-trash" style="color:var(--red2);margin-right:8px;"></i>Delete Template</span>
+        <span class="modal-close" onclick="etCancelDelete()"><i class="fas fa-times"></i></span>
+      </div>
+      <p style="font-size:13.5px;color:var(--text);margin:0 0 18px 0;">
+        Are you sure you want to delete <strong id="et-del-tname"></strong>?<br>
+        <span style="font-size:12px;color:var(--muted);">This cannot be undone.</span>
+      </p>
+      <div style="display:flex;gap:8px;">
+        <button class="btn btn-red" style="flex:1;justify-content:center;" onclick="etConfirmDelete()">
+          <i class="fas fa-trash"></i> Yes, Delete
+        </button>
+        <button class="btn btn-ghost" onclick="etCancelDelete()">Cancel</button>
       </div>
     </div>
   </div>
@@ -29333,6 +29586,39 @@ Nagpur, Maharashtra, 440017, India<br>
           </div>
         </div>
       </div>
+    </div>
+  </div>
+
+  <div id="wa-backup-modal" class="modal-overlay"
+    style="display:none;position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,0.7);align-items:center;justify-content:center;backdrop-filter:blur(4px);">
+    <div
+      style="background:var(--card);border:1px solid var(--border);border-radius:14px;padding:0;width:620px;max-width:96vw;max-height:90vh;overflow:auto;box-shadow:0 20px 60px rgba(0,0,0,0.6);animation:fadeUp 0.2s ease;">
+      <div
+        style="padding:16px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;">
+        <div style="display:flex;align-items:center;gap:10px;">
+          <i class="fas fa-database" style="color:#25D366;font-size:18px;"></i>
+          <div>
+            <div style="font-size:15px;font-weight:800;color:var(--text);">WhatsApp Backup Inventory</div>
+            <div style="font-size:11px;color:var(--muted);margin-top:1px;">Backups only load into the same linked WhatsApp account</div>
+          </div>
+        </div>
+        <button onclick="closeModal('wa-backup-modal')"
+          style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:18px;padding:4px 6px;"><i
+            class="fas fa-times"></i></button>
+      </div>
+      <div style="padding:10px 20px;background:rgba(37,211,102,0.05);border-bottom:1px solid var(--border);">
+        <div style="font-size:11.5px;color:var(--muted2);line-height:1.55;">
+          <b style="color:var(--green2);">Safety rule:</b> a backup is restored only when its account number exactly matches the currently connected WhatsApp number.
+        </div>
+      </div>
+      <div style="padding:14px 20px;display:flex;gap:8px;align-items:center;justify-content:space-between;">
+        <div id="wa-backup-status" style="font-size:12.5px;color:var(--muted);min-height:18px;"></div>
+        <div style="display:flex;gap:8px;">
+          <button class="btn btn-ghost btn-sm" onclick="waLoadBackupInventory()"><i class="fas fa-redo"></i> Refresh</button>
+          <button class="btn btn-green btn-sm" onclick="waCreateBackup().then(waLoadBackupInventory)"><i class="fas fa-archive"></i> Create Backup</button>
+        </div>
+      </div>
+      <div id="wa-backup-list" style="border-top:1px solid var(--border);max-height:420px;overflow:auto;"></div>
     </div>
   </div>
 

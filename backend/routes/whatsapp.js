@@ -4,6 +4,7 @@
 const express = require('express');
 const pool    = require('../db/pool');
 const wa      = require('../services/whatsapp');
+const waInventory = require('../services/whatsappInventory');
 const { authenticate } = require('../middleware/auth');
 
 const router = express.Router();
@@ -194,6 +195,34 @@ router.post('/sync', authenticate, async (req, res) => {
       WHERE account_phone = $1
     `, [accountPhone]);
     res.json({ success: true, stats: stats.rows[0] });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+router.post('/backups/create', authenticate, async (req, res) => {
+  try {
+    const accountPhone = connectedAccount(res);
+    if (!accountPhone) return;
+    const result = await waInventory.createBackup(accountPhone, 'manual');
+    res.json({ success: true, ...result });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+router.get('/backups', authenticate, async (req, res) => {
+  try {
+    const accountPhone = connectedAccount(res);
+    if (!accountPhone) return;
+    res.json(waInventory.listBackups(accountPhone));
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+router.post('/backups/load', authenticate, async (req, res) => {
+  try {
+    const accountPhone = connectedAccount(res);
+    if (!accountPhone) return;
+    const fileName = req.body?.fileName;
+    if (!fileName) return res.status(400).json({ error: 'fileName is required' });
+    const result = await waInventory.restoreBackup(fileName, accountPhone);
+    res.json(result);
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
