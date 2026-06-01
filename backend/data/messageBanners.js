@@ -397,7 +397,7 @@ const BANNER_PRESETS = {
     footerLine: 'Unicircuit Engineering Services LLP · Agri Storage & Cold Chain ELV Solutions · GeM Empanelled',
     accentColor: '#0e7490',
     overlayColor: '#0c2340',
-    imageUrl: '/assets/banners/cold-chain-banner.jpg',
+    imageUrl: 'https://images.unsplash.com/photo-1561329913-721c104c3846?w=1200&q=80',
     heroHeight: 280,
     textAlign: 'left',
     showCta: false,
