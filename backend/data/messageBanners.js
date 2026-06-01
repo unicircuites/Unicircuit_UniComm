@@ -237,7 +237,7 @@ const BANNER_PRESETS = {
     footerLine: 'Unicircuit Engineering Services LLP · Healthcare PSU ELV & Digital Infrastructure · GeM Registered',
     accentColor: '#0369a1',
     overlayColor: '#0c2340',
-    imageUrl: 'https://images.unsplash.com/photo-1519494026892-80bbd2d6fd0d?w=1200&q=80',
+    imageUrl: 'https://images.unsplash.com/photo-1758691462878-6edc3d3da1be?w=1200&q=80',
     heroHeight: 280,
     textAlign: 'left',
     showCta: false,
