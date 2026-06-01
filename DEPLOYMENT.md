@@ -515,6 +515,16 @@ Logs mein `[Graph]` aur `[MSAL]` lines dekho — exact error wahan hoga.
 > **Copy-paste these commands directly into Tower server PowerShell (as Administrator).**
 > `.env` aur `certs/` kabhi delete nahi honge — yeh commands unhe touch nahi karte.
 
+---
+
+### 📋 Recent Deploy Notes
+
+| Date | Commit | What Changed | Special Steps |
+|---|---|---|---|
+| 01-Jun-2026 | `cfeff91` | Added Power Generation PSU + State PSU email templates (2 new banner presets, 2 new seed templates, dashboard dropdowns updated) | **Re-seed email templates after deploy** — run `node db/seedEmailTemplates.js` (or `node db/init.js` if no separate seed script) from the `backend/` folder |
+
+
+
 ### Step 1 — Project folder pe jao
 ```powershell
 cd C:\UniComm\Unicircuit_UniComm-main
