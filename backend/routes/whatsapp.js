@@ -17,6 +17,18 @@ function connectedAccount(res) {
   return accountPhone;
 }
 
+async function ensureBlocklistTable() {
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS wa_chat_blocklist (
+      account_phone VARCHAR(50) NOT NULL,
+      chat_id VARCHAR(100) NOT NULL,
+      reason TEXT,
+      created_at TIMESTAMPTZ DEFAULT NOW(),
+      PRIMARY KEY (account_phone, chat_id)
+    )
+  `);
+}
+
 // -- PUBLIC (no auth) -------------------------------------------------------
 router.get('/qr',     async (req, res) => { res.json({ qr: await wa.requestQR() || null }); });
 router.get('/status', (req, res)       => { res.json(wa.getStatus()); });
@@ -131,6 +143,11 @@ router.get('/chats', authenticate, async (req, res) => {
         -- Imported chats (from WhatsApp Export)
         c.id LIKE 'import_%'
       )
+      AND NOT EXISTS (
+        SELECT 1 FROM wa_chat_blocklist b
+        WHERE b.account_phone = c.account_phone
+          AND b.chat_id = c.id
+      )
       ORDER BY last_time DESC NULLS LAST LIMIT 300
     `, [accountPhone]);
     res.json(result.rows);
@@ -157,11 +174,40 @@ router.post('/sync', authenticate, async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
+router.post('/block-chat', authenticate, async (req, res) => {
+  try {
+    const accountPhone = connectedAccount(res);
+    if (!accountPhone) return;
+    const jid = String(req.body?.jid || '').trim()
+      .replace(/@g\.us@g\.us$/, '@g.us')
+      .replace(/@s\.whatsapp\.net@s\.whatsapp\.net$/, '@s.whatsapp.net');
+    if (!jid || !jid.includes('@')) return res.status(400).json({ error: 'jid is required' });
+    await ensureBlocklistTable();
+    await pool.query(
+      `INSERT INTO wa_chat_blocklist (account_phone, chat_id, reason)
+       VALUES ($1, $2, $3)
+       ON CONFLICT (account_phone, chat_id) DO UPDATE SET reason=EXCLUDED.reason`,
+      [accountPhone, jid, req.body?.reason || 'blocked from current WhatsApp account']
+    );
+    await pool.query(`DELETE FROM wa_messages WHERE account_phone=$1 AND chat_id=$2`, [accountPhone, jid]);
+    await pool.query(`DELETE FROM wa_chats WHERE account_phone=$1 AND id=$2`, [accountPhone, jid]);
+    res.json({ success: true, account_phone: accountPhone, jid });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
 router.get('/group/:jid', authenticate, async (req, res) => {
   try {
+    const accountPhone = connectedAccount(res);
+    if (!accountPhone) return;
+    await ensureBlocklistTable();
     let jid = decodeURIComponent(req.params.jid);
     // Fix double domain suffix
     jid = jid.replace(/@g\.us@g\.us$/, '@g.us').replace(/@s\.whatsapp\.net@s\.whatsapp\.net$/, '@s.whatsapp.net');
+    const blocked = await pool.query(
+      `SELECT 1 FROM wa_chat_blocklist WHERE account_phone=$1 AND chat_id=$2 LIMIT 1`,
+      [accountPhone, jid]
+    );
+    if (blocked.rowCount) return res.status(404).json({ error: 'Chat is blocked for this WhatsApp account' });
     res.json(await wa.getGroupMetadata(jid));
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
@@ -173,6 +219,12 @@ router.get('/messages/:jid', authenticate, async (req, res) => {
   try {
     const accountPhone = connectedAccount(res);
     if (!accountPhone) return;
+    await ensureBlocklistTable();
+    const blocked = await pool.query(
+      `SELECT 1 FROM wa_chat_blocklist WHERE account_phone=$1 AND chat_id=$2 LIMIT 1`,
+      [accountPhone, jid]
+    );
+    if (blocked.rowCount) return res.json([]);
     // If this is a group chat, populate LID phone numbers from group metadata first
     if (jid.endsWith('@g.us')) {
       try {

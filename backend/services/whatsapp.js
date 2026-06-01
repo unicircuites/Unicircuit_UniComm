@@ -58,6 +58,7 @@ let importedLastTsMap = {};
 const groupMetadataCache = new Map();
 
 const AUTH_DIR = path.join(__dirname, '../wa_auth');
+const SYNC_FULL_HISTORY = String(process.env.WA_SYNC_FULL_HISTORY || 'false').toLowerCase() === 'true';
 
 function hasSavedSession() {
   return fs.existsSync(path.join(AUTH_DIR, 'creds.json'));
@@ -87,6 +88,19 @@ function setIO(socketIO) { io = socketIO; }
 
 function emit(event, data) {
   if (io) io.emit(event, data);
+}
+
+async function isBlockedChat(jid, accPhone) {
+  if (!jid || !accPhone) return false;
+  try {
+    const result = await pool.query(
+      `SELECT 1 FROM wa_chat_blocklist WHERE account_phone=$1 AND chat_id=$2 LIMIT 1`,
+      [accPhone, jid]
+    );
+    return result.rowCount > 0;
+  } catch (_) {
+    return false;
+  }
 }
 
 // Helper: Normalize JID to prevent double domains and device suffixes
@@ -326,6 +340,15 @@ async function ensureTables(retries = 3) {
       await pool.query(`ALTER TABLE wa_messages ADD COLUMN IF NOT EXISTS reply_to_msg_id VARCHAR(200)`).catch(() => { });
       await pool.query(`ALTER TABLE wa_messages ADD COLUMN IF NOT EXISTS media_path TEXT`).catch(() => { });
       await pool.query(`ALTER TABLE wa_chats ADD COLUMN IF NOT EXISTS imported_last_ts TIMESTAMPTZ`).catch(() => { });
+      await pool.query(`
+        CREATE TABLE IF NOT EXISTS wa_chat_blocklist (
+          account_phone VARCHAR(50) NOT NULL,
+          chat_id VARCHAR(100) NOT NULL,
+          reason TEXT,
+          created_at TIMESTAMPTZ DEFAULT NOW(),
+          PRIMARY KEY (account_phone, chat_id)
+        )
+      `);
 
       // Handle migrations for multi-account support on existing databases (e.g. Tower Server)
       await pool.query(`ALTER TABLE wa_contacts ADD COLUMN IF NOT EXISTS account_phone VARCHAR(50) DEFAULT 'unknown'`).catch(() => { });
@@ -390,6 +413,7 @@ async function saveChat(rawJid, name, lastMsg, lastTime, unread, isGroup) {
   try {
     const accPhone = phoneNumber;
     if (!accPhone) return;
+    if (await isBlockedChat(jid, accPhone)) return;
     await pool.query(`
       INSERT INTO wa_chats (id, account_phone, name, phone, is_group, last_message, last_time, unread)
       VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
@@ -533,6 +557,7 @@ async function saveMessage(msg) {
     } catch (e) { }
     const accPhone = phoneNumber;
     if (!accPhone) return null;
+    if (await isBlockedChat(jid, accPhone)) return null;
     await pool.query(`
       INSERT INTO wa_messages (id, chat_id, account_phone, from_me, sender, sender_name, body, msg_type, timestamp, is_read, quoted_body, is_reply, reply_to_msg_id, media_path)
       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)
@@ -657,7 +682,7 @@ async function startWA(options = {}) {
     auth: state,
     printQRInTerminal: false,
     browser: ['UniComm Pro', 'Chrome', '120.0'],
-    syncFullHistory: true,  // true = ensures full history is downloaded (faster, prevents sync stuck)
+    syncFullHistory: SYNC_FULL_HISTORY,
     logger: require('pino')({ level: 'info' }), // Enabled info level to see Baileys internal logs
     getMessage: async (key) => {
       if (!phoneNumber) return { conversation: '' };
@@ -810,6 +835,11 @@ async function startWA(options = {}) {
 
   // ── HISTORY SYNC ───────────────────────────────────────────────────────────────────────
   sock.ev.on('messaging-history.set', async ({ chats, contacts, messages, isLatest }) => {
+    if (!SYNC_FULL_HISTORY) {
+      console.log('[WA] History sync chunk ignored because WA_SYNC_FULL_HISTORY is disabled');
+      if (isLatest) emit('wa:sync_complete', {});
+      return;
+    }
     console.log(`[WA] History chunk — chats=${chats.length} contacts=${contacts?.length || 0} messages=${messages.length} isLatest=${isLatest}`);
 
     // Helper to yield the event loop to prevent blocking HTTP requests
