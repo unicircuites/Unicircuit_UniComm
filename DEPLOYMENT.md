@@ -522,6 +522,7 @@ Logs mein `[Graph]` aur `[MSAL]` lines dekho — exact error wahan hoga.
 | Date | Commit | What Changed | Special Steps |
 |---|---|---|---|
 | 01-Jun-2026 | `cfeff91` | Added Power Generation PSU + State PSU email templates (2 new banner presets, 2 new seed templates, dashboard dropdowns updated) | **Re-seed email templates after deploy** — run `node db/seedEmailTemplates.js` (or `node db/init.js` if no separate seed script) from the `backend/` folder |
+| 01-Jun-2026 | `273acd5` | Sync line endings, updated image.png, added `scripts/sync-email-templates.js` | No special steps — standard pull + restart |
 
 
 
