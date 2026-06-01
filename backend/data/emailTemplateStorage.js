@@ -10,6 +10,16 @@ const foodProcessingBannerConfig = getBannerPreset('foodProcessing');
 const coalMiningBannerConfig    = getBannerPreset('coalMining');
 const powerGenerationPsuBannerConfig      = getBannerPreset('powerGenerationPsu');
 const powerGenerationStatePsuBannerConfig = getBannerPreset('powerGenerationStatePsu');
+const centralBankBannerConfig             = getBannerPreset('centralBank');
+const healthcarePsuBannerConfig           = getBannerPreset('healthcarePsu');
+const educationPsuBannerConfig            = getBannerPreset('educationPsu');
+const educationStateBannerConfig          = getBannerPreset('educationState');
+const educationCentralBannerConfig        = getBannerPreset('educationCentral');
+const educationPrivateBannerConfig        = getBannerPreset('educationPrivate');
+const industrialAssocBannerConfig         = getBannerPreset('industrialAssoc');
+const stateGovtBannerConfig               = getBannerPreset('stateGovt');
+const correctionalBannerConfig            = getBannerPreset('correctional');
+const coldChainStorageBannerConfig        = getBannerPreset('coldChainStorage');
 
 const agricultureBodyHtml = `
       <p>Dear {{recipient_name}},</p>
@@ -712,6 +722,315 @@ const seedEmailTemplates = [
     ],
     banner_config: powerGenerationStatePsuBannerConfig,
     html_body: buildFramedEmailHtml(powerGenerationStatePsuBannerConfig, powerGenerationStatePsuBodyHtml)
+  },
+  {
+    slug: 'central-bank-introduction',
+    name: 'Central Bank - Introduction',
+    category: 'Banking',
+    subject: 'High-Security Infrastructure and ELV Solutions for Central Banking Operations',
+    variable_fields: [
+      { key: 'recipient_name', label: 'Recipient Name', required: true, source: 'recipient', value: '', example: 'Sir/Madam', options: ['Sir/Madam', 'Dear Colleague', 'Team'] },
+      { key: 'meeting_window', label: 'Meeting Window', required: true, source: 'static', value: 'at your convenience', example: 'at your convenience', options: ['this week', 'next week', 'in the coming days', 'at your convenience', 'early next month'] },
+      { key: 'sender_name', label: 'Sender Name', required: true, source: 'static', value: 'Nidhisha Badhel', example: 'Nidhisha Badhel', options: ['Nidhisha Badhel', 'Rahul Sharma', 'Sales Team'] },
+      { key: 'sender_designation', label: 'Sender Designation', required: true, source: 'static', value: 'Sales Executive', example: 'Sales Executive', options: ['Sales Executive', 'Business Development Manager', 'Regional Sales Manager', 'Key Account Manager'] },
+      { key: 'sender_phone', label: 'Sender Phone', required: true, source: 'static', value: '+91 93594 75770', example: '+91 93594 75770', options: ['+91 93594 75770', '+91 712 2996167 Ext. 21', 'M 09359475770 | P +91 712 2996167 Ext. 21'] },
+      { key: 'sender_email', label: 'Sender Email', required: true, source: 'static', value: 'sales@unicircuites.com', example: 'sales@unicircuites.com', options: ['sales@unicircuites.com', 'noreply@unicircuites.live'] },
+      { key: 'company_website', label: 'Company Website', required: false, source: 'static', value: 'www.unicircuites.com', example: 'www.unicircuites.com', options: ['www.unicircuites.com', 'unicircuites.com', 'https://www.unicircuites.com'] }
+    ],
+    banner_config: centralBankBannerConfig,
+    html_body: buildFramedEmailHtml(centralBankBannerConfig, `
+      <p>Dear {{recipient_name}},</p>
+      <p>I am writing to introduce Unicircuit Engineering Services LLP — an Indian digital transformation and ELV systems integrator with deep capability in high-security, mission-critical environments such as those operated by central banking institutions.</p>
+      <p>Central banks operate among the most security-sensitive facilities in the country — vaults, currency processing centres, regional offices, and data centres. The expectation is uncompromising: layered security, audit-grade documentation, zero downtime, and absolute confidentiality. We support these through:</p>
+      <ul>
+        <li><strong>Physical Security &amp; Surveillance</strong> — Multi-layer access control, biometric authentication, vault and strongroom protection, and integrated command centres.</li>
+        <li><strong>Smart Building Ecosystem</strong> — Clean-agent fire suppression (FM200, Novec), BMS, and environmental controls for data centres and currency chests.</li>
+        <li><strong>Digital Infrastructure &amp; Connectivity</strong> — Tier-rated data centre infrastructure, secure structured cabling, and DR-site setup.</li>
+        <li><strong>ELV Turnkey Projects</strong> — Single-window design-to-commissioning for sensitive facilities, under tight confidentiality protocols.</li>
+        <li><strong>Professional Services</strong> — Clearance-aware execution, long-term AMC, and compliance support.</li>
+      </ul>
+      <p>May I request a brief introductory meeting {{meeting_window}} to share our credentials in confidence, and explore how we may be of service?</p>
+      <p>Warm regards,<br>{{sender_name}}<br>{{sender_designation}} | Unicircuit Engineering Services LLP<br>{{sender_phone}} | {{sender_email}} | {{company_website}}</p>
+    `.trim())
+  },
+  {
+    slug: 'healthcare-psu-introduction',
+    name: 'Healthcare PSU (Central) - Introduction',
+    category: 'Healthcare',
+    subject: 'Smart Hospital Infrastructure for Central PSU Healthcare Institutions',
+    variable_fields: [
+      { key: 'recipient_name', label: 'Recipient Name', required: true, source: 'recipient', value: '', example: 'Sir/Madam', options: ['Sir/Madam', 'Dear Colleague', 'Team', 'Dr. Sharma'] },
+      { key: 'meeting_window', label: 'Meeting Window', required: true, source: 'static', value: 'at your convenience', example: 'at your convenience', options: ['this week', 'next week', 'in the coming days', 'at your convenience', 'early next month'] },
+      { key: 'sender_name', label: 'Sender Name', required: true, source: 'static', value: 'Nidhisha Badhel', example: 'Nidhisha Badhel', options: ['Nidhisha Badhel', 'Rahul Sharma', 'Sales Team'] },
+      { key: 'sender_designation', label: 'Sender Designation', required: true, source: 'static', value: 'Sales Executive', example: 'Sales Executive', options: ['Sales Executive', 'Business Development Manager', 'Regional Sales Manager', 'Key Account Manager'] },
+      { key: 'sender_phone', label: 'Sender Phone', required: true, source: 'static', value: '+91 93594 75770', example: '+91 93594 75770', options: ['+91 93594 75770', '+91 712 2996167 Ext. 21', 'M 09359475770 | P +91 712 2996167 Ext. 21'] },
+      { key: 'sender_email', label: 'Sender Email', required: true, source: 'static', value: 'sales@unicircuites.com', example: 'sales@unicircuites.com', options: ['sales@unicircuites.com', 'noreply@unicircuites.live'] },
+      { key: 'company_website', label: 'Company Website', required: false, source: 'static', value: 'www.unicircuites.com', example: 'www.unicircuites.com', options: ['www.unicircuites.com', 'unicircuites.com', 'https://www.unicircuites.com'] }
+    ],
+    banner_config: healthcarePsuBannerConfig,
+    html_body: buildFramedEmailHtml(healthcarePsuBannerConfig, `
+      <p>Dear {{recipient_name}},</p>
+      <p>I am writing to introduce Unicircuit Engineering Services LLP — a digital transformation and ELV partner working with public healthcare institutions to deliver smart hospital infrastructure that supports clinical excellence and operational efficiency.</p>
+      <p>Central PSU healthcare institutions — AIIMS, JIPMER, PGIMER, ESIC hospitals, and others — manage large, complex campuses with intensive patient flow, critical care services, research wings, and academic facilities. We help address this complexity through:</p>
+      <ul>
+        <li><strong>Smart Building Ecosystem</strong> — Integrated BMS, HVAC, and energy management for OTs, ICUs, wards, and research labs with NABH-aligned logging.</li>
+        <li><strong>Physical Security &amp; Surveillance</strong> — Campus-wide CCTV, access control, infant tracking, and queue/crowd analytics for OPD areas.</li>
+        <li><strong>Industrial Asset Management</strong> — RFID-based tracking of medical equipment, linen, and consumables to drive utilisation and reduce loss.</li>
+        <li><strong>Digital Infrastructure &amp; Connectivity</strong> — Campus networking, structured cabling, data centre, and high-density Wi-Fi to support HIMS / EMR / PACS.</li>
+        <li><strong>ELV Turnkey Projects</strong> — Design-to-commissioning for new blocks, super-specialty wings, and expansions.</li>
+      </ul>
+      <p>We are GeM-registered and conversant with CPWD, HSCC, and PSU tender frameworks.</p>
+      <p>Could we request a brief introductory meeting {{meeting_window}} to share our credentials?</p>
+      <p>Warm regards,<br>{{sender_name}}<br>{{sender_designation}} | Unicircuit Engineering Services LLP<br>{{sender_phone}} | {{sender_email}} | {{company_website}}</p>
+    `.trim())
+  },
+  {
+    slug: 'education-psu-introduction',
+    name: 'Education PSU (Central) - Introduction',
+    category: 'Education',
+    subject: 'Smart Campus and Digital Infrastructure Solutions for Central PSU Educational Institutions',
+    variable_fields: [
+      { key: 'recipient_name', label: 'Recipient Name', required: true, source: 'recipient', value: '', example: 'Sir/Madam', options: ['Sir/Madam', 'Dear Colleague', 'Team', 'Prof. Kumar'] },
+      { key: 'meeting_window', label: 'Meeting Window', required: true, source: 'static', value: 'at your convenience', example: 'at your convenience', options: ['this week', 'next week', 'in the coming days', 'at your convenience', 'early next month'] },
+      { key: 'sender_name', label: 'Sender Name', required: true, source: 'static', value: 'Nidhisha Badhel', example: 'Nidhisha Badhel', options: ['Nidhisha Badhel', 'Rahul Sharma', 'Sales Team'] },
+      { key: 'sender_designation', label: 'Sender Designation', required: true, source: 'static', value: 'Sales Executive', example: 'Sales Executive', options: ['Sales Executive', 'Business Development Manager', 'Regional Sales Manager', 'Key Account Manager'] },
+      { key: 'sender_phone', label: 'Sender Phone', required: true, source: 'static', value: '+91 93594 75770', example: '+91 93594 75770', options: ['+91 93594 75770', '+91 712 2996167 Ext. 21', 'M 09359475770 | P +91 712 2996167 Ext. 21'] },
+      { key: 'sender_email', label: 'Sender Email', required: true, source: 'static', value: 'sales@unicircuites.com', example: 'sales@unicircuites.com', options: ['sales@unicircuites.com', 'noreply@unicircuites.live'] },
+      { key: 'company_website', label: 'Company Website', required: false, source: 'static', value: 'www.unicircuites.com', example: 'www.unicircuites.com', options: ['www.unicircuites.com', 'unicircuites.com', 'https://www.unicircuites.com'] }
+    ],
+    banner_config: educationPsuBannerConfig,
+    html_body: buildFramedEmailHtml(educationPsuBannerConfig, `
+      <p>Dear {{recipient_name}},</p>
+      <p>I am writing to introduce Unicircuit Engineering Services LLP — a digital transformation and ELV partner working with educational institutions to build smart, secure, and digitally enabled campuses.</p>
+      <p>PSU-managed institutions — training academies, technical institutes, and R&amp;D centres — demand infrastructure that supports modern pedagogy, examination integrity, residential life, and research activity on a single integrated campus. Unicircuit brings:</p>
+      <ul>
+        <li><strong>Smart Building Ecosystem</strong> — BMS, classroom automation, and energy management for academic and hostel blocks.</li>
+        <li><strong>Physical Security &amp; Surveillance</strong> — Campus-wide CCTV with analytics, access control for hostels and labs, and examination-hall monitoring.</li>
+        <li><strong>Digital Infrastructure &amp; Connectivity</strong> — Campus-wide Wi-Fi, structured cabling, data centre, and smart classroom AV.</li>
+        <li><strong>ELV Turnkey Projects</strong> — Single-window execution for greenfield campuses and major upgrades.</li>
+        <li><strong>Professional Services</strong> — Design consultancy, AMC, training, and managed services.</li>
+      </ul>
+      <p>We engage through standard PSU procurement processes and have ready credentials for technical pre-qualification.</p>
+      <p>May I request a brief introductory meeting {{meeting_window}} to share relevant work?</p>
+      <p>Warm regards,<br>{{sender_name}}<br>{{sender_designation}} | Unicircuit Engineering Services LLP<br>{{sender_phone}} | {{sender_email}} | {{company_website}}</p>
+    `.trim())
+  },
+  {
+    slug: 'education-state-govt-introduction',
+    name: 'Education State Govt - Introduction',
+    category: 'Education',
+    subject: 'Smart Classroom, Surveillance, and Campus Solutions for State Educational Institutions',
+    variable_fields: [
+      { key: 'recipient_name', label: 'Recipient Name', required: true, source: 'recipient', value: '', example: 'Sir/Madam', options: ['Sir/Madam', 'Dear Colleague', 'Team'] },
+      { key: 'meeting_window', label: 'Meeting Window', required: true, source: 'static', value: 'at your convenience', example: 'at your convenience', options: ['this week', 'next week', 'in the coming days', 'at your convenience', 'early next month'] },
+      { key: 'sender_name', label: 'Sender Name', required: true, source: 'static', value: 'Nidhisha Badhel', example: 'Nidhisha Badhel', options: ['Nidhisha Badhel', 'Rahul Sharma', 'Sales Team'] },
+      { key: 'sender_designation', label: 'Sender Designation', required: true, source: 'static', value: 'Sales Executive', example: 'Sales Executive', options: ['Sales Executive', 'Business Development Manager', 'Regional Sales Manager', 'Key Account Manager'] },
+      { key: 'sender_phone', label: 'Sender Phone', required: true, source: 'static', value: '+91 93594 75770', example: '+91 93594 75770', options: ['+91 93594 75770', '+91 712 2996167 Ext. 21'] },
+      { key: 'sender_email', label: 'Sender Email', required: true, source: 'static', value: 'sales@unicircuites.com', example: 'sales@unicircuites.com', options: ['sales@unicircuites.com', 'noreply@unicircuites.live'] },
+      { key: 'company_website', label: 'Company Website', required: false, source: 'static', value: 'www.unicircuites.com', example: 'www.unicircuites.com', options: ['www.unicircuites.com', 'unicircuites.com'] }
+    ],
+    banner_config: educationStateBannerConfig,
+    html_body: buildFramedEmailHtml(educationStateBannerConfig, `
+      <p>Dear {{recipient_name}},</p>
+      <p>I am writing to introduce Unicircuit Engineering Services LLP — a digital transformation and ELV partner working with State Government education departments, universities, technical boards, and Samagra Shiksha programmes to digitally modernise schools, colleges, and examination infrastructure.</p>
+      <p>State-managed education today balances scale (thousands of institutions) with the imperative for digital learning, examination integrity, campus safety, and central monitoring. Unicircuit supports these mandates through:</p>
+      <ul>
+        <li><strong>Digital Infrastructure &amp; Connectivity</strong> — Smart classroom AV, ICT labs, and school/college networking with central manageability.</li>
+        <li><strong>Physical Security &amp; Surveillance</strong> — CCTV for institutions, central viewing at district / DEO level, and examination-hall recording.</li>
+        <li><strong>Smart Building Ecosystem</strong> — Energy-efficient lighting, public address, and fire safety for schools and college blocks.</li>
+        <li><strong>ELV Turnkey Projects</strong> — Large-scale rollouts and standardisation programmes across districts.</li>
+        <li><strong>Professional Services</strong> — District-level AMC, training of teachers and support staff, and helpdesk models.</li>
+      </ul>
+      <p>We have the operational depth to execute multi-site, time-bound deployments with consistent quality and reporting.</p>
+      <p>Could we connect for a brief introductory meeting {{meeting_window}}?</p>
+      <p>Warm regards,<br>{{sender_name}}<br>{{sender_designation}} | Unicircuit Engineering Services LLP<br>{{sender_phone}} | {{sender_email}} | {{company_website}}</p>
+    `.trim())
+  },
+  {
+    slug: 'industrial-association-introduction',
+    name: 'Industrial Association - Introduction',
+    category: 'General',
+    subject: 'Partnership Opportunity — Member Solutions and Industry Engagement with Unicircuit',
+    variable_fields: [
+      { key: 'recipient_name', label: 'Recipient Name', required: true, source: 'recipient', value: '', example: 'Sir/Madam', options: ['Sir/Madam', 'Dear Colleague', 'Team'] },
+      { key: 'meeting_window', label: 'Meeting Window', required: true, source: 'static', value: 'at your convenience', example: 'at your convenience', options: ['this week', 'next week', 'in the coming days', 'at your convenience', 'early next month'] },
+      { key: 'sender_name', label: 'Sender Name', required: true, source: 'static', value: 'Nidhisha Badhel', example: 'Nidhisha Badhel', options: ['Nidhisha Badhel', 'Rahul Sharma', 'Sales Team'] },
+      { key: 'sender_designation', label: 'Sender Designation', required: true, source: 'static', value: 'Sales Executive', example: 'Sales Executive', options: ['Sales Executive', 'Business Development Manager', 'Regional Sales Manager', 'Key Account Manager'] },
+      { key: 'sender_phone', label: 'Sender Phone', required: true, source: 'static', value: '+91 93594 75770', example: '+91 93594 75770', options: ['+91 93594 75770', '+91 712 2996167 Ext. 21'] },
+      { key: 'sender_email', label: 'Sender Email', required: true, source: 'static', value: 'sales@unicircuites.com', example: 'sales@unicircuites.com', options: ['sales@unicircuites.com', 'noreply@unicircuites.live'] },
+      { key: 'company_website', label: 'Company Website', required: false, source: 'static', value: 'www.unicircuites.com', example: 'www.unicircuites.com', options: ['www.unicircuites.com', 'unicircuites.com'] }
+    ],
+    banner_config: industrialAssocBannerConfig,
+    html_body: buildFramedEmailHtml(industrialAssocBannerConfig, `
+      <p>Dear {{recipient_name}},</p>
+      <p>I am writing on behalf of Unicircuit Engineering Services LLP — a digital transformation and ELV solutions company serving Indian industry across Smart Building, Physical Security, Industrial Asset Management, Digital Infrastructure, and ELV Turnkey Projects.</p>
+      <p>We see industry associations as critical multipliers — bringing together members on shared priorities such as plant modernisation, Industry 4.0 adoption, energy efficiency, and security. We would value the opportunity to engage with your association in the following ways:</p>
+      <ul>
+        <li><strong>Membership &amp; Participation</strong> — Active engagement in committees, working groups, and technology forums relevant to your members.</li>
+        <li><strong>Knowledge Sessions</strong> — Curated sessions for member organisations on Smart Manufacturing, ELV best practices, and government digital initiatives.</li>
+        <li><strong>Industry Showcasing</strong> — Showcasing relevant solutions at vendor meets, expos, and association conferences.</li>
+        <li><strong>Policy &amp; Advocacy</strong> — Collaborating on industry inputs around digital transformation, ease of doing business, and Make-in-India.</li>
+        <li><strong>Member Benefit Programmes</strong> — Co-creating preferential consultation, audits, or pilot programmes for member organisations.</li>
+      </ul>
+      <p>We would be honoured to formally introduce ourselves and discuss how Unicircuit can contribute to your association's agenda for the year.</p>
+      <p>Could we request a short introductory meeting {{meeting_window}}?</p>
+      <p>Warm regards,<br>{{sender_name}}<br>{{sender_designation}} | Unicircuit Engineering Services LLP<br>{{sender_phone}} | {{sender_email}} | {{company_website}}</p>
+    `.trim())
+  },
+  {
+    slug: 'state-government-introduction',
+    name: 'State Government - Introduction',
+    category: 'Government',
+    subject: 'Smart Governance, Surveillance, and ELV Infrastructure for State Government Departments',
+    variable_fields: [
+      { key: 'recipient_name', label: 'Recipient Name', required: true, source: 'recipient', value: '', example: 'Sir/Madam', options: ['Sir/Madam', 'Dear Colleague', 'Team'] },
+      { key: 'meeting_window', label: 'Meeting Window', required: true, source: 'static', value: 'at your convenience', example: 'at your convenience', options: ['this week', 'next week', 'in the coming days', 'at your convenience', 'early next month'] },
+      { key: 'sender_name', label: 'Sender Name', required: true, source: 'static', value: 'Nidhisha Badhel', example: 'Nidhisha Badhel', options: ['Nidhisha Badhel', 'Rahul Sharma', 'Sales Team'] },
+      { key: 'sender_designation', label: 'Sender Designation', required: true, source: 'static', value: 'Sales Executive', example: 'Sales Executive', options: ['Sales Executive', 'Business Development Manager', 'Regional Sales Manager', 'Key Account Manager'] },
+      { key: 'sender_phone', label: 'Sender Phone', required: true, source: 'static', value: '+91 93594 75770', example: '+91 93594 75770', options: ['+91 93594 75770', '+91 712 2996167 Ext. 21'] },
+      { key: 'sender_email', label: 'Sender Email', required: true, source: 'static', value: 'sales@unicircuites.com', example: 'sales@unicircuites.com', options: ['sales@unicircuites.com', 'noreply@unicircuites.live'] },
+      { key: 'company_website', label: 'Company Website', required: false, source: 'static', value: 'www.unicircuites.com', example: 'www.unicircuites.com', options: ['www.unicircuites.com', 'unicircuites.com'] }
+    ],
+    banner_config: stateGovtBannerConfig,
+    html_body: buildFramedEmailHtml(stateGovtBannerConfig, `
+      <p>Dear {{recipient_name}},</p>
+      <p>I am writing to introduce Unicircuit Engineering Services LLP — a digital transformation and ELV systems integrator working with State Government departments to modernise office, citizen-services, and field infrastructure.</p>
+      <p>State governments today drive an ambitious agenda — Smart Cities, e-Governance, citizen services, surveillance command centres, and departmental digitisation. Each of these has real infrastructure demands that we are positioned to address:</p>
+      <ul>
+        <li><strong>Physical Security &amp; Surveillance</strong> — City surveillance, secretariat and office CCTV, and integrated command-and-control centres.</li>
+        <li><strong>Smart Building Ecosystem</strong> — BMS, energy management, and fire and life safety for government buildings and citizen-service centres.</li>
+        <li><strong>Digital Infrastructure &amp; Connectivity</strong> — Secretariat networking, state data centres, district-office connectivity, and video conferencing.</li>
+        <li><strong>ELV Turnkey Projects</strong> — Single-window design-to-commissioning for large, multi-discipline government projects.</li>
+        <li><strong>Professional Services</strong> — Long-term AMC, 24×7 NOC monitoring, and managed services.</li>
+      </ul>
+      <p>We are GeM-empanelled and well-versed with state-level tendering, technical pre-qualification, and project execution norms.</p>
+      <p>May I request a brief introductory meeting {{meeting_window}} to share our credentials?</p>
+      <p>Warm regards,<br>{{sender_name}}<br>{{sender_designation}} | Unicircuit Engineering Services LLP<br>{{sender_phone}} | {{sender_email}} | {{company_website}}</p>
+    `.trim())
+  },
+  {
+    slug: 'correctional-facilities-introduction',
+    name: 'Correctional Facilities - Introduction',
+    category: 'Government',
+    subject: 'Secure Surveillance, Access Control, and ELV Solutions for Correctional Facilities',
+    variable_fields: [
+      { key: 'recipient_name', label: 'Recipient Name', required: true, source: 'recipient', value: '', example: 'Sir/Madam', options: ['Sir/Madam', 'Dear Colleague', 'Team'] },
+      { key: 'meeting_window', label: 'Meeting Window', required: true, source: 'static', value: 'at your convenience', example: 'at your convenience', options: ['this week', 'next week', 'in the coming days', 'at your convenience', 'early next month'] },
+      { key: 'sender_name', label: 'Sender Name', required: true, source: 'static', value: 'Nidhisha Badhel', example: 'Nidhisha Badhel', options: ['Nidhisha Badhel', 'Rahul Sharma', 'Sales Team'] },
+      { key: 'sender_designation', label: 'Sender Designation', required: true, source: 'static', value: 'Sales Executive', example: 'Sales Executive', options: ['Sales Executive', 'Business Development Manager', 'Regional Sales Manager', 'Key Account Manager'] },
+      { key: 'sender_phone', label: 'Sender Phone', required: true, source: 'static', value: '+91 93594 75770', example: '+91 93594 75770', options: ['+91 93594 75770', '+91 712 2996167 Ext. 21'] },
+      { key: 'sender_email', label: 'Sender Email', required: true, source: 'static', value: 'sales@unicircuites.com', example: 'sales@unicircuites.com', options: ['sales@unicircuites.com', 'noreply@unicircuites.live'] },
+      { key: 'company_website', label: 'Company Website', required: false, source: 'static', value: 'www.unicircuites.com', example: 'www.unicircuites.com', options: ['www.unicircuites.com', 'unicircuites.com'] }
+    ],
+    banner_config: correctionalBannerConfig,
+    html_body: buildFramedEmailHtml(correctionalBannerConfig, `
+      <p>Dear {{recipient_name}},</p>
+      <p>I am writing to introduce Unicircuit Engineering Services LLP — a digital transformation and ELV systems integrator with capability in high-security environments, including correctional facilities, defence sites, and central banking installations.</p>
+      <p>Modern correctional administration demands a fine balance — enhanced inmate management and safety, perimeter integrity, contraband and communication control, staff safety, and full audit-grade transparency. Unicircuit's capabilities directly support these mandates:</p>
+      <ul>
+        <li><strong>Physical Security &amp; Surveillance</strong> — AI-enabled CCTV with behaviour analytics, perimeter intrusion detection, and integrated command-and-control rooms.</li>
+        <li><strong>Industrial Asset Management</strong> — RFID and biometric inmate tracking, visitor management, and asset traceability.</li>
+        <li><strong>Smart Building Ecosystem</strong> — Fire detection, public address, and energy management for barracks and administrative blocks.</li>
+        <li><strong>Digital Infrastructure &amp; Connectivity</strong> — Secure networking and video conferencing for e-Court and e-Mulaqaat initiatives.</li>
+        <li><strong>ELV Turnkey Projects</strong> — Single-window design-to-commissioning under strict confidentiality and security protocols.</li>
+      </ul>
+      <p>We engage through standard government tender and GeM channels, and are accustomed to security clearance processes.</p>
+      <p>May I request a brief introductory meeting {{meeting_window}} to present relevant credentials?</p>
+      <p>Warm regards,<br>{{sender_name}}<br>{{sender_designation}} | Unicircuit Engineering Services LLP<br>{{sender_phone}} | {{sender_email}} | {{company_website}}</p>
+    `.trim())
+  },
+  {
+    slug: 'cold-chain-storage-psu-introduction',
+    name: 'Cold Chain & Storage PSU - Introduction',
+    category: 'Agriculture',
+    subject: 'Warehouse Modernisation, Cold Chain Monitoring, and Surveillance for Storage Infrastructure',
+    variable_fields: [
+      { key: 'recipient_name', label: 'Recipient Name', required: true, source: 'recipient', value: '', example: 'Sir/Madam', options: ['Sir/Madam', 'Dear Colleague', 'Team'] },
+      { key: 'meeting_window', label: 'Meeting Window', required: true, source: 'static', value: 'at your convenience', example: 'at your convenience', options: ['this week', 'next week', 'in the coming days', 'at your convenience', 'early next month'] },
+      { key: 'sender_name', label: 'Sender Name', required: true, source: 'static', value: 'Nidhisha Badhel', example: 'Nidhisha Badhel', options: ['Nidhisha Badhel', 'Rahul Sharma', 'Sales Team'] },
+      { key: 'sender_designation', label: 'Sender Designation', required: true, source: 'static', value: 'Sales Executive', example: 'Sales Executive', options: ['Sales Executive', 'Business Development Manager', 'Regional Sales Manager', 'Key Account Manager'] },
+      { key: 'sender_phone', label: 'Sender Phone', required: true, source: 'static', value: '+91 93594 75770', example: '+91 93594 75770', options: ['+91 93594 75770', '+91 712 2996167 Ext. 21'] },
+      { key: 'sender_email', label: 'Sender Email', required: true, source: 'static', value: 'sales@unicircuites.com', example: 'sales@unicircuites.com', options: ['sales@unicircuites.com', 'noreply@unicircuites.live'] },
+      { key: 'company_website', label: 'Company Website', required: false, source: 'static', value: 'www.unicircuites.com', example: 'www.unicircuites.com', options: ['www.unicircuites.com', 'unicircuites.com'] }
+    ],
+    banner_config: coldChainStorageBannerConfig,
+    html_body: buildFramedEmailHtml(coldChainStorageBannerConfig, `
+      <p>Dear {{recipient_name}},</p>
+      <p>I am writing to introduce Unicircuit Engineering Services LLP — a digital transformation and ELV partner supporting food and agri storage organisations in modernising warehouses, silos, and cold-chain infrastructure across India.</p>
+      <p>National food security depends on the integrity of stored grain, perishables, and buffer stocks — across thousands of locations of varying age and capacity. Loss prevention, environmental control, and security are top priorities. Unicircuit brings:</p>
+      <ul>
+        <li><strong>Industrial Asset Management</strong> — IoT-based temperature and humidity monitoring, fumigation alerts, and silo-level inventory monitoring.</li>
+        <li><strong>Physical Security &amp; Surveillance</strong> — Warehouse and silo perimeter surveillance, weighbridge integration, and dispatch monitoring.</li>
+        <li><strong>Smart Building Ecosystem</strong> — Energy-efficient lighting, fire detection, and BMS for cold-storage and ambient warehouses.</li>
+        <li><strong>Digital Infrastructure &amp; Connectivity</strong> — Networking for distributed depots, regional offices, and central headquarters.</li>
+        <li><strong>ELV Turnkey Projects</strong> — Multi-site rollout under a standardised design, with uniform reporting and AMC.</li>
+      </ul>
+      <p>Our solutions are engineered for the realities of large, distributed networks operated under PSU procurement norms. We are GeM-empanelled.</p>
+      <p>Could we request a brief introductory meeting {{meeting_window}}?</p>
+      <p>Warm regards,<br>{{sender_name}}<br>{{sender_designation}} | Unicircuit Engineering Services LLP<br>{{sender_phone}} | {{sender_email}} | {{company_website}}</p>
+    `.trim())
+  },
+  {
+    slug: 'education-central-govt-introduction',
+    name: 'Education Central Govt - Introduction',
+    category: 'Education',
+    subject: 'Smart Campus, Surveillance, and Digital Infrastructure for Central Government Institutions',
+    variable_fields: [
+      { key: 'recipient_name', label: 'Recipient Name', required: true, source: 'recipient', value: '', example: 'Sir/Madam', options: ['Sir/Madam', 'Dear Colleague', 'Team', 'Prof. Kumar'] },
+      { key: 'meeting_window', label: 'Meeting Window', required: true, source: 'static', value: 'at your convenience', example: 'at your convenience', options: ['this week', 'next week', 'in the coming days', 'at your convenience', 'early next month'] },
+      { key: 'sender_name', label: 'Sender Name', required: true, source: 'static', value: 'Nidhisha Badhel', example: 'Nidhisha Badhel', options: ['Nidhisha Badhel', 'Rahul Sharma', 'Sales Team'] },
+      { key: 'sender_designation', label: 'Sender Designation', required: true, source: 'static', value: 'Sales Executive', example: 'Sales Executive', options: ['Sales Executive', 'Business Development Manager', 'Regional Sales Manager', 'Key Account Manager'] },
+      { key: 'sender_phone', label: 'Sender Phone', required: true, source: 'static', value: '+91 93594 75770', example: '+91 93594 75770', options: ['+91 93594 75770', '+91 712 2996167 Ext. 21'] },
+      { key: 'sender_email', label: 'Sender Email', required: true, source: 'static', value: 'sales@unicircuites.com', example: 'sales@unicircuites.com', options: ['sales@unicircuites.com', 'noreply@unicircuites.live'] },
+      { key: 'company_website', label: 'Company Website', required: false, source: 'static', value: 'www.unicircuites.com', example: 'www.unicircuites.com', options: ['www.unicircuites.com', 'unicircuites.com'] }
+    ],
+    banner_config: educationCentralBannerConfig,
+    html_body: buildFramedEmailHtml(educationCentralBannerConfig, `
+      <p>Dear {{recipient_name}},</p>
+      <p>I am writing to introduce Unicircuit Engineering Services LLP — a digital transformation and ELV partner supporting central government educational institutions such as Kendriya Vidyalayas, Navodaya Vidyalayas, IITs, NITs, IIMs, AIIMS academic blocks, and central universities.</p>
+      <p>Central government institutions operate at the leading edge of pedagogy, research, and student experience — and require infrastructure that matches. Unicircuit's portfolio supports the entire campus stack:</p>
+      <ul>
+        <li><strong>Smart Building Ecosystem</strong> — BMS, energy management, and smart lighting for academic blocks, hostels, and research labs.</li>
+        <li><strong>Physical Security &amp; Surveillance</strong> — Campus CCTV with AI analytics, access control, and examination-hall monitoring.</li>
+        <li><strong>Digital Infrastructure &amp; Connectivity</strong> — Campus-wide Wi-Fi, structured cabling, data centre, and smart classroom AV.</li>
+        <li><strong>ELV Turnkey Projects</strong> — Design-to-commissioning for new campuses, expansions, and modernisation.</li>
+        <li><strong>Professional Services</strong> — AMC, managed services, and on-site support models.</li>
+      </ul>
+      <p>We are GeM-empanelled and conversant with CPWD and central institution procurement frameworks.</p>
+      <p>May I request a brief introductory meeting {{meeting_window}} to share our credentials?</p>
+      <p>Warm regards,<br>{{sender_name}}<br>{{sender_designation}} | Unicircuit Engineering Services LLP<br>{{sender_phone}} | {{sender_email}} | {{company_website}}</p>
+    `.trim())
+  },
+  {
+    slug: 'education-private-introduction',
+    name: 'Education Private - Introduction',
+    category: 'Education',
+    subject: 'Smart Campus and Digital Infrastructure Solutions for Modern Educational Institutions',
+    variable_fields: [
+      { key: 'recipient_name', label: 'Recipient Name', required: true, source: 'recipient', value: '', example: 'Sir/Madam', options: ['Sir/Madam', 'Dear Colleague', 'Team', 'Prof. Sharma'] },
+      { key: 'meeting_window', label: 'Meeting Window', required: true, source: 'static', value: 'at your convenience', example: 'at your convenience', options: ['this week', 'next week', 'in the coming days', 'at your convenience', 'early next month'] },
+      { key: 'sender_name', label: 'Sender Name', required: true, source: 'static', value: 'Nidhisha Badhel', example: 'Nidhisha Badhel', options: ['Nidhisha Badhel', 'Rahul Sharma', 'Sales Team'] },
+      { key: 'sender_designation', label: 'Sender Designation', required: true, source: 'static', value: 'Sales Executive', example: 'Sales Executive', options: ['Sales Executive', 'Business Development Manager', 'Regional Sales Manager', 'Key Account Manager'] },
+      { key: 'sender_phone', label: 'Sender Phone', required: true, source: 'static', value: '+91 93594 75770', example: '+91 93594 75770', options: ['+91 93594 75770', '+91 712 2996167 Ext. 21'] },
+      { key: 'sender_email', label: 'Sender Email', required: true, source: 'static', value: 'sales@unicircuites.com', example: 'sales@unicircuites.com', options: ['sales@unicircuites.com', 'noreply@unicircuites.live'] },
+      { key: 'company_website', label: 'Company Website', required: false, source: 'static', value: 'www.unicircuites.com', example: 'www.unicircuites.com', options: ['www.unicircuites.com', 'unicircuites.com'] }
+    ],
+    banner_config: educationPrivateBannerConfig,
+    html_body: buildFramedEmailHtml(educationPrivateBannerConfig, `
+      <p>Dear {{recipient_name}},</p>
+      <p>I am writing to introduce Unicircuit Engineering Services LLP — a digital transformation and ELV partner working with private universities, deemed-to-be universities, and reputed schools across India to build smart, secure, and digitally enabled campuses.</p>
+      <p>Today's parents and students choose institutions as much for the campus experience and safety as for academics. That places real demand on infrastructure — smart classrooms, hostel safety, energy efficiency, network availability, and visible security. Unicircuit's portfolio addresses each:</p>
+      <ul>
+        <li><strong>Smart Building Ecosystem</strong> — Classroom automation, BMS, energy management, and smart lighting across academic and residential blocks.</li>
+        <li><strong>Physical Security &amp; Surveillance</strong> — Campus CCTV with analytics, access control for hostels and labs, and visitor management.</li>
+        <li><strong>Digital Infrastructure &amp; Connectivity</strong> — Campus-wide high-density Wi-Fi, structured cabling, data centre, and AV for auditoriums and seminar halls.</li>
+        <li><strong>ELV Turnkey Projects</strong> — Design-to-commissioning for greenfield campuses and major upgrades.</li>
+        <li><strong>Professional Services</strong> — AMC, managed services, and on-site helpdesk support.</li>
+      </ul>
+      <p>We work flexibly through direct engagement, EPC partnerships, and OEM tie-ups.</p>
+      <p>Could we connect for a brief introductory meeting {{meeting_window}} to share relevant work?</p>
+      <p>Warm regards,<br>{{sender_name}}<br>{{sender_designation}} | Unicircuit Engineering Services LLP<br>{{sender_phone}} | {{sender_email}} | {{company_website}}</p>
+    `.trim())
   }
 ];
 

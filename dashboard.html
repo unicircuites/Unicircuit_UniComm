@@ -22614,7 +22614,7 @@ ${plainText}`;
 
     // ── MESSAGE BANNER (hero image + overlay, header bar, CTA — like MediCare-style emails) ──
     var MSG_BANNER_STORAGE_PREFIX = 'unicomm_banner_v2_';
-    var MSG_BANNER_PANEL_VERSION = '4';
+    var MSG_BANNER_PANEL_VERSION = '5';
     var EMAIL_FRAME_WIDTH = 600;
     var _msgBannerImageDataCache = {};
     var MSG_BANNER_EDITORS = { bc: 'bc-html', et: 'et-html-editor', cl: 'cl-body-editor' };
@@ -22729,6 +22729,116 @@ ${plainText}`;
         imageUrl: 'https://images.unsplash.com/photo-1473341304170-971dccb5ac1e?w=1200&q=80',
         heroHeight: 280, textAlign: 'left', showHeader: true, logoText: 'Unicircuit',
         logoSubtext: 'ENGINEERING SERVICES LLP', headerBg: '#1e40af'
+      },
+      centralBank: {
+        id: 'centralBank', label: 'Central Bank Hero', enabled: true, layout: 'hero',
+        eyebrow: 'HIGH-SECURITY · VAULT PROTECTION · MISSION-CRITICAL ELV',
+        headline: 'Infrastructure Worthy of the Nation\'s Trust.',
+        subheadline: 'Layered security, audit-grade documentation, and zero-downtime ELV for central banking vaults, data centres, and currency processing centres',
+        footerLine: 'Unicircuit Engineering Services LLP · Central Banking & High-Security ELV Solutions',
+        accentColor: '#92400e', overlayColor: '#1c1917',
+        imageUrl: 'https://images.unsplash.com/photo-1501167786227-4cba60f6d58f?w=1200&q=80',
+        heroHeight: 280, textAlign: 'left', showHeader: true, logoText: 'Unicircuit',
+        logoSubtext: 'ENGINEERING SERVICES LLP', headerBg: '#78350f'
+      },
+      healthcarePsu: {
+        id: 'healthcarePsu', label: 'Healthcare PSU Hero', enabled: true, layout: 'hero',
+        eyebrow: 'SMART HOSPITAL · NABH · GeM REGISTERED',
+        headline: 'Smart Infrastructure for Public Healthcare Excellence.',
+        subheadline: 'BMS, CCTV, RFID asset tracking, and campus networking for AIIMS, ESIC, JIPMER, and central PSU hospitals',
+        footerLine: 'Unicircuit Engineering Services LLP · Healthcare PSU ELV & Digital Infrastructure · GeM Registered',
+        accentColor: '#0369a1', overlayColor: '#0c2340',
+        imageUrl: 'https://images.unsplash.com/photo-1519494026892-80bbd2d6fd0d?w=1200&q=80',
+        heroHeight: 280, textAlign: 'left', showHeader: true, logoText: 'Unicircuit',
+        logoSubtext: 'ENGINEERING SERVICES LLP', headerBg: '#075985'
+      },
+      educationPsu: {
+        id: 'educationPsu', label: 'Education PSU Hero', enabled: true, layout: 'hero',
+        eyebrow: 'SMART CAMPUS · DIGITAL INFRASTRUCTURE · ELV',
+        headline: 'Building the Campus of Tomorrow, Today.',
+        subheadline: 'BMS, campus Wi-Fi, surveillance, and smart classroom AV for PSU training academies, technical institutes, and R&D centres',
+        footerLine: 'Unicircuit Engineering Services LLP · Education & Campus ELV & Digital Solutions',
+        accentColor: '#1d4ed8', overlayColor: '#1e1b4b',
+        imageUrl: 'https://images.unsplash.com/photo-1562774053-701939374585?w=1200&q=80',
+        heroHeight: 280, textAlign: 'left', showHeader: true, logoText: 'Unicircuit',
+        logoSubtext: 'ENGINEERING SERVICES LLP', headerBg: '#1e40af'
+      },
+      educationState: {
+        id: 'educationState', label: 'Education State Govt Hero', enabled: true, layout: 'hero',
+        eyebrow: 'SMART CLASSROOMS · SURVEILLANCE · CAMPUS SAFETY',
+        headline: 'Modernising State Education Infrastructure.',
+        subheadline: 'Smart classroom AV, district-level CCTV, and ELV solutions for state schools, colleges, and examination infrastructure',
+        footerLine: 'Unicircuit Engineering Services LLP · State Education ELV & Digital Solutions',
+        accentColor: '#0f766e', overlayColor: '#134e4a',
+        imageUrl: 'https://images.unsplash.com/photo-1580582932707-520aed937b7b?w=1200&q=80',
+        heroHeight: 280, textAlign: 'left', showHeader: true, logoText: 'Unicircuit',
+        logoSubtext: 'ENGINEERING SERVICES LLP', headerBg: '#0f766e'
+      },
+      educationCentral: {
+        id: 'educationCentral', label: 'Education Central Govt Hero', enabled: true, layout: 'hero',
+        eyebrow: 'KVS · NVS · IIT · NIT · CENTRAL UNIVERSITIES',
+        headline: 'Smart Infrastructure for India\'s Premier Institutions.',
+        subheadline: 'BMS, campus Wi-Fi, CCTV, and smart classroom AV for KVs, NVs, IITs, NITs, IIMs, and central universities',
+        footerLine: 'Unicircuit Engineering Services LLP · Central Govt Education ELV & Digital Solutions · GeM Empanelled',
+        accentColor: '#1d4ed8', overlayColor: '#172554',
+        imageUrl: 'https://images.unsplash.com/photo-1523050854058-8df90110c9f1?w=1200&q=80',
+        heroHeight: 280, textAlign: 'left', showHeader: true, logoText: 'Unicircuit',
+        logoSubtext: 'ENGINEERING SERVICES LLP', headerBg: '#1e40af'
+      },
+      educationPrivate: {
+        id: 'educationPrivate', label: 'Education Private Hero', enabled: true, layout: 'hero',
+        eyebrow: 'SMART CAMPUS · SAFETY · DIGITAL LEARNING',
+        headline: 'The Campus Experience Students Choose.',
+        subheadline: 'Smart classrooms, hostel safety, campus Wi-Fi, and ELV solutions for private universities, deemed institutions, and reputed schools',
+        footerLine: 'Unicircuit Engineering Services LLP · Private Education ELV & Smart Campus Solutions',
+        accentColor: '#7c3aed', overlayColor: '#2e1065',
+        imageUrl: 'https://images.unsplash.com/photo-1498243691581-b145c3f54a5a?w=1200&q=80',
+        heroHeight: 280, textAlign: 'left', showHeader: true, logoText: 'Unicircuit',
+        logoSubtext: 'ENGINEERING SERVICES LLP', headerBg: '#6d28d9'
+      },
+      industrialAssoc: {
+        id: 'industrialAssoc', label: 'Industrial Association Hero', enabled: true, layout: 'hero',
+        eyebrow: 'INDUSTRY PARTNERSHIP · MEMBER SOLUTIONS · ENGAGEMENT',
+        headline: 'Partnering with Industry. Enabling Members.',
+        subheadline: 'Knowledge sessions, member benefit programmes, and Industry 4.0 solutions for industrial associations and chambers of commerce',
+        footerLine: 'Unicircuit Engineering Services LLP · Industry Association & Member Engagement',
+        accentColor: '#b45309', overlayColor: '#1c1917',
+        imageUrl: 'https://images.unsplash.com/photo-1515187029135-18ee286d815b?w=1200&q=80',
+        heroHeight: 280, textAlign: 'left', showHeader: true, logoText: 'Unicircuit',
+        logoSubtext: 'ENGINEERING SERVICES LLP', headerBg: '#92400e'
+      },
+      stateGovt: {
+        id: 'stateGovt', label: 'State Government Hero', enabled: true, layout: 'hero',
+        eyebrow: 'SMART GOVERNANCE · SURVEILLANCE · ELV INFRASTRUCTURE',
+        headline: 'Digital Infrastructure for Smarter Governance.',
+        subheadline: 'City surveillance, secretariat networking, state data centres, and ELV solutions for state government departments — GeM empanelled',
+        footerLine: 'Unicircuit Engineering Services LLP · State Government ELV & Digital Infrastructure Solutions',
+        accentColor: '#0369a1', overlayColor: '#0c2340',
+        imageUrl: 'https://images.unsplash.com/photo-1477959858617-67f85cf4f1df?w=1200&q=80',
+        heroHeight: 280, textAlign: 'left', showHeader: true, logoText: 'Unicircuit',
+        logoSubtext: 'ENGINEERING SERVICES LLP', headerBg: '#075985'
+      },
+      correctional: {
+        id: 'correctional', label: 'Correctional Facilities Hero', enabled: true, layout: 'hero',
+        eyebrow: 'SECURE SURVEILLANCE · ACCESS CONTROL · ELV',
+        headline: 'Security and Transparency for Correctional Administration.',
+        subheadline: 'AI-enabled CCTV, biometric inmate tracking, perimeter protection, and ELV solutions for correctional facilities — audit-grade, GeM compliant',
+        footerLine: 'Unicircuit Engineering Services LLP · Correctional & High-Security ELV Solutions',
+        accentColor: '#374151', overlayColor: '#111827',
+        imageUrl: 'https://images.unsplash.com/photo-1589829545856-d10d557cf95f?w=1200&q=80',
+        heroHeight: 280, textAlign: 'left', showHeader: true, logoText: 'Unicircuit',
+        logoSubtext: 'ENGINEERING SERVICES LLP', headerBg: '#1f2937'
+      },
+      coldChainStorage: {
+        id: 'coldChainStorage', label: 'Cold Chain & Storage Hero', enabled: true, layout: 'hero',
+        eyebrow: 'IoT MONITORING · WAREHOUSE SECURITY · COLD CHAIN',
+        headline: 'Protecting India\'s Food Security Infrastructure.',
+        subheadline: 'IoT temperature monitoring, warehouse surveillance, and ELV solutions for FCI, NAFED, and agri storage PSUs — GeM empanelled',
+        footerLine: 'Unicircuit Engineering Services LLP · Agri Storage & Cold Chain ELV Solutions · GeM Empanelled',
+        accentColor: '#0e7490', overlayColor: '#0c2340',
+        imageUrl: 'https://images.unsplash.com/photo-1586528116311-ad8dd3c8310d?w=1200&q=80',
+        heroHeight: 280, textAlign: 'left', showHeader: true, logoText: 'Unicircuit',
+        logoSubtext: 'ENGINEERING SERVICES LLP', headerBg: '#0e7490'
       },
       brand: {
         id: 'brand', label: 'Unicircuit Brand', enabled: true, layout: 'simple',
@@ -23007,7 +23117,7 @@ ${plainText}`;
         + '<label style="display:flex;align-items:center;gap:8px;font-size:12px;margin-bottom:8px;cursor:pointer;"><input type="checkbox" id="' + s + '-banner-enabled" onchange="msgBannerOnEnabledChange(\'' + s + '\')" /> Enable banner</label>'
         + '<div id="' + s + '-banner-fields">'
         + '<div class="form-row" style="gap:8px;margin-bottom:8px;"><div style="flex:1;"><label class="form-label">Preset</label>'
-        + '<select class="inp" id="' + s + '-banner-preset" style="font-size:12px;" onchange="msgBannerOnPresetChange(\'' + s + '\')"><option value="none">No banner</option><option value="healthcare">Healthcare Hero</option><option value="forest">Forest &amp; Wildlife Hero</option><option value="defence">Defence &amp; Manufacturing Hero</option><option value="defencePsu">Defence PSU Hero</option><option value="banking">Banking &amp; PSU Hero</option><option value="agriculture">Agriculture &amp; Mandi Hero</option><option value="foodProcessing">Food Processing Hero</option><option value="coalMining">Coal Mining &amp; PSU Hero</option><option value="powerGenerationPsu">Power Generation PSU Hero</option><option value="powerGenerationStatePsu">Power Generation State PSU Hero</option><option value="brand">Brand bar</option><option value="custom">Custom</option></select></div>'
+        + '<select class="inp" id="' + s + '-banner-preset" style="font-size:12px;" onchange="msgBannerOnPresetChange(\'' + s + '\')"><option value="none">No banner</option><option value="healthcare">Healthcare Hero</option><option value="healthcarePsu">Healthcare PSU Hero</option><option value="forest">Forest &amp; Wildlife Hero</option><option value="defence">Defence &amp; Manufacturing Hero</option><option value="defencePsu">Defence PSU Hero</option><option value="banking">Banking &amp; PSU Hero</option><option value="centralBank">Central Bank Hero</option><option value="agriculture">Agriculture &amp; Mandi Hero</option><option value="foodProcessing">Food Processing Hero</option><option value="coalMining">Coal Mining &amp; PSU Hero</option><option value="powerGenerationPsu">Power Generation PSU Hero</option><option value="powerGenerationStatePsu">Power Generation State PSU Hero</option><option value="educationPsu">Education PSU Hero</option><option value="educationState">Education State Govt Hero</option><option value="educationCentral">Education Central Govt Hero</option><option value="educationPrivate">Education Private Hero</option><option value="industrialAssoc">Industrial Association Hero</option><option value="stateGovt">State Government Hero</option><option value="correctional">Correctional Facilities Hero</option><option value="coldChainStorage">Cold Chain &amp; Storage Hero</option><option value="brand">Brand bar</option><option value="custom">Custom</option></select></div>'
         + '<div style="flex:1;"><label class="form-label">Layout</label>'
         + '<select class="inp" id="' + s + '-banner-layout" style="font-size:12px;" onchange="msgBannerOnLayoutChange(\'' + s + '\')"><option value="hero">Hero image + overlay</option><option value="simple">Simple color bar</option></select></div></div>'
         + '<div class="form-group" id="' + s + '-banner-image-wrap" style="margin-bottom:8px;"><label class="form-label">Hero background image</label>'
@@ -23269,15 +23379,25 @@ ${plainText}`;
         + '<select id="' + panelId + '-industry" class="inp" style="font-size:12px;padding:5px 8px;width:auto;" onchange="ucSelectOther(this)">'
         + '<option value="general">General B2B</option>'
         + '<option value="healthcare">Healthcare / Hospital</option>'
+        + '<option value="healthcarePsu">Healthcare PSU (AIIMS / ESIC)</option>'
         + '<option value="forest">Forest / Environment</option>'
         + '<option value="defence">Defence / Strategic Manufacturing</option>'
         + '<option value="defencePsu">Defence PSU</option>'
         + '<option value="banking">Banking / PSU Bank</option>'
+        + '<option value="centralBank">Central Bank</option>'
         + '<option value="agriculture">Agriculture / Government</option>'
         + '<option value="foodProcessing">Food Processing / Dairy</option>'
         + '<option value="coalMining">Coal Mining / PSU</option>'
         + '<option value="powerGenerationPsu">Power Generation / PSU</option>'
         + '<option value="powerGenerationStatePsu">Power Generation / State PSU</option>'
+        + '<option value="educationPsu">Education PSU / Campus</option>'
+        + '<option value="educationState">Education State Govt</option>'
+        + '<option value="educationCentral">Education Central Govt (KV / IIT / NIT)</option>'
+        + '<option value="educationPrivate">Education Private / University</option>'
+        + '<option value="industrialAssoc">Industrial Association / Chamber</option>'
+        + '<option value="stateGovt">State Government</option>'
+        + '<option value="correctional">Correctional Facilities</option>'
+        + '<option value="coldChainStorage">Cold Chain &amp; Storage (FCI / NAFED)</option>'
         + '<option value="industrial">Industrial / Manufacturing</option>'
         + '<option value="electrical">Electrical / ELV</option>'
         + '<option value="smart-building">Smart Building / IoT</option>'
@@ -23312,20 +23432,30 @@ ${plainText}`;
       if (statusEl) { statusEl.style.color = 'var(--muted)'; statusEl.innerHTML = '<span class="spin-loader"></span> Generating…'; }
 
       var industryCtx = {
-        healthcare:      'hospitals, clinics, and healthcare institutions',
-        forest:          'forest departments, tiger reserves, and environmental agencies',
-        defence:         'defence PSUs, ordnance factories, and strategic manufacturing facilities',
-        defencePsu:      'Defence PSUs requiring GeM-compliant, audit-ready secure infrastructure',
-        banking:         'PSU banks, currency chests, and RBI-regulated branch networks',
-        agriculture:     'agriculture departments, mandis, procurement yards, and warehouses',
-        foodProcessing:  'food processing plants, dairy operations, and agri-export facilities',
+        healthcare:              'hospitals, clinics, and healthcare institutions',
+        healthcarePsu:           'central PSU hospitals like AIIMS, ESIC, JIPMER, and PGIMER',
+        forest:                  'forest departments, tiger reserves, and environmental agencies',
+        defence:                 'defence PSUs, ordnance factories, and strategic manufacturing facilities',
+        defencePsu:              'Defence PSUs requiring GeM-compliant, audit-ready secure infrastructure',
+        banking:                 'PSU banks, currency chests, and RBI-regulated branch networks',
+        centralBank:             'central banking institutions with vaults, currency processing centres, and data centres',
+        agriculture:             'agriculture departments, mandis, procurement yards, and warehouses',
+        foodProcessing:          'food processing plants, dairy operations, and agri-export facilities',
         coalMining:              'coal mining PSUs, open-cast and underground mines, and heavy industry',
         powerGenerationPsu:      'power generation PSUs operating thermal, hydro, and renewable plants',
         powerGenerationStatePsu: 'state power generation companies, Discoms, and Transcos',
-        industrial:      'industrial plants, manufacturing facilities, and OEMs',
-        electrical:      'electrical contractors, panel builders, and EPC companies',
-        'smart-building': 'smart buildings, campuses, and IoT-enabled facilities',
-        general:         'B2B engineering and technology clients'
+        educationPsu:            'PSU training academies, technical institutes, and R&D campuses',
+        educationState:          'state government schools, colleges, and examination infrastructure under Samagra Shiksha',
+        educationCentral:        'central government institutions — KVs, NVs, IITs, NITs, IIMs, and central universities',
+        educationPrivate:        'private universities, deemed institutions, and reputed schools',
+        industrialAssoc:         'industrial associations, chambers of commerce, and trade bodies',
+        stateGovt:               'state government departments, secretariats, and citizen-service centres',
+        correctional:            'correctional facilities, prisons, and high-security government establishments',
+        coldChainStorage:        'agri storage PSUs like FCI and NAFED managing warehouses, silos, and cold-chain networks',
+        industrial:              'industrial plants, manufacturing facilities, and OEMs',
+        electrical:              'electrical contractors, panel builders, and EPC companies',
+        'smart-building':        'smart buildings, campuses, and IoT-enabled facilities',
+        general:                 'B2B engineering and technology clients'
       }[industry] || 'B2B clients';
 
       var prompt = 'Generate email banner copy for Unicircuit Engineering Services LLP for the following campaign:\n'
@@ -23638,7 +23768,9 @@ ${plainText}`;
         + '<option>Newsletter</option><option>Promotion</option><option>Announcement</option>'
         + '<option>Healthcare</option><option>Forest &amp; Environment</option>'
         + '<option>Defence</option><option>Banking</option>'
-        + '<option>Agriculture</option><option>Food Processing</option><option>Mining</option><option>Power Generation</option>'
+        + '<option>Agriculture</option><option>Food Processing</option><option>Mining</option>'
+        + '<option>Power Generation</option><option>Education</option>'
+        + '<option>Government</option><option>Cold Chain &amp; Storage</option>'
         + '<option value="__other__">Other…</option>'
         + '</select>'
         + '<div id="uc-other-input-sat-category-placeholder" style="margin-bottom:12px;"></div>'
@@ -29432,6 +29564,10 @@ ${plainText}`;
                 <option>Agriculture</option>
                 <option>Food Processing</option>
                 <option>Mining</option>
+                <option>Power Generation</option>
+                <option>Education</option>
+                <option>Government</option>
+                <option>Cold Chain &amp; Storage</option>
                 <option value="__other__">Other…</option>
               </select>
             </div>

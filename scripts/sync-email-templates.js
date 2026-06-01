@@ -5,7 +5,7 @@ const path = require('path');
 process.chdir(path.join(__dirname, '../backend'));
 require('dotenv').config();
 const pool = require('./db/pool');
-const { seedEmailTemplates } = require('../backend/data/emailTemplateStorage');
+const { seedEmailTemplates } = require('./data/emailTemplateStorage');
 
 async function seedDefaultTemplates() {
   for (const tpl of seedEmailTemplates) {
