@@ -7004,13 +7004,14 @@
         </div>
         <div class="form-group" style="flex:1;margin-bottom:0;">
           <label class="form-label">Campaign Goal</label>
-          <select class="inp" id="nc-campaign-goal">
+          <select class="inp" id="nc-campaign-goal" onchange="ucSelectOther(this)">
             <option value="Lead Generation">Lead Generation</option>
             <option value="Sales Conversion">Sales Conversion</option>
             <option value="User Engagement">User Engagement</option>
             <option value="Customer Retention">Customer Retention</option>
             <option value="Brand Awareness">Brand Awareness</option>
             <option value="Re-engagement">Re-engagement</option>
+            <option value="__other__">Other…</option>
           </select>
         </div>
       </div>
@@ -7115,13 +7116,14 @@
           </div>
           <div class="form-group" style="margin-bottom:0;">
             <label class="form-label">AI Goal (for copy)</label>
-            <select class="inp" id="nc-goal">
+            <select class="inp" id="nc-goal" onchange="ucSelectOther(this)">
               <option>Lead generation</option>
               <option>Product awareness</option>
               <option>Quote requests</option>
               <option>Order follow-up</option>
               <option>Re-engagement</option>
               <option>Customer retention</option>
+              <option value="__other__">Other…</option>
             </select>
           </div>
         </div>
@@ -7159,6 +7161,103 @@
   <script>
     // ──────────────────────────────────────────────────────────────
     // UNICIRCUIT UNICOMM PRO – ADVANCED AI PLATFORM
+    // ──────────────────────────────────────────────────────────────
+    // "OTHER" OPTION UTILITY — shared by all extensible dropdowns
+    // ──────────────────────────────────────────────────────────────
+    // Persists custom options in localStorage keyed by select id.
+    // Usage: add <option value="__other__">Other…</option> to any
+    // select and call onchange="ucSelectOther(this)"
+    // ──────────────────────────────────────────────────────────────
+
+    var _ucSelectOtherPending = {}; // tracks inline input per select id
+
+    function ucSelectLoadCustom(selectEl) {
+      if (!selectEl || !selectEl.id) return;
+      var stored = JSON.parse(localStorage.getItem('uc_custom_opts_' + selectEl.id) || '[]');
+      stored.forEach(function (val) { ucSelectEnsureOption(selectEl, val); });
+    }
+
+    function ucSelectEnsureOption(selectEl, val) {
+      if (!val) return;
+      var exists = Array.from(selectEl.options).some(function (o) {
+        return o.value === val || o.textContent === val;
+      });
+      if (!exists) {
+        var otherOpt = Array.from(selectEl.options).find(function (o) { return o.value === '__other__'; });
+        var newOpt = document.createElement('option');
+        newOpt.value = val; newOpt.textContent = val;
+        if (otherOpt) selectEl.insertBefore(newOpt, otherOpt);
+        else selectEl.appendChild(newOpt);
+      }
+    }
+
+    function ucSelectPersist(selectId, val) {
+      var key = 'uc_custom_opts_' + selectId;
+      var stored = JSON.parse(localStorage.getItem(key) || '[]');
+      if (!stored.includes(val)) { stored.push(val); localStorage.setItem(key, JSON.stringify(stored)); }
+    }
+
+    function ucSelectOther(selectEl) {
+      if (!selectEl) return;
+      if (selectEl.value !== '__other__') {
+        // Remove any pending inline input for this select
+        var old = document.getElementById('uc-other-input-' + selectEl.id);
+        if (old) old.remove();
+        return;
+      }
+      // Already showing input? ignore
+      if (document.getElementById('uc-other-input-' + selectEl.id)) return;
+
+      var wrap = document.createElement('div');
+      wrap.id = 'uc-other-input-' + selectEl.id;
+      wrap.style.cssText = 'display:flex;gap:6px;align-items:center;margin-top:5px;';
+      wrap.innerHTML =
+        '<input class="inp" placeholder="Type new option…" style="flex:1;font-size:12px;padding:5px 8px;" '
+        + 'onkeydown="if(event.key===\'Enter\'){event.preventDefault();ucSelectOtherAdd(\'' + selectEl.id + '\');}" />'
+        + '<button type="button" class="btn btn-gold btn-xs" onclick="ucSelectOtherAdd(\'' + selectEl.id + '\')" title="Add option">'
+        + '<i class="fas fa-plus"></i></button>'
+        + '<button type="button" class="btn btn-ghost btn-xs" onclick="ucSelectOtherCancel(\'' + selectEl.id + '\')" title="Cancel">✕</button>';
+
+      // Insert right after the select element
+      selectEl.parentNode.insertBefore(wrap, selectEl.nextSibling);
+      wrap.querySelector('input').focus();
+    }
+
+    function ucSelectOtherAdd(selectId) {
+      var wrap = document.getElementById('uc-other-input-' + selectId);
+      if (!wrap) return;
+      var input = wrap.querySelector('input');
+      var val = input ? input.value.trim() : '';
+      if (!val) { if (input) input.focus(); return; }
+
+      var selectEl = document.getElementById(selectId);
+      if (!selectEl) return;
+
+      ucSelectEnsureOption(selectEl, val);
+      ucSelectPersist(selectId, val);
+      selectEl.value = val;
+      wrap.remove();
+    }
+
+    function ucSelectOtherCancel(selectId) {
+      var wrap = document.getElementById('uc-other-input-' + selectId);
+      if (wrap) wrap.remove();
+      var selectEl = document.getElementById(selectId);
+      // Revert to first non-other option
+      if (selectEl) {
+        var first = Array.from(selectEl.options).find(function (o) { return o.value !== '__other__'; });
+        if (first) selectEl.value = first.value;
+      }
+    }
+
+    // Call on page load to restore persisted custom options for all known selects
+    function ucSelectRestoreAll() {
+      ['et-category', 'nc-campaign-goal', 'nc-goal'].forEach(function (id) {
+        var el = document.getElementById(id);
+        if (el) ucSelectLoadCustom(el);
+      });
+    }
+
     // ──────────────────────────────────────────────────────────────
     // API_BASE is declared earlier in the page.
 
@@ -11079,25 +11178,94 @@ Keep it concise and professional.`;
       var subject = (document.getElementById('bc-subject') || {}).value.trim();
       var el = document.getElementById('bc-html');
       if (!el) return;
-      var origContent = el.innerHTML;
-      var isWa = _bcChannel === 'whatsapp';
-      el.innerHTML = '<div style="padding:12px;color:#888;font-size:13px;"><span class="spin-loader"></span> AI is writing your ' + (isWa ? 'WhatsApp message' : 'email') + '…</div>';
+      await emailAIGenerate('bc-html', subject);
+    }
+
+    // ── SHARED AI EMAIL GENERATE ──────────────────────────────────────────────
+    // Used by compose, template editor, campaign launch, and broadcast editors.
+    async function emailAIGenerate(editorId, subject) {
+      var el = document.getElementById(editorId);
+      if (!el) return;
+
+      // Build a small inline prompt panel above the editor
+      var panelId = 'ai-gen-panel-' + editorId;
+      var existing = document.getElementById(panelId);
+      if (existing) { existing.remove(); return; } // toggle off
+
+      var panel = document.createElement('div');
+      panel.id = panelId;
+      panel.style.cssText = 'background:rgba(245,166,35,0.06);border:1px solid rgba(245,166,35,0.2);border-radius:8px;padding:10px 12px;margin-bottom:6px;';
+      panel.innerHTML =
+        '<div style="font-size:10px;font-weight:700;color:var(--gold);margin-bottom:8px;letter-spacing:.5px;">'
+        + '<i class="fas fa-robot"></i> AI EMAIL GENERATOR'
+        + '<span onclick="document.getElementById(\'' + panelId + '\').remove()" style="float:right;cursor:pointer;color:var(--muted);font-size:12px;">✕</span></div>'
+        + '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:6px;">'
+        + '<input id="' + panelId + '-topic" class="inp" placeholder="Topic / product / purpose…" style="flex:1;font-size:12px;padding:5px 8px;" value="' + (subject || '').replace(/"/g, '&quot;') + '" />'
+        + '<select id="' + panelId + '-tone" class="inp" style="font-size:12px;padding:5px 8px;width:auto;">'
+        + '<option value="professional">Professional</option>'
+        + '<option value="friendly">Friendly</option>'
+        + '<option value="formal">Formal</option>'
+        + '<option value="persuasive">Persuasive</option>'
+        + '<option value="follow-up">Follow-up</option>'
+        + '</select>'
+        + '<select id="' + panelId + '-len" class="inp" style="font-size:12px;padding:5px 8px;width:auto;">'
+        + '<option value="short">Short (80w)</option>'
+        + '<option value="medium" selected>Medium (150w)</option>'
+        + '<option value="long">Long (250w)</option>'
+        + '</select>'
+        + '</div>'
+        + '<div style="display:flex;gap:6px;align-items:center;">'
+        + '<button class="btn btn-gold btn-xs" style="flex:1;justify-content:center;" onclick="emailAIGenerateRun(\'' + editorId + '\',\'' + panelId + '\')">'
+        + '<i class="fas fa-wand-magic-sparkles"></i> Generate</button>'
+        + '<button class="btn btn-ghost btn-xs" onclick="emailAIGenerateRun(\'' + editorId + '\',\'' + panelId + '\',true)">'
+        + '<i class="fas fa-plus"></i> Append</button>'
+        + '<span id="' + panelId + '-status" style="font-size:11px;color:var(--muted);"></span>'
+        + '</div>';
+
+      // Insert panel just before the editor element
+      el.parentNode.insertBefore(panel, el);
+      setTimeout(function () { var t = document.getElementById(panelId + '-topic'); if (t) { t.focus(); t.select(); } }, 50);
+    }
+
+    async function emailAIGenerateRun(editorId, panelId, append) {
+      var el = document.getElementById(editorId);
+      var topicEl = document.getElementById(panelId + '-topic');
+      var toneEl = document.getElementById(panelId + '-tone');
+      var lenEl = document.getElementById(panelId + '-len');
+      var statusEl = document.getElementById(panelId + '-status');
+      if (!el || !topicEl) return;
+
+      var topic = topicEl.value.trim();
+      var tone = (toneEl || {}).value || 'professional';
+      var len = (lenEl || {}).value || 'medium';
+      var wordCount = len === 'short' ? '80' : len === 'long' ? '250' : '150';
+
+      if (!topic) { if (statusEl) { statusEl.style.color = 'var(--red2)'; statusEl.textContent = 'Enter a topic first.'; } topicEl.focus(); return; }
+      if (statusEl) { statusEl.style.color = 'var(--muted)'; statusEl.innerHTML = '<span class="spin-loader"></span> Writing…'; }
+
+      var prompt = 'Write a ' + tone + ' HTML email body for Unicircuit Engineering Services LLP'
+        + ' about: "' + topic + '".'
+        + ' Target: Indian B2B engineering clients.'
+        + ' Use {{name}} for recipient personalization.'
+        + ' Under ' + wordCount + ' words.'
+        + ' Include a clear call-to-action.'
+        + ' Return ONLY the HTML body content (no <html>/<head>/<body> tags). Use inline styles for formatting.';
+
       try {
-        var prompt = isWa
-          ? ('Write a professional WhatsApp broadcast message for Unicircuit Engineering Services LLP'
-            + (subject ? ' for campaign: "' + subject + '"' : '')
-            + '. Suitable for Indian B2B engineering clients. Use {{name}} for personalization, include tasteful emoji where helpful, keep it under 120 words, and include a clear CTA. Return ONLY message body HTML using simple <p> and <br> tags.')
-          : ('Write a professional HTML email body for Unicircuit Engineering Services LLP'
-            + (subject ? ' with subject: "' + subject + '"' : '')
-            + '. Use {{name}} for recipient personalization. Under 200 words. Include a clear CTA. Return ONLY the HTML body content (no <html>/<head>/<body> tags). Use inline styles for formatting.');
         var text = await callPicoClaw(prompt);
-        // Strip any accidental outer tags
-        var clean = text.trim().replace(/^```html\s*/i,'').replace(/```\s*$/,'').trim();
-        el.innerHTML = clean || origContent;
-        notify(isWa ? 'AI WhatsApp message generated' : 'AI email generated', 'Review and edit before sending', 'var(--blue2)', 'fas fa-robot');
+        var clean = text.trim().replace(/^```html\s*/i, '').replace(/```\s*$/, '').trim();
+        if (!clean) throw new Error('Empty response');
+        if (append) {
+          var cur = el.innerHTML.trim();
+          el.innerHTML = cur ? cur + '<br><br>' + clean : clean;
+        } else {
+          el.innerHTML = clean;
+        }
+        if (statusEl) { statusEl.style.color = 'var(--green2)'; statusEl.textContent = '✓ Done'; }
+        setTimeout(function () { var p = document.getElementById(panelId); if (p) p.remove(); }, 1200);
+        notify('AI email generated', 'Review and edit before sending', 'var(--blue2)', 'fas fa-robot');
       } catch (err) {
-        el.innerHTML = origContent;
-        notify('AI error', err.message, 'var(--red)', 'fas fa-exclamation-circle');
+        if (statusEl) { statusEl.style.color = 'var(--red2)'; statusEl.textContent = err.message || 'Error'; }
       }
     }
 
@@ -11722,6 +11890,9 @@ Keep it concise and professional.`;
     window.addEventListener('DOMContentLoaded', () => {
       // Apply saved theme
       applyTheme(localStorage.getItem('uc_theme') || 'dark');
+
+      // Restore custom dropdown options added by user
+      ucSelectRestoreAll();
 
       // ── AUTH GUARD ──────────────────────────────────────────────────────────
       const token = localStorage.getItem('uc_token') || sessionStorage.getItem('uc_token');
@@ -12436,6 +12607,7 @@ Best regards,<br>
               <button type="button" class="btn btn-ghost btn-xs" onmousedown="bcToolbarMousedown(event,'cl-body-editor')" onclick="bcInsertSignature()" title="Signature"><i class="fas fa-signature"></i> Signature</button>
               <button type="button" class="btn btn-ghost btn-xs" onmousedown="bcToolbarMousedown(event,'cl-body-editor')" onclick="openInsertHtmlModal('cl-body-editor')" title="Insert HTML"><i class="fas fa-code"></i> HTML</button>
               <button type="button" class="btn btn-ghost btn-xs" onmousedown="event.preventDefault()" onclick="previewEditorContent('cl-body-editor')" title="Preview"><i class="fas fa-eye"></i> Preview</button>
+              <button type="button" class="btn btn-ghost btn-xs" onmousedown="event.preventDefault()" onclick="emailAIGenerate('cl-body-editor', document.getElementById('cl-subject')?.value || '')" title="AI Generate email body"><i class="fas fa-robot" style="color:var(--gold);"></i> AI</button>
               <button type="button" class="btn btn-ghost btn-xs" onmousedown="event.preventDefault()" onclick="clearEditor('cl-body-editor')" title="Clear editor content"><i class="fas fa-eraser"></i> Clear</button>
             </div>
             <div id="cl-body-editor" contenteditable="true"
@@ -22470,6 +22642,94 @@ ${plainText}`;
         heroHeight: 280, textAlign: 'left', showHeader: true, logoText: 'Unicircuit',
         logoSubtext: 'ENGINEERING SERVICES LLP', headerBg: '#15803d'
       },
+      defence: {
+        id: 'defence', label: 'Defence & Manufacturing Hero', enabled: true, layout: 'hero',
+        eyebrow: 'ELV · PLANT SECURITY · DIGITAL INFRASTRUCTURE',
+        headline: 'Securing India\'s Strategic Manufacturing.',
+        subheadline: 'Turnkey ELV, physical security, and digital infrastructure for defence PSUs and strategic manufacturing facilities',
+        footerLine: 'Unicircuit Engineering Services LLP · Defence & Industrial ELV Solutions · GeM Registered',
+        accentColor: '#78350f', overlayColor: '#1c1917',
+        imageUrl: 'https://images.unsplash.com/photo-1581091226825-a6a2a5aee158?w=1200&q=80',
+        heroHeight: 280, textAlign: 'left', showHeader: true, logoText: 'Unicircuit',
+        logoSubtext: 'ENGINEERING SERVICES LLP', headerBg: '#292524'
+      },
+      defencePsu: {
+        id: 'defencePsu', label: 'Defence PSU Hero', enabled: true, layout: 'hero',
+        eyebrow: 'SECURE INFRASTRUCTURE · ELV · DEFENCE PSU',
+        headline: 'Built for India\'s Most Demanding Facilities.',
+        subheadline: 'Integrated plant security, OT infrastructure, and ELV solutions for Defence PSUs — GeM-empanelled, audit-ready',
+        footerLine: 'Unicircuit Engineering Services LLP · Defence PSU ELV & Secure Infrastructure · GeM Empanelled',
+        accentColor: '#1e3a5f', overlayColor: '#0f172a',
+        imageUrl: 'https://images.unsplash.com/photo-1504307651254-35680f356dfd?w=1200&q=80',
+        heroHeight: 280, textAlign: 'left', showHeader: true, logoText: 'Unicircuit',
+        logoSubtext: 'ENGINEERING SERVICES LLP', headerBg: '#1e3a5f'
+      },
+      banking: {
+        id: 'banking', label: 'Banking & PSU Hero', enabled: true, layout: 'hero',
+        eyebrow: 'BRANCH SECURITY · ELV · CURRENCY CHEST SOLUTIONS',
+        headline: 'Securing Every Branch. Every Chest. Every Day.',
+        subheadline: 'RBI-compliant physical security, e-surveillance, and ELV infrastructure for PSU banking networks across India',
+        footerLine: 'Unicircuit Engineering Services LLP · Banking & PSU ELV & Security Solutions',
+        accentColor: '#1e40af', overlayColor: '#172554',
+        imageUrl: 'https://images.unsplash.com/photo-1541354329998-f4d9a9f9297f?w=1200&q=80',
+        heroHeight: 280, textAlign: 'left', showHeader: true, logoText: 'Unicircuit',
+        logoSubtext: 'ENGINEERING SERVICES LLP', headerBg: '#1e3a8a'
+      },
+      agriculture: {
+        id: 'agriculture', label: 'Agriculture & Mandi Hero', enabled: true, layout: 'hero',
+        eyebrow: 'SMART MANDIS · IoT STORAGE · FIELD CONNECTIVITY',
+        headline: 'Modernising India\'s Agricultural Infrastructure.',
+        subheadline: 'Surveillance, IoT monitoring, and digital connectivity for mandis, procurement yards, warehouses, and field operations',
+        footerLine: 'Unicircuit Engineering Services LLP · Agriculture & Government ELV Solutions',
+        accentColor: '#365314', overlayColor: '#1a2e05',
+        imageUrl: 'https://images.unsplash.com/photo-1500937386664-56d1dfef3854?w=1200&q=80',
+        heroHeight: 280, textAlign: 'left', showHeader: true, logoText: 'Unicircuit',
+        logoSubtext: 'ENGINEERING SERVICES LLP', headerBg: '#3f6212'
+      },
+      foodProcessing: {
+        id: 'foodProcessing', label: 'Food Processing Hero', enabled: true, layout: 'hero',
+        eyebrow: 'COLD CHAIN · SMART PLANT · FSSAI COMPLIANCE',
+        headline: 'Precision Infrastructure for Food Processing.',
+        subheadline: 'BMS, cold-chain IoT, surveillance, and ELV solutions for food processing, dairy, and agri-export operations',
+        footerLine: 'Unicircuit Engineering Services LLP · Food Processing & Agri ELV Solutions',
+        accentColor: '#0f766e', overlayColor: '#042f2e',
+        imageUrl: 'https://images.unsplash.com/photo-1556909114-f6e7ad7d3136?w=1200&q=80',
+        heroHeight: 280, textAlign: 'left', showHeader: true, logoText: 'Unicircuit',
+        logoSubtext: 'ENGINEERING SERVICES LLP', headerBg: '#0f766e'
+      },
+      coalMining: {
+        id: 'coalMining', label: 'Coal Mining &amp; PSU Hero', enabled: true, layout: 'hero',
+        eyebrow: 'MINE SAFETY · ASSET TRACKING · SURVEILLANCE',
+        headline: 'Safety and Visibility Across Every Mine Site.',
+        subheadline: 'Worker safety, HEMM tracking, perimeter security, and digital infrastructure for coal mining PSUs — GeM registered',
+        footerLine: 'Unicircuit Engineering Services LLP · Mining &amp; Heavy Industry ELV Solutions · GeM Registered',
+        accentColor: '#44403c', overlayColor: '#1c1917',
+        imageUrl: 'https://images.unsplash.com/photo-1578662996442-48f60103fc96?w=1200&q=80',
+        heroHeight: 280, textAlign: 'left', showHeader: true, logoText: 'Unicircuit',
+        logoSubtext: 'ENGINEERING SERVICES LLP', headerBg: '#44403c'
+      },
+      powerGenerationPsu: {
+        id: 'powerGenerationPsu', label: 'Power Generation PSU Hero', enabled: true, layout: 'hero',
+        eyebrow: 'PLANT SECURITY · ASSET HEALTH · ELV SOLUTIONS',
+        headline: 'Powering Reliability. Securing Every Megawatt.',
+        subheadline: 'Integrated plant security, asset monitoring, and ELV infrastructure for thermal, hydro, and renewable power PSUs',
+        footerLine: 'Unicircuit Engineering Services LLP · Power Generation ELV &amp; Security Solutions · GeM Empanelled',
+        accentColor: '#b45309', overlayColor: '#1c1917',
+        imageUrl: 'https://images.unsplash.com/photo-1466611653911-95081537e5b7?w=1200&q=80',
+        heroHeight: 280, textAlign: 'left', showHeader: true, logoText: 'Unicircuit',
+        logoSubtext: 'ENGINEERING SERVICES LLP', headerBg: '#92400e'
+      },
+      powerGenerationStatePsu: {
+        id: 'powerGenerationStatePsu', label: 'Power Generation State PSU Hero', enabled: true, layout: 'hero',
+        eyebrow: 'STATE POWER · SMART GRID · ELV MODERNISATION',
+        headline: 'Modernising State Power. Strengthening Energy Security.',
+        subheadline: 'Asset monitoring, sub-station surveillance, and ELV infrastructure for state Gencos, Discoms, and Transcos',
+        footerLine: 'Unicircuit Engineering Services LLP · State Power Utility ELV &amp; Digital Solutions',
+        accentColor: '#1d4ed8', overlayColor: '#1e3a8a',
+        imageUrl: 'https://images.unsplash.com/photo-1473341304170-971dccb5ac1e?w=1200&q=80',
+        heroHeight: 280, textAlign: 'left', showHeader: true, logoText: 'Unicircuit',
+        logoSubtext: 'ENGINEERING SERVICES LLP', headerBg: '#1e40af'
+      },
       brand: {
         id: 'brand', label: 'Unicircuit Brand', enabled: true, layout: 'simple',
         headline: 'Unicircuit Engineering Services LLP',
@@ -22747,7 +23007,7 @@ ${plainText}`;
         + '<label style="display:flex;align-items:center;gap:8px;font-size:12px;margin-bottom:8px;cursor:pointer;"><input type="checkbox" id="' + s + '-banner-enabled" onchange="msgBannerOnEnabledChange(\'' + s + '\')" /> Enable banner</label>'
         + '<div id="' + s + '-banner-fields">'
         + '<div class="form-row" style="gap:8px;margin-bottom:8px;"><div style="flex:1;"><label class="form-label">Preset</label>'
-        + '<select class="inp" id="' + s + '-banner-preset" style="font-size:12px;" onchange="msgBannerOnPresetChange(\'' + s + '\')"><option value="none">No banner</option><option value="healthcare">Healthcare Hero</option><option value="forest">Forest &amp; Wildlife Hero</option><option value="brand">Brand bar</option><option value="custom">Custom</option></select></div>'
+        + '<select class="inp" id="' + s + '-banner-preset" style="font-size:12px;" onchange="msgBannerOnPresetChange(\'' + s + '\')"><option value="none">No banner</option><option value="healthcare">Healthcare Hero</option><option value="forest">Forest &amp; Wildlife Hero</option><option value="defence">Defence &amp; Manufacturing Hero</option><option value="defencePsu">Defence PSU Hero</option><option value="banking">Banking &amp; PSU Hero</option><option value="agriculture">Agriculture &amp; Mandi Hero</option><option value="foodProcessing">Food Processing Hero</option><option value="coalMining">Coal Mining &amp; PSU Hero</option><option value="powerGenerationPsu">Power Generation PSU Hero</option><option value="powerGenerationStatePsu">Power Generation State PSU Hero</option><option value="brand">Brand bar</option><option value="custom">Custom</option></select></div>'
         + '<div style="flex:1;"><label class="form-label">Layout</label>'
         + '<select class="inp" id="' + s + '-banner-layout" style="font-size:12px;" onchange="msgBannerOnLayoutChange(\'' + s + '\')"><option value="hero">Hero image + overlay</option><option value="simple">Simple color bar</option></select></div></div>'
         + '<div class="form-group" id="' + s + '-banner-image-wrap" style="margin-bottom:8px;"><label class="form-label">Hero background image</label>'
@@ -22790,6 +23050,7 @@ ${plainText}`;
         + '<button type="button" class="btn btn-gold btn-xs" onclick="msgBannerApplyToEditor(\'' + s + '\')"><i class="fas fa-check"></i> Apply to message</button>'
         + '<button type="button" class="btn btn-ghost btn-xs" onclick="msgBannerRemoveFromEditor(\'' + s + '\')"><i class="fas fa-times"></i> Remove</button>'
         + '<button type="button" class="btn btn-ghost btn-xs" onclick="msgBannerSaveDefaults(\'' + s + '\')"><i class="fas fa-save"></i> Save default</button>'
+        + '<button type="button" class="btn btn-ghost btn-xs" onclick="msgBannerAIGenerate(\'' + s + '\')" title="AI-generate banner text and colors"><i class="fas fa-robot" style="color:var(--gold);"></i> AI Fill</button>'
         + '</div></div></div></div>';
     }
 
@@ -22986,6 +23247,133 @@ ${plainText}`;
       notify('Banner defaults saved', 'Loaded automatically next time you open this editor', 'var(--green)', 'fas fa-save');
     }
 
+    // ── AI BANNER FILL ────────────────────────────────────────────────────────
+    async function msgBannerAIGenerate(scope) {
+      // Build a small inline prompt panel inside the banner body
+      var bodyEl = document.getElementById(scope + '-banner-body');
+      if (!bodyEl) return;
+
+      var panelId = scope + '-banner-ai-panel';
+      var existing = document.getElementById(panelId);
+      if (existing) { existing.remove(); return; } // toggle
+
+      var panel = document.createElement('div');
+      panel.id = panelId;
+      panel.style.cssText = 'background:rgba(245,166,35,0.07);border:1px solid rgba(245,166,35,0.25);border-radius:8px;padding:10px 12px;margin-bottom:10px;';
+      panel.innerHTML =
+        '<div style="font-size:10px;font-weight:700;color:var(--gold);margin-bottom:8px;letter-spacing:.5px;">'
+        + '<i class="fas fa-robot"></i> AI BANNER GENERATOR'
+        + '<span onclick="document.getElementById(\'' + panelId + '\').remove()" style="float:right;cursor:pointer;color:var(--muted);font-size:12px;">✕</span></div>'
+        + '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:6px;">'
+        + '<input id="' + panelId + '-topic" class="inp" placeholder="Topic / industry / campaign purpose…" style="flex:1;font-size:12px;padding:5px 8px;" />'
+        + '<select id="' + panelId + '-industry" class="inp" style="font-size:12px;padding:5px 8px;width:auto;" onchange="ucSelectOther(this)">'
+        + '<option value="general">General B2B</option>'
+        + '<option value="healthcare">Healthcare / Hospital</option>'
+        + '<option value="forest">Forest / Environment</option>'
+        + '<option value="defence">Defence / Strategic Manufacturing</option>'
+        + '<option value="defencePsu">Defence PSU</option>'
+        + '<option value="banking">Banking / PSU Bank</option>'
+        + '<option value="agriculture">Agriculture / Government</option>'
+        + '<option value="foodProcessing">Food Processing / Dairy</option>'
+        + '<option value="coalMining">Coal Mining / PSU</option>'
+        + '<option value="powerGenerationPsu">Power Generation / PSU</option>'
+        + '<option value="powerGenerationStatePsu">Power Generation / State PSU</option>'
+        + '<option value="industrial">Industrial / Manufacturing</option>'
+        + '<option value="electrical">Electrical / ELV</option>'
+        + '<option value="smart-building">Smart Building / IoT</option>'
+        + '<option value="__other__">Other…</option>'
+        + '</select>'
+        + '</div>'
+        + '<div style="display:flex;gap:6px;align-items:center;">'
+        + '<button class="btn btn-gold btn-xs" style="flex:1;justify-content:center;" onclick="msgBannerAIFill(\'' + scope + '\',\'' + panelId + '\')">'
+        + '<i class="fas fa-wand-magic-sparkles"></i> Generate Banner Text</button>'
+        + '<span id="' + panelId + '-status" style="font-size:11px;color:var(--muted);"></span>'
+        + '</div>';
+
+      // Insert at top of banner body, before the enable checkbox
+      bodyEl.insertBefore(panel, bodyEl.firstChild);
+      setTimeout(function () { var t = document.getElementById(panelId + '-topic'); if (t) t.focus(); }, 50);
+    }
+
+    async function msgBannerAIFill(scope, panelId) {
+      var topicEl = document.getElementById(panelId + '-topic');
+      var industryEl = document.getElementById(panelId + '-industry');
+      var statusEl = document.getElementById(panelId + '-status');
+
+      var topic = (topicEl || {}).value || '';
+      var industry = (industryEl || {}).value || 'general';
+
+      topic = topic.trim();
+      if (!topic) {
+        if (statusEl) { statusEl.style.color = 'var(--red2)'; statusEl.textContent = 'Enter a topic first.'; }
+        if (topicEl) topicEl.focus();
+        return;
+      }
+      if (statusEl) { statusEl.style.color = 'var(--muted)'; statusEl.innerHTML = '<span class="spin-loader"></span> Generating…'; }
+
+      var industryCtx = {
+        healthcare:      'hospitals, clinics, and healthcare institutions',
+        forest:          'forest departments, tiger reserves, and environmental agencies',
+        defence:         'defence PSUs, ordnance factories, and strategic manufacturing facilities',
+        defencePsu:      'Defence PSUs requiring GeM-compliant, audit-ready secure infrastructure',
+        banking:         'PSU banks, currency chests, and RBI-regulated branch networks',
+        agriculture:     'agriculture departments, mandis, procurement yards, and warehouses',
+        foodProcessing:  'food processing plants, dairy operations, and agri-export facilities',
+        coalMining:              'coal mining PSUs, open-cast and underground mines, and heavy industry',
+        powerGenerationPsu:      'power generation PSUs operating thermal, hydro, and renewable plants',
+        powerGenerationStatePsu: 'state power generation companies, Discoms, and Transcos',
+        industrial:      'industrial plants, manufacturing facilities, and OEMs',
+        electrical:      'electrical contractors, panel builders, and EPC companies',
+        'smart-building': 'smart buildings, campuses, and IoT-enabled facilities',
+        general:         'B2B engineering and technology clients'
+      }[industry] || 'B2B clients';
+
+      var prompt = 'Generate email banner copy for Unicircuit Engineering Services LLP for the following campaign:\n'
+        + 'Topic: ' + topic + '\n'
+        + 'Target audience: ' + industryCtx + '\n\n'
+        + 'Return ONLY a valid JSON object with these exact keys (no markdown, no explanation):\n'
+        + '{\n'
+        + '  "eyebrow": "SHORT CAPS TAGLINE · MAX 6 WORDS",\n'
+        + '  "headline": "Main headline, max 8 words, impactful",\n'
+        + '  "subheadline": "Supporting sentence, max 15 words",\n'
+        + '  "footerLine": "Company footer line, max 12 words",\n'
+        + '  "overlayColor": "#hexcolor (dark, suits the industry)",\n'
+        + '  "accentColor": "#hexcolor (brand accent, complements overlay)"\n'
+        + '}';
+
+      try {
+        var raw = await callPicoClaw(prompt);
+        // Strip markdown fences if present
+        var jsonStr = raw.trim().replace(/^```json\s*/i, '').replace(/^```\s*/i, '').replace(/```\s*$/, '').trim();
+        var data = JSON.parse(jsonStr);
+
+        // Write fields into the banner form
+        var set = function (id, val) { var el = document.getElementById(scope + '-' + id); if (el && val) el.value = val; };
+        set('banner-eyebrow', data.eyebrow || '');
+        set('banner-headline', data.headline || '');
+        set('banner-subheadline', data.subheadline || '');
+        set('banner-footer', data.footerLine || '');
+        if (data.overlayColor) set('banner-overlay', data.overlayColor);
+        if (data.accentColor) set('banner-accent', data.accentColor);
+
+        // Switch to custom preset and enable banner
+        var presetEl = document.getElementById(scope + '-banner-preset');
+        if (presetEl) presetEl.value = 'custom';
+        var enabledEl = document.getElementById(scope + '-banner-enabled');
+        if (enabledEl) enabledEl.checked = true;
+
+        // Trigger preview refresh
+        msgBannerOnFieldChange(scope);
+
+        if (statusEl) { statusEl.style.color = 'var(--green2)'; statusEl.textContent = '✓ Done — review and apply'; }
+        setTimeout(function () { var p = document.getElementById(panelId); if (p) p.remove(); }, 2000);
+        notify('Banner text generated', 'Review the fields, then click Apply to message', 'var(--gold)', 'fas fa-robot');
+      } catch (err) {
+        if (statusEl) { statusEl.style.color = 'var(--red2)'; statusEl.textContent = 'Parse error — try again'; }
+        console.warn('[BannerAI] raw response:', err.message);
+      }
+    }
+
     function msgBannerCopyConfig(fromScope, toScope) {
       msgBannerMountPanel(fromScope);
       msgBannerMountPanel(toScope);
@@ -23165,24 +23553,38 @@ ${plainText}`;
     async function etLoadTemplate(id) {
       try {
         var res = await fetch(API_BASE + '/templates/' + id, { headers: getAuthHeaders() });
+        if (!res.ok) throw new Error('Failed to load template');
         var t = await res.json();
         etCurrentId = t.id;
         document.getElementById('et-name').value = t.name || '';
         document.getElementById('et-subject').value = t.subject || '';
-        document.getElementById('et-category').value = t.category || 'General';
+        // Set category — add option dynamically if not present
+        var catSel = document.getElementById('et-category');
+        if (catSel) {
+          var found = Array.from(catSel.options).some(function (o) { return o.value === (t.category || 'General'); });
+          if (!found && t.category) {
+            var opt = document.createElement('option');
+            opt.value = t.category; opt.textContent = t.category;
+            catSel.appendChild(opt);
+          }
+          catSel.value = t.category || 'General';
+        }
         etSetHTML(t.html_body || '');
         etVariableFields = emailNormalizeVariableFields(t.variable_fields || []);
         etRefreshVariablesPanel();
-        if (t.banner_config) {
+        // Restore banner — only if banner_config is explicitly saved
+        if (typeof msgBannerMountPanel === 'function') {
           msgBannerMountPanel('et');
-          msgBannerWriteForm('et', t.banner_config);
-          msgBannerSaveSaved('et', t.banner_config);
-        } else if ((t.html_body || '').indexOf('data-uc-banner') !== -1) {
-          msgBannerMountPanel('et');
-          msgBannerWriteForm('et', msgBannerNormalizeConfig({ preset: 'healthcare', enabled: true }));
+          if (t.banner_config && t.banner_config.enabled) {
+            msgBannerWriteForm('et', t.banner_config);
+            msgBannerSaveSaved('et', t.banner_config);
+          } else {
+            msgBannerWriteForm('et', { enabled: false, preset: 'none' });
+          }
         }
         var delBtn = document.getElementById('et-delete-btn');
         if (delBtn) delBtn.style.display = 'inline-flex';
+        // Highlight active card
         document.querySelectorAll('.template-card').forEach(function (c) { c.style.borderColor = ''; });
         var card = document.getElementById('et-card-' + id);
         if (card) card.style.borderColor = 'var(--gold)';
@@ -23197,6 +23599,11 @@ ${plainText}`;
       etSetHTML('');
       etVariableFields = [];
       etRefreshVariablesPanel();
+      // Reset banner panel to disabled state
+      if (typeof msgBannerMountPanel === 'function') {
+        msgBannerMountPanel('et');
+        msgBannerWriteForm('et', { enabled: false, preset: 'none' });
+      }
       var delBtn = document.getElementById('et-delete-btn');
       if (delBtn) delBtn.style.display = 'none';
       document.querySelectorAll('.template-card').forEach(function (c) { c.style.borderColor = ''; });
@@ -23226,11 +23633,15 @@ ${plainText}`;
         + '<label class="form-label">Subject</label>'
         + '<input id="sat-subject" class="inp" placeholder="Email subject line" style="margin-bottom:10px;" value="' + (defaultSubject || '').replace(/"/g, '&quot;') + '" />'
         + '<label class="form-label">Category</label>'
-        + '<select id="sat-category" class="inp" style="margin-bottom:16px;">'
+        + '<select id="sat-category" class="inp" style="margin-bottom:4px;" onchange="ucSelectOther(this)">'
         + '<option>General</option><option>Product</option><option>Follow-up</option>'
         + '<option>Newsletter</option><option>Promotion</option><option>Announcement</option>'
         + '<option>Healthcare</option><option>Forest &amp; Environment</option>'
+        + '<option>Defence</option><option>Banking</option>'
+        + '<option>Agriculture</option><option>Food Processing</option><option>Mining</option><option>Power Generation</option>'
+        + '<option value="__other__">Other…</option>'
         + '</select>'
+        + '<div id="uc-other-input-sat-category-placeholder" style="margin-bottom:12px;"></div>'
         + '<div style="display:flex;gap:8px;">'
         + '<button class="btn btn-gold" style="flex:1;justify-content:center;" onclick="satConfirmSave(\'' + editorId + '\')">'
         + '<i class="fas fa-save"></i> Save</button>'
@@ -23239,7 +23650,12 @@ ${plainText}`;
         + '<div id="sat-status" style="font-size:11px;margin-top:8px;text-align:center;"></div>'
         + '</div>';
       document.body.appendChild(dialog);
-      setTimeout(function () { var n = document.getElementById('sat-name'); if (n) { n.focus(); n.select(); } }, 50);
+      setTimeout(function () {
+        var n = document.getElementById('sat-name'); if (n) { n.focus(); n.select(); }
+        // Restore any previously added custom categories
+        var catEl = document.getElementById('sat-category');
+        if (catEl) ucSelectLoadCustom(catEl);
+      }, 50);
     }
 
     async function satConfirmSave(editorId) {
@@ -23314,7 +23730,12 @@ ${plainText}`;
           etCurrentId = data.id;
           if (statusEl) statusEl.innerHTML = '<span style="color:var(--green2);"><i class="fas fa-check"></i> Saved!</span>';
           setTimeout(function () { if (statusEl) statusEl.innerHTML = ''; }, 2000);
-          etLoadTemplates();
+          etLoadTemplates().then(function () {
+            // Re-highlight the saved card after list re-renders
+            document.querySelectorAll('.template-card').forEach(function (c) { c.style.borderColor = ''; });
+            var card = document.getElementById('et-card-' + etCurrentId);
+            if (card) card.style.borderColor = 'var(--gold)';
+          });
           var delBtn = document.getElementById('et-delete-btn');
           if (delBtn) delBtn.style.display = 'inline-flex';
           notify('Template saved', name, 'var(--green)', 'fas fa-save');
@@ -28760,6 +29181,8 @@ ${plainText}`;
             onclick="previewEditorContent('compose-body')" title="Preview email full-screen"><i class="fas fa-eye"></i>
             Preview</button>
           <button type="button" class="btn btn-ghost btn-xs" onmousedown="event.preventDefault()"
+            onclick="emailAIGenerate('compose-body', document.getElementById('compose-subject')?.value || '')" title="AI Generate email body"><i class="fas fa-robot" style="color:var(--gold);"></i> AI</button>
+          <button type="button" class="btn btn-ghost btn-xs" onmousedown="event.preventDefault()"
             onclick="clearEditor('compose-body')" title="Clear editor content"><i class="fas fa-eraser"></i> Clear</button>
         </div>
         <div id="compose-body" contenteditable="true" class="compose-editor-body" placeholder="Write your message…"
@@ -28995,7 +29418,7 @@ ${plainText}`;
             </div>
             <div>
               <label class="form-label">Category</label>
-              <select class="inp" id="et-category" style="font-size:12.5px;width:auto;">
+              <select class="inp" id="et-category" style="font-size:12.5px;width:auto;" onchange="ucSelectOther(this)">
                 <option>General</option>
                 <option>Product</option>
                 <option>Follow-up</option>
@@ -29004,6 +29427,12 @@ ${plainText}`;
                 <option>Announcement</option>
                 <option>Healthcare</option>
                 <option>Forest &amp; Environment</option>
+                <option>Defence</option>
+                <option>Banking</option>
+                <option>Agriculture</option>
+                <option>Food Processing</option>
+                <option>Mining</option>
+                <option value="__other__">Other…</option>
               </select>
             </div>
           </div>
@@ -29144,6 +29573,8 @@ Preview shows final Outlook-compatible version"><i class="fas fa-code"></i> HTML
               title="Header banner settings"><i class="fas fa-image"></i> Banner</button>
             <button class="btn btn-ghost btn-xs" onmousedown="event.preventDefault()" onclick="etPreviewTemplate()"
               title="Preview"><i class="fas fa-eye"></i> Preview</button>
+            <button class="btn btn-ghost btn-xs" onmousedown="event.preventDefault()"
+              onclick="emailAIGenerate('et-html-editor', document.getElementById('et-subject')?.value || '')" title="AI Generate email body"><i class="fas fa-robot" style="color:var(--gold);"></i> AI</button>
             <button class="btn btn-ghost btn-xs" onmousedown="event.preventDefault()" onclick="clearEditor('et-html-editor');etMarkDirty();"
               title="Clear editor content"><i class="fas fa-eraser"></i> Clear</button>
             <button class="btn btn-ghost btn-xs" onmousedown="event.preventDefault()" onclick="etUseInBroadcast()"
