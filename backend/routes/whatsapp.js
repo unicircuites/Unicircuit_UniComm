@@ -100,63 +100,83 @@ router.get('/chats', authenticate, async (req, res) => {
       ORDER BY chats DESC
     `) : null;
     const result = await pool.query(`
-      SELECT
-        c.id,
-        c.account_phone,
-        COALESCE(c.name, wc.name, wc.notify) AS name,
-        COALESCE(c.phone, wc.phone) AS phone,
-        c.is_group,
-        COALESCE(NULLIF(latest.body, ''), NULLIF(c.last_message, ''), c.last_message) AS last_message,
-        COALESCE(latest.timestamp, c.last_time) AS last_time,
-        c.unread,
-        c.updated_at,
-        c.imported_last_ts
-      FROM wa_chats c
-      LEFT JOIN LATERAL (
-        SELECT body, timestamp
-        FROM wa_messages m
-        WHERE m.chat_id = c.id AND m.account_phone = c.account_phone
-        ORDER BY m.timestamp DESC NULLS LAST
-        LIMIT 1
-      ) latest ON true
-      LEFT JOIN wa_contacts wc
-        ON wc.jid = c.id
-       AND wc.account_phone = c.account_phone
-      WHERE c.account_phone = $1 AND (
-        -- Groups: real WhatsApp groups only
-        (c.id LIKE '%@g.us')
-        OR
-        -- Individual: only Indian +91 numbers on real WhatsApp
-        (
-          c.id LIKE '%@s.whatsapp.net'
-          AND split_part(c.id,'@',1) LIKE '91%'
-          AND length(split_part(c.id,'@',1)) = 12
-        )
-        OR
-        -- LID chats: only show if named AND no matching @s.whatsapp.net chat exists
-        -- This prevents duplicates when mobile (s.whatsapp.net) and web (LID) show same contact
-        (
-          c.id LIKE '%@lid'
+      WITH chat_rows AS (
+        SELECT
+          c.id,
+          c.account_phone,
+          COALESCE(c.name, wc.name, wc.notify) AS name,
+          COALESCE(c.phone, wc.phone) AS phone,
+          c.is_group,
+          COALESCE(NULLIF(latest.body, ''), NULLIF(c.last_message, ''), c.last_message) AS last_message,
+          COALESCE(latest.timestamp, c.last_time) AS last_time,
+          c.unread,
+          c.updated_at,
+          c.imported_last_ts,
+          0 AS sort_bucket
+        FROM wa_chats c
+        LEFT JOIN LATERAL (
+          SELECT body, timestamp
+          FROM wa_messages m
+          WHERE m.chat_id = c.id AND m.account_phone = c.account_phone
+          ORDER BY m.timestamp DESC NULLS LAST
+          LIMIT 1
+        ) latest ON true
+        LEFT JOIN wa_contacts wc
+          ON wc.jid = c.id
+         AND wc.account_phone = c.account_phone
+        WHERE c.account_phone = $1
           AND NOT EXISTS (
-            SELECT 1 FROM wa_chats c2
-            WHERE c2.account_phone = $1
-              AND c2.id LIKE '%@s.whatsapp.net'
+            SELECT 1 FROM wa_chat_blocklist b
+            WHERE b.account_phone = c.account_phone
+              AND b.chat_id = c.id
+          )
+      ),
+      contact_rows AS (
+        SELECT
+          CASE
+            WHEN regexp_replace(COALESCE(wc.phone, ''), '[^0-9]', '', 'g') ~ '^[0-9]{7,15}$'
+              THEN regexp_replace(wc.phone, '[^0-9]', '', 'g') || '@s.whatsapp.net'
+            ELSE wc.jid
+          END AS id,
+          wc.account_phone,
+          COALESCE(NULLIF(wc.name, ''), NULLIF(wc.notify, '')) AS name,
+          NULLIF(regexp_replace(COALESCE(wc.phone, ''), '[^0-9]', '', 'g'), '') AS phone,
+          false AS is_group,
+          '' AS last_message,
+          NULL::timestamptz AS last_time,
+          0 AS unread,
+          wc.updated_at,
+          NULL::timestamptz AS imported_last_ts,
+          1 AS sort_bucket
+        FROM wa_contacts wc
+        WHERE wc.account_phone = $1
+          AND wc.jid IS NOT NULL
+          AND wc.jid <> ''
+          AND NOT EXISTS (
+            SELECT 1
+            FROM wa_chats c
+            WHERE c.account_phone = wc.account_phone
               AND (
-                c2.name = COALESCE(c.name, wc.name, wc.notify)
-                OR (COALESCE(c.phone, wc.phone) IS NOT NULL AND c2.phone = COALESCE(c.phone, wc.phone))
+                c.id = wc.jid
+                OR (
+                  regexp_replace(COALESCE(wc.phone, ''), '[^0-9]', '', 'g') <> ''
+                  AND (
+                    c.id = regexp_replace(wc.phone, '[^0-9]', '', 'g') || '@s.whatsapp.net'
+                    OR regexp_replace(COALESCE(c.phone, ''), '[^0-9]', '', 'g') = regexp_replace(wc.phone, '[^0-9]', '', 'g')
+                  )
+                )
               )
           )
-        )
-        OR
-        -- Imported chats (from WhatsApp Export)
-        c.id LIKE 'import_%'
+      ),
+      combined AS (
+        SELECT * FROM chat_rows
+        UNION ALL
+        SELECT * FROM contact_rows
       )
-      AND NOT EXISTS (
-        SELECT 1 FROM wa_chat_blocklist b
-        WHERE b.account_phone = c.account_phone
-          AND b.chat_id = c.id
-      )
-      ORDER BY last_time DESC NULLS LAST LIMIT 300
+      SELECT DISTINCT ON (account_phone, id)
+        id, account_phone, name, phone, is_group, last_message, last_time, unread, updated_at, imported_last_ts
+      FROM combined
+      ORDER BY account_phone, id, sort_bucket ASC, last_time DESC NULLS LAST, updated_at DESC NULLS LAST
     `, [accountPhone]);
     if (WA_DEBUG_ACCOUNT_SCOPE) {
       const sample = result.rows.slice(0, 10).map(c => ({
