@@ -183,6 +183,7 @@ router.post('/sync', authenticate, async (req, res) => {
   try {
     const accountPhone = connectedAccount(res);
     if (!accountPhone) return;
+    const metadata = await wa.refreshCurrentAccountGroupMetadata(50).catch(err => ({ error: err.message }));
     const stats = await pool.query(`
       SELECT
         COUNT(*) FILTER (WHERE is_group) AS groups,
@@ -194,7 +195,7 @@ router.post('/sync', authenticate, async (req, res) => {
       FROM wa_chats
       WHERE account_phone = $1
     `, [accountPhone]);
-    res.json({ success: true, stats: stats.rows[0] });
+    res.json({ success: true, stats: stats.rows[0], metadata });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 

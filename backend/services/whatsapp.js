@@ -1520,6 +1520,61 @@ async function getGroupMetadata(jid) {
   return result;
 }
 
+async function refreshCurrentAccountGroupMetadata(limit = 25) {
+  if (!sock || !isConnected) throw new Error('WhatsApp not connected');
+  const accPhone = phoneNumber;
+  if (!accPhone) throw new Error('Connected WhatsApp account is not known yet');
+  const groups = await pool.query(`
+    SELECT id, name
+    FROM wa_chats
+    WHERE account_phone=$1
+      AND is_group=true
+    ORDER BY updated_at DESC NULLS LAST, last_time DESC NULLS LAST
+    LIMIT $2
+  `, [accPhone, Math.max(1, Math.min(parseInt(limit, 10) || 25, 100))]);
+
+  let groupsUpdated = 0;
+  let contactsUpdated = 0;
+  for (const row of groups.rows) {
+    try {
+      await new Promise(resolve => setTimeout(resolve, 250));
+      const meta = await sock.groupMetadata(row.id);
+      if (meta?.subject) {
+        await pool.query(
+          `UPDATE wa_chats SET name=$1, updated_at=NOW() WHERE id=$2 AND account_phone=$3`,
+          [meta.subject, row.id, accPhone]
+        );
+        contactsStore[row.id] = { id: row.id, name: meta.subject };
+        groupsUpdated++;
+      }
+
+      for (const p of meta?.participants || []) {
+        if (!p.id || !p.id.endsWith('@lid') || !p.phoneNumber) continue;
+        const pNum = typeof p.phoneNumber === 'string' ? p.phoneNumber : (p.phoneNumber?.jid || '');
+        const rawPhone = pNum.replace(/\D/g, '');
+        if (!rawPhone || rawPhone.length < 7) continue;
+        await pool.query(`
+          INSERT INTO wa_contacts (jid, account_phone, name, phone)
+          VALUES ($1, $2, $3, $4)
+          ON CONFLICT (jid, account_phone) DO UPDATE SET
+            phone = EXCLUDED.phone,
+            name = COALESCE(EXCLUDED.name, wa_contacts.name),
+            updated_at = NOW()
+        `, [p.id, accPhone, null, rawPhone]);
+        if (!contactsStore[p.id]) contactsStore[p.id] = { id: p.id };
+        contactsStore[p.id].phoneJid = rawPhone + '@s.whatsapp.net';
+        contactsUpdated++;
+      }
+    } catch (err) {
+      console.warn(`[WA] Group metadata refresh skipped for ${row.id}:`, err.message);
+    }
+  }
+
+  await updateChatNames();
+  emit('wa:participants_synced', { total: contactsUpdated });
+  return { groups_checked: groups.rows.length, groups_updated: groupsUpdated, lid_contacts_updated: contactsUpdated };
+}
+
 // ── MEDIA DOWNLOAD ────────────────────────────────────────────────────────────
 const msgCache = new Map();
 const MAX_CACHE = 500;
@@ -1717,6 +1772,6 @@ async function importExportedChat(chatText, chatJid, mediaFiles, clearOld) {
   return { imported, chatJid, chatName: displayChatName };
 }
 
-module.exports = { startWA, sendMessage, sendMediaMessage, logout, getStatus, getQR, requestQR, setIO, getGroupMetadata, downloadMedia, msgCache, importExportedChat, getConnectedPhone };
+module.exports = { startWA, sendMessage, sendMediaMessage, logout, getStatus, getQR, requestQR, setIO, getGroupMetadata, refreshCurrentAccountGroupMetadata, downloadMedia, msgCache, importExportedChat, getConnectedPhone };
 
 
