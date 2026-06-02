@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -19,8 +19,8 @@
   --text: #e8ecf4;
   --muted: #6b7a99;
   --muted2: #8b9ab8;
-  --gold: #f5a623;
-  --gold2: #ffc659;
+  --gold: #2796C4;
+  --gold2: #7ec3e2;
   --blue: #3b82f6;
   --blue2: #60a5fa;
   --green: #10b981;
@@ -53,7 +53,7 @@ code,pre,.mono{font-family:'JetBrains Mono',monospace;}
 .sidebar-glow{
   position:absolute;top:-100px;left:-60px;
   width:280px;height:280px;
-  background:radial-gradient(circle,rgba(245,166,35,0.06) 0%,transparent 70%);
+  background:radial-gradient(circle,rgba(39,150,196,0.06) 0%,transparent 70%);
   pointer-events:none;
 }
 .brand-area{
@@ -63,10 +63,10 @@ code,pre,.mono{font-family:'JetBrains Mono',monospace;}
 .brand-logo{display:flex;align-items:center;gap:10px;}
 .brand-icon{
   width:36px;height:36px;
-  background:linear-gradient(135deg,#f5a623,#e8820a);
+  background:linear-gradient(135deg,#2796C4,#1a6e99);
   border-radius:9px;
   display:flex;align-items:center;justify-content:center;
-  box-shadow:0 4px 14px rgba(245,166,35,0.35);
+  box-shadow:0 4px 14px rgba(39,150,196,0.35);
   flex-shrink:0;
 }
 .brand-icon i{color:#fff;font-size:14px;}
@@ -96,7 +96,7 @@ nav{flex:1;overflow-y:auto;padding:10px 8px;}
   transition:all 0.15s;position:relative;
 }
 .nav-item:hover{background:rgba(255,255,255,0.04);color:var(--text);}
-.nav-item.active{background:rgba(245,166,35,0.1);color:var(--gold);}
+.nav-item.active{background:rgba(39,150,196,0.1);color:var(--gold);}
 .nav-item.active::before{
   content:'';position:absolute;left:0;top:50%;transform:translateY(-50%);
   width:2.5px;height:55%;background:var(--gold);border-radius:0 2px 2px 0;
@@ -110,7 +110,7 @@ nav{flex:1;overflow-y:auto;padding:10px 8px;}
 .nb-red{background:rgba(239,68,68,0.2);color:var(--red2);}
 .nb-green{background:rgba(16,185,129,0.2);color:var(--green2);}
 .nb-blue{background:rgba(59,130,246,0.2);color:var(--blue2);}
-.nb-gold{background:rgba(245,166,35,0.2);color:var(--gold2);}
+.nb-gold{background:rgba(39,150,196,0.2);color:var(--gold2);}
 
 .user-block{
   padding:12px 14px;border-top:1px solid var(--border);
@@ -209,7 +209,7 @@ nav{flex:1;overflow-y:auto;padding:10px 8px;}
 .badge{display:inline-flex;align-items:center;gap:4px;padding:2px 8px;border-radius:20px;font-size:10.5px;font-weight:600;}
 .b-green{background:rgba(16,185,129,0.12);color:var(--green2);}
 .b-blue{background:rgba(59,130,246,0.12);color:var(--blue2);}
-.b-gold{background:rgba(245,166,35,0.12);color:var(--gold2);}
+.b-gold{background:rgba(39,150,196,0.12);color:var(--gold2);}
 .b-red{background:rgba(239,68,68,0.12);color:var(--red2);}
 .b-gray{background:rgba(255,255,255,0.06);color:var(--muted2);}
 .b-cyan{background:rgba(6,182,212,0.12);color:#67e8f9;}
@@ -217,8 +217,8 @@ nav{flex:1;overflow-y:auto;padding:10px 8px;}
 
 /* BUTTONS */
 .btn{display:inline-flex;align-items:center;gap:6px;padding:8px 15px;border-radius:8px;font-size:12.5px;font-weight:600;cursor:pointer;border:none;transition:all 0.15s;font-family:'Outfit',sans-serif;}
-.btn-gold{background:linear-gradient(135deg,#f5a623,#e8820a);color:#fff;box-shadow:0 3px 10px rgba(245,166,35,0.25);}
-.btn-gold:hover{box-shadow:0 4px 14px rgba(245,166,35,0.4);transform:translateY(-1px);}
+.btn-gold{background:linear-gradient(135deg,#2796C4,#1a6e99);color:#fff;box-shadow:0 3px 10px rgba(39,150,196,0.25);}
+.btn-gold:hover{box-shadow:0 4px 14px rgba(39,150,196,0.4);transform:translateY(-1px);}
 .btn-ghost{background:rgba(255,255,255,0.05);color:var(--muted2);border:1px solid var(--border);}
 .btn-ghost:hover{background:rgba(255,255,255,0.08);color:var(--text);}
 .btn-blue{background:rgba(59,130,246,0.15);color:var(--blue2);border:1px solid rgba(59,130,246,0.25);}
@@ -240,7 +240,7 @@ nav{flex:1;overflow-y:auto;padding:10px 8px;}
   font-family:'Outfit',sans-serif;outline:none;
   transition:border-color 0.15s,box-shadow 0.15s;width:100%;
 }
-.inp:focus{border-color:rgba(245,166,35,0.4);box-shadow:0 0 0 3px rgba(245,166,35,0.08);}
+.inp:focus{border-color:rgba(39,150,196,0.4);box-shadow:0 0 0 3px rgba(39,150,196,0.08);}
 .inp::placeholder{color:var(--muted);}
 select.inp option{background:#1a2035;color:var(--text);}
 
@@ -252,7 +252,7 @@ select.inp option{background:#1a2035;color:var(--text);}
 .chat-wrap{display:flex;flex-direction:column;height:100%;}
 .chat-msgs{flex:1;overflow-y:auto;padding:16px;display:flex;flex-direction:column;gap:10px;}
 .chat-msg{max-width:82%;padding:10px 14px;border-radius:12px;font-size:13px;line-height:1.55;}
-.chat-msg.user{background:rgba(245,166,35,0.12);border:1px solid rgba(245,166,35,0.2);color:var(--text);align-self:flex-end;border-radius:12px 4px 12px 12px;}
+.chat-msg.user{background:rgba(39,150,196,0.12);border:1px solid rgba(39,150,196,0.2);color:var(--text);align-self:flex-end;border-radius:12px 4px 12px 12px;}
 .chat-msg.ai{background:var(--card2);border:1px solid var(--border);color:var(--text);align-self:flex-start;border-radius:4px 12px 12px 12px;}
 .chat-msg.ai .ai-tag{font-size:9.5px;font-weight:700;color:var(--gold);letter-spacing:0.5px;margin-bottom:5px;display:flex;align-items:center;gap:4px;}
 .chat-input-bar{padding:12px 14px;border-top:1px solid var(--border);display:flex;gap:8px;flex-shrink:0;}
@@ -276,7 +276,7 @@ select.inp option{background:#1a2035;color:var(--text);}
   transition:all 0.15s;
 }
 .contact-card:hover{border-color:var(--border2);background:var(--card2);}
-.contact-card.selected{border-color:rgba(245,166,35,0.35);background:rgba(245,166,35,0.04);}
+.contact-card.selected{border-color:rgba(39,150,196,0.35);background:rgba(39,150,196,0.04);}
 
 /* MODAL */
 .modal-overlay{
@@ -369,7 +369,7 @@ select.inp option{background:#1a2035;color:var(--text);}
   border-radius:6px;padding:5px 10px;font-size:11.5px;color:var(--muted2);
   cursor:pointer;transition:all 0.13s;
 }
-.quick-chip:hover{background:rgba(245,166,35,0.08);color:var(--gold);border-color:rgba(245,166,35,0.25);}
+.quick-chip:hover{background:rgba(39,150,196,0.08);color:var(--gold);border-color:rgba(39,150,196,0.25);}
 
 /* STAT ROW */
 .stat-row{display:flex;align-items:center;gap:8px;padding:9px 0;border-bottom:1px solid rgba(255,255,255,0.04);}
@@ -462,7 +462,7 @@ select.inp option{background:#1a2035;color:var(--text);}
       <div class="kpi gold fu">
         <div class="kpi-top">
           <div class="kpi-label">Total Calls (7d)</div>
-          <div class="kpi-icon" style="background:rgba(245,166,35,0.12);color:var(--gold);"><i class="fas fa-phone-volume"></i></div>
+          <div class="kpi-icon" style="background:rgba(39,150,196,0.12);color:var(--gold);"><i class="fas fa-phone-volume"></i></div>
         </div>
         <div class="kpi-val">1,284</div>
         <div class="kpi-change" style="color:var(--green2);"><i class="fas fa-arrow-up"></i> +12% this week</div>
@@ -600,7 +600,7 @@ select.inp option{background:#1a2035;color:var(--text);}
         <div class="card-header"><h3><i class="fas fa-trophy" style="color:var(--gold);"></i> Top Contacts Today</h3></div>
         <div class="card-body">
           <div class="stat-row"><div style="display:flex;align-items:center;gap:8px;flex:1;"><div class="contact-avatar" style="width:28px;height:28px;background:rgba(59,130,246,0.15);color:var(--blue2);font-size:11px;">LT</div><div class="stat-label">L&T ECC</div></div><span class="badge b-green">Hot</span></div>
-          <div class="stat-row"><div style="display:flex;align-items:center;gap:8px;flex:1;"><div class="contact-avatar" style="width:28px;height:28px;background:rgba(245,166,35,0.15);color:var(--gold2);font-size:11px;">BH</div><div class="stat-label">BHEL Procurement</div></div><span class="badge b-gold">Warm</span></div>
+          <div class="stat-row"><div style="display:flex;align-items:center;gap:8px;flex:1;"><div class="contact-avatar" style="width:28px;height:28px;background:rgba(39,150,196,0.15);color:var(--gold2);font-size:11px;">BH</div><div class="stat-label">BHEL Procurement</div></div><span class="badge b-gold">Warm</span></div>
           <div class="stat-row"><div style="display:flex;align-items:center;gap:8px;flex:1;"><div class="contact-avatar" style="width:28px;height:28px;background:rgba(139,92,246,0.15);color:#c4b5fd;font-size:11px;">SE</div><div class="stat-label">Schneider Elec.</div></div><span class="badge b-blue">Active</span></div>
         </div>
       </div>
@@ -811,7 +811,7 @@ select.inp option{background:#1a2035;color:var(--text);}
           <h3><i class="fas fa-robot" style="color:var(--gold);"></i> UniComm AI · Powered by Claude</h3>
           <span class="badge b-green"><i class="fas fa-circle" style="font-size:6px;"></i> Online</span>
         </div>
-        <div style="padding:9px 16px;border-bottom:1px solid var(--border);background:rgba(245,166,35,0.04);">
+        <div style="padding:9px 16px;border-bottom:1px solid var(--border);background:rgba(39,150,196,0.04);">
           <div style="font-size:11.5px;color:var(--muted);">Specialised in Unicircuit Engineering Services LLP communications — switchgear, VFDs, PLCs, cable management, MCC panels, industrial electrical solutions.</div>
         </div>
         <div class="chat-msgs" id="ai-messages" style="flex:1;"></div>
@@ -835,7 +835,7 @@ select.inp option{background:#1a2035;color:var(--text);}
     <div class="kpi-row" style="margin-bottom:16px;">
       <div class="kpi blue"><div class="kpi-top"><div class="kpi-label">Avg Handle Time</div><div class="kpi-icon" style="background:rgba(59,130,246,0.12);color:var(--blue2);"><i class="fas fa-stopwatch"></i></div></div><div class="kpi-val">6m 44s</div><div class="kpi-change" style="color:var(--green2);">↓ -12% vs last month</div></div>
       <div class="kpi green"><div class="kpi-top"><div class="kpi-label">First Call Res.</div><div class="kpi-icon" style="background:rgba(16,185,129,0.12);color:var(--green2);"><i class="fas fa-check-double"></i></div></div><div class="kpi-val">78%</div><div class="kpi-change" style="color:var(--muted2);">Industry avg: 70%</div></div>
-      <div class="kpi gold"><div class="kpi-top"><div class="kpi-label">Email Resp. Time</div><div class="kpi-icon" style="background:rgba(245,166,35,0.12);color:var(--gold2);"><i class="fas fa-clock"></i></div></div><div class="kpi-val">2.4h</div><div class="kpi-change" style="color:var(--red2);">↑ needs attention</div></div>
+      <div class="kpi gold"><div class="kpi-top"><div class="kpi-label">Email Resp. Time</div><div class="kpi-icon" style="background:rgba(39,150,196,0.12);color:var(--gold2);"><i class="fas fa-clock"></i></div></div><div class="kpi-val">2.4h</div><div class="kpi-change" style="color:var(--red2);">↑ needs attention</div></div>
       <div class="kpi cyan"><div class="kpi-top"><div class="kpi-label">WA Engagement</div><div class="kpi-icon" style="background:rgba(6,182,212,0.12);color:var(--cyan);"><i class="fab fa-whatsapp"></i></div></div><div class="kpi-val">81%</div><div class="kpi-change" style="color:var(--green2);">↑ +5% this week</div></div>
       <div class="kpi red"><div class="kpi-top"><div class="kpi-label">Churn Risk</div><div class="kpi-icon" style="background:rgba(239,68,68,0.12);color:var(--red2);"><i class="fas fa-exclamation-triangle"></i></div></div><div class="kpi-val">8%</div><div class="kpi-change" style="color:var(--red2);">3 flagged accounts</div></div>
     </div>
@@ -1033,7 +1033,7 @@ function segmentColor(seg) {
 function scoreColor(s) {
   if (s >= 80) return 'var(--green2)';
   if (s >= 60) return 'var(--gold2)';
-  if (s >= 40) return '#fb923c';
+  if (s >= 40) return '#2796C4';
   return 'var(--red2)';
 }
 
@@ -1227,7 +1227,7 @@ async function aiContactInsight(id) {
   result.innerHTML = '<div style="font-size:12px;color:var(--muted);"><span class="spin-loader"></span> Generating AI insight…</div>';
   try {
     const text = await callClaude(`Generate a brief AI sales intelligence insight for the following contact at Unicircuit Engineering Services LLP:\n\nName: ${c.fname} ${c.lname}\nCompany: ${c.company}\nDesignation: ${c.designation}\nSegment: ${c.segment}\nLead Score: ${c.score}/100\nProducts of Interest: ${c.products}\nCity: ${c.city}\nNotes: ${c.notes}\nCalls: ${c.calls}, Emails: ${c.emails}, WhatsApp: ${c.wa_count}\nLast Contact: ${c.lastContact}\n\nProvide: 1) Engagement summary 2) Next best action 3) Risk/opportunity alert. Keep it under 80 words, practical and actionable.`);
-    result.innerHTML = `<div style="background:rgba(245,166,35,0.06);border:1px solid rgba(245,166,35,0.15);border-radius:9px;padding:12px 14px;font-size:12.5px;line-height:1.6;color:var(--text);"><div style="font-size:10px;font-weight:700;color:var(--gold);margin-bottom:6px;"><i class="fas fa-robot"></i> CLAUDE AI INSIGHT</div>${text.replace(/\n/g,'<br>')}</div>`;
+    result.innerHTML = `<div style="background:rgba(39,150,196,0.06);border:1px solid rgba(39,150,196,0.15);border-radius:9px;padding:12px 14px;font-size:12.5px;line-height:1.6;color:var(--text);"><div style="font-size:10px;font-weight:700;color:var(--gold);margin-bottom:6px;"><i class="fas fa-robot"></i> CLAUDE AI INSIGHT</div>${text.replace(/\n/g,'<br>')}</div>`;
   } catch(e) {
     result.innerHTML = '<div style="color:var(--red2);font-size:12px;">API error — check network.</div>';
   }
@@ -1464,7 +1464,7 @@ async function doSummarizeCall(targetId) {
   el.innerHTML = '<span class="spin-loader"></span> Transcribing with Whisper + Claude summarising…';
   try {
     const text = await callClaude(`Summarise the following PBX call for Unicircuit Engineering Services LLP's call log system:\n\nCall details: Inbound from BHEL Procurement, 8m 22s. Agent Ext. 305 (Sales).\n\nTranscript excerpt: "Caller enquired about dispatch timeline for cable trays and DB panels per PO BH-2190. Agent checked ERP, confirmed material packed and ready. Caller requested expediting due to site deadline April 10. Agent committed dispatch by April 6 via transport, agreed to share AWB details via WhatsApp. Client satisfied."\n\nGenerate structured summary with: Issue | Resolution | Sentiment | Key Action Items | Follow-up Required. Be concise.`);
-    el.innerHTML = `<div style="background:rgba(245,166,35,0.05);border:1px solid rgba(245,166,35,0.12);border-radius:9px;padding:13px 15px;">
+    el.innerHTML = `<div style="background:rgba(39,150,196,0.05);border:1px solid rgba(39,150,196,0.12);border-radius:9px;padding:13px 15px;">
       <div style="font-size:9.5px;font-weight:700;color:var(--gold);margin-bottom:8px;"><i class="fas fa-robot"></i> CLAUDE AI CALL SUMMARY · BHEL_call_Apr4.mp3</div>
       <div style="font-size:12.5px;line-height:1.65;white-space:pre-wrap;color:var(--text);">${text}</div>
       <div style="margin-top:9px;"><span class="badge b-green"><i class="fas fa-check"></i> Summary saved to call log</span></div>
@@ -1500,7 +1500,7 @@ async function generateCampaign() {
   el.innerHTML = '<div style="font-size:12px;color:var(--muted);"><span class="spin-loader"></span> Claude is crafting your campaign copy…</div>';
   try {
     const text = await callClaude(`You are a B2B marketing specialist for Unicircuit Engineering Services LLP (Indian electrical engineering company). Generate campaign copy for:\n\nProduct: ${product}\nTarget audience: ${audience}\nGoal: ${goal}\nChannels: ${channels.join(', ')}\n\nGenerate:\n${channels.includes('Email') ? '1) EMAIL: Subject line + 80-word body\n' : ''}${channels.includes('WhatsApp') ? '2) WHATSAPP: 40-word broadcast message\n' : ''}${channels.includes('SMS') ? '3) SMS: 160-character message\n' : ''}\nUse Indian B2B engineering industry context. Professional, compelling, clear CTA.`);
-    el.innerHTML = `<div style="background:rgba(245,166,35,0.05);border:1px solid rgba(245,166,35,0.12);border-radius:10px;padding:14px 16px;margin-top:4px;">
+    el.innerHTML = `<div style="background:rgba(39,150,196,0.05);border:1px solid rgba(39,150,196,0.12);border-radius:10px;padding:14px 16px;margin-top:4px;">
       <div style="font-size:9.5px;font-weight:700;color:var(--gold);margin-bottom:10px;"><i class="fas fa-robot"></i> AI-GENERATED CAMPAIGN COPY</div>
       <pre style="font-size:12.5px;line-height:1.65;white-space:pre-wrap;font-family:'Outfit';color:var(--text);">${text}</pre>
       <div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap;">

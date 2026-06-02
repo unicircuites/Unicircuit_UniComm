@@ -10,6 +10,90 @@ const { authenticate } = require('../middleware/auth');
 const router = express.Router();
 const WA_DEBUG_ACCOUNT_SCOPE = String(process.env.WA_DEBUG_ACCOUNT_SCOPE || 'false').toLowerCase() === 'true';
 
+function normalizeDigits(value) {
+  return String(value || '').replace(/\D/g, '');
+}
+
+function isAllowedWaNumber(value) {
+  const digits = normalizeDigits(value);
+  if (!digits) return false;
+  // Allowed:
+  // 1) Indian WhatsApp mobiles: 91 + 10 digits (starting 6-9)
+  // 2) Internal extension style: starts with 0
+  return /^91[6-9]\d{9}$/.test(digits) || /^0\d{1,10}$/.test(digits);
+}
+
+function formatDisplayPhone(value) {
+  const digits = normalizeDigits(value);
+  if (!digits) return '';
+  if (digits.startsWith('91') && digits.length === 12) {
+    return `+91 ${digits.slice(2, 7)} ${digits.slice(7)}`;
+  }
+  if (digits.startsWith('0')) {
+    return digits;
+  }
+  return `+${digits}`;
+}
+
+function canonicalizeChats(rows) {
+  const map = new Map();
+  for (const row of Array.isArray(rows) ? rows : []) {
+    if (!row?.id) continue;
+    const id = String(row.id);
+    // Hard rule: only @g.us JIDs are real WhatsApp groups.
+    // Ignore stale/incorrect DB flags that mark number chats as groups.
+    const isGroup = id.endsWith('@g.us');
+    const idLocal = id.split('@')[0].split(':')[0];
+    const phoneDigits = normalizeDigits(row.phone || (id.endsWith('@lid') ? '' : idLocal));
+    const allowedNumber = isAllowedWaNumber(phoneDigits);
+
+    // Hard rule: no raw @lid chat should be exposed when it can't be mapped to a phone number.
+    if (!isGroup && id.endsWith('@lid') && !phoneDigits) continue;
+    // Hard rule: for individual chats show only +91 numbers or 0-extension numbers.
+    if (!isGroup && !allowedNumber) continue;
+
+    const normalizedId = !isGroup && phoneDigits ? `${phoneDigits}@s.whatsapp.net` : id;
+    const key = isGroup ? `group:${normalizedId}` : (phoneDigits ? `phone:${phoneDigits}` : `id:${normalizedId}`);
+    const lastTs = row.last_time ? new Date(row.last_time).getTime() : 0;
+    const unread = Number(row.unread || 0);
+    const cleanName = String(row.name || '').trim();
+    const numericName = normalizeDigits(cleanName);
+    const safeName = !cleanName || /@lid/i.test(cleanName) || (numericName && !isAllowedWaNumber(numericName))
+      ? null
+      : cleanName;
+    const normalizedRow = {
+      ...row,
+      id: normalizedId,
+      phone: !isGroup && phoneDigits ? formatDisplayPhone(phoneDigits) : row.phone,
+      name: safeName || (!isGroup && phoneDigits ? formatDisplayPhone(phoneDigits) : row.name),
+      _lastTs: Number.isFinite(lastTs) ? lastTs : 0,
+      _unread: Number.isFinite(unread) ? unread : 0,
+    };
+
+    const existing = map.get(key);
+    if (!existing) {
+      map.set(key, normalizedRow);
+      continue;
+    }
+
+    // Keep newest row and preserve highest unread count.
+    const winner = normalizedRow._lastTs >= existing._lastTs
+      ? { ...existing, ...normalizedRow }
+      : { ...normalizedRow, ...existing };
+    winner._unread = Math.max(existing._unread, normalizedRow._unread);
+    winner.unread = winner._unread;
+    map.set(key, winner);
+  }
+
+  return Array.from(map.values())
+    .map(({ _lastTs, _unread, ...row }) => row)
+    .sort((a, b) => {
+      const ta = a.last_time ? new Date(a.last_time).getTime() : 0;
+      const tb = b.last_time ? new Date(b.last_time).getTime() : 0;
+      return tb - ta;
+    });
+}
+
 function connectedAccount(res) {
   const accountPhone = wa.getConnectedPhone();
   if (!accountPhone) {
@@ -107,6 +191,7 @@ router.get('/chats', authenticate, async (req, res) => {
           COALESCE(c.name, wc.name, wc.notify) AS name,
           COALESCE(c.phone, wc.phone) AS phone,
           c.is_group,
+          COALESCE(wc.is_group_member, false) AS is_group_member,
           COALESCE(NULLIF(latest.body, ''), NULLIF(c.last_message, ''), c.last_message) AS last_message,
           COALESCE(latest.timestamp, c.last_time) AS last_time,
           c.unread,
@@ -141,6 +226,7 @@ router.get('/chats', authenticate, async (req, res) => {
           wc.account_phone,
           COALESCE(NULLIF(wc.name, ''), NULLIF(wc.notify, '')) AS name,
           NULLIF(regexp_replace(COALESCE(wc.phone, ''), '[^0-9]', '', 'g'), '') AS phone,
+          COALESCE(wc.is_group_member, false) AS is_group_member,
           false AS is_group,
           '' AS last_message,
           NULL::timestamptz AS last_time,
@@ -174,7 +260,7 @@ router.get('/chats', authenticate, async (req, res) => {
         SELECT * FROM contact_rows
       )
       SELECT DISTINCT ON (account_phone, id)
-        id, account_phone, name, phone, is_group, last_message, last_time, unread, updated_at, imported_last_ts
+        id, account_phone, name, phone, is_group, is_group_member, last_message, last_time, unread, updated_at, imported_last_ts
       FROM combined
       ORDER BY account_phone, id, sort_bucket ASC, last_time DESC NULLS LAST, updated_at DESC NULLS LAST
     `, [accountPhone]);
@@ -194,7 +280,15 @@ router.get('/chats', authenticate, async (req, res) => {
         sample,
       });
     }
-    res.json(result.rows);
+    res.json(canonicalizeChats(result.rows));
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+router.get('/chats-live', authenticate, async (req, res) => {
+  try {
+    const accountPhone = connectedAccount(res);
+    if (!accountPhone) return;
+    res.json(canonicalizeChats(wa.getLiveChats()));
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
@@ -281,7 +375,9 @@ router.get('/group/:jid', authenticate, async (req, res) => {
       [accountPhone, jid]
     );
     if (blocked.rowCount) return res.status(404).json({ error: 'Chat is blocked for this WhatsApp account' });
-    res.json(await wa.getGroupMetadata(jid));
+    const participantsLimit = Math.max(1, parseInt(req.query.limit || '200', 10) || 200);
+    const participantsOffset = Math.max(0, parseInt(req.query.offset || '0', 10) || 0);
+    res.json(await wa.getGroupMetadata(jid, { participantsLimit, participantsOffset }));
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
@@ -301,7 +397,7 @@ router.get('/messages/:jid', authenticate, async (req, res) => {
     // If this is a group chat, populate LID phone numbers from group metadata first
     if (jid.endsWith('@g.us')) {
       try {
-        const groupMeta = await wa.getGroupMetadata(jid);
+        const groupMeta = await wa.getGroupMetadata(jid, { participantsLimit: 2000, participantsOffset: 0 });
         let updated = 0;
         const accPhone = accountPhone;
         for (const p of groupMeta.participants) {
@@ -389,6 +485,21 @@ router.get('/messages/:jid', authenticate, async (req, res) => {
     await pool.query(`UPDATE wa_messages SET is_read=true WHERE chat_id=$1 AND account_phone=$2 AND from_me=false`, [jid, accPhone]);
     await pool.query(`UPDATE wa_chats SET unread=0 WHERE id=$1 AND account_phone=$2`, [jid, accPhone]);
     res.json(result.rows);
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+router.get('/messages-live/:jid', authenticate, async (req, res) => {
+  const jid = decodeURIComponent(req.params.jid).replace(/@g\.us@g\.us$/, '@g.us').replace(/@s\.whatsapp\.net@s\.whatsapp\.net$/, '@s.whatsapp.net');
+  const limit = Math.min(Math.max(parseInt(req.query.limit || '100', 10) || 100, 1), 200);
+  const before = req.query.before ? new Date(String(req.query.before)) : null;
+  try {
+    const accountPhone = connectedAccount(res);
+    if (!accountPhone) return;
+    const rows = wa.getLiveMessages(jid, {
+      limit,
+      before: before && !Number.isNaN(before.getTime()) ? before.toISOString() : null,
+    });
+    res.json(rows);
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 

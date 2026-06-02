@@ -68,6 +68,9 @@ SMTP_FROM_NAME=Unicircuit Engineering Services LLP
 AI_API_HOST=https://api.groq.com/openai/v1
 AI_API_MODEL=llama-3.1-8b-instant
 AI_API_KEY=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
+WA_WATCHDOG_ENABLED=true
+WA_WATCHDOG_INTERVAL_MS=45000
+WA_STALE_RESTART_MS=180000
 "@ | Set-Content -Path "C:\UniComm\Unicircuit_UniComm-main\backend\.env" -Encoding UTF8
 ```
 

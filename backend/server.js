@@ -46,7 +46,7 @@ const cron = require('node-cron');
 const maintenance = require('./services/maintenance');
 
 const httpsAgent = new https.Agent({
-    rejectUnauthorized: false
+  rejectUnauthorized: false
 });
 
 // ── DATABASE SCHEMA MIGRATION (Self-Healing) ───────────────────────────────
@@ -173,11 +173,11 @@ function systemBridge(event, data) {
         markOffline('pbx', data.error || data.reason);
       } else {
         // Non-fatal disconnect — server still listening
-        const ev = activityLog.append({ 
-          type: 'info', 
-          service: 'pbx', 
+        const ev = activityLog.append({
+          type: 'info',
+          service: 'pbx',
           message: `PBX disconnected: ${data?.reason || 'Connection lost'} — listening for reconnection`,
-          timestamp: _now() 
+          timestamp: _now()
         });
         try { _origEmit('system:activity', ev); } catch (_) { }
       }

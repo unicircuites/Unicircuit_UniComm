@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Task Notification Scheduler
  * Runs every 30 seconds, sends WhatsApp and/or Outlook email reminders
  * for mail_reply_tasks that are within their notify_before_minutes window.
@@ -79,7 +79,7 @@ function buildEmailPayload(task) {
 
   const bodyHtml = `
     <div style="font-family:Arial,sans-serif;font-size:14px;color:#222;">
-      <h3 style="color:#f5a623;">📋 Task Reminder</h3>
+      <h3 style="color:#2796C4;">📋 Task Reminder</h3>
       <table style="border-collapse:collapse;">
         <tr><td style="padding:4px 12px 4px 0;font-weight:bold;">Subject</td><td>${escHtml(task.subject || '(no subject)')}</td></tr>
         <tr><td style="padding:4px 12px 4px 0;font-weight:bold;">Due</td><td>${escHtml(due)}</td></tr>

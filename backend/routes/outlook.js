@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Outlook / Microsoft Graph Routes
  * GET  /api/outlook/status          — check if authenticated
  * GET  /api/outlook/auth            — get OAuth2 login URL
@@ -1547,7 +1547,7 @@ router.get('/callback', async (req, res) => {
         <div style="text-align:center;">
           <h2 style="color:#f87171;">Authentication Failed</h2>
           <p>${error_description || error}</p>
-          <a href="${APP_PUBLIC_URL}/dashboard.html" style="color:#f5a623;">← Back to Dashboard</a>
+          <a href="${APP_PUBLIC_URL}/dashboard.html" style="color:#2796C4;">← Back to Dashboard</a>
         </div>
       </body></html>
     `);
@@ -1557,7 +1557,7 @@ router.get('/callback', async (req, res) => {
     return res.status(400).send(`
       <html><body style="font-family:sans-serif;background:#0c0f1a;color:#e8ecf4;display:flex;align-items:center;justify-content:center;min-height:100vh;margin:0;padding:24px;">
         <div style="max-width:420px;text-align:center;">
-          <h2 style="color:#f5a623;margin-top:0;">This page is not opened directly</h2>
+          <h2 style="color:#2796C4;margin-top:0;">This page is not opened directly</h2>
           <p style="color:#8b9ab8;line-height:1.5;">Microsoft sends you here <strong>after</strong> you sign in, with <code style="background:#1a2035;padding:2px 6px;border-radius:4px;">?code=…</code> in the URL.</p>
           <p style="color:#6b7a99;font-size:14px;">Go to the dashboard, click <strong>Connect Outlook</strong>, complete login — you will land here automatically.</p>
           <p style="margin-top:24px;"><a href="${APP_PUBLIC_URL}/dashboard.html" style="color:#34d399;">Open dashboard</a></p>

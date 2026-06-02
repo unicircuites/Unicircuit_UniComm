@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="en">
 
 <head>
@@ -27,8 +27,8 @@
       --text: #e8ecf4;
       --muted: #6b7a99;
       --muted2: #8b9ab8;
-      --gold: #f5a623;
-      --gold2: #ffc659;
+      --gold: #2796C4;
+      --gold2: #7ec3e2;
       --blue: #3b82f6;
       --blue2: #60a5fa;
       --green: #10b981;
@@ -82,7 +82,7 @@
     }
 
     #outlook-backup-modal .modal-title i {
-      color: #f59e0b;
+      color: #2796C4;
     }
 
     #outlook-backup-modal .backup-grid {
@@ -186,8 +186,8 @@
       --text: #1a2035;
       --muted: #7a8aaa;
       --muted2: #4a5a7a;
-      --gold: #c97d08;
-      --gold2: #e09010;
+      --gold: #2796C4;
+      --gold2: #7ec3e2;
       --blue: #2563eb;
       --blue2: #1d4ed8;
       --green: #059669;
@@ -356,6 +356,16 @@
       color: var(--text) !important;
     }
 
+    /* Light theme safety net: fix inline white text on white/light backgrounds */
+    html.light [style*="color:#fff"],
+    html.light [style*="color: #fff"],
+    html.light [style*="color:white"],
+    html.light [style*="color: white"],
+    html.light [style*="color:#ffffff"],
+    html.light [style*="color: #ffffff"] {
+      color: var(--text) !important;
+    }
+
     /* PBX Recordings: Folders panel & right panel use dark backgrounds - override */
     html.light #pbx-recordings-list {
       color: var(--text);
@@ -469,7 +479,7 @@
       left: -60px;
       width: 280px;
       height: 280px;
-      background: radial-gradient(circle, rgba(245, 166, 35, 0.06) 0%, transparent 70%);
+      background: radial-gradient(circle, rgba(39, 150, 196, 0.06) 0%, transparent 70%);
       pointer-events: none;
     }
 
@@ -492,7 +502,7 @@
       display: flex;
       align-items: center;
       justify-content: center;
-      box-shadow: 0 4px 16px rgba(245, 166, 35, 0.45);
+      box-shadow: 0 4px 16px rgba(39, 150, 196, 0.45);
       flex-shrink: 0;
       overflow: hidden;
       padding: 0;
@@ -596,7 +606,7 @@
     }
 
     .nav-item.active {
-      background: rgba(245, 166, 35, 0.1);
+      background: rgba(39, 150, 196, 0.1);
       color: var(--gold);
     }
 
@@ -648,7 +658,7 @@
     }
 
     .nb-gold {
-      background: rgba(245, 166, 35, 0.2);
+      background: rgba(39, 150, 196, 0.2);
       color: var(--gold2);
     }
 
@@ -1191,7 +1201,7 @@
     }
 
     .b-gold {
-      background: rgba(245, 166, 35, 0.12);
+      background: rgba(39, 150, 196, 0.12);
       color: var(--gold2);
     }
 
@@ -1241,9 +1251,9 @@
     }
 
     .mail-category.NEEDS_REPLY {
-      background: rgba(245, 166, 35, 0.15);
+      background: rgba(39, 150, 196, 0.15);
       color: var(--gold2);
-      border: 1px solid rgba(245, 166, 35, 0.3);
+      border: 1px solid rgba(39, 150, 196, 0.3);
     }
 
     .mail-category.SYSTEM {
@@ -1367,13 +1377,13 @@
     }
 
     .btn-gold {
-      background: linear-gradient(135deg, #f5a623, #e8820a);
+      background: linear-gradient(135deg, #2796C4, #1a6e99);
       color: #fff;
-      box-shadow: 0 3px 10px rgba(245, 166, 35, 0.25);
+      box-shadow: 0 3px 10px rgba(39, 150, 196, 0.25);
     }
 
     .btn-gold:hover {
-      box-shadow: 0 4px 14px rgba(245, 166, 35, 0.4);
+      box-shadow: 0 4px 14px rgba(39, 150, 196, 0.4);
       transform: translateY(-1px);
     }
 
@@ -1449,8 +1459,8 @@
     }
 
     .inp:focus {
-      border-color: rgba(245, 166, 35, 0.4);
-      box-shadow: 0 0 0 3px rgba(245, 166, 35, 0.08);
+      border-color: rgba(39, 150, 196, 0.4);
+      box-shadow: 0 0 0 3px rgba(39, 150, 196, 0.08);
     }
 
     .inp::placeholder {
@@ -1506,8 +1516,8 @@
     }
 
     .chat-msg.user {
-      background: rgba(245, 166, 35, 0.12);
-      border: 1px solid rgba(245, 166, 35, 0.2);
+      background: rgba(39, 150, 196, 0.12);
+      border: 1px solid rgba(39, 150, 196, 0.2);
       color: var(--text);
       align-self: flex-end;
       border-radius: 12px 4px 12px 12px;
@@ -1607,8 +1617,8 @@
     }
 
     .contact-card.selected {
-      border-color: rgba(245, 166, 35, 0.35);
-      background: rgba(245, 166, 35, 0.04);
+      border-color: rgba(39, 150, 196, 0.35);
+      background: rgba(39, 150, 196, 0.04);
     }
 
     /* MODAL */
@@ -3256,9 +3266,9 @@
     }
 
     .quick-chip:hover {
-      background: rgba(245, 166, 35, 0.08);
+      background: rgba(39, 150, 196, 0.08);
       color: var(--gold);
-      border-color: rgba(245, 166, 35, 0.25);
+      border-color: rgba(39, 150, 196, 0.25);
     }
 
     /* STAT ROW */
@@ -3315,8 +3325,14 @@
 
     .theme-btn:hover {
       color: var(--gold);
-      border-color: rgba(245, 166, 35, 0.4);
-      background: rgba(245, 166, 35, 0.08);
+      border-color: rgba(39, 150, 196, 0.4);
+      background: rgba(39, 150, 196, 0.08);
+    }
+
+    html.light .theme-btn {
+      color: var(--gold);
+      border-color: rgba(39, 150, 196, 0.35);
+      background: rgba(39, 150, 196, 0.08);
     }
 
     /* ── AUTH GUARD OVERLAY ── */
@@ -3620,7 +3636,7 @@
     }
 
     .flow-node.process {
-      background: rgba(245, 166, 35, 0.05);
+      background: rgba(39, 150, 196, 0.05);
       border-color: var(--gold);
       color: var(--gold2);
     }
@@ -4032,7 +4048,7 @@
     .emoji-tab:hover,
     .emoji-tab.active {
       border-bottom-color: var(--gold);
-      background: rgba(245, 166, 35, 0.06);
+      background: rgba(39, 150, 196, 0.06);
     }
 
     .emoji-search {
@@ -4086,7 +4102,7 @@
 
     .template-card:hover {
       border-color: var(--gold);
-      background: rgba(245, 166, 35, 0.04);
+      background: rgba(39, 150, 196, 0.04);
     }
 
     /* Word font families in Quill editor */
@@ -4508,7 +4524,7 @@
             <div class="kpi gold fu">
               <div class="kpi-top">
                 <div class="kpi-label">Total Calls (7d)</div>
-                <div class="kpi-icon" style="background:rgba(245,166,35,0.12);color:var(--gold);"><i
+                <div class="kpi-icon" style="background:rgba(39,150,196,0.12);color:var(--gold);"><i
                     class="fas fa-phone-volume"></i></div>
               </div>
               <div class="kpi-val" data-kpi="calls_7d">—</div>
@@ -4722,7 +4738,7 @@
           <!-- PBX Status Bar -->
           <div style="margin-bottom:12px;">
             <div
-              style="background:rgba(245,166,35,0.06);border:1px solid rgba(245,166,35,0.2);border-radius:8px;padding:8px 16px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+              style="background:rgba(39,150,196,0.06);border:1px solid rgba(39,150,196,0.2);border-radius:8px;padding:8px 16px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
               <span id="pbx-dot"
                 style="width:8px;height:8px;border-radius:50%;background:var(--muted);flex-shrink:0;transition:background 0.3s;"></span>
               <span id="pbx-status-text" style="font-size:12.5px;font-weight:600;color:var(--muted);">Matrix PBX ·
@@ -4989,7 +5005,7 @@
                       <div id="pbx-sync-progress-bar" style="
                           width:0%;
                           height:100%;
-                          background:#f59e0b;
+                          background:#2796C4;
                           transition:0.3s;
                         "></div>
 
@@ -5033,8 +5049,8 @@
                           background:
                             linear-gradient(
                               90deg,
-                              #f59e0b,
-                              #fbbf24
+                              #2796C4,
+                              #5ab4d8
                             );
                           transition:width .4s ease;
                           border-radius:999px;
@@ -5044,7 +5060,7 @@
 
                     <div id="pbx-backup-progress-text" style="
                         min-width:42px;
-                        color:#fbbf24;
+                        color:#5ab4d8;
                         font-size:13px;
                         font-weight:600;
                       ">
@@ -5075,17 +5091,17 @@
                       <div id="pbx-db-sync-progress-fill" style="
                       width:0%;
                       height:100%;
-                      background:linear-gradient(90deg,#f59e0b,#fbbf24);
+                      background:linear-gradient(90deg,#2796C4,#5ab4d8);
                       border-radius:999px;
                       transition:width .4s ease;
-                      box-shadow:0 0 12px rgba(245,158,11,.5);
+                      box-shadow:0 0 12px rgba(39,150,196,.5);
                     "></div>
 
                     </div>
 
                     <!-- Percentage -->
                     <div id="pbx-db-sync-progress-text" style="
-                    color:#fbbf24;
+                    color:#5ab4d8;
                       font-size:13px;
                       min-width:42px;
                       font-weight:600;
@@ -5298,7 +5314,7 @@
                 style="white-space:nowrap;"><i class="fas fa-brain"></i> AI Assistant</button>
               <!-- Marketing quick-actions -->
               <div style="position:relative;display:inline-block;" id="oa-mkt-wrap">
-                <button class="btn btn-ghost btn-xs" id="oa-mkt-btn" onclick="toggleOaMktMenu()" style="white-space:nowrap;color:var(--gold);border-color:rgba(245,166,35,0.35);">
+                <button class="btn btn-ghost btn-xs" id="oa-mkt-btn" onclick="toggleOaMktMenu()" style="white-space:nowrap;color:var(--gold);border-color:rgba(39,150,196,0.35);">
                   <i class="fas fa-bullhorn"></i> Marketing <i class="fas fa-chevron-down" style="font-size:8px;margin-left:2px;"></i>
                 </button>
                 <div id="oa-mkt-menu" style="display:none;position:absolute;top:calc(100% + 5px);right:0;z-index:9999;
@@ -5379,7 +5395,7 @@
                   <i class="fas fa-plug"></i> <span id="force-offline-label">Disconnect</span>
                 </button>
                 <span id="force-offline-badge"
-                  style="display:none;font-size:10px;color:var(--gold2);background:rgba(245,166,35,0.15);padding:3px 8px;border-radius:12px;font-weight:700;">OFFLINE
+                  style="display:none;font-size:10px;color:var(--gold2);background:rgba(39,150,196,0.15);padding:3px 8px;border-radius:12px;font-weight:700;">OFFLINE
                   MODE (DB)</span>
               </div>
               <div id="ai-filter-bar"
@@ -5522,6 +5538,11 @@
                 <div style="font-size:12.5px;color:var(--muted);margin-bottom:14px;">Scan the QR code with your
                   WhatsApp
                   to connect. Old chats will auto-sync to database.</div>
+                <div id="wa-connection-status"
+                  style="font-size:11.5px;color:var(--muted2);margin-bottom:12px;display:flex;align-items:center;gap:6px;">
+                  <i class="fas fa-circle-notch fa-spin" style="font-size:10px;color:var(--blue2);"></i>
+                  <span>Checking WhatsApp status...</span>
+                </div>
                 <button class="btn btn-green" id="wa-get-qr-btn" onclick="waGetQR()"><i class="fas fa-qrcode"></i>
                   Show
                   QR Code</button>
@@ -5548,7 +5569,7 @@
               <button class="btn btn-ghost btn-xs" onclick="waCreateBackup()" title="Create a safe backup for the currently linked WhatsApp account"><i
                   class="fas fa-archive"></i> Backup</button>
               <button class="btn btn-ghost btn-xs" onclick="waOpenBackupInventory()" title="Load chats from a saved backup for this same WhatsApp account"><i
-                  class="fas fa-database"></i> Load DB</button>
+                  class="fas fa-database"></i> Load Backup</button>
               <button class="btn btn-red btn-xs" onclick="waLogout()"><i class="fas fa-sign-out-alt"></i>
                 Disconnect</button>
             </div>
@@ -5723,6 +5744,8 @@
                 onclick="setContactsSource('whatsapp')"><i class="fab fa-whatsapp"></i> WhatsApp</button>
               <button type="button" class="btn btn-ghost btn-xs contacts-source-tab" data-src="pbx"
                 onclick="setContactsSource('pbx')"><i class="fas fa-phone-alt"></i> PBX calls</button>
+              <button type="button" class="btn btn-ghost btn-xs contacts-source-tab" data-src="all"
+                onclick="setContactsSource('all')"><i class="fas fa-layer-group"></i> All</button>
             </div>
             <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;">
               <div class="search-box" style="max-width:340px;flex:1;min-width:200px;"><i
@@ -5765,6 +5788,11 @@
                   <button type="button" class="btn btn-ghost btn-sm" onclick="nav('calls', null)"><i
                       class="fas fa-list"></i> Call logs</button>
                 </div>
+                <div id="contacts-tools-all" style="display:none;gap:8px;flex-wrap:wrap;align-items:center;">
+                  <button type="button" class="btn btn-ghost btn-sm" onclick="loadAllMergedContacts(true)"><i
+                      class="fas fa-sync-alt"></i> Refresh All</button>
+                  <span style="font-size:11px;color:var(--muted);padding:0 8px;">Merged view: Outlook · WhatsApp · PBX</span>
+                </div>
               </div>
             </div>
           </div>
@@ -5772,7 +5800,7 @@
           <div class="contacts-directory-grid">
             <div class="contacts-list-cell">
               <!-- Bulk action bar — shown when contacts are checked -->
-              <div id="contacts-bulk-bar" style="display:none;align-items:center;gap:8px;padding:8px 10px;margin-bottom:8px;background:rgba(245,166,35,0.08);border:1px solid rgba(245,166,35,0.25);border-radius:8px;flex-wrap:wrap;">
+              <div id="contacts-bulk-bar" style="display:none;align-items:center;gap:8px;padding:8px 10px;margin-bottom:8px;background:rgba(39,150,196,0.08);border:1px solid rgba(39,150,196,0.25);border-radius:8px;flex-wrap:wrap;">
                 <span id="contacts-bulk-count" style="font-size:12px;font-weight:700;color:var(--gold);flex:1;min-width:120px;"></span>
                 <button class="btn btn-ghost btn-xs" onclick="contactsSelectAll()"><i class="fas fa-check-double"></i> All</button>
                 <button class="btn btn-ghost btn-xs" onclick="contactsDeselectAll()"><i class="fas fa-times"></i> None</button>
@@ -5854,7 +5882,7 @@
             <div class="kpi gold">
               <div class="kpi-top">
                 <div class="kpi-label">Spam</div>
-                <div class="kpi-icon" style="background:rgba(245,166,35,0.12);color:var(--gold);"><i
+                <div class="kpi-icon" style="background:rgba(39,150,196,0.12);color:var(--gold);"><i
                     class="fas fa-ban"></i></div>
               </div>
               <div class="kpi-val" id="mkt-email-spam">0</div>
@@ -6261,7 +6289,7 @@
                     <span class="badge b-green"><i class="fas fa-circle" style="font-size:6px;"></i> Online</span>
                   </div>
                 </div>
-                <div style="padding:9px 16px;border-bottom:1px solid var(--border);background:rgba(245,166,35,0.04);">
+                <div style="padding:9px 16px;border-bottom:1px solid var(--border);background:rgba(39,150,196,0.04);">
                   <div style="font-size:11.5px;color:var(--muted);">Specialised in Unicircuit Engineering Services LLP
                     communications – switchgear, VFDs, PLCs, cable management, MCC panels, industrial electrical
                     solutions.</div>
@@ -6481,7 +6509,7 @@
             <div class="kpi gold">
               <div class="kpi-top">
                 <div class="kpi-label">Email Resp. Time</div>
-                <div class="kpi-icon" style="background:rgba(245,166,35,0.12);color:var(--gold2);"><i
+                <div class="kpi-icon" style="background:rgba(39,150,196,0.12);color:var(--gold2);"><i
                     class="fas fa-clock"></i></div>
               </div>
               <div class="kpi-val">2.4h</div>
@@ -6780,8 +6808,8 @@
                 style="width:20px;height:20px;border-radius:4px;background:#000000;cursor:pointer;border:2px solid transparent;"></span>
               <span onclick="bcPickColor('fg','#ffffff')"
                 style="width:20px;height:20px;border-radius:4px;background:#ffffff;cursor:pointer;border:1px solid #ccc;"></span>
-              <span onclick="bcPickColor('fg','#e8820a')"
-                style="width:20px;height:20px;border-radius:4px;background:#e8820a;cursor:pointer;"></span>
+              <span onclick="bcPickColor('fg','#1a6e99')"
+                style="width:20px;height:20px;border-radius:4px;background:#1a6e99;cursor:pointer;"></span>
               <span onclick="bcPickColor('fg','#dc2626')"
                 style="width:20px;height:20px;border-radius:4px;background:#dc2626;cursor:pointer;"></span>
               <span onclick="bcPickColor('fg','#16a34a')"
@@ -6829,8 +6857,8 @@
                 style="width:20px;height:20px;border-radius:4px;background:#fecaca;cursor:pointer;"></span>
               <span onclick="bcPickColor('bg','#e9d5ff')"
                 style="width:20px;height:20px;border-radius:4px;background:#e9d5ff;cursor:pointer;"></span>
-              <span onclick="bcPickColor('bg','#fed7aa')"
-                style="width:20px;height:20px;border-radius:4px;background:#fed7aa;cursor:pointer;"></span>
+              <span onclick="bcPickColor('bg','#bde3f5')"
+                style="width:20px;height:20px;border-radius:4px;background:#bde3f5;cursor:pointer;"></span>
             </div>
             <div style="display:flex;gap:6px;align-items:center;">
               <input type="color" id="bc-bgcolor-custom" value="#ffff00"
@@ -7105,7 +7133,7 @@
       </div>
 
       <!-- AI Campaign Generator (PicoClaw) -->
-      <div style="border:1px solid rgba(245,166,35,0.18);border-radius:10px;padding:12px 14px;margin-top:8px;background:rgba(245,166,35,0.03);">
+      <div style="border:1px solid rgba(39,150,196,0.18);border-radius:10px;padding:12px 14px;margin-top:8px;background:rgba(39,150,196,0.03);">
         <div style="font-size:10.5px;font-weight:700;color:var(--gold);margin-bottom:10px;letter-spacing:.5px;">
           <i class="fas fa-robot"></i> AI CAMPAIGN GENERATOR — PICOCLAW
         </div>
@@ -7296,7 +7324,7 @@ Always write in a professional yet warm Indian B2B communication style. Use form
       if (main && main.value !== mode) main.value = mode;
       if (drawer && drawer.value !== mode) drawer.value = mode;
       document.querySelectorAll('[data-ai-decision-mode]').forEach(node => {
-        node.style.boxShadow = node.dataset.aiDecisionMode === mode ? '0 0 0 2px rgba(245,166,35,0.75)' : 'none';
+        node.style.boxShadow = node.dataset.aiDecisionMode === mode ? '0 0 0 2px rgba(39,150,196,0.75)' : 'none';
         node.style.transform = node.dataset.aiDecisionMode === mode ? 'translateY(-1px)' : 'none';
       });
     }
@@ -7449,7 +7477,7 @@ Always write in a professional yet warm Indian B2B communication style. Use form
     function scoreColor(s) {
       if (s >= 80) return 'var(--green2)';
       if (s >= 60) return 'var(--gold2)';
-      if (s >= 40) return '#fb923c';
+      if (s >= 40) return '#2796C4';
       return 'var(--red2)';
     }
 
@@ -7564,6 +7592,7 @@ Always write in a professional yet warm Indian B2B communication style. Use form
     let contactsSource = 'outlook';
     let outlookContactsCache = [];
     let pbxContactsCache = [];
+    let allMergedContactsCache = [];
 
     function updateContactsSourceTabsUI() {
       document.querySelectorAll('.contacts-source-tab').forEach(btn => {
@@ -7574,9 +7603,11 @@ Always write in a professional yet warm Indian B2B communication style. Use form
       const o = document.getElementById('contacts-tools-outlook');
       const w = document.getElementById('contacts-tools-wa');
       const p = document.getElementById('contacts-tools-pbx');
+      const a = document.getElementById('contacts-tools-all');
       if (o) o.style.display = contactsSource === 'outlook' ? 'flex' : 'none';
       if (w) w.style.display = contactsSource === 'whatsapp' ? 'flex' : 'none';
       if (p) p.style.display = contactsSource === 'pbx' ? 'flex' : 'none';
+      if (a) a.style.display = contactsSource === 'all' ? 'flex' : 'none';
     }
 
     async function setContactsSource(src) {
@@ -7590,6 +7621,7 @@ Always write in a professional yet warm Indian B2B communication style. Use form
       if (src === 'outlook') await loadOutlookContactsDirectory();
       else if (src === 'whatsapp') await renderWhatsappContactsDirectory(false);
       else if (src === 'pbx') await loadPbxContactsDirectory();
+      else if (src === 'all') await loadAllMergedContacts();
     }
 
     function refreshContactsSection() {
@@ -7597,6 +7629,7 @@ Always write in a professional yet warm Indian B2B communication style. Use form
       if (contactsSource === 'outlook') loadOutlookContactsDirectory();
       else if (contactsSource === 'whatsapp') renderWhatsappContactsDirectory(false);
       else if (contactsSource === 'pbx') loadPbxContactsDirectory();
+      else if (contactsSource === 'all') loadAllMergedContacts();
     }
 
     function outlookPrimaryEmail(oc) {
@@ -7892,7 +7925,7 @@ Always write in a professional yet warm Indian B2B communication style. Use form
         const hasLive = outlookContactsCache.some(c => c.source === 'outlook-contacts' || c.source === 'outlook-people' || c.source === 'outlook-org-contacts' || c.source === 'outlook-directory-users');
         if (!hasLive && outlookContactsCache.length > 0) {
           const hint = document.createElement('div');
-          hint.style.cssText = 'padding:8px 14px;font-size:11px;color:var(--muted);background:rgba(245,166,35,0.06);border-bottom:1px solid var(--border);';
+          hint.style.cssText = 'padding:8px 14px;font-size:11px;color:var(--muted);background:rgba(39,150,196,0.06);border-bottom:1px solid var(--border);';
           hint.innerHTML = '<i class="fab fa-microsoft" style="color:#0078d4;margin-right:4px;"></i> Showing DB contacts. <button class="btn btn-blue btn-xs" style="margin-left:6px;" onclick="connectOutlook()">Connect Outlook</button> to sync live contacts.';
           el.parentElement.insertBefore(hint, el);
         }
@@ -9347,6 +9380,358 @@ Always write in a professional yet warm Indian B2B communication style. Use form
       }
     }
 
+    /* ─────────────────────────────────────────────────────────────────────
+       ALL MERGED CONTACTS
+       Merges Outlook, WhatsApp (wa_chats) and PBX contacts.
+       Primary key = last 10 significant digits of the phone number,
+       so +91-9545073545, 919545073545, 9545073545 all collapse to the same record.
+    ───────────────────────────────────────────────────────────────────── */
+
+    /**
+     * Normalise any phone string to its last 10 digits (the local subscriber number).
+     * Returns '' for numbers that are too short or contain no digits.
+     */
+    function normalisePhone(raw) {
+      if (!raw) return '';
+      const digits = String(raw).replace(/\D/g, '');
+      if (digits.length < 7) return '';          // landlines / extensions allowed
+      return digits.length >= 10 ? digits.slice(-10) : digits;
+    }
+
+    async function loadAllMergedContacts(forceRefresh = false) {
+      const el = document.getElementById('contact-list');
+      el.innerHTML = '<div style="text-align:center;padding:28px;"><div class="spin-loader" style="margin:0 auto;"></div><div style="font-size:12px;color:var(--muted);margin-top:10px;">Merging all sources…</div></div>';
+
+      try {
+        // Fetch all three sources in parallel — force fresh if requested
+        const [outlookData, waData, pbxData] = await Promise.allSettled([
+          // Outlook
+          (async () => {
+            if (!forceRefresh && outlookContactsCache.length) return outlookContactsCache;
+            const res = await fetch(`${API_BASE}/outlook/contacts?_=${Date.now()}`, { headers: getAuthHeaders(), cache: 'no-store' });
+            if (!res.ok) return [];
+            const raw = await res.json();
+            outlookContactsCache = Array.isArray(raw) ? raw : (raw.contacts || []);
+            return outlookContactsCache;
+          })(),
+          // WhatsApp
+          (async () => {
+            if (!forceRefresh && waAllChats && waAllChats.length) return waAllChats;
+            const res = await fetch(`${API_BASE}/wa/chats`, { headers: getAuthHeaders() });
+            if (res.status === 401) { localStorage.clear(); sessionStorage.clear(); window.location.href = 'login.html'; return []; }
+            if (res.ok) waAllChats = await res.json();
+            return waAllChats || [];
+          })(),
+          // PBX
+          (async () => {
+            if (!forceRefresh && pbxContactsCache.length) return pbxContactsCache;
+            const res = await fetch(`${API_BASE}/calls/contacts`, { headers: getAuthHeaders() });
+            if (!res.ok) return [];
+            pbxContactsCache = await res.json();
+            return pbxContactsCache;
+          })(),
+        ]);
+
+        const outlook = outlookData.status === 'fulfilled' ? (outlookData.value || []) : [];
+        const wa      = waData.status === 'fulfilled'      ? (waData.value  || []) : [];
+        const pbx     = pbxData.status === 'fulfilled'     ? (pbxData.value || []) : [];
+
+        // Map: normalised 10-digit key → merged record
+        const map = new Map();
+
+        function getOrCreate(key, phone) {
+          if (!map.has(key)) {
+            map.set(key, {
+              key,
+              phone,          // canonical phone for display (first one we see)
+              name: '',
+              email: '',
+              company: '',
+              sources: [],    // ['outlook','whatsapp','pbx']
+              outlook: null,
+              wa: null,
+              pbx: null,
+            });
+          }
+          return map.get(key);
+        }
+
+        // ── Outlook ──────────────────────────────────────────
+        outlook.forEach(oc => {
+          const phone = outlookPrimaryPhone(oc) || '';
+          const key = normalisePhone(phone);
+          if (!key) return;
+          const rec = getOrCreate(key, phone);
+          if (!rec.sources.includes('outlook')) rec.sources.push('outlook');
+          rec.outlook = oc;
+          // Prefer Outlook's display name as it's typically the richest
+          if (!rec.name) rec.name = outlookDisplayTitle(oc) || '';
+          if (!rec.email) rec.email = outlookPrimaryEmail(oc) || '';
+          if (!rec.company && oc.companyName) rec.company = oc.companyName;
+        });
+
+        // ── WhatsApp ──────────────────────────────────────────
+        wa.forEach(c => {
+          const phone = c.phone || (c.id && c.id.split('@')[0]) || '';
+          const key = normalisePhone(phone);
+          if (!key) return;
+          const rec = getOrCreate(key, phone);
+          if (!rec.sources.includes('whatsapp')) rec.sources.push('whatsapp');
+          rec.wa = c;
+          if (!rec.name && c.name) rec.name = c.name;
+        });
+
+        // ── PBX ──────────────────────────────────────────────
+        pbx.forEach(p => {
+          const key = normalisePhone(p.phone);
+          if (!key) return;
+          const rec = getOrCreate(key, p.phone);
+          if (!rec.sources.includes('pbx')) rec.sources.push('pbx');
+          rec.pbx = p;
+          // PBX saved name wins if no name yet
+          if (!rec.name && p.name) rec.name = p.name;
+          if (!rec.company && p.company) rec.company = p.company;
+        });
+
+        allMergedContactsCache = [...map.values()].sort((a, b) => {
+          // Default: named contacts first, then by source count, then alphabetical
+          const aName = a.name ? 0 : 1;
+          const bName = b.name ? 0 : 1;
+          if (aName !== bName) return aName - bName;
+          if (b.sources.length !== a.sources.length) return b.sources.length - a.sources.length;
+          return (a.name || a.phone).localeCompare(b.name || b.phone);
+        });
+
+        // Stamp last activity timestamp from PBX or WA for sort-by-recent
+        allMergedContactsCache.forEach(r => {
+          const pbxTime = r.pbx && r.pbx.last_call ? new Date(r.pbx.last_call).getTime() : 0;
+          const waTime  = r.wa  && r.wa.last_time  ? new Date(r.wa.last_time).getTime()  : 0;
+          const olTime  = r.outlook && r.outlook.lastEmailAt ? new Date(r.outlook.lastEmailAt).getTime() : 0;
+          r._lastActivity = Math.max(pbxTime, waTime, olTime);
+        });
+
+        filterContacts();
+      } catch (err) {
+        console.error('[AllMerged] error:', err);
+        el.innerHTML = `<div style="padding:24px;color:var(--red2);font-size:12.5px;">Could not load merged contacts: ${escHtml(err.message)}</div>`;
+      }
+    }
+
+    function renderAllMergedContacts(list) {
+      const el = document.getElementById('contact-list');
+      if (!list.length) {
+        el.innerHTML = '<div style="text-align:center;padding:30px;color:var(--muted);font-size:12.5px;">No contacts found across all sources.</div>';
+        return;
+      }
+
+      const sourceIcon = {
+        outlook:   '<i class="fab fa-microsoft" style="color:#0078d4;" title="Outlook"></i>',
+        whatsapp:  '<i class="fab fa-whatsapp" style="color:#25D366;" title="WhatsApp"></i>',
+        pbx:       '<i class="fas fa-phone-alt" style="color:var(--green2);" title="PBX"></i>',
+      };
+
+      el.innerHTML = list.map(r => {
+        const displayName = r.name || r.phone || r.key;
+        const initials = displayName.split(' ').map(w => w[0] || '').join('').toUpperCase().slice(0, 2) || '?';
+        const subtitle = [r.email, r.company].filter(Boolean).join(' · ') || r.phone || '';
+        const badges = r.sources.map(s => sourceIcon[s] || '').join(' ');
+        const multiSource = r.sources.length >= 2
+          ? `<span class="badge b-blue" style="font-size:9px;margin-left:4px;">${r.sources.length} sources</span>`
+          : '';
+
+        return `
+    <div class="contact-card" onclick='showAllMergedDetail(${JSON.stringify(r.key)}, this)'>
+      <div style="display:flex;align-items:center;gap:11px;">
+        <div class="contact-avatar" style="background:rgba(39,150,196,0.15);color:#2796C4;">${escHtml(initials)}</div>
+        <div style="flex:1;min-width:0;">
+          <div style="font-weight:700;font-size:13.5px;color:var(--text);">${escHtml(displayName)}${multiSource}</div>
+          <div style="font-size:11.5px;color:var(--muted);margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escHtml(subtitle)}</div>
+        </div>
+        <div style="display:flex;gap:5px;align-items:center;font-size:14px;">${badges}</div>
+      </div>
+    </div>`;
+      }).join('');
+    }
+
+    async function showAllMergedDetail(key, cardEl) {
+      if (cardEl) {
+        document.querySelectorAll('#contact-list .contact-card').forEach(e => e.classList.remove('selected'));
+        cardEl.classList.add('selected');
+      }
+
+      const r = allMergedContactsCache.find(x => x.key === key);
+      if (!r) return;
+
+      const displayName = r.name || r.phone || key;
+      const phone = r.phone || ('+' + key);
+
+      // Show spinner while loading call logs
+      document.getElementById('contact-detail-panel').innerHTML = `
+    <div style="padding:60px 20px;text-align:center;"><div class="spin-loader" style="margin:0 auto;"></div></div>`;
+
+      // Fetch PBX call history in background
+      let callHistory = [];
+      if (r.pbx) {
+        try {
+          const res = await fetch(`${API_BASE}/calls/contact/${encodeURIComponent(r.pbx.phone || phone)}`, { headers: getAuthHeaders() });
+          const data = res.ok ? await res.json() : {};
+          callHistory = data.calls || [];
+        } catch (_) {}
+      }
+
+      // Fetch Outlook activity (mail stats) if we have an email
+      let outlookStats = null;
+      const outlookEmail = r.email || (r.outlook ? outlookPrimaryEmail(r.outlook) : '');
+      if (outlookEmail) {
+        try {
+          const res = await fetch(`${API_BASE}/outlook/directory-activity?email=${encodeURIComponent(outlookEmail)}`, { headers: getAuthHeaders() });
+          if (res.ok) outlookStats = await res.json();
+        } catch (_) {}
+      }
+
+      // ── Source pills ─────────────────────────────────────────────────────
+      const sourceChips = {
+        outlook:  `<span class="badge b-blue" style="font-size:10px;padding:3px 7px;"><i class="fab fa-microsoft"></i> Outlook</span>`,
+        whatsapp: `<span class="badge" style="background:rgba(37,211,102,0.15);color:#25D366;font-size:10px;padding:3px 7px;"><i class="fab fa-whatsapp"></i> WhatsApp</span>`,
+        pbx:      `<span class="badge b-green" style="font-size:10px;padding:3px 7px;"><i class="fas fa-phone-alt"></i> PBX</span>`,
+      };
+
+      // ── Outlook section ───────────────────────────────────────────────────
+      let outlookSection = '';
+      if (r.outlook) {
+        const oc = r.outlook;
+        const email = outlookPrimaryEmail(oc) || '';
+        const ocPhone = outlookPrimaryPhone(oc) || '';
+        const allPhones = [
+          oc.mobilePhone,
+          ...(Array.isArray(oc.businessPhones) ? oc.businessPhones : []),
+          ...(Array.isArray(oc.homePhones) ? oc.homePhones : [])
+        ].filter(Boolean).filter((v,i,a) => a.indexOf(v) === i);
+
+        const sentCount  = outlookStats ? (outlookStats.outlookSentToThem       || 0) : '—';
+        const recvCount  = outlookStats ? (outlookStats.outlookReceivedFromThem || 0) : '—';
+        const lastMail   = outlookStats && outlookStats.lastEmailAt
+          ? new Date(outlookStats.lastEmailAt).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' })
+          : '—';
+
+        outlookSection = `
+      <div style="padding:13px 20px;border-bottom:1px solid var(--border);">
+        <div style="font-size:10px;font-weight:700;color:#0078d4;text-transform:uppercase;letter-spacing:0.7px;margin-bottom:10px;"><i class="fab fa-microsoft"></i> Outlook</div>
+        ${email    ? `<div class="stat-row"><div class="stat-label">Email</div><div class="stat-val" style="font-size:12px;word-break:break-all;">${escHtml(email)}</div></div>` : ''}
+        ${oc.companyName  ? `<div class="stat-row"><div class="stat-label">Company</div><div class="stat-val" style="font-size:12px;">${escHtml(oc.companyName)}</div></div>` : ''}
+        ${oc.jobTitle     ? `<div class="stat-row"><div class="stat-label">Job Title</div><div class="stat-val" style="font-size:12px;">${escHtml(oc.jobTitle)}</div></div>` : ''}
+        ${oc.department   ? `<div class="stat-row"><div class="stat-label">Department</div><div class="stat-val" style="font-size:12px;">${escHtml(oc.department)}</div></div>` : ''}
+        ${allPhones.length > 1 ? `<div class="stat-row"><div class="stat-label">All phones</div><div class="stat-val" style="font-size:12px;">${allPhones.map(p => escHtml(p)).join('<br>')}</div></div>` : ''}
+        <div class="stat-row"><div class="stat-label">Emails sent</div><div class="stat-val" style="font-size:12px;font-weight:600;">${sentCount}</div></div>
+        <div class="stat-row"><div class="stat-label">Emails received</div><div class="stat-val" style="font-size:12px;font-weight:600;">${recvCount}</div></div>
+        <div class="stat-row"><div class="stat-label">Last email</div><div class="stat-val" style="font-size:12px;">${lastMail}</div></div>
+        <div style="margin-top:10px;display:flex;gap:6px;flex-wrap:wrap;">
+          ${email ? `<button class="btn btn-blue btn-xs" onclick="nav('email',null)"><i class="fas fa-envelope"></i> Email</button>` : ''}
+          ${oc.outlookPeopleUrl ? `<a href="${escAttr(oc.outlookPeopleUrl)}" target="_blank" class="btn btn-ghost btn-xs"><i class="fab fa-microsoft"></i> View in Outlook</a>` : ''}
+        </div>
+      </div>`;
+      }
+
+      // ── WhatsApp section ──────────────────────────────────────────────────
+      let waSection = '';
+      if (r.wa) {
+        const wc = r.wa;
+        const wName    = wc.name || wc.phone || (wc.id && wc.id.split('@')[0]) || '';
+        const last     = wc.last_message ? String(wc.last_message).slice(0, 200) : '—';
+        const lastTime = wc.last_time ? new Date(wc.last_time).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' }) : '—';
+        const wPhone   = wc.phone || (wc.id && wc.id.split('@')[0]) || '';
+        waSection = `
+      <div style="padding:13px 20px;border-bottom:1px solid var(--border);">
+        <div style="font-size:10px;font-weight:700;color:#25D366;text-transform:uppercase;letter-spacing:0.7px;margin-bottom:10px;"><i class="fab fa-whatsapp"></i> WhatsApp</div>
+        ${wName  ? `<div class="stat-row"><div class="stat-label">Name</div><div class="stat-val" style="font-size:12px;">${escHtml(wName)}</div></div>` : ''}
+        ${wPhone ? `<div class="stat-row"><div class="stat-label">WA Number</div><div class="stat-val" style="font-family:'JetBrains Mono',monospace;font-size:12px;">${escHtml(wPhone)}</div></div>` : ''}
+        <div class="stat-row"><div class="stat-label">Last message</div><div class="stat-val" style="font-size:12px;color:var(--muted);max-width:220px;white-space:normal;line-height:1.4;">${escHtml(last)}</div></div>
+        <div class="stat-row"><div class="stat-label">Last active</div><div class="stat-val" style="font-size:12px;">${escHtml(lastTime)}</div></div>
+        ${wc.unread > 0 ? `<div class="stat-row"><div class="stat-label">Unread</div><div class="stat-val"><span class="badge b-green">${wc.unread} new</span></div></div>` : ''}
+        ${wc.is_group   ? `<div class="stat-row"><div class="stat-label">Type</div><div class="stat-val"><span class="badge b-gold" style="font-size:9px;">Group</span></div></div>` : ''}
+        <div style="margin-top:10px;">
+          <button class="btn btn-green btn-xs" onclick='openWhatsAppChatFromContacts(${JSON.stringify(wc.id)},${JSON.stringify(wName)},${JSON.stringify(wPhone)})'>
+            <i class="fab fa-whatsapp"></i> Open Chat
+          </button>
+        </div>
+      </div>`;
+      }
+
+      // ── PBX section + call history ────────────────────────────────────────
+      let pbxSection = '';
+      if (r.pbx) {
+        const pc = r.pbx;
+        const n  = pc.call_count || 0;
+        const lc = pc.last_call ? new Date(pc.last_call).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' }) : '—';
+
+        const callRows = callHistory.length
+          ? callHistory.map(h => {
+              let dateObj = null;
+              try {
+                if (h.call_date && h.call_time) {
+                  const d = typeof h.call_date === 'string' ? h.call_date.split('T')[0] : h.call_date;
+                  dateObj = new Date(`${d}T${h.call_time}`);
+                  if (isNaN(dateObj.getTime())) dateObj = null;
+                }
+                if (!dateObj && h.created_at) dateObj = new Date(h.created_at);
+              } catch (_) {}
+              const dateStr = dateObj ? dateObj.toLocaleString('en-IN', { dateStyle: 'short', timeStyle: 'short' }) : '—';
+              const dur = h.duration != null ? `${Math.floor(h.duration / 60)}m ${h.duration % 60}s` : '';
+              const typeBadge = h.call_type === 'Missed'
+                ? `<span class="badge b-red" style="font-size:9px;">Missed</span>`
+                : h.call_type === 'In'
+                  ? `<span class="badge b-blue" style="font-size:9px;">In</span>`
+                  : `<span class="badge b-gold" style="font-size:9px;">Out</span>`;
+              return `
+              <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid rgba(255,255,255,0.04);">
+                <div>
+                  <div style="font-size:12px;color:var(--text);font-weight:600;">${dateStr}</div>
+                  ${dur ? `<div style="font-size:10.5px;color:var(--muted);">${dur}${h.extension ? ` · Ext ${escHtml(String(h.extension))}` : ''}</div>` : ''}
+                </div>
+                <div style="display:flex;align-items:center;gap:6px;">${typeBadge}</div>
+              </div>`;
+            }).join('')
+          : '<div style="color:var(--muted);font-size:12px;padding:8px 0;">No call history found.</div>';
+
+        pbxSection = `
+      <div style="padding:13px 20px;border-bottom:1px solid var(--border);">
+        <div style="font-size:10px;font-weight:700;color:var(--green2);text-transform:uppercase;letter-spacing:0.7px;margin-bottom:10px;"><i class="fas fa-phone-alt"></i> PBX</div>
+        ${pc.name    ? `<div class="stat-row"><div class="stat-label">Saved name</div><div class="stat-val" style="font-size:12px;">${escHtml(pc.name)}</div></div>` : ''}
+        ${pc.company ? `<div class="stat-row"><div class="stat-label">Company</div><div class="stat-val" style="font-size:12px;">${escHtml(pc.company)}</div></div>` : ''}
+        <div class="stat-row"><div class="stat-label">Total calls</div><div class="stat-val" style="font-size:12px;font-weight:600;">${n}</div></div>
+        <div class="stat-row"><div class="stat-label">Last call</div><div class="stat-val" style="font-size:12px;">${escHtml(lc)}</div></div>
+        ${pc.notes   ? `<div class="stat-row"><div class="stat-label">Notes</div><div class="stat-val" style="font-size:12px;color:var(--muted);max-width:220px;white-space:normal;line-height:1.4;">${escHtml(pc.notes)}</div></div>` : ''}
+        <div style="margin-top:10px;display:flex;gap:6px;flex-wrap:wrap;">
+          <button class="btn btn-green btn-xs" onclick="pbxDial(${jsArg(pc.phone || phone)})"><i class="fas fa-phone-alt"></i> Call</button>
+          <button class="btn btn-ghost btn-xs" onclick="nav('calls',null)"><i class="fas fa-list"></i> All logs</button>
+          ${!pc.name ? `<button class="btn btn-ghost btn-xs" onclick="pbxSaveContactModal(${jsArg(pc.phone || phone)})"><i class="fas fa-user-plus"></i> Save name</button>` : ''}
+        </div>
+        <div style="margin-top:12px;">
+          <div style="font-size:10px;text-transform:uppercase;color:var(--muted);font-weight:700;letter-spacing:0.8px;margin-bottom:6px;">Recent Call History</div>
+          <div style="max-height:280px;overflow-y:auto;">${callRows}</div>
+        </div>
+      </div>`;
+      }
+
+      document.getElementById('contact-detail-panel').innerHTML = `
+    <div class="card" style="animation:fadeUp 0.2s ease;">
+      <div style="padding:18px 20px;border-bottom:1px solid var(--border);">
+        <div class="section-label"><i class="fas fa-layer-group" style="color:#2796C4;"></i> Merged Contact</div>
+        <div style="font-size:17px;font-weight:800;color:var(--text);margin-top:8px;">${escHtml(displayName)}</div>
+        <div style="font-family:'JetBrains Mono',monospace;font-size:13px;color:var(--muted2);margin-top:3px;">${escHtml(phone)}</div>
+        <div style="display:flex;gap:5px;margin-top:8px;flex-wrap:wrap;">
+          ${r.sources.map(s => sourceChips[s] || '').join('')}
+        </div>
+      </div>
+      ${outlookSection}
+      ${waSection}
+      ${pbxSection}
+      <div style="padding:10px 20px 14px;">
+        <div style="font-size:9.5px;color:rgba(255,255,255,0.2);font-family:'JetBrains Mono',monospace;">key: ${escHtml(key)} (last 10 digits)</div>
+      </div>
+    </div>`;
+    }
+
     function filterContacts() {
       const q = (document.getElementById('contact-search').value || '').toLowerCase().trim();
       const sortVal = document.getElementById('contact-sort') ? document.getElementById('contact-sort').value : 'recent';
@@ -9395,6 +9780,28 @@ Always write in a professional yet warm Indian B2B communication style. Use form
       if (contactsSource === 'pbx') {
         const list = !q ? pbxContactsCache : pbxContactsCache.filter(r => (r.phone || '').toLowerCase().includes(q) || (r.name || '').toLowerCase().includes(q));
         renderPbxContactsList(list);
+      }
+      if (contactsSource === 'all') {
+        let list = !q ? [...allMergedContactsCache] : allMergedContactsCache.filter(r => {
+          const name = (r.name || '').toLowerCase();
+          const phone = (r.phone || '').toLowerCase();
+          const email = (r.email || '').toLowerCase();
+          const company = (r.company || '').toLowerCase();
+          return name.includes(q) || phone.includes(q) || email.includes(q) || company.includes(q);
+        });
+        // Apply sort
+        if (sortVal === 'recent') {
+          list.sort((a, b) => (b._lastActivity || 0) - (a._lastActivity || 0));
+        } else if (sortVal === 'oldest') {
+          list.sort((a, b) => (a._lastActivity || 0) - (b._lastActivity || 0));
+        } else if (sortVal === 'az') {
+          list.sort((a, b) => (a.name || a.phone || '').localeCompare(b.name || b.phone || ''));
+        } else if (sortVal === 'za') {
+          list.sort((a, b) => (b.name || b.phone || '').localeCompare(a.name || a.phone || ''));
+        } else if (sortVal === 'mobile') {
+          list.sort((a, b) => (a.phone || '').localeCompare(b.phone || ''));
+        }
+        renderAllMergedContacts(list);
       }
     }
 
@@ -9556,7 +9963,7 @@ Always write in a professional yet warm Indian B2B communication style. Use form
       const phone = document.getElementById('c-phone').value.trim();
       if (!fname || !company || !phone) { notify('Missing required fields', 'Name, Company and Phone are required', 'var(--red)', 'fas fa-exclamation-triangle'); return; }
       const initials = (fname[0] + (lname[0] || '')).toUpperCase();
-      const palette = [['#1d4ed8', 'rgba(29,78,216,0.15)'], ['#d97706', 'rgba(217,119,6,0.15)'], ['#7c3aed', 'rgba(124,58,237,0.15)'], ['#059669', 'rgba(5,150,105,0.15)'], ['#dc2626', 'rgba(220,38,38,0.15)'], ['#0891b2', 'rgba(8,145,178,0.15)']];
+      const palette = [['#1d4ed8', 'rgba(29,78,216,0.15)'], ['#2796C4', 'rgba(39,150,196,0.15)'], ['#7c3aed', 'rgba(124,58,237,0.15)'], ['#059669', 'rgba(5,150,105,0.15)'], ['#dc2626', 'rgba(220,38,38,0.15)'], ['#0891b2', 'rgba(8,145,178,0.15)']];
       const p = palette[Math.floor(Math.random() * palette.length)];
       if (editingContactId) {
         const idx = contacts.findIndex(x => x.id === editingContactId);
@@ -9615,7 +10022,7 @@ Always write in a professional yet warm Indian B2B communication style. Use form
       const prompt = `Generate a brief AI sales intelligence insight for the following contact at Unicircuit Engineering Services LLP:\n\nName: ${c.fname} ${c.lname}\nCompany: ${c.company}\nDesignation: ${c.designation}\nSegment: ${c.segment}\nLead Score: ${c.score}/100\nProducts of Interest: ${c.products}\nCity: ${c.city}\nNotes: ${c.notes}\nCalls: ${c.calls}, Emails: ${c.emails}, WhatsApp: ${c.wa_count}\nLast Contact: ${c.lastContact}\n\nProvide: 1) Engagement summary 2) Next best action 3) Risk/opportunity alert. Keep it under 80 words, practical and actionable.`;
       try {
         const text = await callPicoClaw(prompt);
-        result.innerHTML = `<div style="background:rgba(245,166,35,0.06);border:1px solid rgba(245,166,35,0.15);border-radius:9px;padding:12px 14px;font-size:12.5px;line-height:1.6;color:var(--text);"><div style="font-size:10px;font-weight:700;color:var(--gold);margin-bottom:6px;"><i class="fas fa-robot"></i> PICOCLAW AI INSIGHT</div>${text.replace(/\n/g, '<br>')}</div>`;
+        result.innerHTML = `<div style="background:rgba(39,150,196,0.06);border:1px solid rgba(39,150,196,0.15);border-radius:9px;padding:12px 14px;font-size:12.5px;line-height:1.6;color:var(--text);"><div style="font-size:10px;font-weight:700;color:var(--gold);margin-bottom:6px;"><i class="fas fa-robot"></i> PICOCLAW AI INSIGHT</div>${text.replace(/\n/g, '<br>')}</div>`;
       } catch (e) {
         result.innerHTML = '<div style="color:var(--red2);font-size:12px;">API error – check network.</div>';
       }
@@ -9705,7 +10112,7 @@ Always write in a professional yet warm Indian B2B communication style. Use form
       // Info section
       document.getElementById('pbx-sidebar-info').innerHTML = `
         <div style="display:flex;align-items:flex-start;gap:12px;">
-          <div style="width:42px;height:42px;border-radius:50%;background:rgba(245,166,35,0.15);display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:800;color:var(--gold);flex-shrink:0;">
+          <div style="width:42px;height:42px;border-radius:50%;background:rgba(39,150,196,0.15);display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:800;color:var(--gold);flex-shrink:0;">
             ${(callerDisplay).charAt(0).toUpperCase()}
           </div>
           <div style="flex:1;min-width:0;">
@@ -9750,7 +10157,7 @@ Always write in a professional yet warm Indian B2B communication style. Use form
         summaryEl.style.fontStyle = 'normal';
         summaryEl.style.color = 'var(--text)';
         summaryEl.innerHTML = `
-          <div style="background:rgba(245,166,35,0.05);border:1px solid rgba(245,166,35,0.15);border-radius:9px;padding:13px 15px;">
+          <div style="background:rgba(39,150,196,0.05);border:1px solid rgba(39,150,196,0.15);border-radius:9px;padding:13px 15px;">
             <div style="font-size:9.5px;font-weight:700;color:var(--gold);margin-bottom:8px;"><i class="fas fa-robot"></i> AI CALL SUMMARY</div>
             <div style="font-size:12.5px;line-height:1.65;white-space:pre-wrap;color:var(--text);">${escHtml(log.ai_summary)}</div>
           </div>`;
@@ -9925,7 +10332,7 @@ Always write in a professional yet warm Indian B2B communication style. Use form
 
         // AI narrative
         const aiSection = `
-          <div style="background:rgba(245,166,35,0.05);border:1px solid rgba(245,166,35,0.15);border-radius:9px;padding:14px 16px;">
+          <div style="background:rgba(39,150,196,0.05);border:1px solid rgba(39,150,196,0.15);border-radius:9px;padding:14px 16px;">
             <div style="font-size:10px;font-weight:700;color:var(--gold);margin-bottom:10px;"><i class="fas fa-robot"></i> AI INTELLIGENCE SUMMARY</div>
             <div id="pbx-section-ai-text" style="font-size:12.5px;color:var(--muted);font-style:italic;">
               <div style="display:flex;align-items:center;gap:8px;"><div class="spin-loader" style="width:14px;height:14px;"></div> Generating AI analysis...</div>
@@ -10014,7 +10421,7 @@ Keep it concise and professional.`;
           const text = await callPicoClaw(prompt);
 
           summaryEl.innerHTML = `
-            <div style="background:rgba(245,166,35,0.05);border:1px solid rgba(245,166,35,0.15);border-radius:9px;padding:13px 15px;">
+            <div style="background:rgba(39,150,196,0.05);border:1px solid rgba(39,150,196,0.15);border-radius:9px;padding:13px 15px;">
               <div style="font-size:9.5px;font-weight:700;color:var(--gold);margin-bottom:8px;"><i class="fas fa-robot"></i> AI CALL SUMMARY · ${escHtml(callerLabel)}</div>
               <div style="font-size:12.5px;line-height:1.65;white-space:pre-wrap;color:var(--text);">${escHtml(text)}</div>
               <div style="margin-top:10px;font-size:10px;color:var(--muted);">Generated ${new Date().toLocaleString('en-IN', { dateStyle: 'short', timeStyle: 'short' })}</div>
@@ -10043,7 +10450,7 @@ Keep it concise and professional.`;
       el.innerHTML = '<span class="spin-loader"></span> Generating summary…';
       try {
         const text = await callPicoClaw('Generate a 1-sentence AI call summary for a B2B engineering sales call at Unicircuit Engineering Services LLP. Include: what was discussed and next action. Keep it under 15 words.');
-        el.innerHTML = `<div style="background:rgba(245,166,35,0.05);border:1px solid rgba(245,166,35,0.12);border-radius:9px;padding:13px 15px;">
+        el.innerHTML = `<div style="background:rgba(39,150,196,0.05);border:1px solid rgba(39,150,196,0.12);border-radius:9px;padding:13px 15px;">
           <div style="font-size:9.5px;font-weight:700;color:var(--gold);margin-bottom:8px;"><i class="fas fa-robot"></i> AI CALL SUMMARY</div>
           <div style="font-size:12.5px;line-height:1.65;white-space:pre-wrap;color:var(--text);">${escHtml(text)}</div>
         </div>`;
@@ -11194,7 +11601,7 @@ Keep it concise and professional.`;
 
       var panel = document.createElement('div');
       panel.id = panelId;
-      panel.style.cssText = 'background:rgba(245,166,35,0.06);border:1px solid rgba(245,166,35,0.2);border-radius:8px;padding:10px 12px;margin-bottom:6px;';
+      panel.style.cssText = 'background:rgba(39,150,196,0.06);border:1px solid rgba(39,150,196,0.2);border-radius:8px;padding:10px 12px;margin-bottom:6px;';
       panel.innerHTML =
         '<div style="font-size:10px;font-weight:700;color:var(--gold);margin-bottom:8px;letter-spacing:.5px;">'
         + '<i class="fas fa-robot"></i> AI EMAIL GENERATOR'
@@ -11492,9 +11899,9 @@ Keep it concise and professional.`;
       Object.keys(map).forEach(function (id) {
         var el = document.getElementById(id); if (!el) return;
         var on = document.queryCommandState(map[id]);
-        el.style.background = on ? 'rgba(245,166,35,0.18)' : '';
+        el.style.background = on ? 'rgba(39,150,196,0.18)' : '';
         el.style.color = on ? 'var(--gold)' : '';
-        el.style.borderColor = on ? 'rgba(245,166,35,0.4)' : '';
+        el.style.borderColor = on ? 'rgba(39,150,196,0.4)' : '';
       });
     }
     function bcInsertHR() { if (!_bcRestoreFocus()) return; document.execCommand('insertHTML', false, '<hr style="border:none;border-top:1px solid #ccc;margin:10px 0;"><br>'); }
@@ -11650,7 +12057,7 @@ Keep it concise and professional.`;
         _lastAiCampaignCopy = { text, emailSubject, emailBody: emailBody || text, waMessage, product, audience, goal };
 
         const safeText = escHtml(text);
-        el.innerHTML = '<div style="background:rgba(245,166,35,0.05);border:1px solid rgba(245,166,35,0.12);border-radius:10px;padding:14px 16px;margin-top:4px;">'
+        el.innerHTML = '<div style="background:rgba(39,150,196,0.05);border:1px solid rgba(39,150,196,0.12);border-radius:10px;padding:14px 16px;margin-top:4px;">'
           + '<div style="font-size:9.5px;font-weight:700;color:var(--gold);margin-bottom:10px;"><i class="fas fa-robot"></i> AI-GENERATED CAMPAIGN COPY</div>'
           + '<pre style="font-size:12.5px;line-height:1.65;white-space:pre-wrap;font-family:\'Outfit\';color:var(--text);max-height:260px;overflow-y:auto;">' + safeText + '</pre>'
           + '<div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap;">'
@@ -12547,7 +12954,7 @@ Best regards,<br>
                   <div style="display:flex;flex-wrap:wrap;gap:5px;margin-bottom:8px;">
                     <span onclick="clPickColor('fg','#000000')" style="width:20px;height:20px;border-radius:4px;background:#000000;cursor:pointer;"></span>
                     <span onclick="clPickColor('fg','#ffffff')" style="width:20px;height:20px;border-radius:4px;background:#ffffff;cursor:pointer;border:1px solid #ccc;"></span>
-                    <span onclick="clPickColor('fg','#e8820a')" style="width:20px;height:20px;border-radius:4px;background:#e8820a;cursor:pointer;"></span>
+                    <span onclick="clPickColor('fg','#1a6e99')" style="width:20px;height:20px;border-radius:4px;background:#1a6e99;cursor:pointer;"></span>
                     <span onclick="clPickColor('fg','#dc2626')" style="width:20px;height:20px;border-radius:4px;background:#dc2626;cursor:pointer;"></span>
                     <span onclick="clPickColor('fg','#16a34a')" style="width:20px;height:20px;border-radius:4px;background:#16a34a;cursor:pointer;"></span>
                     <span onclick="clPickColor('fg','#2563eb')" style="width:20px;height:20px;border-radius:4px;background:#2563eb;cursor:pointer;"></span>
@@ -12572,7 +12979,7 @@ Best regards,<br>
                     <span onclick="clPickColor('bg','#bfdbfe')" style="width:20px;height:20px;border-radius:4px;background:#bfdbfe;cursor:pointer;"></span>
                     <span onclick="clPickColor('bg','#fecaca')" style="width:20px;height:20px;border-radius:4px;background:#fecaca;cursor:pointer;"></span>
                     <span onclick="clPickColor('bg','#e9d5ff')" style="width:20px;height:20px;border-radius:4px;background:#e9d5ff;cursor:pointer;"></span>
-                    <span onclick="clPickColor('bg','#fed7aa')" style="width:20px;height:20px;border-radius:4px;background:#fed7aa;cursor:pointer;"></span>
+                    <span onclick="clPickColor('bg','#bde3f5')" style="width:20px;height:20px;border-radius:4px;background:#bde3f5;cursor:pointer;"></span>
                   </div>
                   <div style="display:flex;gap:6px;align-items:center;"><input type="color" id="cl-bgcolor-custom" value="#ffff00" style="width:32px;height:28px;padding:1px;border:1px solid var(--border);border-radius:4px;cursor:pointer;flex-shrink:0;"><span style="font-size:10px;color:var(--muted);">Custom</span><button type="button" class="btn btn-gold btn-xs" style="margin-left:auto;" onclick="clPickColor('bg',document.getElementById('cl-bgcolor-custom').value)">Apply</button></div>
                 </div>
@@ -12769,7 +13176,7 @@ Best regards,<br>
               <div style="font-size:18px;font-weight:800;color:var(--red2);">${failedList.length}</div>
               <div style="font-size:9.5px;color:var(--muted);">Failed</div>
             </div>
-            <div style="text-align:center;background:rgba(245,166,35,0.07);border-radius:8px;padding:10px 4px;">
+            <div style="text-align:center;background:rgba(39,150,196,0.07);border-radius:8px;padding:10px 4px;">
               <div style="font-size:18px;font-weight:800;color:var(--gold);">${pendingList.length}</div>
               <div style="font-size:9.5px;color:var(--muted);">Pending</div>
             </div>
@@ -13146,7 +13553,7 @@ Best regards,<br>
         _ncGeneratedEmailSubject = extracted.subject || _ncGeneratedEmailSubject;
         _ncGeneratedEmailBodyHtml = extracted.bodyHtml || _ncGeneratedEmailBodyHtml;
 
-        el.innerHTML = '<div style="background:rgba(245,166,35,0.05);border:1px solid rgba(245,166,35,0.12);border-radius:8px;padding:10px 12px;">'
+        el.innerHTML = '<div style="background:rgba(39,150,196,0.05);border:1px solid rgba(39,150,196,0.12);border-radius:8px;padding:10px 12px;">'
           + '<pre style="font-size:12px;line-height:1.6;white-space:pre-wrap;font-family:\'Outfit\';color:var(--text);max-height:200px;overflow-y:auto;">' + safeText + '</pre>'
           + '<div style="margin-top:8px;display:flex;gap:6px;flex-wrap:wrap;">'
           + '<button class="btn btn-ghost btn-xs" onclick="navigator.clipboard&&navigator.clipboard.writeText(' + JSON.stringify(text) + ').then(function(){notify(\'Copied\',\'AI copy copied\',\'var(--green)\',\'fas fa-check\')})"><i class="fas fa-copy"></i> Copy All</button>'
@@ -13973,7 +14380,7 @@ Best regards,<br>
           const warnIcon = !hasPhone && (chVal === 'wa' || chVal === 'both')
             ? '<i class="fas fa-exclamation-triangle" title="No phone — WA notification won\'t send" style="color:var(--gold);font-size:9px;margin-left:3px;"></i>'
             : '';
-          return '<span style="display:inline-flex;align-items:center;gap:5px;background:rgba(245,166,35,0.12);border:1px solid rgba(245,166,35,0.3);border-radius:20px;padding:3px 10px 3px 8px;font-size:12px;color:var(--text);margin:2px;">'
+          return '<span style="display:inline-flex;align-items:center;gap:5px;background:rgba(39,150,196,0.12);border:1px solid rgba(39,150,196,0.3);border-radius:20px;padding:3px 10px 3px 8px;font-size:12px;color:var(--text);margin:2px;">'
             + '<i class="fas fa-user" style="font-size:9px;color:var(--gold);"></i>'
             + escHtml(label) + warnIcon
             + '<span onclick="removeAssignee(' + i + ')" style="cursor:pointer;color:var(--muted);margin-left:4px;font-size:11px;line-height:1;" title="Remove">✕</span>'
@@ -15508,12 +15915,12 @@ Best regards,<br>
 
     function oaCategoryColorMap() {
       return {
-        preset0: '#e74856', preset1: '#ff8c00', preset2: '#ffb900', preset3: '#fff100',
+        preset0: '#e74856', preset1: '#2796C4', preset2: '#5ab4d8', preset3: '#fff100',
         preset4: '#16c60c', preset5: '#00b7c3', preset6: '#0078d4', preset7: '#8764b8',
-        preset8: '#b146c2', preset9: '#e3008c', preset10: '#ef6950', preset11: '#bad80a',
+        preset8: '#b146c2', preset9: '#e3008c', preset10: '#2796C4', preset11: '#bad80a',
         preset12: '#0099bc', preset13: '#00cc6a', preset14: '#00bcf2', preset15: '#8764b8',
         preset16: '#744da9', preset17: '#b4009e', preset18: '#e3008c', preset19: '#e74856',
-        preset20: '#ff8c00', preset21: '#ffb900', preset22: '#fff100', preset23: '#bad80a',
+        preset20: '#2796C4', preset21: '#5ab4d8', preset22: '#fff100', preset23: '#bad80a',
         preset24: '#16c60c', none: 'var(--muted)'
       };
     }
@@ -15686,14 +16093,14 @@ Best regards,<br>
           <div class="oa-storage-usage">${escHtml(usageLabel)}</div>
           <div class="oa-storage-bar">
           <div title="Inbox ${inboxPct.toFixed(1)}%" style="width:${segmentWidth(inboxPct, 2)}%;background:#0f9ee8;"></div>
-          <div title="Sent Items ${sentPct.toFixed(1)}%" style="width:${segmentWidth(sentPct, 2)}%;background:#ff9f1a;"></div>
+          <div title="Sent Items ${sentPct.toFixed(1)}%" style="width:${segmentWidth(sentPct, 2)}%;background:#2796C4;"></div>
           <div title="Deleted Items ${deletedPct.toFixed(1)}%" style="width:${segmentWidth(deletedPct, 2)}%;background:#5c8f12;"></div>
           <div title="Other ${otherPct.toFixed(1)}%" style="width:${segmentWidth(otherPct, 2)}%;background:#7a7a7a;"></div>
           <div class="oa-storage-fill-empty"></div>
           </div>
           <div class="oa-storage-legend">
             <span class="oa-storage-legend-item"><i class="oa-storage-swatch" style="background:#0f9ee8;"></i>Inbox</span>
-            <span class="oa-storage-legend-item"><i class="oa-storage-swatch" style="background:#ff9f1a;"></i>Sent Items</span>
+            <span class="oa-storage-legend-item"><i class="oa-storage-swatch" style="background:#2796C4;"></i>Sent Items</span>
             <span class="oa-storage-legend-item"><i class="oa-storage-swatch" style="background:#5c8f12;"></i>Deleted Items</span>
             <span class="oa-storage-legend-item"><i class="oa-storage-swatch" style="background:#7a7a7a;"></i>Other</span>
           </div>
@@ -18000,13 +18407,13 @@ Best regards,<br>
 
     const SMART_MAIL_CATEGORIES = [
       { label: 'LEAD', value: 'LEAD', color: '#b146c2' },
-      { label: 'BROADCAST', value: 'BROADCAST', color: '#ff8c00' },
+      { label: 'BROADCAST', value: 'BROADCAST', color: '#2796C4' },
       { label: 'CLIENT', value: 'CLIENT', color: '#16c60c' },
       { label: 'PRAPOSAL SEND', value: 'PRAPOSAL_SEND', outlook: 'PRAPOSAL SEND', color: '#e3008c' },
       { label: 'VENDOR', value: 'VENDOR', color: '#8764b8' },
       { label: 'Red category', value: 'RED_CATEGORY', outlook: 'Red category', color: '#e74856' },
       { label: 'IMPORTANT', value: 'IMPORTANT', color: '#ef4444' },
-      { label: 'NEEDS REPLY', value: 'NEEDS_REPLY', outlook: 'NEEDS REPLY', color: '#f5a623' },
+      { label: 'NEEDS REPLY', value: 'NEEDS_REPLY', outlook: 'NEEDS REPLY', color: '#2796C4' },
       { label: 'GENERAL', value: 'GENERAL', color: '#94a3b8' }
     ];
 
@@ -18925,7 +19332,7 @@ ${plainText}`;
       // Highlight selected row
       document.querySelectorAll('[id^="email-row-"]').forEach(r => r.style.background = '');
       const row = document.getElementById(`email-row-${id}`);
-      if (row) row.style.background = 'rgba(245,166,35,0.06)';
+      if (row) row.style.background = 'rgba(39,150,196,0.06)';
 
       const subjectEl = document.getElementById('email-detail-subject');
       const bodyEl = document.getElementById('email-detail-body');
@@ -19019,7 +19426,7 @@ ${plainText}`;
         if (bodyEl) {
           let loadBanner = '';
           if (msg.partial && msg.loadWarning) {
-            loadBanner = '<div style="padding:8px 12px;margin:0 0 8px;background:rgba(245,166,35,0.12);border:1px solid rgba(245,166,35,0.35);border-radius:6px;font-size:11.5px;color:var(--gold);">Showing preview only — full body could not be loaded from Outlook. Try refresh or open in Outlook.</div>';
+            loadBanner = '<div style="padding:8px 12px;margin:0 0 8px;background:rgba(39,150,196,0.12);border:1px solid rgba(39,150,196,0.35);border-radius:6px;font-size:11.5px;color:var(--gold);">Showing preview only — full body could not be loaded from Outlook. Try refresh or open in Outlook.</div>';
           }
           const bodyPick = outlookPickFullBody(msg);
           const raw = bodyPick.content || msg.bodyPreview || '';
@@ -19056,7 +19463,7 @@ ${plainText}`;
         if (cached && bodyEl) {
           if (subjectEl) subjectEl.textContent = cached.subject || '(no subject)';
           const preview = cached.bodyPreview || '';
-          const banner = '<div style="padding:8px 12px;margin:8px;background:rgba(245,166,35,0.12);border:1px solid rgba(245,166,35,0.35);border-radius:6px;font-size:11.5px;color:var(--gold);">Could not load full message from Outlook. Showing list preview.</div>';
+          const banner = '<div style="padding:8px 12px;margin:8px;background:rgba(39,150,196,0.12);border:1px solid rgba(39,150,196,0.35);border-radius:6px;font-size:11.5px;color:var(--gold);">Could not load full message from Outlook. Showing list preview.</div>';
           bodyEl.innerHTML = banner + '<div class="email-plain-scroll"><pre style="white-space:pre-wrap;font-family:\'Outfit\',sans-serif;font-size:13px;color:var(--text);margin:0;">' + escHtml(preview) + '</pre></div>';
           activeMailMessage = cached;
         } else if (bodyEl) {
@@ -19424,7 +19831,7 @@ ${plainText}`;
       const safeEmail = senderEmail.replace(/'/g, "\\'");
       const banner = document.createElement('div');
       banner.className = 'reply-unknown-banner';
-      banner.style.cssText = 'background:rgba(245,166,35,0.08);border:1px solid rgba(245,166,35,0.2);border-radius:8px;padding:9px 14px;margin-bottom:10px;display:flex;align-items:center;gap:10px;font-size:12.5px;';
+      banner.style.cssText = 'background:rgba(39,150,196,0.08);border:1px solid rgba(39,150,196,0.2);border-radius:8px;padding:9px 14px;margin-bottom:10px;display:flex;align-items:center;gap:10px;font-size:12.5px;';
       banner.innerHTML =
         `<i class="fa fa-circle-exclamation" style="color:var(--gold);flex-shrink:0;"></i>` +
         `<span style="flex:1;color:var(--muted2);">${label}</span>` +
@@ -20299,13 +20706,21 @@ ${plainText}`;
       return digits.length >= 15;
     }
 
+    function waIsAllowedWaNumber(value) {
+      var digits = String(value || '').replace(/\D/g, '');
+      if (!digits) return false;
+      return /^91[6-9]\d{9}$/.test(digits) || /^0\d{1,10}$/.test(digits);
+    }
+
     function waFormatPhoneForDisplay(value) {
       var digits = String(value || '').replace(/\D/g, '');
-      if (!digits || waIsLikelyLidNumber(digits)) return '';
-      if (digits.startsWith('91') && digits.length === 12) {
+      if (!digits || waIsLikelyLidNumber(digits) || !waIsAllowedWaNumber(digits)) return '';
+      if (/^91[6-9]\d{9}$/.test(digits)) {
         return '+91 ' + digits.slice(2, 7) + ' ' + digits.slice(7);
       }
-      return '+' + digits;
+      // Extension format, keep leading zero as-is
+      if (digits.startsWith('0')) return digits;
+      return '';
     }
 
     function waResolveJidDisplay(jid, fallbackName) {
@@ -20316,9 +20731,41 @@ ${plainText}`;
       var phone = (mapped && mapped.phone) || (chat && chat.phone) || '';
       var formattedPhone = waFormatPhoneForDisplay(phone || (!jid.endsWith('@lid') ? raw : ''));
       var name = fallbackName || (mapped && mapped.name) || (chat && chat.name) || '';
+      var nameDigits = String(name || '').replace(/\D/g, '');
 
-      if (name && !/^(unknown|unknown whatsapp contact)$/i.test(String(name).trim()) && !waIsLikelyLidNumber(name) && !String(name).includes('@lid')) return name;
-      return formattedPhone || (jid.endsWith('@lid') ? 'Unknown WhatsApp contact' : raw);
+      if (jid.endsWith('@g.us')) {
+        // If group subject is missing, we might fall back to raw numeric IDs.
+        // For the UI, never show numeric-only fallback; show a friendly label.
+        if (!name || !name.trim() || /^\d+$/.test(String(name).trim())) return 'Group';
+        return name;
+      }
+
+      if (
+        name &&
+        !/^(unknown|unknown whatsapp contact)$/i.test(String(name).trim()) &&
+        !waIsLikelyLidNumber(name) &&
+        !String(name).includes('@lid') &&
+        (!nameDigits || waIsAllowedWaNumber(nameDigits))
+      ) return name;
+      return formattedPhone || '';
+    }
+
+    function waSetConnectionStatus(text, level) {
+      var msg = String(text || '').trim();
+      var tone = String(level || 'info');
+      var safeMsg = msg
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;');
+      var syncEl = document.getElementById('wa-sync-status');
+      var connWrap = document.getElementById('wa-connection-status');
+      if (syncEl) syncEl.textContent = msg;
+      if (connWrap) {
+        var color = tone === 'error' ? 'var(--red2)' : tone === 'success' ? 'var(--green2)' : tone === 'warn' ? 'var(--gold)' : 'var(--muted2)';
+        var icon = tone === 'error' ? 'fas fa-exclamation-circle' : tone === 'success' ? 'fas fa-check-circle' : tone === 'warn' ? 'fas fa-exclamation-triangle' : 'fas fa-circle-notch fa-spin';
+        connWrap.style.color = color;
+        connWrap.innerHTML = '<i class="' + icon + '" style="font-size:10px;"></i><span>' + (safeMsg || 'Working...') + '</span>';
+      }
     }
 
     function waLooksSameChat(jidA, jidB) {
@@ -20414,6 +20861,7 @@ ${plainText}`;
       socket = waSocket;
 
       waSocket.on('wa:qr', ({ qr }) => {
+        waSetConnectionStatus('Generating QR / waiting for scan...', 'info');
         const img = document.getElementById('wa-qr-img');
         const wrap = document.getElementById('wa-qr-wrap');
         if (img) img.src = qr;
@@ -20425,13 +20873,15 @@ ${plainText}`;
         // Clear any pending disconnect banner timeout
         clearTimeout(window._waDisconnectTimeout);
         waOnConnected(phone, name);
-        waLoadChats();
+        waSetConnectionStatus('Connected. Click Reload to load chats.', 'success');
         // Reload LID map after connect — backend will sync group participants in ~8s
         // Reload immediately for existing data, then again after sync completes
         waLoadLidMap();
         setTimeout(waLoadLidMap, 12000); // reload after backend group sync finishes
       });
-      waSocket.on('wa:disconnected', () => {
+      waSocket.on('wa:disconnected', (payload) => {
+        var reason = payload && payload.reason ? String(payload.reason) : '';
+        waSetConnectionStatus(reason ? ('Disconnected: ' + reason) : 'Disconnected. Reconnecting...', 'warn');
         // Only show connect banner if disconnected for more than 5 seconds
         // This prevents the QR from "popping out" during brief server restarts
         clearTimeout(window._waDisconnectTimeout);
@@ -20441,14 +20891,22 @@ ${plainText}`;
           if (sb) sb.style.display = 'none';
           if (cb) cb.style.display = 'block';
 
-          // Clear chats from UI to prevent old chats showing for new account
-          const cl = document.getElementById('wa-chat-list');
-          if (cl) cl.innerHTML = '';
-          const ms = document.getElementById('wa-messages');
-          if (ms) ms.innerHTML = '<div class="wa-empty-state"><p>Select a chat or start a new conversation</p></div>';
-          const ch = document.getElementById('wa-chat-header-info');
-          if (ch) ch.innerHTML = 'Select a chat';
+          // Clear chats from UI to prevent stale list while disconnected
+          const convoList = document.getElementById('wa-convo-list');
+          if (convoList) convoList.innerHTML = '<div style="text-align:center;padding:30px;color:var(--muted);font-size:12.5px;">Connect WhatsApp to load chats.</div>';
+          const area = document.getElementById('wa-chat-area');
+          if (area) area.innerHTML = '';
+          const titleEl = document.getElementById('wa-active-title');
+          if (titleEl) titleEl.textContent = 'Select a chat to start';
+          const phoneEl = document.getElementById('wa-active-phone');
+          if (phoneEl) phoneEl.textContent = '';
+          const countEl = document.getElementById('wa-chat-count');
+          if (countEl) countEl.textContent = '0 chats';
+          const unreadEl = document.getElementById('wa-unread-total');
+          if (unreadEl) { unreadEl.textContent = '0'; unreadEl.style.display = 'none'; }
           window.waCurrentChat = null;
+          waAllChats = [];
+          waActiveJid = null;
         }, 5000);
       });
       waSocket.on('wa:message', function (msg) {
@@ -20481,20 +20939,26 @@ ${plainText}`;
           var sub = waCleanMessagePreview(msg.body || '');
           notify("New WhatsApp from " + sender, sub, "var(--green)", "fab fa-whatsapp");
         }
-        waLoadChats(); // Sync with database in background
       });
-      waSocket.on('wa:chats_updated', () => waLoadChats());
+      waSocket.on('wa:chats_updated', () => { });
       waSocket.on('wa:sync_complete', () => {
         console.log('[WA-UI] Full sync complete — loading all chats');
-        waLoadChats();
+        waSetConnectionStatus('Sync complete. Click Reload to fetch chats.', 'success');
       });
       waSocket.on('wa:participants_synced', function (data) {
         console.log('[WA] Group participants synced — reloading LID map (' + (data.total || 0) + ' entries)');
         waLoadLidMap(); // Reload so all new LID→phone mappings are available immediately
       });
-      waSocket.on('wa:syncing', ({ status }) => {
-        const el = document.getElementById('wa-sync-status');
-        if (el) el.textContent = status === 'done' ? '' : 'Syncing...';
+      waSocket.on('wa:syncing', (payload) => {
+        const status = payload && payload.status ? String(payload.status) : '';
+        const detail = payload && payload.detail ? String(payload.detail) : '';
+        const stage = payload && payload.stage ? String(payload.stage) : '';
+        if (status === 'done') {
+          waSetConnectionStatus('Done', 'success');
+          return;
+        }
+        const tone = /error|failed|disconnect/i.test(detail + ' ' + stage) ? 'warn' : /connected|complete|done/i.test(detail + ' ' + stage) ? 'success' : 'info';
+        waSetConnectionStatus(detail || (stage ? ('WhatsApp: ' + stage) : 'Syncing...'), tone);
       });
 
       // PBX real-time events
@@ -20798,16 +21262,16 @@ ${plainText}`;
 
     async function checkWAStatus(requestQR) {
       initWASocket();
+      waSetConnectionStatus('Checking WhatsApp connection...', 'info');
       try {
         // /wa/status is public — no auth needed
         const res = await fetch(API_BASE + '/wa/status');
         const data = await res.json();
         if (data.connected) {
           waOnConnected(data.phone, data.name);
-          // Only load chats if we have a valid token
-          const token = localStorage.getItem('uc_token') || sessionStorage.getItem('uc_token');
-          if (token) waLoadChats();
+          waSetConnectionStatus('Connected. Click Reload to load chats.', 'success');
         } else {
+          waSetConnectionStatus('Not connected. Requesting QR...', 'warn');
           const cb = document.getElementById('wa-connect-banner');
           if (cb) cb.style.display = 'block';
           const qrWrap = document.getElementById('wa-qr-wrap');
@@ -20816,6 +21280,7 @@ ${plainText}`;
           }
         }
       } catch (_) {
+        waSetConnectionStatus('Unable to reach WhatsApp service', 'error');
         const cb = document.getElementById('wa-connect-banner');
         if (cb) cb.style.display = 'block';
         if (requestQR) waGetQR();
@@ -20834,20 +21299,24 @@ ${plainText}`;
     async function waGetQR() {
       const btn = document.getElementById('wa-get-qr-btn');
       if (btn) { btn.innerHTML = '<span class="spin-loader"></span> Getting QR...'; btn.disabled = true; }
+      waSetConnectionStatus('Generating QR code...', 'info');
       try {
         const res = await fetch(API_BASE + '/wa/qr');
         const data = await res.json();
         if (data.qr) {
+          waSetConnectionStatus('QR ready. Please scan with WhatsApp.', 'info');
           const img = document.getElementById('wa-qr-img');
           const wrap = document.getElementById('wa-qr-wrap');
           if (img) img.src = data.qr;
           if (wrap) wrap.style.display = 'flex';
           if (btn) btn.style.display = 'none';
         } else {
+          waSetConnectionStatus('QR not ready yet. Retrying is safe.', 'warn');
           if (btn) { btn.innerHTML = '<i class="fas fa-qrcode"></i> Show QR Code'; btn.disabled = false; }
           notify('QR not ready', 'Please wait a moment and try again', 'var(--gold)', 'fas fa-qrcode');
         }
       } catch (_) {
+        waSetConnectionStatus('QR request failed', 'error');
         if (btn) { btn.innerHTML = '<i class="fas fa-qrcode"></i> Show QR Code'; btn.disabled = false; }
       }
     }
@@ -20855,6 +21324,10 @@ ${plainText}`;
     async function waLoadLidMap() {
       try {
         var res = await fetch(API_BASE + '/wa/lid-map', { headers: getAuthHeaders() });
+        if (res.status === 409) {
+          waLidMap = {};
+          return;
+        }
         if (res.ok) {
           waLidMap = await res.json();
           console.log('[WA] LID map loaded:', Object.keys(waLidMap).length, 'entries');
@@ -20878,7 +21351,7 @@ ${plainText}`;
       return new Promise(function (resolve) {
         _waLoadChatsTimer = setTimeout(function () {
           resolve(_waDoLoadChats(opts));
-        }, 400);
+        }, 80);
       });
     }
 
@@ -20886,15 +21359,26 @@ ${plainText}`;
       var byId = {};
       (Array.isArray(chats) ? chats : []).forEach(function (chat) {
         if (!chat || !chat.id) return;
-        var existing = byId[chat.id];
+        var id = String(chat.id);
+        var isGroup = !!chat.is_group || id.endsWith('@g.us');
+        var digits = String(chat.phone || '').replace(/\D/g, '');
+        if (!digits && !isGroup) {
+          digits = id.endsWith('@lid') ? '' : id.split('@')[0].split(':')[0].replace(/\D/g, '');
+        }
+        // Hard frontend guard: never show raw @lid row when no real phone is available
+        if (!isGroup && id.endsWith('@lid') && !digits) return;
+        // Hard frontend rule: only +91 or 0-extension for individual chats
+        if (!isGroup && !waIsAllowedWaNumber(digits)) return;
+        var key = isGroup ? ('group:' + id) : (digits ? ('phone:' + digits) : ('id:' + id));
+        var existing = byId[key];
         if (!existing) {
-          byId[chat.id] = chat;
+          byId[key] = chat;
           return;
         }
         var currentTime = chat.last_time ? new Date(chat.last_time).getTime() : 0;
         var existingTime = existing.last_time ? new Date(existing.last_time).getTime() : 0;
         if (currentTime >= existingTime) {
-          byId[chat.id] = Object.assign({}, existing, chat, { unread: Math.max(existing.unread || 0, chat.unread || 0) });
+          byId[key] = Object.assign({}, existing, chat, { unread: Math.max(existing.unread || 0, chat.unread || 0) });
         }
       });
       return Object.keys(byId).map(function (id) { return byId[id]; });
@@ -20910,6 +21394,7 @@ ${plainText}`;
       }
       _waLoadChatsInFlight = true;
       _waLoadChatsQueued = false;
+      waSetConnectionStatus('Refreshing chat list...', 'info');
       var seq = ++_waLoadChatsSeq;
       try {
         const res = await fetch(API_BASE + '/wa/chats?_=' + Date.now(), { headers: getAuthHeaders(), cache: 'no-store' });
@@ -20922,6 +21407,7 @@ ${plainText}`;
         if (seq !== _waLoadChatsSeq) return;
         waAllChats = waDedupeChats(await res.json());
         waRenderChats(waAllChats);
+        waSetConnectionStatus('Latest chats loaded', 'success');
       } catch (_) { } finally {
         _waLoadChatsInFlight = false;
         if (_waLoadChatsQueued) {
@@ -20949,16 +21435,24 @@ ${plainText}`;
       if (count) count.textContent = chats.length + ' chats';
       if (!chats.length) { el.innerHTML = '<div style="text-align:center;padding:30px;color:var(--muted);font-size:12.5px;">No chats yet.</div>'; return; }
       el.innerHTML = chats.map(function (c) {
+        var isRealGroup = String(c.id || '').endsWith('@g.us');
         var rawId = c.id.split('@')[0].split(':')[0];
         var displayName = waResolveJidDisplay(c.id, c.name || c.phone || rawId);
+        if (!isRealGroup && !displayName) return '';
         // Format Indian numbers: 91XXXXXXXXXX -> +91 XXXXX XXXXX
         if (displayName && /^\+?91\d{10}$/.test(displayName)) {
           var d = displayName.replace(/^\+/, '');
           displayName = '+91 ' + d.slice(2, 7) + ' ' + d.slice(7);
-        } else if (displayName && /^\d{10,15}$/.test(displayName)) {
-          displayName = '+' + displayName;
+        } else if (displayName && /^0\d{1,10}$/.test(displayName)) {
+          displayName = displayName;
+        } else if (!isRealGroup && displayName && /^\d{10,15}$/.test(displayName)) {
+          displayName = '';
         }
+        if (isRealGroup && (!displayName || !String(displayName).trim())) displayName = 'Group';
+        if (!isRealGroup && !displayName) return '';
         var name = displayName;
+        // Show GRP only for real WhatsApp groups (@g.us), not for contact-only group members.
+        var grpBadge = isRealGroup ? '<span style="font-size:10px;color:var(--gold);border:1px solid rgba(255, 215, 0, 0.35);padding:1px 6px;border-radius:999px;font-weight:800;white-space:nowrap;">GRP</span>' : '';
         var initials = name.split(' ').map(function (w) { return w[0] || ''; }).join('').toUpperCase().slice(0, 2) || '?';
         var time = '';
         if (c.last_time) {
@@ -20993,6 +21487,7 @@ ${plainText}`;
           '<div style="flex:1;min-width:0;">' +
           '<div style="display:flex;justify-content:space-between;align-items:center;gap:4px;">' +
           '<span style="font-size:13px;font-weight:' + (c.unread ? '700' : '500') + ';color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:150px;">' + name + '</span>' +
+          (grpBadge ? grpBadge : '') +
           '<span style="font-size:10.5px;color:var(--muted);flex-shrink:0;">' + time + '</span>' +
           '</div>' +
           '<div style="display:flex;justify-content:space-between;align-items:center;margin-top:2px;">' +
@@ -21001,6 +21496,9 @@ ${plainText}`;
           '</div>' +
           '</div></div>';
       }).join('');
+      if (!el.innerHTML.trim()) {
+        el.innerHTML = '<div style="text-align:center;padding:30px;color:var(--muted);font-size:12.5px;">No valid chats found (+91 / 0-extension only).</div>';
+      }
     }
     function waFilterChats(q) {
       if (!q) { waRenderChats(waAllChats); return; }
@@ -21949,24 +22447,29 @@ ${plainText}`;
 
       if (giAv) giAv.textContent = (gData.name || 'G').charAt(0).toUpperCase();
       if (giName) giName.textContent = gData.name || 'Group';
-      if (giMeta) giMeta.textContent = 'Group · ' + (gData.participants || []).length + ' members';
+      var totalCnt = (gData && (gData.total_participants !== undefined && gData.total_participants !== null))
+        ? gData.total_participants
+        : (gData.participants || []).length;
+      var loadedCnt = (gData && Array.isArray(gData.participants)) ? gData.participants.length : 0;
+      if (giMeta) giMeta.textContent = 'Group · ' + totalCnt + ' members' + (gData.has_more ? (' (showing ' + loadedCnt + ')') : '');
       if (giDesc && gData.description) {
         giDesc.textContent = gData.description;
         if (giDescWrap) giDescWrap.style.display = 'block';
       } else if (giDescWrap) {
         giDescWrap.style.display = 'none';
       }
-      if (giCount) giCount.textContent = (gData.participants || []).length + ' members';
+      if (giCount) giCount.textContent = totalCnt + ' members';
 
       if (giMembers) {
         giMembers.innerHTML = (gData.participants || []).map(function (p) {
-          var displayName = p.name || p.phone || null;
+          var phoneSafe = p && p.phone ? waFormatPhoneForDisplay(p.phone) : '';
+          var displayName = (p && p.name && String(p.name).trim()) ? p.name : (phoneSafe || null);
           var initials = displayName ? displayName.charAt(0).toUpperCase() : '?';
           var adminBadge = p.admin
-            ? '<span style="font-size:9px;background:rgba(245,166,35,0.15);color:var(--gold2);padding:1px 6px;border-radius:4px;font-weight:700;white-space:nowrap;">Admin</span>'
+            ? '<span style="font-size:9px;background:rgba(39,150,196,0.15);color:var(--gold2);padding:1px 6px;border-radius:4px;font-weight:700;white-space:nowrap;">Admin</span>'
             : '';
           // Show phone only if it's different from the display name
-          var phoneStr = (p.phone && p.phone !== displayName) ? p.phone : '';
+          var phoneStr = (phoneSafe && phoneSafe !== displayName) ? phoneSafe : '';
           var phoneHtml = phoneStr
             ? '<div style="font-size:10.5px;color:var(--muted);margin-top:1px;">' + phoneStr + '</div>'
             : '';
@@ -22845,7 +23348,7 @@ ${plainText}`;
         headline: 'Unicircuit Engineering Services LLP',
         subheadline: 'Switchgear · ELV · Smart Building · Industrial Automation',
         footerLine: 'Your partner for turnkey electrical & ELV projects across India',
-        accentColor: '#e8820a', imageUrl: ''
+        accentColor: '#1a6e99', imageUrl: ''
       },
       custom: {
         id: 'custom', label: 'Custom', enabled: true, layout: 'hero',
@@ -23369,7 +23872,7 @@ ${plainText}`;
 
       var panel = document.createElement('div');
       panel.id = panelId;
-      panel.style.cssText = 'background:rgba(245,166,35,0.07);border:1px solid rgba(245,166,35,0.25);border-radius:8px;padding:10px 12px;margin-bottom:10px;';
+      panel.style.cssText = 'background:rgba(39,150,196,0.07);border:1px solid rgba(39,150,196,0.25);border-radius:8px;padding:10px 12px;margin-bottom:10px;';
       panel.innerHTML =
         '<div style="font-size:10px;font-weight:700;color:var(--gold);margin-bottom:8px;letter-spacing:.5px;">'
         + '<i class="fas fa-robot"></i> AI BANNER GENERATOR'
@@ -24107,9 +24610,9 @@ ${plainText}`;
         if (btns[id]) {
           el.classList.add('active');
           el.setAttribute('aria-pressed', 'true');
-          el.style.background = 'rgba(245,166,35,0.18)';
+          el.style.background = 'rgba(39,150,196,0.18)';
           el.style.color = 'var(--gold)';
-          el.style.borderColor = 'rgba(245,166,35,0.4)';
+          el.style.borderColor = 'rgba(39,150,196,0.4)';
         } else {
           el.classList.remove('active');
           el.setAttribute('aria-pressed', 'false');
@@ -24134,9 +24637,9 @@ ${plainText}`;
       _marqueeTarget = target;
       // Reset fields
       document.getElementById('mq-text').value = '';
-      document.getElementById('mq-textcolor').value = '#e8820a';
+      document.getElementById('mq-textcolor').value = '#1a6e99';
       document.getElementById('mq-bgcolor').value = '#fff8ee';
-      document.getElementById('mq-textcolor-hex').textContent = '#e8820a';
+      document.getElementById('mq-textcolor-hex').textContent = '#1a6e99';
       document.getElementById('mq-bgcolor-hex').textContent = '#fff8ee';
       document.getElementById('mq-speed').value = 6;
       document.getElementById('mq-speed-val').textContent = '6';
@@ -24549,7 +25052,7 @@ ${plainText}`;
       var phone = (document.getElementById('sig-phone') ? document.getElementById('sig-phone').value : '').trim();
       var web = (document.getElementById('sig-web') ? document.getElementById('sig-web').value : 'unicircuites.com').trim();
       var tagline = (document.getElementById('sig-tagline') ? document.getElementById('sig-tagline').value : '').trim();
-      var color = (document.getElementById('sig-color') ? document.getElementById('sig-color').value : '#e8820a').trim();
+      var color = (document.getElementById('sig-color') ? document.getElementById('sig-color').value : '#1a6e99').trim();
       var imgUrl = (document.getElementById('sig-img') ? document.getElementById('sig-img').value : '').trim();
       var styleEl = document.querySelector('input[name="sig-style"]:checked');
       var style = styleEl ? styleEl.value : 'classic';
@@ -24906,7 +25409,7 @@ ${plainText}`;
       if (document.getElementById('sig-phone')) document.getElementById('sig-phone').value = data.phone || '';
       if (document.getElementById('sig-web')) document.getElementById('sig-web').value = data.web || '';
       if (document.getElementById('sig-tagline')) document.getElementById('sig-tagline').value = data.tagline || '';
-      if (document.getElementById('sig-color')) document.getElementById('sig-color').value = data.color || '#e8820a';
+      if (document.getElementById('sig-color')) document.getElementById('sig-color').value = data.color || '#1a6e99';
       if (document.getElementById('sig-img')) document.getElementById('sig-img').value = data.imgUrl || '';
 
       // Custom signature fields
@@ -24961,7 +25464,7 @@ ${plainText}`;
         phone: (document.getElementById('sig-phone') || {}).value || '',
         web: (document.getElementById('sig-web') || {}).value || '',
         tagline: (document.getElementById('sig-tagline') || {}).value || '',
-        color: (document.getElementById('sig-color') || {}).value || '#e8820a',
+        color: (document.getElementById('sig-color') || {}).value || '#1a6e99',
         imgUrl: (document.getElementById('sig-img') || {}).value || ''
       };
 
@@ -25111,12 +25614,12 @@ ${plainText}`;
     function _aiStartTimer() {
       const timerEl = document.getElementById('ai-elapsed-timer');
       const startMs = Date.now();
-      console.group('%c[AI] ⏱ Analysis started', 'color:#f5a623;font-weight:bold;');
+      console.group('%c[AI] ⏱ Analysis started', 'color:#2796C4;font-weight:bold;');
       console.time('AI analysis total time');
       _aiTimerInterval = setInterval(() => {
         const elapsed = Math.floor((Date.now() - startMs) / 1000);
         if (timerEl) timerEl.textContent = `⏱ Elapsed: ${elapsed}s`;
-        console.log(`%c[AI] ⏱ Running... ${elapsed}s`, 'color:#f5a623;');
+        console.log(`%c[AI] ⏱ Running... ${elapsed}s`, 'color:#2796C4;');
       }, 1000);
     }
 
@@ -25205,12 +25708,12 @@ ${plainText}`;
         <div style="margin:0 0 14px;padding:12px;border:1px solid var(--border);border-radius:10px;background:rgba(255,255,255,0.025);">
           <div style="font-size:10px;font-weight:800;color:var(--muted);text-transform:uppercase;letter-spacing:.8px;margin-bottom:10px;">PicoClaw Decision Model</div>
           <div style="display:grid;grid-template-columns:1fr;justify-items:center;gap:6px;">
-            <div style="width:62%;">${node('auto', 'Decision Node: Auto', 'routes by intent', 'rgba(245,166,35,0.12)', 'rgba(245,166,35,0.35)')}</div>
+            <div style="width:62%;">${node('auto', 'Decision Node: Auto', 'routes by intent', 'rgba(39,150,196,0.12)', 'rgba(39,150,196,0.35)')}</div>
             <div style="height:16px;width:1px;background:var(--border);"></div>
             <div style="width:100%;display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;align-items:stretch;position:relative;">
               ${node('fast', 'Leaf: Fast', 'short email tasks', 'rgba(16,185,129,0.12)', 'rgba(16,185,129,0.32)')}
               ${node('current', 'Decision: Current', 'public/current info', 'rgba(96,165,250,0.12)', 'rgba(96,165,250,0.32)')}
-              ${node('deep', 'Sub-Tree: Deep', 'complete long answers', 'rgba(245,166,35,0.10)', 'rgba(245,166,35,0.32)')}
+              ${node('deep', 'Sub-Tree: Deep', 'complete long answers', 'rgba(39,150,196,0.10)', 'rgba(39,150,196,0.32)')}
             </div>
           </div>
         </div>`;
@@ -25443,15 +25946,15 @@ ${plainText}`;
           'Network transfer': { ms: p.network_transfer_ms },
           '⚙️  JSON parse': { ms: p.json_parse_ms },
         });
-        console.log(`%c[AI-TEST] Totals → PicoClaw: ${t.totals.ollama_total_ms}ms | Wall: ${t.totals.wall_clock_ms}ms | Status: ${t.status.toUpperCase()}`, 'color:#f5a623;font-weight:bold;');
+        console.log(`%c[AI-TEST] Totals → PicoClaw: ${t.totals.ollama_total_ms}ms | Wall: ${t.totals.wall_clock_ms}ms | Status: ${t.status.toUpperCase()}`, 'color:#2796C4;font-weight:bold;');
         console.log(`%c[AI-TEST] Model replied: "${t.model.response_text}"  (${t.model.tokens_out} tokens @ ${t.model.tokens_per_sec} tok/s)`, 'color:#8b5cf6;');
         console.groupEnd();
 
         // ── Modal result panel ───────────────────────────────────────────────
         const isWarm = t.status === 'warm';
         const statusColor = isWarm ? 'var(--green2)' : 'var(--gold)';
-        const statusBg = isWarm ? 'rgba(16,185,129,0.08)' : 'rgba(245,166,35,0.08)';
-        const statusBorder = isWarm ? 'rgba(16,185,129,0.2)' : 'rgba(245,166,35,0.2)';
+        const statusBg = isWarm ? 'rgba(16,185,129,0.08)' : 'rgba(39,150,196,0.08)';
+        const statusBorder = isWarm ? 'rgba(16,185,129,0.2)' : 'rgba(39,150,196,0.2)';
         const statusLabel = isWarm ? '✓ WARM (model in RAM)' : '❄ COLD START (loaded from disk)';
 
         const fmtMs = (v) => v == null ? '<span style="color:var(--muted)">—</span>' :
@@ -26001,7 +26504,7 @@ ${plainText}`;
           // Create wrapper with transformed HTML
           htmlToInsert =
             `<div contenteditable="false" data-html-uid="${uid}" style="width:100%;margin:8px 0;border:1px solid #ddd;border-radius:6px;overflow:hidden;display:block;position:relative;">` +
-            `<div style="position:absolute;top:5px;right:5px;background:rgba(245,166,35,0.9);color:#fff;padding:3px 8px;font-size:10px;font-weight:600;border-radius:4px;z-index:10;">✓ Outlook Compatible</div>` +
+            `<div style="position:absolute;top:5px;right:5px;background:rgba(39,150,196,0.9);color:#fff;padding:3px 8px;font-size:10px;font-weight:600;border-radius:4px;z-index:10;">✓ Outlook Compatible</div>` +
             `<iframe id="${uid}" sandbox="allow-scripts allow-popups" srcdoc="" style="width:100%;min-height:500px;border:none;display:block;" scrolling="yes"></iframe>` +
             `</div><br>`;
 
@@ -28076,7 +28579,7 @@ ${plainText}`;
         syncText.innerText = '0%';
 
         syncDetails.innerHTML = `
-          <div style="color:#fbbf24;">
+          <div style="color:#5ab4d8;">
             Scanning PBX recordings...
           </div>
         `;
@@ -28242,7 +28745,7 @@ ${plainText}`;
             data.progress + '%';
 
           details.innerHTML = `
-            <div style="color:#fbbf24;">
+            <div style="color:#5ab4d8;">
               ${data.status}
             </div>
           `;
@@ -28641,7 +29144,7 @@ ${plainText}`;
 
     function selectCallRecord(row, id) {
       document.querySelectorAll('#calls-tbody tr').forEach(r => r.style.background = '');
-      row.style.background = 'rgba(245,166,35,0.06)';
+      row.style.background = 'rgba(39,150,196,0.06)';
       openPbxCallSidebar(id);
     }
 
@@ -29167,8 +29670,8 @@ ${plainText}`;
                 <span onclick="composePickColor('fg','#ffffff')"
                   style="width:20px;height:20px;border-radius:4px;background:#ffffff;cursor:pointer;border:1px solid #ccc;"
                   title="White"></span>
-                <span onclick="composePickColor('fg','#e8820a')"
-                  style="width:20px;height:20px;border-radius:4px;background:#e8820a;cursor:pointer;"
+                <span onclick="composePickColor('fg','#1a6e99')"
+                  style="width:20px;height:20px;border-radius:4px;background:#1a6e99;cursor:pointer;"
                   title="Orange"></span>
                 <span onclick="composePickColor('fg','#dc2626')"
                   style="width:20px;height:20px;border-radius:4px;background:#dc2626;cursor:pointer;"
@@ -29238,8 +29741,8 @@ ${plainText}`;
                 <span onclick="composePickColor('bg','#e9d5ff')"
                   style="width:20px;height:20px;border-radius:4px;background:#e9d5ff;cursor:pointer;"
                   title="Purple"></span>
-                <span onclick="composePickColor('bg','#fed7aa')"
-                  style="width:20px;height:20px;border-radius:4px;background:#fed7aa;cursor:pointer;"
+                <span onclick="composePickColor('bg','#bde3f5')"
+                  style="width:20px;height:20px;border-radius:4px;background:#bde3f5;cursor:pointer;"
                   title="Orange"></span>
                 <span onclick="composePickColor('bg','#f0f0f0')"
                   style="width:20px;height:20px;border-radius:4px;background:#f0f0f0;cursor:pointer;border:1px solid #ddd;"
@@ -29881,7 +30384,7 @@ Preview shows final Outlook-compatible version"><i class="fas fa-code"></i> HTML
           </div>
           <div class="form-group">
             <label class="form-label">Accent Color</label>
-            <input class="inp" id="sig-color" type="color" value="#e8820a"
+            <input class="inp" id="sig-color" type="color" value="#1a6e99"
               style="height:40px;padding:4px 8px;cursor:pointer;" oninput="etRefreshSigPreview()">
           </div>
         </div>
@@ -30080,10 +30583,10 @@ Nagpur, Maharashtra, 440017, India<br>
           <div>
             <label class="form-label">Text Color</label>
             <div style="display:flex;gap:8px;align-items:center;">
-              <input type="color" id="mq-textcolor" value="#e8820a"
+              <input type="color" id="mq-textcolor" value="#1a6e99"
                 style="width:36px;height:32px;padding:2px;border:1px solid var(--border);border-radius:6px;cursor:pointer;"
                 oninput="marqueeUpdatePreview()" onchange="marqueeUpdatePreview()" />
-              <span id="mq-textcolor-hex" style="font-size:12px;color:var(--muted);">#e8820a</span>
+              <span id="mq-textcolor-hex" style="font-size:12px;color:var(--muted);">#1a6e99</span>
             </div>
           </div>
           <div>
@@ -30109,13 +30612,13 @@ Nagpur, Maharashtra, 440017, India<br>
         </div>
         <!-- Live preview -->
         <div style="border:1px solid var(--border);border-radius:8px;overflow:hidden;background:#fff;">
-          <div id="mq-preview" style="overflow:hidden;padding:6px 0;border-left:3px solid #e8820a;background:#fff8ee;">
+          <div id="mq-preview" style="overflow:hidden;padding:6px 0;border-left:3px solid #1a6e99;background:#fff8ee;">
             <marquee id="mq-preview-marquee" behavior="scroll" direction="left" scrollamount="6"
-              style="color:#e8820a;font-weight:bold;font-size:15px;">Breaking News — Special Offer!</marquee>
+              style="color:#1a6e99;font-weight:bold;font-size:15px;">Breaking News — Special Offer!</marquee>
           </div>
         </div>
         <div
-          style="padding:6px 8px;background:rgba(245,166,35,0.06);border:1px solid rgba(245,166,35,0.15);border-radius:6px;font-size:11px;color:var(--muted2);line-height:1.5;">
+          style="padding:6px 8px;background:rgba(39,150,196,0.06);border:1px solid rgba(39,150,196,0.15);border-radius:6px;font-size:11px;color:var(--muted2);line-height:1.5;">
           <i class="fas fa-info-circle" style="color:var(--gold);"></i>
           <b style="color:var(--gold);">Note:</b> Animation works in Outlook & Apple Mail. Gmail strips CSS animations —
           recipients will see a <b>static styled banner</b> instead (still looks good).
@@ -30981,13 +31484,13 @@ Nagpur, Maharashtra, 440017, India<br>
         width:52px;
         height:52px;
         border-radius:16px;
-        background:linear-gradient(135deg,#f59e0b,#f97316);
+        background:linear-gradient(135deg,#2796C4,#2796C4);
         display:flex;
         align-items:center;
         justify-content:center;
         font-size:22px;
         color:white;
-        box-shadow:0 10px 25px rgba(245,158,11,0.25);
+        box-shadow:0 10px 25px rgba(39,150,196,0.25);
         ">
           <i class="fas fa-database"></i>
         </div>
@@ -31041,8 +31544,8 @@ Nagpur, Maharashtra, 440017, India<br>
             width:34px;
             height:34px;
             border-radius:10px;
-            background:rgba(245,158,11,0.12);
-            color:#f59e0b;
+            background:rgba(39,150,196,0.12);
+            color:#2796C4;
             display:flex;
             align-items:center;
             justify-content:center;

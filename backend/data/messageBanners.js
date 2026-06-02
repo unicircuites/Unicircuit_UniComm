@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Outlook-compatible email frames: banner + body + footer in one 600px bordered table.
  */
 
@@ -414,7 +414,7 @@ const BANNER_PRESETS = {
     headline: 'Unicircuit Engineering Services LLP',
     subheadline: 'Switchgear · ELV · Smart Building · Industrial Automation',
     footerLine: 'Your partner for turnkey electrical & ELV projects across India',
-    accentColor: '#e8820a',
+    accentColor: '#1a6e99',
     imageUrl: '',
   },
   custom: {

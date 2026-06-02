@@ -42,6 +42,8 @@ let socketGeneration = 0;
 let allowQrGeneration = false;
 let groupParticipantSyncing = false;
 let lastGroupParticipantSyncAt = 0;
+let lastActivityAt = Date.now();
+let watchdogTimer = null;
 // Reconnect detection: first connect uses sync_complete for UI refresh;
 // on reconnect Baileys replays chats.upsert — emit wa:chats_updated once after settle.
 let hasConnectedBefore = false;
@@ -49,9 +51,17 @@ let isReconnect = false;
 const MAX_RECONNECT_ATTEMPTS = 10;
 const RECONNECT_DELAYS = [2000, 5000, 10000, 15000, 30000]; // Progressive delays
 const GROUP_PARTICIPANT_SYNC_INTERVAL_MS = 30 * 60 * 1000;
+const ACTIVITY_BUFFER_LIMIT = 120;
+const activityBuffer = [];
+const WA_WATCHDOG_ENABLED = String(process.env.WA_WATCHDOG_ENABLED || 'true').toLowerCase() !== 'false';
+const WA_WATCHDOG_INTERVAL_MS = Math.max(15000, parseInt(process.env.WA_WATCHDOG_INTERVAL_MS || '45000', 10) || 45000);
+const WA_STALE_RESTART_MS = Math.max(60000, parseInt(process.env.WA_STALE_RESTART_MS || '180000', 10) || 180000);
+const WA_DYNAMIC_DB_STORE = String(process.env.WA_DYNAMIC_DB_STORE || 'true').toLowerCase() === 'true';
 
 // In-memory contacts store (name lookup)
 const contactsStore = {};
+const liveChatsStore = new Map();
+const liveMessagesStore = new Map();
 // In-memory imported chat checkpoint to protect against history sync duplicates
 let importedLastTsMap = {};
 // In-memory group metadata cache to prevent hangs on large groups
@@ -68,8 +78,40 @@ function normalizeAccountPhone(value) {
   return String(value || '').split('_')[0].split('@')[0].split(':')[0].replace(/\D/g, '');
 }
 
+function isAllowedWaNumber(value) {
+  const digits = String(value || '').replace(/\D/g, '');
+  if (!digits) return false;
+  // Allowed:
+  // 1) Indian WhatsApp mobiles: 91 + 10 digits (starting 6-9)
+  // 2) Extension format starting with 0
+  return /^91[6-9]\d{9}$/.test(digits) || /^0\d{1,10}$/.test(digits);
+}
+
 function clearContactsStore() {
   for (const key of Object.keys(contactsStore)) delete contactsStore[key];
+}
+
+function pushLiveMessage(jid, message) {
+  if (!jid || !message) return;
+  const key = formatJid(jid);
+  const list = liveMessagesStore.get(key) || [];
+  if (!list.find(m => m.id === message.id)) list.push(message);
+  list.sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
+  if (list.length > 400) list.splice(0, list.length - 400);
+  liveMessagesStore.set(key, list);
+}
+
+function updateLiveChatRow(chat) {
+  if (!chat?.id) return;
+  const key = formatJid(chat.id);
+  const existing = liveChatsStore.get(key) || {};
+  const merged = {
+    ...existing,
+    ...chat,
+    id: key,
+    unread: Number(chat.unread ?? existing.unread ?? 0),
+  };
+  liveChatsStore.set(key, merged);
 }
 
 function setActiveAccountPhone(value) {
@@ -88,6 +130,59 @@ function setIO(socketIO) { io = socketIO; }
 
 function emit(event, data) {
   if (io) io.emit(event, data);
+}
+
+function sleep(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+function recordActivity(stage, detail, meta = null) {
+  const entry = {
+    ts: new Date().toISOString(),
+    stage: String(stage || 'info'),
+    detail: String(detail || ''),
+    meta: meta && typeof meta === 'object' ? meta : undefined,
+  };
+  activityBuffer.push(entry);
+  lastActivityAt = Date.now();
+  if (activityBuffer.length > ACTIVITY_BUFFER_LIMIT) {
+    activityBuffer.splice(0, activityBuffer.length - ACTIVITY_BUFFER_LIMIT);
+  }
+  emit('wa:syncing', entry);
+}
+
+function startWatchdog() {
+  if (!WA_WATCHDOG_ENABLED) return;
+  if (watchdogTimer) return;
+  watchdogTimer = setInterval(async () => {
+    try {
+      if (startInProgress) return;
+      const now = Date.now();
+      const staleForMs = now - lastActivityAt;
+      const hasSession = hasSavedSession();
+
+      if (!sock && hasSession && !isConnected && !reconnectTimer) {
+        recordActivity('watchdog', 'Socket missing with saved session; restarting');
+        await startWA();
+        return;
+      }
+
+      if (!isConnected && hasSession && staleForMs > WA_STALE_RESTART_MS && !reconnectTimer) {
+        recordActivity('watchdog', 'Disconnected state stale; scheduling reconnect', { staleForMs });
+        scheduleReconnect('watchdog stale disconnected');
+      }
+    } catch (err) {
+      console.warn('[WA] Watchdog error:', err.message);
+      recordActivity('error', 'Watchdog check failed', { error: err.message });
+    }
+  }, WA_WATCHDOG_INTERVAL_MS);
+}
+
+function stopWatchdog() {
+  if (watchdogTimer) {
+    clearInterval(watchdogTimer);
+    watchdogTimer = null;
+  }
 }
 
 async function isBlockedChat(jid, accPhone) {
@@ -130,6 +225,7 @@ function scheduleReconnect(reason) {
   if (reconnectAttempts >= MAX_RECONNECT_ATTEMPTS) {
     console.log(`[WA] Max reconnect attempts (${MAX_RECONNECT_ATTEMPTS}) reached. Stopping auto-reconnect.`);
     currentState = 'DISCONNECTED';
+    recordActivity('reconnect', 'Max reconnect attempts reached', { attempts: reconnectAttempts, reason });
     emit('wa:reconnect_failed', { attempts: reconnectAttempts });
     return;
   }
@@ -140,6 +236,7 @@ function scheduleReconnect(reason) {
   currentState = 'RECONNECTING';
 
   console.log(`[WA] Reconnect attempt ${reconnectAttempts}/${MAX_RECONNECT_ATTEMPTS} in ${delay}ms (reason: ${reason})`);
+  recordActivity('reconnect', 'Reconnect scheduled', { attempt: reconnectAttempts, delay, reason });
   emit('wa:reconnecting', { attempt: reconnectAttempts, delay, reason });
 
   reconnectTimer = setTimeout(() => {
@@ -295,6 +392,7 @@ async function ensureTables(retries = 3) {
           name         VARCHAR(200),
           notify       VARCHAR(200),
           phone        VARCHAR(50),
+          is_group_member BOOLEAN DEFAULT FALSE,
           updated_at   TIMESTAMPTZ DEFAULT NOW(),
           PRIMARY KEY (jid, account_phone)
         )
@@ -352,23 +450,24 @@ async function ensureTables(retries = 3) {
 
       // Handle migrations for multi-account support on existing databases (e.g. Tower Server)
       await pool.query(`ALTER TABLE wa_contacts ADD COLUMN IF NOT EXISTS account_phone VARCHAR(50) DEFAULT 'unknown'`).catch(() => { });
+      await pool.query(`ALTER TABLE wa_contacts ADD COLUMN IF NOT EXISTS is_group_member BOOLEAN DEFAULT FALSE`).catch(() => { });
       await pool.query(`ALTER TABLE wa_chats ADD COLUMN IF NOT EXISTS account_phone VARCHAR(50) DEFAULT 'unknown'`).catch(() => { });
       await pool.query(`ALTER TABLE wa_messages ADD COLUMN IF NOT EXISTS account_phone VARCHAR(50) DEFAULT 'unknown'`).catch(() => { });
 
       try {
         await pool.query(`ALTER TABLE wa_contacts DROP CONSTRAINT IF EXISTS wa_contacts_pkey CASCADE`);
         await pool.query(`ALTER TABLE wa_contacts ADD PRIMARY KEY (jid, account_phone)`);
-      } catch(e) {}
+      } catch (e) { }
 
       try {
         await pool.query(`ALTER TABLE wa_chats DROP CONSTRAINT IF EXISTS wa_chats_pkey CASCADE`);
         await pool.query(`ALTER TABLE wa_chats ADD PRIMARY KEY (id, account_phone)`);
-      } catch(e) {}
+      } catch (e) { }
 
       try {
         await pool.query(`ALTER TABLE wa_messages DROP CONSTRAINT IF EXISTS wa_messages_pkey CASCADE`);
         await pool.query(`ALTER TABLE wa_messages ADD PRIMARY KEY (id, chat_id, account_phone)`);
-      } catch(e) {}
+      } catch (e) { }
 
       return; // Success
     } catch (err) {
@@ -410,6 +509,16 @@ async function saveChat(rawJid, name, lastMsg, lastTime, unread, isGroup) {
     ? null
     : (cleanName || null);
   const ts = lastTime instanceof Date ? lastTime : toDate(lastTime);
+  updateLiveChatRow({
+    id: jid,
+    name: safeName || displayPhone,
+    phone: displayPhone,
+    is_group: isGroupChat,
+    last_message: lastMsg || '',
+    last_time: ts || null,
+    unread: unread || 0,
+  });
+  if (!WA_DYNAMIC_DB_STORE) return;
   try {
     const accPhone = phoneNumber;
     if (!accPhone) return;
@@ -453,6 +562,7 @@ async function saveContact(contact) {
     contactsStore[jid].phoneJid = phoneJid;
   }
 
+  if (!WA_DYNAMIC_DB_STORE) return;
   try {
     await pool.query(`
       INSERT INTO wa_contacts (jid, account_phone, name, notify, phone)
@@ -475,10 +585,29 @@ async function saveMessage(msg) {
     // Normalize JID: remove device suffixes and resolve LID to phone if possible
     let jid = rawJid.split(':')[0].split('@')[0] + '@' + rawJid.split('@')[1];
 
-    // LID to Phone resolution (from memory or DB)
+    // LID to Phone resolution (from in-memory map first, DB fallback)
     if (jid.endsWith('@lid')) {
       const mapped = contactsStore[jid];
-      if (mapped?.phoneJid) jid = mapped.phoneJid;
+      if (mapped?.phoneJid) {
+        jid = mapped.phoneJid;
+      } else if (phoneNumber) {
+        try {
+          const lidLookup = await pool.query(
+            `SELECT phone FROM wa_contacts
+             WHERE jid=$1 AND account_phone=$2
+               AND phone IS NOT NULL AND phone != ''
+             LIMIT 1`,
+            [jid, phoneNumber]
+          );
+          const resolvedPhone = String(lidLookup.rows?.[0]?.phone || '').replace(/\D/g, '');
+          if (/^\d{7,15}$/.test(resolvedPhone)) {
+            const resolvedPhoneJid = `${resolvedPhone}@s.whatsapp.net`;
+            if (!contactsStore[jid]) contactsStore[jid] = { id: jid };
+            contactsStore[jid].phoneJid = resolvedPhoneJid;
+            jid = resolvedPhoneJid;
+          }
+        } catch (_) { }
+      }
     }
 
     const ts = toDate(msg.messageTimestamp);
@@ -558,6 +687,34 @@ async function saveMessage(msg) {
     const accPhone = phoneNumber;
     if (!accPhone) return null;
     if (await isBlockedChat(jid, accPhone)) return null;
+    const liveRow = {
+      id,
+      chat_id: jid,
+      account_phone: accPhone,
+      from_me: fromMe,
+      sender: senderJid,
+      sender_name: senderName,
+      body,
+      msg_type: type,
+      timestamp: ts ? ts.toISOString() : new Date().toISOString(),
+      is_read: fromMe,
+      quoted_body: quotedBody,
+      is_reply: replyInfo.isReply,
+      reply_to_msg_id: replyInfo.replyToMsgId,
+      media_path: mediaPath,
+      sender_phone: senderJid && !String(senderJid).endsWith('@g.us')
+        ? (() => {
+          const digits = String(senderJid).split('@')[0].split(':')[0].replace(/\D/g, '');
+          if (!digits) return null;
+          if (digits.startsWith('91') && digits.length === 12) return '+91 ' + digits.slice(2, 7) + ' ' + digits.slice(7);
+          return '+' + digits;
+        })()
+        : null,
+    };
+    pushLiveMessage(jid, liveRow);
+    if (!WA_DYNAMIC_DB_STORE) {
+      return { id, jid, fromMe, sender: senderJid, senderName, body, type, ts, quotedBody, isReply: replyInfo.isReply, replyToMsgId: replyInfo.replyToMsgId, mediaPath };
+    }
     await pool.query(`
       INSERT INTO wa_messages (id, chat_id, account_phone, from_me, sender, sender_name, body, msg_type, timestamp, is_read, quoted_body, is_reply, reply_to_msg_id, media_path)
       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)
@@ -581,9 +738,9 @@ async function loadContactsFromDB() {
       return;
     }
     // Include phone so LID entries get their phoneJid pre-populated for group msg rendering
-    const res = await pool.query(`SELECT jid, name, notify, phone FROM wa_contacts WHERE account_phone=$1`, [accPhone]);
+    const res = await pool.query(`SELECT jid, name, notify, phone, is_group_member FROM wa_contacts WHERE account_phone=$1`, [accPhone]);
     res.rows.forEach(r => {
-      const entry = { id: r.jid, name: r.name, notify: r.notify };
+      const entry = { id: r.jid, name: r.name, notify: r.notify, is_group_member: !!r.is_group_member };
       // Pre-populate phoneJid for @lid contacts so saveMessage can resolve senders immediately
       if (r.jid.endsWith('@lid') && r.phone) {
         entry.phoneJid = r.phone + '@s.whatsapp.net';
@@ -592,7 +749,7 @@ async function loadContactsFromDB() {
       // Also index by phone number for cross-format lookup
       const phone = r.jid.split('@')[0].split(':')[0];
       if (phone && !contactsStore[phone]) {
-        contactsStore[phone] = { id: r.jid, name: r.name, notify: r.notify };
+        contactsStore[phone] = { id: r.jid, name: r.name, notify: r.notify, is_group_member: !!r.is_group_member };
       }
     });
     const lidCount = res.rows.filter(r => r.jid.endsWith('@lid') && r.phone).length;
@@ -625,15 +782,19 @@ async function loadLidPhoneMapFromDB() {
 
 // ── START WHATSAPP ────────────────────────────────────────────────────────────────────
 async function startWA(options = {}) {
+  startWatchdog();
   const allowQR = !!options.allowQR;
   if (allowQR) allowQrGeneration = true;
+  recordActivity('startup', 'Starting WhatsApp service', { allowQR });
 
   if (startInProgress) {
     console.log('[WA] startWA ignored: start already in progress');
+    recordActivity('startup', 'Startup already in progress');
     return;
   }
   if (sock && isConnected) {
     console.log('[WA] startWA ignored: already connected');
+    recordActivity('startup', 'Already connected');
     return;
   }
 
@@ -644,6 +805,7 @@ async function startWA(options = {}) {
   if (!allowQrGeneration && !hasSavedSession()) {
     console.log('[WA] No saved session. WhatsApp will stay idle until QR is requested from WhatsApp Biz.');
     currentState = 'DISCONNECTED';
+    recordActivity('idle', 'Waiting for QR request (no saved session)');
     startInProgress = false;
     return;
   }
@@ -671,6 +833,7 @@ async function startWA(options = {}) {
   }
 
   console.log('[WA] Starting Baileys v' + version.join('.'));
+  recordActivity('startup', 'WhatsApp engine booting', { version: version.join('.') });
 
   if (sock) {
     try { sock.ev.removeAllListeners(); } catch (_) { }
@@ -720,6 +883,7 @@ async function startWA(options = {}) {
       isConnected = false;
       currentState = 'QR_READY';
       console.log('[WA] QR ready — waiting for scan');
+      recordActivity('qr', 'QR ready, waiting for scan');
       try {
         const qrDataUrl = await qrcode.toDataURL(qr);
         emit('wa:qr', { qr: qrDataUrl });
@@ -746,6 +910,7 @@ async function startWA(options = {}) {
       setActiveAccountPhone(rawId);
       userJid = rawId;
       console.log(`[WA] Connected as ${phoneNumber} | raw id: ${rawId} | reconnect: ${isReconnect}`);
+      recordActivity('connected', 'WhatsApp connected', { phone: phoneNumber, reconnect: isReconnect });
       await loadContactsFromDB();
       await loadImportedCheckpointsFromDB();
       await updateChatNames();
@@ -764,11 +929,12 @@ async function startWA(options = {}) {
     if (connection === 'close') {
       isConnected = false;
       currentState = 'DISCONNECTED';
-      emit('wa:disconnected');
-
       const code = (lastDisconnect?.error)?.output?.statusCode || (lastDisconnect?.error)?.code;
       const reason = lastDisconnect?.error?.message || 'unknown';
+      emit('wa:disconnected', { code: code || null, reason });
+      recordActivity('disconnected', 'Connection closed');
       console.warn(`[WA] Connection closed. Code: ${code}, Reason: ${reason}`);
+      recordActivity('disconnected', 'Disconnect reason captured', { code: code || null, reason });
       if (lastDisconnect?.error) {
         console.error('[WA] Full Disconnect Error:', JSON.stringify(lastDisconnect.error, null, 2));
       }
@@ -839,6 +1005,7 @@ async function startWA(options = {}) {
 
     if (!SYNC_FULL_HISTORY) {
       console.log(`[WA] Directory sync chunk — chats=${chats.length} contacts=${contacts?.length || 0} messages skipped=${messages.length} isLatest=${isLatest}`);
+      recordActivity('sync', 'Directory sync chunk', { chats: chats.length, contacts: contacts?.length || 0, messages: messages.length, isLatest: !!isLatest });
       if (contacts?.length) {
         for (let i = 0; i < contacts.length; i++) {
           await saveContact(contacts[i]);
@@ -858,11 +1025,13 @@ async function startWA(options = {}) {
       }
       if (isLatest) {
         await updateChatNames();
+        recordActivity('sync', 'Directory sync complete');
         emit('wa:sync_complete', {});
       }
       return;
     }
     console.log(`[WA] History chunk — chats=${chats.length} contacts=${contacts?.length || 0} messages=${messages.length} isLatest=${isLatest}`);
+    recordActivity('sync', 'History sync chunk', { chats: chats.length, contacts: contacts?.length || 0, messages: messages.length, isLatest: !!isLatest });
 
     // 1. Save contacts FIRST (needed for name resolution)
     if (contacts?.length) {
@@ -911,6 +1080,7 @@ async function startWA(options = {}) {
       console.log('[WA] ✅ Full history sync complete — refreshing UI');
       // Update all chat names now that all contacts are loaded
       await updateChatNames();
+      recordActivity('sync', 'Full history sync complete');
       emit('wa:sync_complete', {});
     }
   });
@@ -1162,6 +1332,7 @@ async function syncAllGroupParticipants() {
     const groups = await pool.query(`SELECT id FROM wa_chats WHERE is_group = true AND account_phone=$1`, [accPhone]);
     if (groups.rows.length === 0) return;
     console.log(`[WA] Syncing participants for ${groups.rows.length} groups...`);
+    recordActivity('participants', 'Group participant sync started', { groups: groups.rows.length });
     let total = 0;
     for (const group of groups.rows) {
       if (!isConnected) break; // Stop sync if disconnected
@@ -1174,12 +1345,14 @@ async function syncAllGroupParticipants() {
           const pNum = typeof p.phoneNumber === 'string' ? p.phoneNumber : (p.phoneNumber?.jid || '');
           const rawPhone = pNum.replace(/\D/g, '');
           if (!rawPhone || rawPhone.length < 7) continue;
+          if (!isAllowedWaNumber(rawPhone)) continue;
           await pool.query(`
-            INSERT INTO wa_contacts (jid, account_phone, name, phone)
-            VALUES ($1, $2, $3, $4)
+            INSERT INTO wa_contacts (jid, account_phone, name, phone, is_group_member)
+            VALUES ($1, $2, $3, $4, true)
             ON CONFLICT (jid, account_phone) DO UPDATE SET
               phone = EXCLUDED.phone,
               name  = COALESCE(EXCLUDED.name, wa_contacts.name),
+              is_group_member = true,
               updated_at = NOW()
           `, [p.id, accPhone, null, rawPhone]);
           total++;
@@ -1187,10 +1360,12 @@ async function syncAllGroupParticipants() {
       } catch (_) { }
     }
     console.log(`[WA] ✅ Group participant sync done — ${total} LID→phone entries saved`);
+    recordActivity('participants', 'Group participant sync complete', { total });
     lastGroupParticipantSyncAt = Date.now();
     emit('wa:participants_synced', { total });
   } catch (err) {
     console.error('[WA] syncAllGroupParticipants error:', err.message);
+    recordActivity('error', 'Group participant sync failed', { error: err.message });
   } finally {
     groupParticipantSyncing = false;
   }
@@ -1511,31 +1686,57 @@ async function sendMediaMessage(jid, media, quotedMsgId) {
 }
 
 // ── GROUP METADATA ───────────────────────────────────────────────────────────
-async function getGroupMetadata(jid) {
+async function getGroupMetadata(jid, opts = {}) {
   if (!sock || !isConnected) throw new Error('WhatsApp not connected');
   const CACHE_TTL = 15 * 60 * 1000;
-  const cached = groupMetadataCache.get(jid);
+  const participantsLimit = Math.max(1, parseInt(opts.participantsLimit || '200', 10) || 200);
+  const participantsOffset = Math.max(0, parseInt(opts.participantsOffset || '0', 10) || 0);
+  const cacheKey = `${jid}::${participantsOffset}:${participantsLimit}`;
+  const cached = groupMetadataCache.get(cacheKey);
   if (cached && (Date.now() - cached.ts < CACHE_TTL)) return cached.data;
 
   const meta = await sock.groupMetadata(jid);
-  const processedParticipants = meta.participants.map(p => {
+  const allParticipants = Array.isArray(meta.participants) ? meta.participants : [];
+  const totalParticipants = allParticipants.length;
+  const slice = (participantsLimit >= totalParticipants)
+    ? allParticipants
+    : allParticipants.slice(participantsOffset, participantsOffset + participantsLimit);
+
+  const processedParticipants = slice.map(p => {
     const pJid = p.id;
     const phoneJid = p.phoneNumber || (pJid.endsWith('@lid') ? null : pJid);
     const rawPhone = phoneJid ? phoneJid.split('@')[0].split(':')[0] : '';
     let phoneDisplay = '';
-    if (rawPhone && /^\d{7,15}$/.test(rawPhone)) {
+    if (rawPhone && isAllowedWaNumber(rawPhone)) {
       phoneDisplay = rawPhone.startsWith('91') && rawPhone.length === 12
         ? '+91 ' + rawPhone.slice(2, 7) + ' ' + rawPhone.slice(7)
-        : '+' + rawPhone;
+        : rawPhone.startsWith('0')
+          ? rawPhone
+          : '+' + rawPhone;
     }
     const realJid = phoneJid || pJid;
     const stored = contactsStore[realJid] || contactsStore[pJid];
-    const displayName = stored?.name || stored?.notify || phoneDisplay || null;
+    let displayName = stored?.name || stored?.notify || null;
+    // If displayName is numeric, show only allowed numbers
+    const displayDigits = displayName ? String(displayName).replace(/\D/g, '') : '';
+    if (displayName && displayDigits && !isAllowedWaNumber(displayDigits)) {
+      displayName = null;
+    }
+    displayName = displayName || phoneDisplay || null;
     return { jid: pJid, phone: phoneDisplay, name: displayName, admin: p.admin === 'admin' || p.admin === 'superadmin' };
   });
 
-  const result = { id: meta.id, name: meta.subject, description: meta.desc || '', participants: processedParticipants };
-  groupMetadataCache.set(jid, { ts: Date.now(), data: result });
+  const result = {
+    id: meta.id,
+    name: meta.subject,
+    description: meta.desc || '',
+    participants: processedParticipants,
+    total_participants: totalParticipants,
+    participants_limit: slice.length,
+    participants_offset: participantsOffset,
+    has_more: participantsOffset + slice.length < totalParticipants,
+  };
+  groupMetadataCache.set(cacheKey, { ts: Date.now(), data: result });
   return result;
 }
 
@@ -1572,12 +1773,14 @@ async function refreshCurrentAccountGroupMetadata(limit = 25) {
         const pNum = typeof p.phoneNumber === 'string' ? p.phoneNumber : (p.phoneNumber?.jid || '');
         const rawPhone = pNum.replace(/\D/g, '');
         if (!rawPhone || rawPhone.length < 7) continue;
+        if (!isAllowedWaNumber(rawPhone)) continue;
         await pool.query(`
-          INSERT INTO wa_contacts (jid, account_phone, name, phone)
-          VALUES ($1, $2, $3, $4)
+          INSERT INTO wa_contacts (jid, account_phone, name, phone, is_group_member)
+          VALUES ($1, $2, $3, $4, true)
           ON CONFLICT (jid, account_phone) DO UPDATE SET
             phone = EXCLUDED.phone,
             name = COALESCE(EXCLUDED.name, wa_contacts.name),
+            is_group_member = true,
             updated_at = NOW()
         `, [p.id, accPhone, null, rawPhone]);
         if (!contactsStore[p.id]) contactsStore[p.id] = { id: p.id };
@@ -1637,6 +1840,7 @@ async function downloadMedia(msgId) {
 // ── LOGOUT ────────────────────────────────────────────────────────────────────
 async function logout() {
   console.log('[WA] Logging out...');
+  stopWatchdog();
   allowQrGeneration = false;
   currentState = 'DISCONNECTED';
   if (sock) {
@@ -1647,6 +1851,8 @@ async function logout() {
     phoneNumber = null;
     userJid = null;
     clearContactsStore();
+    liveChatsStore.clear();
+    liveMessagesStore.clear();
     importedLastTsMap = {};
     groupMetadataCache.clear();
     reconnectAttempts = 0;
@@ -1662,7 +1868,9 @@ function getStatus() {
     name: sock?.user?.name || null,
     hasQR: !!qrString,
     hasSession: hasSavedSession(),
-    state: currentState
+    state: currentState,
+    activity: activityBuffer[activityBuffer.length - 1] || null,
+    recent_activity: activityBuffer.slice(-40),
   };
 }
 
@@ -1672,13 +1880,39 @@ async function getQR() {
 }
 
 async function requestQR() {
+  allowQrGeneration = true;
+  recordActivity('qr', 'QR requested');
+  if (reconnectTimer) {
+    clearTimeout(reconnectTimer);
+    reconnectTimer = null;
+  }
+
   if (!isConnected && !qrString) {
     await startWA({ allowQR: true });
   }
+
   const startedAt = Date.now();
-  while (!qrString && !isConnected && Date.now() - startedAt < 8000) {
-    await new Promise(resolve => setTimeout(resolve, 250));
+  const waitBudgetMs = 30000;
+  const retryAtMs = 12000;
+  let restarted = false;
+
+  while (!qrString && !isConnected && Date.now() - startedAt < waitBudgetMs) {
+    // If WA socket did not produce QR in reasonable time, restart once.
+    if (!restarted && Date.now() - startedAt > retryAtMs && !startInProgress && !qrString) {
+      restarted = true;
+      recordActivity('qr', 'QR delayed, restarting socket once');
+      try {
+        if (sock) {
+          try { sock.ev.removeAllListeners(); } catch (_) { }
+          try { sock.end?.(); } catch (_) { }
+          sock = null;
+        }
+      } catch (_) { }
+      await startWA({ allowQR: true });
+    }
+    await sleep(300);
   }
+
   return getQR();
 }
 
@@ -1791,6 +2025,111 @@ async function importExportedChat(chatText, chatJid, mediaFiles, clearOld) {
   return { imported, chatJid, chatName: displayChatName };
 }
 
-module.exports = { startWA, sendMessage, sendMediaMessage, logout, getStatus, getQR, requestQR, setIO, getGroupMetadata, refreshCurrentAccountGroupMetadata, downloadMedia, msgCache, importExportedChat, getConnectedPhone };
+function getLiveChats() {
+  if (!liveChatsStore.size && sock && sock.chats) {
+    const rawChats = getSocketChatsSnapshot();
+    for (const c of rawChats) {
+      if (!c?.id || c.id === 'status@broadcast') continue;
+      const isGroup = c.id.endsWith('@g.us');
+      const lastTs = toDate(c.conversationTimestamp);
+      const chatName = isGroup ? (c.name || c.subject || null) : getContactName(c.id, c.name || c.notify);
+      updateLiveChatRow({
+        id: c.id,
+        name: chatName,
+        phone: isGroup ? null : waFormatPhoneFromJid(c.id),
+        is_group: isGroup,
+        last_message: '',
+        last_time: lastTs || null,
+        unread: Number(c.unreadCount || 0),
+      });
+    }
+  }
+  return Array.from(liveChatsStore.values()).sort((a, b) => {
+    const ta = a.last_time ? new Date(a.last_time).getTime() : 0;
+    const tb = b.last_time ? new Date(b.last_time).getTime() : 0;
+    return tb - ta;
+  });
+}
+
+function getSocketChatsSnapshot() {
+  if (!sock || !sock.chats) return [];
+  const source = sock.chats;
+  try {
+    if (Array.isArray(source)) return source;
+    if (source instanceof Map) return Array.from(source.values());
+    if (typeof source.all === 'function') {
+      const fromAll = source.all();
+      if (Array.isArray(fromAll)) return fromAll;
+    }
+    if (typeof source.values === 'function') {
+      const values = source.values();
+      if (Array.isArray(values)) return values;
+      if (values && typeof values[Symbol.iterator] === 'function') return Array.from(values);
+    }
+    if (typeof source.toJSON === 'function') {
+      const asJson = source.toJSON();
+      if (Array.isArray(asJson)) return asJson;
+      if (asJson && Array.isArray(asJson.chats)) return asJson.chats;
+    }
+    return Object.values(source || {});
+  } catch (_) {
+    return [];
+  }
+}
+
+function getLiveMessages(jid, opts = {}) {
+  const key = formatJid(jid);
+  const limit = Math.min(Math.max(parseInt(opts.limit || 100, 10) || 100, 1), 200);
+  const before = opts.before ? new Date(String(opts.before)) : null;
+  const beforeTs = before && !Number.isNaN(before.getTime()) ? before.getTime() : null;
+  let rows = (liveMessagesStore.get(key) || []).slice();
+  if (!rows.length && msgCache.size) {
+    const fallback = [];
+    for (const cached of msgCache.values()) {
+      const remote = formatJid(cached?.key?.remoteJid || '');
+      if (remote !== key) continue;
+      const ts = toDate(cached?.messageTimestamp) || new Date();
+      fallback.push({
+        id: cached?.key?.id || ('local_' + Date.now()),
+        chat_id: key,
+        account_phone: phoneNumber,
+        from_me: !!cached?.key?.fromMe,
+        sender: cached?.key?.participant || null,
+        sender_name: cached?.pushName || null,
+        body: getBody(cached),
+        msg_type: getContentType(cached.message) || 'text',
+        timestamp: ts.toISOString(),
+        is_read: !!cached?.key?.fromMe,
+        quoted_body: getQuotedBody(cached),
+        is_reply: false,
+        reply_to_msg_id: null,
+        media_path: cached?.mediaPath || null,
+        sender_phone: null,
+      });
+    }
+    if (fallback.length) {
+      fallback.sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
+      liveMessagesStore.set(key, fallback);
+      rows = fallback.slice();
+    }
+  }
+  if (beforeTs) {
+    rows = rows.filter(m => {
+      const ts = new Date(m.timestamp).getTime();
+      return Number.isFinite(ts) && ts < beforeTs;
+    });
+  }
+  rows = rows.slice(-limit);
+  return rows;
+}
+
+function waFormatPhoneFromJid(jid) {
+  const digits = String(jid || '').split('@')[0].split(':')[0].replace(/\D/g, '');
+  if (!digits) return null;
+  if (digits.startsWith('91') && digits.length === 12) return '+91 ' + digits.slice(2, 7) + ' ' + digits.slice(7);
+  return '+' + digits;
+}
+
+module.exports = { startWA, sendMessage, sendMediaMessage, logout, getStatus, getQR, requestQR, setIO, getGroupMetadata, refreshCurrentAccountGroupMetadata, downloadMedia, msgCache, importExportedChat, getConnectedPhone, getLiveChats, getLiveMessages };
 
 
