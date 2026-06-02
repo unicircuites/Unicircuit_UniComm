@@ -1,5 +1,25 @@
 const { getBannerPreset, buildFramedEmailHtml } = require('./messageBanners');
 
+// ── SERVICE LINK HELPER ───────────────────────────────────────────────────────
+// Replaces bold service names with hyperlinks in rendered email HTML.
+// ELV Turnkey Projects and any service not listed below stays as plain <strong>.
+const SVC_URLS = {
+  'Physical Security &amp; Surveillance': 'https://unicircuites.com/services/physical-security-surveillance/video-surveillance-solution/',
+  'Industrial Asset Management':          'https://unicircuites.com/services/industrial-asset-management/',
+  'Digital Infrastructure &amp; Connectivity': 'https://unicircuites.com/services/digital-infrastructure-connectivity/networking-solution/',
+  'Smart Building Ecosystem':             'https://unicircuites.com/services/smart-building-ecosystem/',
+  'Professional Services':                'https://unicircuites.com/services/professional-services/',
+};
+
+function applyServiceLinks(html) {
+  let out = html;
+  Object.entries(SVC_URLS).forEach(([name, url]) => {
+    const re = new RegExp('<strong>' + name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '<\\/strong>', 'g');
+    out = out.replace(re, '<a href="' + url + '" style="color:#1d4ed8;text-decoration:none;font-weight:700;" target="_blank">' + name + '</a>');
+  });
+  return out;
+}
+
 const healthcareBannerConfig    = getBannerPreset('healthcare');
 const forestBannerConfig        = getBannerPreset('forest');
 const defenceBannerConfig       = getBannerPreset('defence');
@@ -335,7 +355,7 @@ const seedEmailTemplates = [
       }
     ],
     banner_config: healthcareBannerConfig,
-    html_body: buildFramedEmailHtml(healthcareBannerConfig, healthcareBodyHtml)
+    html_body: applyServiceLinks(buildFramedEmailHtml(healthcareBannerConfig, healthcareBodyHtml))
   },
   {
     slug: 'forest-wildlife-introduction',
@@ -408,7 +428,7 @@ const seedEmailTemplates = [
       }
     ],
     banner_config: forestBannerConfig,
-    html_body: buildFramedEmailHtml(forestBannerConfig, forestBodyHtml)
+    html_body: applyServiceLinks(buildFramedEmailHtml(forestBannerConfig, forestBodyHtml))
   },
   {
     slug: 'defence-manufacturing-introduction',
@@ -490,7 +510,7 @@ const seedEmailTemplates = [
       }
     ],
     banner_config: defenceBannerConfig,
-    html_body: buildFramedEmailHtml(defenceBannerConfig, defenceBodyHtml)
+    html_body: applyServiceLinks(buildFramedEmailHtml(defenceBannerConfig, defenceBodyHtml))
   },
   {
     slug: 'defence-psu-introduction',
@@ -563,7 +583,7 @@ const seedEmailTemplates = [
       }
     ],
     banner_config: defencePsuBannerConfig,
-    html_body: buildFramedEmailHtml(defencePsuBannerConfig, defencePsuBodyHtml)
+    html_body: applyServiceLinks(buildFramedEmailHtml(defencePsuBannerConfig, defencePsuBodyHtml))
   },
   {
     slug: 'banking-psu-introduction',
@@ -636,7 +656,7 @@ const seedEmailTemplates = [
       }
     ],
     banner_config: bankingBannerConfig,
-    html_body: buildFramedEmailHtml(bankingBannerConfig, bankingBodyHtml)
+    html_body: applyServiceLinks(buildFramedEmailHtml(bankingBannerConfig, bankingBodyHtml))
   },
   {
     slug: 'agriculture-government-introduction',
@@ -653,7 +673,7 @@ const seedEmailTemplates = [
       { key: 'company_website', label: 'Company Website', required: false, source: 'static', value: 'www.unicircuites.com', example: 'www.unicircuites.com', options: ['www.unicircuites.com', 'unicircuites.com', 'https://www.unicircuites.com'] }
     ],
     banner_config: agricultureBannerConfig,
-    html_body: buildFramedEmailHtml(agricultureBannerConfig, agricultureBodyHtml)
+    html_body: applyServiceLinks(buildFramedEmailHtml(agricultureBannerConfig, agricultureBodyHtml))
   },
   {
     slug: 'food-processing-introduction',
@@ -670,7 +690,7 @@ const seedEmailTemplates = [
       { key: 'company_website', label: 'Company Website', required: false, source: 'static', value: 'www.unicircuites.com', example: 'www.unicircuites.com', options: ['www.unicircuites.com', 'unicircuites.com', 'https://www.unicircuites.com'] }
     ],
     banner_config: foodProcessingBannerConfig,
-    html_body: buildFramedEmailHtml(foodProcessingBannerConfig, foodProcessingBodyHtml)
+    html_body: applyServiceLinks(buildFramedEmailHtml(foodProcessingBannerConfig, foodProcessingBodyHtml))
   },
   {
     slug: 'coal-mining-psu-introduction',
@@ -687,7 +707,7 @@ const seedEmailTemplates = [
       { key: 'company_website', label: 'Company Website', required: false, source: 'static', value: 'www.unicircuites.com', example: 'www.unicircuites.com', options: ['www.unicircuites.com', 'unicircuites.com', 'https://www.unicircuites.com'] }
     ],
     banner_config: coalMiningBannerConfig,
-    html_body: buildFramedEmailHtml(coalMiningBannerConfig, coalMiningBodyHtml)
+    html_body: applyServiceLinks(buildFramedEmailHtml(coalMiningBannerConfig, coalMiningBodyHtml))
   },
   {
     slug: 'power-generation-psu-introduction',
@@ -704,7 +724,7 @@ const seedEmailTemplates = [
       { key: 'company_website', label: 'Company Website', required: false, source: 'static', value: 'www.unicircuites.com', example: 'www.unicircuites.com', options: ['www.unicircuites.com', 'unicircuites.com', 'https://www.unicircuites.com'] }
     ],
     banner_config: powerGenerationPsuBannerConfig,
-    html_body: buildFramedEmailHtml(powerGenerationPsuBannerConfig, powerGenerationPsuBodyHtml)
+    html_body: applyServiceLinks(buildFramedEmailHtml(powerGenerationPsuBannerConfig, powerGenerationPsuBodyHtml))
   },
   {
     slug: 'power-generation-state-psu-introduction',
@@ -721,7 +741,7 @@ const seedEmailTemplates = [
       { key: 'company_website', label: 'Company Website', required: false, source: 'static', value: 'www.unicircuites.com', example: 'www.unicircuites.com', options: ['www.unicircuites.com', 'unicircuites.com', 'https://www.unicircuites.com'] }
     ],
     banner_config: powerGenerationStatePsuBannerConfig,
-    html_body: buildFramedEmailHtml(powerGenerationStatePsuBannerConfig, powerGenerationStatePsuBodyHtml)
+    html_body: applyServiceLinks(buildFramedEmailHtml(powerGenerationStatePsuBannerConfig, powerGenerationStatePsuBodyHtml))
   },
   {
     slug: 'central-bank-introduction',
@@ -738,7 +758,7 @@ const seedEmailTemplates = [
       { key: 'company_website', label: 'Company Website', required: false, source: 'static', value: 'www.unicircuites.com', example: 'www.unicircuites.com', options: ['www.unicircuites.com', 'unicircuites.com', 'https://www.unicircuites.com'] }
     ],
     banner_config: centralBankBannerConfig,
-    html_body: buildFramedEmailHtml(centralBankBannerConfig, `
+    html_body: applyServiceLinks(buildFramedEmailHtml(centralBankBannerConfig, `
       <p>Dear {{recipient_name}},</p>
       <p>I am writing to introduce Unicircuit Engineering Services LLP — an Indian digital transformation and ELV systems integrator with deep capability in high-security, mission-critical environments such as those operated by central banking institutions.</p>
       <p>Central banks operate among the most security-sensitive facilities in the country — vaults, currency processing centres, regional offices, and data centres. The expectation is uncompromising: layered security, audit-grade documentation, zero downtime, and absolute confidentiality. We support these through:</p>
@@ -752,7 +772,7 @@ const seedEmailTemplates = [
       <p>May I request a brief introductory meeting {{meeting_window}} to share our credentials in confidence, and explore how we may be of service?</p>
       <p>Warm regards,<br>{{sender_name}}<br>{{sender_designation}} | Unicircuit Engineering Services LLP<br>{{sender_phone}} | {{sender_email}} | {{company_website}}</p>
     `.trim())
-  },
+  )},
   {
     slug: 'healthcare-psu-introduction',
     name: 'Healthcare PSU (Central) - Introduction',
@@ -768,7 +788,7 @@ const seedEmailTemplates = [
       { key: 'company_website', label: 'Company Website', required: false, source: 'static', value: 'www.unicircuites.com', example: 'www.unicircuites.com', options: ['www.unicircuites.com', 'unicircuites.com', 'https://www.unicircuites.com'] }
     ],
     banner_config: healthcarePsuBannerConfig,
-    html_body: buildFramedEmailHtml(healthcarePsuBannerConfig, `
+    html_body: applyServiceLinks(buildFramedEmailHtml(healthcarePsuBannerConfig, `
       <p>Dear {{recipient_name}},</p>
       <p>I am writing to introduce Unicircuit Engineering Services LLP — a digital transformation and ELV partner working with public healthcare institutions to deliver smart hospital infrastructure that supports clinical excellence and operational efficiency.</p>
       <p>Central PSU healthcare institutions — AIIMS, JIPMER, PGIMER, ESIC hospitals, and others — manage large, complex campuses with intensive patient flow, critical care services, research wings, and academic facilities. We help address this complexity through:</p>
@@ -783,7 +803,7 @@ const seedEmailTemplates = [
       <p>Could we request a brief introductory meeting {{meeting_window}} to share our credentials?</p>
       <p>Warm regards,<br>{{sender_name}}<br>{{sender_designation}} | Unicircuit Engineering Services LLP<br>{{sender_phone}} | {{sender_email}} | {{company_website}}</p>
     `.trim())
-  },
+  )},
   {
     slug: 'education-psu-introduction',
     name: 'Education PSU (Central) - Introduction',
@@ -799,7 +819,7 @@ const seedEmailTemplates = [
       { key: 'company_website', label: 'Company Website', required: false, source: 'static', value: 'www.unicircuites.com', example: 'www.unicircuites.com', options: ['www.unicircuites.com', 'unicircuites.com', 'https://www.unicircuites.com'] }
     ],
     banner_config: educationPsuBannerConfig,
-    html_body: buildFramedEmailHtml(educationPsuBannerConfig, `
+    html_body: applyServiceLinks(buildFramedEmailHtml(educationPsuBannerConfig, `
       <p>Dear {{recipient_name}},</p>
       <p>I am writing to introduce Unicircuit Engineering Services LLP — a digital transformation and ELV partner working with educational institutions to build smart, secure, and digitally enabled campuses.</p>
       <p>PSU-managed institutions — training academies, technical institutes, and R&amp;D centres — demand infrastructure that supports modern pedagogy, examination integrity, residential life, and research activity on a single integrated campus. Unicircuit brings:</p>
@@ -814,7 +834,7 @@ const seedEmailTemplates = [
       <p>May I request a brief introductory meeting {{meeting_window}} to share relevant work?</p>
       <p>Warm regards,<br>{{sender_name}}<br>{{sender_designation}} | Unicircuit Engineering Services LLP<br>{{sender_phone}} | {{sender_email}} | {{company_website}}</p>
     `.trim())
-  },
+  )},
   {
     slug: 'education-state-govt-introduction',
     name: 'Education State Govt - Introduction',
@@ -830,7 +850,7 @@ const seedEmailTemplates = [
       { key: 'company_website', label: 'Company Website', required: false, source: 'static', value: 'www.unicircuites.com', example: 'www.unicircuites.com', options: ['www.unicircuites.com', 'unicircuites.com'] }
     ],
     banner_config: educationStateBannerConfig,
-    html_body: buildFramedEmailHtml(educationStateBannerConfig, `
+    html_body: applyServiceLinks(buildFramedEmailHtml(educationStateBannerConfig, `
       <p>Dear {{recipient_name}},</p>
       <p>I am writing to introduce Unicircuit Engineering Services LLP — a digital transformation and ELV partner working with State Government education departments, universities, technical boards, and Samagra Shiksha programmes to digitally modernise schools, colleges, and examination infrastructure.</p>
       <p>State-managed education today balances scale (thousands of institutions) with the imperative for digital learning, examination integrity, campus safety, and central monitoring. Unicircuit supports these mandates through:</p>
@@ -845,7 +865,7 @@ const seedEmailTemplates = [
       <p>Could we connect for a brief introductory meeting {{meeting_window}}?</p>
       <p>Warm regards,<br>{{sender_name}}<br>{{sender_designation}} | Unicircuit Engineering Services LLP<br>{{sender_phone}} | {{sender_email}} | {{company_website}}</p>
     `.trim())
-  },
+  )},
   {
     slug: 'industrial-association-introduction',
     name: 'Industrial Association - Introduction',
@@ -861,7 +881,7 @@ const seedEmailTemplates = [
       { key: 'company_website', label: 'Company Website', required: false, source: 'static', value: 'www.unicircuites.com', example: 'www.unicircuites.com', options: ['www.unicircuites.com', 'unicircuites.com'] }
     ],
     banner_config: industrialAssocBannerConfig,
-    html_body: buildFramedEmailHtml(industrialAssocBannerConfig, `
+    html_body: applyServiceLinks(buildFramedEmailHtml(industrialAssocBannerConfig, `
       <p>Dear {{recipient_name}},</p>
       <p>I am writing on behalf of Unicircuit Engineering Services LLP — a digital transformation and ELV solutions company serving Indian industry across Smart Building, Physical Security, Industrial Asset Management, Digital Infrastructure, and ELV Turnkey Projects.</p>
       <p>We see industry associations as critical multipliers — bringing together members on shared priorities such as plant modernisation, Industry 4.0 adoption, energy efficiency, and security. We would value the opportunity to engage with your association in the following ways:</p>
@@ -876,7 +896,7 @@ const seedEmailTemplates = [
       <p>Could we request a short introductory meeting {{meeting_window}}?</p>
       <p>Warm regards,<br>{{sender_name}}<br>{{sender_designation}} | Unicircuit Engineering Services LLP<br>{{sender_phone}} | {{sender_email}} | {{company_website}}</p>
     `.trim())
-  },
+  )},
   {
     slug: 'state-government-introduction',
     name: 'State Government - Introduction',
@@ -892,7 +912,7 @@ const seedEmailTemplates = [
       { key: 'company_website', label: 'Company Website', required: false, source: 'static', value: 'www.unicircuites.com', example: 'www.unicircuites.com', options: ['www.unicircuites.com', 'unicircuites.com'] }
     ],
     banner_config: stateGovtBannerConfig,
-    html_body: buildFramedEmailHtml(stateGovtBannerConfig, `
+    html_body: applyServiceLinks(buildFramedEmailHtml(stateGovtBannerConfig, `
       <p>Dear {{recipient_name}},</p>
       <p>I am writing to introduce Unicircuit Engineering Services LLP — a digital transformation and ELV systems integrator working with State Government departments to modernise office, citizen-services, and field infrastructure.</p>
       <p>State governments today drive an ambitious agenda — Smart Cities, e-Governance, citizen services, surveillance command centres, and departmental digitisation. Each of these has real infrastructure demands that we are positioned to address:</p>
@@ -907,7 +927,7 @@ const seedEmailTemplates = [
       <p>May I request a brief introductory meeting {{meeting_window}} to share our credentials?</p>
       <p>Warm regards,<br>{{sender_name}}<br>{{sender_designation}} | Unicircuit Engineering Services LLP<br>{{sender_phone}} | {{sender_email}} | {{company_website}}</p>
     `.trim())
-  },
+  )},
   {
     slug: 'correctional-facilities-introduction',
     name: 'Correctional Facilities - Introduction',
@@ -923,7 +943,7 @@ const seedEmailTemplates = [
       { key: 'company_website', label: 'Company Website', required: false, source: 'static', value: 'www.unicircuites.com', example: 'www.unicircuites.com', options: ['www.unicircuites.com', 'unicircuites.com'] }
     ],
     banner_config: correctionalBannerConfig,
-    html_body: buildFramedEmailHtml(correctionalBannerConfig, `
+    html_body: applyServiceLinks(buildFramedEmailHtml(correctionalBannerConfig, `
       <p>Dear {{recipient_name}},</p>
       <p>I am writing to introduce Unicircuit Engineering Services LLP — a digital transformation and ELV systems integrator with capability in high-security environments, including correctional facilities, defence sites, and central banking installations.</p>
       <p>Modern correctional administration demands a fine balance — enhanced inmate management and safety, perimeter integrity, contraband and communication control, staff safety, and full audit-grade transparency. Unicircuit's capabilities directly support these mandates:</p>
@@ -938,7 +958,7 @@ const seedEmailTemplates = [
       <p>May I request a brief introductory meeting {{meeting_window}} to present relevant credentials?</p>
       <p>Warm regards,<br>{{sender_name}}<br>{{sender_designation}} | Unicircuit Engineering Services LLP<br>{{sender_phone}} | {{sender_email}} | {{company_website}}</p>
     `.trim())
-  },
+  )},
   {
     slug: 'cold-chain-storage-psu-introduction',
     name: 'Cold Chain & Storage PSU - Introduction',
@@ -954,7 +974,7 @@ const seedEmailTemplates = [
       { key: 'company_website', label: 'Company Website', required: false, source: 'static', value: 'www.unicircuites.com', example: 'www.unicircuites.com', options: ['www.unicircuites.com', 'unicircuites.com'] }
     ],
     banner_config: coldChainStorageBannerConfig,
-    html_body: buildFramedEmailHtml(coldChainStorageBannerConfig, `
+    html_body: applyServiceLinks(buildFramedEmailHtml(coldChainStorageBannerConfig, `
       <p>Dear {{recipient_name}},</p>
       <p>I am writing to introduce Unicircuit Engineering Services LLP — a digital transformation and ELV partner supporting food and agri storage organisations in modernising warehouses, silos, and cold-chain infrastructure across India.</p>
       <p>National food security depends on the integrity of stored grain, perishables, and buffer stocks — across thousands of locations of varying age and capacity. Loss prevention, environmental control, and security are top priorities. Unicircuit brings:</p>
@@ -969,7 +989,7 @@ const seedEmailTemplates = [
       <p>Could we request a brief introductory meeting {{meeting_window}}?</p>
       <p>Warm regards,<br>{{sender_name}}<br>{{sender_designation}} | Unicircuit Engineering Services LLP<br>{{sender_phone}} | {{sender_email}} | {{company_website}}</p>
     `.trim())
-  },
+  )},
   {
     slug: 'education-central-govt-introduction',
     name: 'Education Central Govt - Introduction',
@@ -985,7 +1005,7 @@ const seedEmailTemplates = [
       { key: 'company_website', label: 'Company Website', required: false, source: 'static', value: 'www.unicircuites.com', example: 'www.unicircuites.com', options: ['www.unicircuites.com', 'unicircuites.com'] }
     ],
     banner_config: educationCentralBannerConfig,
-    html_body: buildFramedEmailHtml(educationCentralBannerConfig, `
+    html_body: applyServiceLinks(buildFramedEmailHtml(educationCentralBannerConfig, `
       <p>Dear {{recipient_name}},</p>
       <p>I am writing to introduce Unicircuit Engineering Services LLP — a digital transformation and ELV partner supporting central government educational institutions such as Kendriya Vidyalayas, Navodaya Vidyalayas, IITs, NITs, IIMs, AIIMS academic blocks, and central universities.</p>
       <p>Central government institutions operate at the leading edge of pedagogy, research, and student experience — and require infrastructure that matches. Unicircuit's portfolio supports the entire campus stack:</p>
@@ -1000,7 +1020,7 @@ const seedEmailTemplates = [
       <p>May I request a brief introductory meeting {{meeting_window}} to share our credentials?</p>
       <p>Warm regards,<br>{{sender_name}}<br>{{sender_designation}} | Unicircuit Engineering Services LLP<br>{{sender_phone}} | {{sender_email}} | {{company_website}}</p>
     `.trim())
-  },
+  )},
   {
     slug: 'education-private-introduction',
     name: 'Education Private - Introduction',
@@ -1016,7 +1036,7 @@ const seedEmailTemplates = [
       { key: 'company_website', label: 'Company Website', required: false, source: 'static', value: 'www.unicircuites.com', example: 'www.unicircuites.com', options: ['www.unicircuites.com', 'unicircuites.com'] }
     ],
     banner_config: educationPrivateBannerConfig,
-    html_body: buildFramedEmailHtml(educationPrivateBannerConfig, `
+    html_body: applyServiceLinks(buildFramedEmailHtml(educationPrivateBannerConfig, `
       <p>Dear {{recipient_name}},</p>
       <p>I am writing to introduce Unicircuit Engineering Services LLP — a digital transformation and ELV partner working with private universities, deemed-to-be universities, and reputed schools across India to build smart, secure, and digitally enabled campuses.</p>
       <p>Today's parents and students choose institutions as much for the campus experience and safety as for academics. That places real demand on infrastructure — smart classrooms, hostel safety, energy efficiency, network availability, and visible security. Unicircuit's portfolio addresses each:</p>
@@ -1031,7 +1051,7 @@ const seedEmailTemplates = [
       <p>Could we connect for a brief introductory meeting {{meeting_window}} to share relevant work?</p>
       <p>Warm regards,<br>{{sender_name}}<br>{{sender_designation}} | Unicircuit Engineering Services LLP<br>{{sender_phone}} | {{sender_email}} | {{company_website}}</p>
     `.trim())
-  }
+  )}
 ];
 
 module.exports = {
