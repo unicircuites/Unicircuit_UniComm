@@ -497,8 +497,8 @@ function buildHeaderBarHtml(cfg) {
   if (!cfg.showHeader) return '';
   const bg = cfg.headerBg || cfg.accentColor || '#2563eb';
   const logoImg = cfg.logoUrl
-    ? '<img src="' + escapeHtml(cfg.logoUrl) + '" alt="" width="36" height="36" style="display:block;border-radius:50%;border:2px solid rgba(255,255,255,0.35);" />'
-    : '<div style="width:36px;height:36px;border-radius:50%;background:rgba(255,255,255,0.2);text-align:center;line-height:36px;font-size:16px;color:#fff;font-weight:800;">U</div>';
+    ? '<img src="' + escapeHtml(cfg.logoUrl) + '" alt="" width="44" height="44" style="display:block;border-radius:50%;border:2px solid rgba(255,255,255,0.35);" />'
+    : '<div style="width:44px;height:44px;border-radius:50%;background:rgba(255,255,255,0.2);text-align:center;line-height:44px;font-size:18px;color:#fff;font-weight:800;">U</div>';
   const nav = String(cfg.navLinks || '').split(',').map((s) => s.trim()).filter(Boolean);
   const navHtml = nav.length
     ? nav.map((link) => '<a href="#" style="color:#ffffff;font-size:12px;text-decoration:none;margin-left:14px;">' + escapeHtml(link) + '</a>').join('')
@@ -509,9 +509,10 @@ function buildHeaderBarHtml(cfg) {
     + '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tr>'
     + '<td valign="middle" style="white-space:nowrap;">'
     + '<table role="presentation" cellpadding="0" cellspacing="0" border="0"><tr>'
-    + '<td valign="middle" style="padding-right:10px;">' + logoImg + '</td>'
-    + '<td valign="middle"><div style="font-size:16px;font-weight:800;color:#ffffff;line-height:1.1;">' + escapeHtml(cfg.logoText) + '</div>'
-    + (cfg.logoSubtext ? '<div style="font-size:9px;color:#bfdbfe;letter-spacing:1px;margin-top:2px;">' + escapeHtml(cfg.logoSubtext) + '</div>' : '')
+    + '<td valign="middle" style="padding-right:12px;">' + logoImg + '</td>'
+    + '<td valign="middle">'
+    + '<div style="font-size:18px;font-weight:800;color:#ffffff;line-height:1;letter-spacing:0.3px;">' + escapeHtml(cfg.logoText) + '</div>'
+    + (cfg.logoSubtext ? '<div style="font-size:9px;color:#bfdbfe;letter-spacing:1.5px;margin-top:6px;line-height:1;">' + escapeHtml(cfg.logoSubtext) + '</div>' : '')
     + '</td></tr></table></td>'
     + '<td valign="middle" align="right" style="text-align:right;">' + navHtml + '</td>'
     + '</tr></table></td></tr></table>';

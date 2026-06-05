@@ -2,8 +2,8 @@ const { getBannerPreset, buildFramedEmailHtml } = require('./messageBanners');
 
 // ── SERVICE LINK HELPER ───────────────────────────────────────────────────────
 // Replaces bold service names with hyperlinks in rendered email HTML.
-// ELV Turnkey Projects and any service not listed below stays as plain <strong>.
 const SVC_URLS = {
+  'ELV Turnkey Projects':                 'https://unicircuites.com/services/turnkey-electrical-services/',
   'Physical Security &amp; Surveillance': 'https://unicircuites.com/services/physical-security-surveillance/video-surveillance-solution/',
   'Industrial Asset Management':          'https://unicircuites.com/services/industrial-asset-management/',
   'Digital Infrastructure &amp; Connectivity': 'https://unicircuites.com/services/digital-infrastructure-connectivity/networking-solution/',
