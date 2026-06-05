@@ -149,8 +149,15 @@ function systemBridge(event, data) {
       });
     }
     // ── Service connect/disconnect ──────────────────────────────────────
-    if (event === 'wa:connected') { markOnline('whatsapp'); serviceState.whatsapp.phone = data?.jid || data?.phone || null; }
-    else if (event === 'wa:disconnected') markOffline('whatsapp', data?.reason || (data?.code ? `code ${data.code}` : null));
+    if (event === 'wa:connected') {
+      markOnline('whatsapp');
+      const raw = data?.phone || data?.jid || null;
+      serviceState.whatsapp.phone = raw ? String(raw).split('@')[0].split(':')[0].replace(/\D/g, '') || null : null;
+    }
+    else if (event === 'wa:disconnected') {
+      markOffline('whatsapp', data?.reason || (data?.code ? `code ${data.code}` : null));
+      serviceState.whatsapp.phone = null;
+    }
     else if (event === 'pbx:listening') {
       // Server is listening but no PBX connected yet
       markPbxListening(data);
@@ -433,6 +440,12 @@ app.use(cors({
   },
   credentials: true,
 }));
+
+// ── COMPRESSION ────────────────────────────────────────────────────────────
+// Gzip all JSON API responses and HTML. Cuts chat list payload ~70%.
+// Socket.IO handles its own framing — compression won't interfere.
+const compression = require('compression');
+app.use(compression({ threshold: 1024 })); // only compress responses > 1KB
 
 // ── BODY PARSING ───────────────────────────────────────────────────────────
 app.use(express.json({ limit: '500mb' }));

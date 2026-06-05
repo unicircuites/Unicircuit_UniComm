@@ -13,6 +13,7 @@ const {
   fetchLatestBaileysVersion,
   getContentType,
   downloadMediaMessage,
+  ALL_WA_PATCH_NAMES,
 } = require('@whiskeysockets/baileys');
 
 const qrcode = require('qrcode');
@@ -30,6 +31,8 @@ function getSharp() {
 // ── STATE ───────────────────────────────────────────────────────────────────────────
 let sock = null;
 let qrString = null;
+let pairingCode = null;
+let pairingPhone = null;
 let isConnected = false;
 let phoneNumber = null; // This will store the REAL phone number
 let userJid = null; // This will store the active JID (Phone or LID)
@@ -81,10 +84,60 @@ function normalizeAccountPhone(value) {
 function isAllowedWaNumber(value) {
   const digits = String(value || '').replace(/\D/g, '');
   if (!digits) return false;
-  // Allowed:
-  // 1) Indian WhatsApp mobiles: 91 + 10 digits (starting 6-9)
-  // 2) Extension format starting with 0
-  return /^91[6-9]\d{9}$/.test(digits) || /^0\d{1,10}$/.test(digits);
+  // LID = 15+ digit internal WhatsApp identifier, never a real phone
+  if (digits.length >= 15) return false;
+  if (digits.length < 7)   return false;
+  if (/^0{5,}$/.test(digits)) return false;
+  return true; // valid international phone number
+}
+
+function normalizeWaPhone(value) {
+  const digits = String(value || '').replace(/\D/g, '');
+  return isAllowedWaNumber(digits) ? digits : '';
+}
+
+function lidLocalPart(jid) {
+  return String(jid || '').split('@')[0].split(':')[0];
+}
+
+function isLidJid(jid) {
+  return String(jid || '').endsWith('@lid');
+}
+
+function isNonChatJid(jid) {
+  const id = String(jid || '');
+  return id === 'status@broadcast' || id.endsWith('@newsletter') || id.endsWith('@broadcast');
+}
+
+function resolvedPhoneForLid(jid, rawPhone) {
+  const lidLocal = lidLocalPart(jid);
+  const digits = normalizeWaPhone(rawPhone);
+  if (!digits || digits === lidLocal) return '';
+  return digits;
+}
+
+function formatDisplayPhone(value) {
+  const digits = normalizeWaPhone(value);
+  if (!digits) return '';
+  if (digits.startsWith('91') && digits.length === 12) {
+    return '+91 ' + digits.slice(2, 7) + ' ' + digits.slice(7);
+  }
+  if (digits.startsWith('0')) return digits;
+  return '+' + digits;
+}
+
+function normalizeRawJid(rawJid) {
+  const raw = String(rawJid || '').trim().toLowerCase();
+  if (!raw || !raw.includes('@')) return raw;
+  const atIdx = raw.indexOf('@');
+  const local = raw.slice(0, atIdx).split(':')[0];
+  const rest = raw.slice(atIdx + 1);
+  const domain = rest.includes('g.us') ? 'g.us'
+    : rest.includes('lid') ? 'lid'
+    : rest.includes('newsletter') ? 'newsletter'
+    : rest.includes('broadcast') ? 'broadcast'
+    : 's.whatsapp.net';
+  return `${local}@${domain}`;
 }
 
 function clearContactsStore() {
@@ -114,13 +167,38 @@ function updateLiveChatRow(chat) {
   liveChatsStore.set(key, merged);
 }
 
+function readPhoneFromAuthCreds() {
+  try {
+    const raw = JSON.parse(fs.readFileSync(path.join(AUTH_DIR, 'creds.json'), 'utf8'));
+    return resolveConnectedAccountPhone(raw?.me?.id || '');
+  } catch (_) {
+    return '';
+  }
+}
+
+/** Real phone digits for account_phone — never a 15+ digit LID. */
+function resolveConnectedAccountPhone(rawUserId) {
+  const digits = normalizeAccountPhone(rawUserId);
+  return isAllowedWaNumber(digits) ? digits : '';
+}
+
+function applyConnectedAccountPhone(rawUserId) {
+  let acc = resolveConnectedAccountPhone(rawUserId);
+  if (!acc) acc = readPhoneFromAuthCreds();
+  if (!acc) return false;
+  return setActiveAccountPhone(acc);
+}
+
 function setActiveAccountPhone(value) {
-  const nextPhone = normalizeAccountPhone(value);
+  const nextPhone = resolveConnectedAccountPhone(value) || normalizeAccountPhone(value);
   if (!nextPhone) return false;
   if (phoneNumber && phoneNumber !== nextPhone) {
     clearContactsStore();
+    liveChatsStore.clear();
+    liveMessagesStore.clear();
     importedLastTsMap = {};
     groupMetadataCache.clear();
+    lastGroupParticipantSyncAt = 0;
   }
   phoneNumber = nextPhone;
   return true;
@@ -200,20 +278,7 @@ async function isBlockedChat(jid, accPhone) {
 
 // Helper: Normalize JID to prevent double domains and device suffixes
 function formatJid(jid) {
-  if (!jid) return jid;
-  let clean = jid.trim().toLowerCase();
-
-  // Aggressively collapse any redundant domain suffixes
-  const parts = clean.split('@');
-  const idPart = parts[0].split(':')[0]; // Also strip device suffixes like :48
-  let domain = 's.whatsapp.net';
-
-  if (clean.includes('@g.us')) domain = 'g.us';
-  else if (clean.includes('@lid')) domain = 'lid';
-  else if (clean.includes('@newsletter')) domain = 'newsletter';
-  else if (clean.includes('@broadcast')) domain = 'broadcast';
-
-  return `${idPart}@${domain}`;
+  return normalizeRawJid(jid);
 }
 
 // Helper: Schedule reconnect with exponential backoff
@@ -267,22 +332,112 @@ function toDate(ts) {
 }
 
 // ── CONTACT NAME RESOLUTION ───────────────────────────────────────────────────────
-// Priority: saved contact name > pushName > formatted phone number
+// Priority: profile/saved name > pushName > formatted phone number (never raw LID digits)
+function isInvalidContactLabel(value) {
+  const text = String(value || '').trim();
+  if (!text) return true;
+  if (/^you$/i.test(text)) return true;
+  if (/^(unknown|unknown whatsapp contact)$/i.test(text)) return true;
+  return false;
+}
+
+function isPhoneLikeLabel(value, phoneDigits) {
+  const text = String(value || '').trim();
+  if (!text || text.includes('@lid')) return false;
+  const digits = String(value || '').replace(/\D/g, '');
+  if (!digits) return false;
+  if (phoneDigits && digits === phoneDigits) return true;
+  if (/^\+?\d[\d\s\-().]+$/.test(text) && digits.length >= 7) return true;
+  return false;
+}
+
 function getContactName(jid, pushName) {
   if (!jid) return '';
-  const phone = jid.split('@')[0].split(':')[0];
-  // Check all possible JID formats: exact, @s.whatsapp.net, @lid
+  jid = normalizeRawJid(jid);
+  const local = jid.split('@')[0].split(':')[0];
   const stored = contactsStore[jid]
-    || contactsStore[phone + '@s.whatsapp.net']
-    || contactsStore[phone + '@lid'];
-  if (stored?.name) return stored.name;
-  if (stored?.notify) return stored.notify;
-  if (pushName) return pushName;
-  // Format Indian number: 91XXXXXXXXXX → +91 XXXXX XXXXX
-  if (phone.startsWith('91') && phone.length === 12) {
-    return '+91 ' + phone.slice(2, 7) + ' ' + phone.slice(7);
+    || contactsStore[local + '@s.whatsapp.net']
+    || contactsStore[local + '@lid'];
+  const mappedPhone = isLidJid(jid)
+    ? resolvedPhoneForLid(jid, stored?.phone)
+    : normalizeWaPhone(local);
+  if (stored?.notify && !isInvalidContactLabel(stored.notify) && !isPhoneLikeLabel(stored.notify, mappedPhone)) {
+    return stored.notify;
   }
-  return '+' + phone;
+  if (stored?.name && !isInvalidContactLabel(stored.name) && !isPhoneLikeLabel(stored.name, mappedPhone)
+    && !isAllowedWaNumber(normalizeWaPhone(stored.name))) {
+    return stored.name;
+  }
+  if (pushName && !isInvalidContactLabel(pushName) && !isPhoneLikeLabel(pushName, mappedPhone)) return pushName;
+  if (mappedPhone) return formatDisplayPhone(mappedPhone);
+  if (isLidJid(jid)) return '';
+  return formatDisplayPhone(local);
+}
+
+const GROUP_METADATA_CONCURRENCY = 6;
+const GROUP_METADATA_DELAY_MS = 80;
+const LID_CONTACT_BATCH_SIZE = 200;
+const LID_RESOLUTION_BATCH_SIZE = 100;
+const LID_RESOLUTION_BATCH_DELAY_MS = 2500;
+const MAX_GROUPS_PER_LID_BATCH = 30;
+let lidResolutionWorkerTimer = null;
+let lidResolutionInFlight = false;
+let lidResolutionGroupCursor = 0;
+let lidResolutionGroupIds = [];
+
+async function runWithConcurrency(items, limit, worker) {
+  const list = Array.isArray(items) ? items : [];
+  if (!list.length) return [];
+  const results = new Array(list.length);
+  let cursor = 0;
+  const runners = Array.from({ length: Math.min(limit, list.length) }, async () => {
+    while (cursor < list.length) {
+      const index = cursor++;
+      results[index] = await worker(list[index], index);
+    }
+  });
+  await Promise.all(runners);
+  return results;
+}
+
+async function upsertGroupMemberContacts(rows, accPhone) {
+  const batch = (Array.isArray(rows) ? rows : []).filter(r => r?.jid);
+  if (!batch.length || !accPhone) return 0;
+
+  let saved = 0;
+  for (let i = 0; i < batch.length; i += LID_CONTACT_BATCH_SIZE) {
+    const chunk = batch.slice(i, i + LID_CONTACT_BATCH_SIZE);
+    const values = [];
+    const params = [accPhone];
+    let idx = 2;
+    for (const row of chunk) {
+      values.push(`($${idx}, $1, $${idx + 1}, $${idx + 2}, true)`);
+      params.push(row.jid, row.name || null, row.phone || null);
+      idx += 3;
+    }
+    await pool.query(`
+      INSERT INTO wa_contacts (jid, account_phone, name, phone, is_group_member)
+      VALUES ${values.join(',')}
+      ON CONFLICT (jid, account_phone) DO UPDATE SET
+        phone = COALESCE(EXCLUDED.phone, wa_contacts.phone),
+        name = CASE
+          WHEN EXCLUDED.name IS NOT NULL AND EXCLUDED.name != '' THEN EXCLUDED.name
+          ELSE wa_contacts.name
+        END,
+        is_group_member = true,
+        updated_at = NOW()
+    `, params);
+    for (const row of chunk) {
+      if (!contactsStore[row.jid]) contactsStore[row.jid] = { id: row.jid };
+      if (row.phone) {
+        contactsStore[row.jid].phone = row.phone;
+        contactsStore[row.jid].phoneJid = `${row.phone}@s.whatsapp.net`;
+      }
+      if (row.name && !isInvalidContactLabel(row.name)) contactsStore[row.jid].name = row.name;
+    }
+    saved += chunk.length;
+  }
+  return saved;
 }
 
 // ── IS REAL MESSAGE (not system/protocol) ────────────────────────────────────────
@@ -469,6 +624,42 @@ async function ensureTables(retries = 3) {
         await pool.query(`ALTER TABLE wa_messages ADD PRIMARY KEY (id, chat_id, account_phone)`);
       } catch (e) { }
 
+      // ── PERFORMANCE INDEXES ────────────────────────────────────────────────
+      // These are the critical indexes that make chat loading fast on both
+      // dev laptop and tower server. All use IF NOT EXISTS — safe to re-run.
+
+      // wa_messages: primary query index (chat_id + account_phone + timestamp DESC)
+      // Powers: /messages/:jid ORDER BY timestamp DESC LIMIT N
+      await pool.query(`
+        CREATE INDEX IF NOT EXISTS idx_wa_messages_chat_ts
+        ON wa_messages (account_phone, chat_id, timestamp DESC NULLS LAST)
+      `).catch(() => {});
+
+      // wa_messages: covering index for the read-status update query
+      await pool.query(`
+        CREATE INDEX IF NOT EXISTS idx_wa_messages_unread
+        ON wa_messages (account_phone, chat_id, from_me, is_read)
+        WHERE is_read = false AND from_me = false
+      `).catch(() => {});
+
+      // wa_chats: account_phone lookup (used in every /chats query and LATERAL join)
+      await pool.query(`
+        CREATE INDEX IF NOT EXISTS idx_wa_chats_account_updated
+        ON wa_chats (account_phone, last_time DESC NULLS LAST)
+      `).catch(() => {});
+
+      // wa_chats: blocklist join
+      await pool.query(`
+        CREATE INDEX IF NOT EXISTS idx_wa_chat_blocklist_lookup
+        ON wa_chat_blocklist (account_phone, chat_id)
+      `).catch(() => {});
+
+      // wa_contacts: jid lookup for sender name resolution in messages query
+      await pool.query(`
+        CREATE INDEX IF NOT EXISTS idx_wa_contacts_account
+        ON wa_contacts (account_phone, jid)
+      `).catch(() => {});
+
       return; // Success
     } catch (err) {
       console.warn(`[WA] Table ensure attempt ${i + 1} failed: ${err.message}`);
@@ -480,34 +671,41 @@ async function ensureTables(retries = 3) {
 
 // ── SAVE CHAT ────────────────────────────────────────────────────────────────────────
 async function saveChat(rawJid, name, lastMsg, lastTime, unread, isGroup) {
-  // Normalize JID: strip device suffix (colon before @) e.g. '9195:42@s.whatsapp.net' -> '9195@s.whatsapp.net'
-  // For LIDs like '18064@lid' there is no colon so the local part stays unchanged
-  let jid = rawJid;
-  if (rawJid.includes('@')) {
-    const atIdx = rawJid.indexOf('@');
-    const localPart = rawJid.substring(0, atIdx);
-    const fullDomain = rawJid.substring(atIdx + 1);
-    const domain = fullDomain.split('@')[0]; // Strip double suffixes like @g.us@g.us
-    const cleanLocal = localPart.includes(':') ? localPart.split(':')[0] : localPart;
-    jid = cleanLocal + '@' + domain;
-  }
+  if (isNonChatJid(rawJid)) return;
+  let jid = normalizeRawJid(rawJid);
 
   const phone = jid.split('@')[0].split(':')[0];
   const isGroupChat = !!isGroup || jid.endsWith('@g.us');
-  // Format Indian number properly
-  let displayPhone;
-  if (isGroupChat) {
-    displayPhone = null;
-  } else if (phone.startsWith('91') && phone.length === 12) {
-    displayPhone = '+91 ' + phone.slice(2, 7) + ' ' + phone.slice(7);
-  } else {
-    displayPhone = '+' + phone;
+  let displayPhone = isGroupChat ? null : formatDisplayPhone(phone);
+  if (!isGroupChat && isLidJid(jid)) {
+    let mappedPhone = resolvedPhoneForLid(jid, contactsStore[jid]?.phone);
+    if (!mappedPhone && contactsStore[jid]?.phoneJid) {
+      mappedPhone = normalizeWaPhone(contactsStore[jid].phoneJid);
+    }
+    if (!mappedPhone && phoneNumber) {
+      try {
+        const lidLookup = await pool.query(
+          `SELECT phone FROM wa_contacts
+           WHERE jid=$1 AND account_phone=$2
+             AND phone IS NOT NULL AND phone != ''
+           LIMIT 1`,
+          [jid, phoneNumber]
+        );
+        mappedPhone = resolvedPhoneForLid(jid, lidLookup.rows?.[0]?.phone);
+      } catch (_) { }
+    }
+    if (mappedPhone) {
+      jid = `${mappedPhone}@s.whatsapp.net`;
+      displayPhone = formatDisplayPhone(mappedPhone);
+    } else {
+      displayPhone = null;
+    }
   }
   const cleanName = String(name || '').trim();
   const groupIdLocal = jid.split('@')[0].split(':')[0];
   const safeName = isGroupChat && (cleanName === groupIdLocal || cleanName === ('+' + groupIdLocal))
     ? null
-    : (cleanName || null);
+    : (cleanName && !isInvalidContactLabel(cleanName) ? cleanName : null);
   const ts = lastTime instanceof Date ? lastTime : toDate(lastTime);
   updateLiveChatRow({
     id: jid,
@@ -542,24 +740,40 @@ async function saveChat(rawJid, name, lastMsg, lastTime, unread, isGroup) {
 
 // ── SAVE / UPDATE CONTACT ──────────────────────────────────────────────────────────────
 async function saveContact(contact) {
-  if (!contact?.id) return;
+  const rawId = contact?.lid || contact?.id;
+  if (!rawId) return;
   const accPhone = phoneNumber;
   if (!accPhone) return;
-  const jid = contact.id;
-  let phone = jid.split('@')[0].split(':')[0];
-  const name = contact.name || contact.verifiedName || null;
-  const notify = contact.notify || null;
+  const jid = normalizeRawJid(rawId);
+  let phone = isLidJid(jid) ? '' : normalizeWaPhone(jid.split('@')[0].split(':')[0]);
+  let name = contact.name || null;
+  let notify = contact.notify || contact.username || null;
+  const verifiedName = contact.verifiedName || null;
+  if (name && (isInvalidContactLabel(name) || isPhoneLikeLabel(name, phone) || normalizeWaPhone(name) === phone)) {
+    name = null;
+  }
+  if (notify && (isInvalidContactLabel(notify) || isPhoneLikeLabel(notify, phone))) {
+    notify = null;
+  }
 
   // Update in-memory store
-  contactsStore[jid] = { id: jid, name, notify };
+  contactsStore[jid] = { id: jid, name, notify, phone };
+
+  if (!name && verifiedName && !isInvalidContactLabel(verifiedName) && !isPhoneLikeLabel(verifiedName, phone)) {
+    name = verifiedName;
+  }
 
   // Identity Mapping: If this is an LID, extract the real phone number
-  if (jid.endsWith('@lid') && contact.phoneNumber) {
+  if (isLidJid(jid) && contact.phoneNumber) {
     const pNum = typeof contact.phoneNumber === 'string' ? contact.phoneNumber : contact.phoneNumber.jid;
-    const realPhone = pNum.replace(/\D/g, '');
-    phone = realPhone; // Use real phone instead of LID number
-    const phoneJid = realPhone + '@s.whatsapp.net';
-    contactsStore[jid].phoneJid = phoneJid;
+    const realPhone = resolvedPhoneForLid(jid, pNum);
+    if (realPhone) {
+      phone = realPhone;
+      contactsStore[jid].phone = realPhone;
+      contactsStore[jid].phoneJid = `${realPhone}@s.whatsapp.net`;
+    }
+  } else if (isLidJid(jid)) {
+    phone = '';
   }
 
   if (!WA_DYNAMIC_DB_STORE) return;
@@ -570,9 +784,12 @@ async function saveContact(contact) {
       ON CONFLICT (jid, account_phone) DO UPDATE SET
         name   = COALESCE(EXCLUDED.name,   wa_contacts.name),
         notify = COALESCE(EXCLUDED.notify, wa_contacts.notify),
-        phone  = COALESCE(EXCLUDED.phone,  wa_contacts.phone),
+        phone  = CASE
+          WHEN EXCLUDED.phone IS NOT NULL AND EXCLUDED.phone != '' THEN EXCLUDED.phone
+          ELSE wa_contacts.phone
+        END,
         updated_at = NOW()
-    `, [jid, accPhone, name, notify, phone]);
+    `, [jid, accPhone, name, notify, phone || null]);
   } catch (_) { }
 }
 
@@ -599,8 +816,8 @@ async function saveMessage(msg) {
              LIMIT 1`,
             [jid, phoneNumber]
           );
-          const resolvedPhone = String(lidLookup.rows?.[0]?.phone || '').replace(/\D/g, '');
-          if (/^\d{7,15}$/.test(resolvedPhone)) {
+          const resolvedPhone = resolvedPhoneForLid(jid, lidLookup.rows?.[0]?.phone);
+          if (resolvedPhone) {
             const resolvedPhoneJid = `${resolvedPhone}@s.whatsapp.net`;
             if (!contactsStore[jid]) contactsStore[jid] = { id: jid };
             contactsStore[jid].phoneJid = resolvedPhoneJid;
@@ -742,8 +959,12 @@ async function loadContactsFromDB() {
     res.rows.forEach(r => {
       const entry = { id: r.jid, name: r.name, notify: r.notify, is_group_member: !!r.is_group_member };
       // Pre-populate phoneJid for @lid contacts so saveMessage can resolve senders immediately
-      if (r.jid.endsWith('@lid') && r.phone) {
-        entry.phoneJid = r.phone + '@s.whatsapp.net';
+      if (isLidJid(r.jid)) {
+        const mapped = resolvedPhoneForLid(r.jid, r.phone);
+        if (mapped) {
+          entry.phone = mapped;
+          entry.phoneJid = `${mapped}@s.whatsapp.net`;
+        }
       }
       contactsStore[r.jid] = entry;
       // Also index by phone number for cross-format lookup
@@ -770,8 +991,11 @@ async function loadLidPhoneMapFromDB() {
     );
     let mapped = 0;
     for (const r of res.rows) {
+      const mappedPhone = resolvedPhoneForLid(r.jid, r.phone);
+      if (!mappedPhone) continue;
       if (!contactsStore[r.jid]) contactsStore[r.jid] = { id: r.jid };
-      contactsStore[r.jid].phoneJid = r.phone + '@s.whatsapp.net';
+      contactsStore[r.jid].phone = mappedPhone;
+      contactsStore[r.jid].phoneJid = `${mappedPhone}@s.whatsapp.net`;
       mapped++;
     }
     console.log(`[WA] LID→phone map refreshed: ${mapped} entries`);
@@ -812,11 +1036,10 @@ async function startWA(options = {}) {
 
   const { state, saveCreds } = await useMultiFileAuthState(AUTH_DIR);
 
-  // Initialize phoneNumber early from existing credentials to prevent 'unknown'
-  if (state.creds && state.creds.me && state.creds.me.id) {
-    const rawId = state.creds.me.id;
-    setActiveAccountPhone(rawId);
-    userJid = rawId;
+  // Scope DB writes to the real linked phone (creds.me.id), not the LID user id.
+  if (state.creds?.me?.id) {
+    applyConnectedAccountPhone(state.creds.me.id);
+    userJid = state.creds.me.id;
   }
 
   await loadContactsFromDB();
@@ -846,6 +1069,9 @@ async function startWA(options = {}) {
     printQRInTerminal: false,
     browser: ['UniComm Pro', 'Chrome', '120.0'],
     syncFullHistory: SYNC_FULL_HISTORY,
+    // Baileys 7: when omitted, this defaults to () => !!syncFullHistory.
+    // With syncFullHistory=false that SKIPS all history + app-state chat loading on QR connect.
+    shouldSyncHistoryMessage: () => true,
     logger: require('pino')({ level: 'info' }), // Enabled info level to see Baileys internal logs
     getMessage: async (key) => {
       if (!phoneNumber) return { conversation: '' };
@@ -903,17 +1129,19 @@ async function startWA(options = {}) {
         reconnectTimer = null;
       }
       qrString = null;
+      pairingCode = null;
+      pairingPhone = null;
       const rawId = sock.user?.id || '';
 
-      // sock.user.id can be "919545073545:48@s.whatsapp.net" or LID "49868...@lid"
-      // Extract real phone: take part before ':' or '@'
-      setActiveAccountPhone(rawId);
+      // sock.user.id may be phone JID or @lid — always scope DB to creds.me.id phone.
+      applyConnectedAccountPhone(rawId);
       userJid = rawId;
       console.log(`[WA] Connected as ${phoneNumber} | raw id: ${rawId} | reconnect: ${isReconnect}`);
       recordActivity('connected', 'WhatsApp connected', { phone: phoneNumber, reconnect: isReconnect });
       await loadContactsFromDB();
       await loadImportedCheckpointsFromDB();
       await updateChatNames();
+      await consolidateLidChats();
       emit('wa:connected', { phone: phoneNumber, name: sock.user?.name });
 
       // Immediately refresh LID→phone map so group msg senders resolve on reconnect
@@ -922,11 +1150,28 @@ async function startWA(options = {}) {
       // After connect: scan ALL groups and populate LID→phone in wa_contacts
       // Delay 60s to let WhatsApp settle before making group metadata requests
       setTimeout(() => {
-        if (generation === socketGeneration) syncAllGroupParticipants();
-      }, 60000);
+        if (generation !== socketGeneration || !isConnected) return;
+        startLidResolutionWorker();
+      }, 4000);
+
+      // If DB was purged while session stayed alive, history sync won't replay — refill from socket.
+      setTimeout(async () => {
+        if (generation !== socketGeneration || !isConnected || !phoneNumber) return;
+        try {
+          const dbCount = await countAccountChats(phoneNumber);
+          const socketCount = getSocketChatsSnapshot().length;
+          if (dbCount === 0 && socketCount > 0) {
+            console.log(`[WA] DB empty (${dbCount}) but socket has ${socketCount} chats — resyncing directory`);
+            await resyncDirectoryFromSocket({ groupLimit: 80 });
+          }
+        } catch (err) {
+          console.warn('[WA] Post-connect directory resync skipped:', err.message);
+        }
+      }, 8000);
     }
 
     if (connection === 'close') {
+      stopLidResolutionWorker();
       isConnected = false;
       currentState = 'DISCONNECTED';
       const code = (lastDisconnect?.error)?.output?.statusCode || (lastDisconnect?.error)?.code;
@@ -997,6 +1242,16 @@ async function startWA(options = {}) {
     for (const c of updates) {
       await saveContact(c);
     }
+    await enrichContactNamesFromMessages();
+  });
+
+  sock.ev.on('lid-mapping.update', async ({ lid, pn }) => {
+    if (!lid || !pn || !phoneNumber) return;
+    const lidJid = String(lid).includes('@') ? normalizeRawJid(lid) : `${lid}@lid`;
+    const phoneJid = String(pn).includes('@') ? pn : `${normalizeWaPhone(pn)}@s.whatsapp.net`;
+    await saveContact({ id: lidJid, phoneNumber: phoneJid });
+    await enrichContactNamesFromMessages();
+    await consolidateLidChats();
   });
 
   // ── HISTORY SYNC ───────────────────────────────────────────────────────────────────────
@@ -1004,7 +1259,7 @@ async function startWA(options = {}) {
     const yieldEventLoop = () => new Promise(resolve => setImmediate(resolve));
 
     if (!SYNC_FULL_HISTORY) {
-      console.log(`[WA] Directory sync chunk — chats=${chats.length} contacts=${contacts?.length || 0} messages skipped=${messages.length} isLatest=${isLatest}`);
+      console.log(`[WA] Directory sync chunk — chats=${chats.length} contacts=${contacts?.length || 0} messages=${messages.length} isLatest=${isLatest}`);
       recordActivity('sync', 'Directory sync chunk', { chats: chats.length, contacts: contacts?.length || 0, messages: messages.length, isLatest: !!isLatest });
       if (contacts?.length) {
         for (let i = 0; i < contacts.length; i++) {
@@ -1014,7 +1269,7 @@ async function startWA(options = {}) {
       }
       for (let i = 0; i < chats.length; i++) {
         const chat = chats[i];
-        if (!chat?.id || chat.id === 'status@broadcast') continue;
+        if (!chat?.id || isNonChatJid(chat.id)) continue;
         const isGroup = chat.id.endsWith('@g.us');
         const name = isGroup
           ? (chat.name || chat.subject || null)
@@ -1023,8 +1278,30 @@ async function startWA(options = {}) {
         await saveChat(chat.id, name, '', ts, 0, isGroup);
         if (i % 50 === 0) await yieldEventLoop();
       }
+      let saved = 0;
+      for (let i = 0; i < messages.length; i++) {
+        const msg = messages[i];
+        if (msg.key && msg.key.id && msg.message) {
+          msgCache.set(msg.key.id, msg);
+          if (msgCache.size > MAX_CACHE) msgCache.delete(msgCache.keys().next().value);
+        }
+        if (!isRealMessage(msg)) continue;
+        const jid = msg.key?.remoteJid;
+        if (!jid || isNonChatJid(jid)) continue;
+        const result = await saveMessage(msg);
+        if (result) {
+          saved++;
+          const isGroup = jid.endsWith('@g.us');
+          const name = isGroup ? null : getContactName(jid, msg.key.fromMe ? null : msg.pushName);
+          await saveChat(jid, name, result.body, result.ts, 0, isGroup);
+        }
+        if (i % 50 === 0) await yieldEventLoop();
+      }
+      if (saved > 0) console.log(`[WA] Directory chunk saved — ${saved} messages`);
       if (isLatest) {
         await updateChatNames();
+        await consolidateLidChats();
+        await loadLidPhoneMapFromDB();
         recordActivity('sync', 'Directory sync complete');
         emit('wa:sync_complete', {});
       }
@@ -1063,12 +1340,12 @@ async function startWA(options = {}) {
       }
       if (!isRealMessage(msg)) continue;
       const jid = msg.key?.remoteJid;
-      if (!jid || jid === 'status@broadcast') continue;
+      if (!jid || isNonChatJid(jid)) continue;
       const result = await saveMessage(msg);
       if (result) {
         saved++;
         const isGroup = jid.endsWith('@g.us');
-        const name = isGroup ? null : getContactName(jid, result.senderName);
+        const name = isGroup ? null : getContactName(jid, msg.key.fromMe ? null : msg.pushName);
         await saveChat(jid, name, result.body, result.ts, 0, isGroup);
       }
       if (i % 50 === 0) await yieldEventLoop();
@@ -1078,8 +1355,11 @@ async function startWA(options = {}) {
     // 4. Only refresh frontend on FINAL chunk (isLatest=true)
     if (isLatest) {
       console.log('[WA] ✅ Full history sync complete — refreshing UI');
-      // Update all chat names now that all contacts are loaded
       await updateChatNames();
+      await consolidateLidChats();
+      await loadLidPhoneMapFromDB();
+      // Fetch missing group subjects so they don't show up as 'Group' in UI
+      try { await refreshCurrentAccountGroupMetadata(200); } catch(e){}
       recordActivity('sync', 'Full history sync complete');
       emit('wa:sync_complete', {});
     }
@@ -1102,16 +1382,22 @@ async function startWA(options = {}) {
     // On FIRST connect: suppress — messaging-history.set isLatest=true fires wa:sync_complete instead.
     // On RECONNECT: Baileys replays chats, data already in DB → emit once after batch settles.
     if (chatsUpsertDebounce) clearTimeout(chatsUpsertDebounce);
-    chatsUpsertDebounce = setTimeout(() => {
+    chatsUpsertDebounce = setTimeout(async () => {
       const batches = chatsBatchCount;
       chatsBatchCount = 0;
       chatsUpsertDebounce = null;
-      if (isReconnect) {
-        console.log(`[WA] chats.upsert settled (${batches} batches, reconnect) — emitting wa:chats_updated`);
-        emit('wa:chats_updated', {});
-      } else {
-        console.log(`[WA] chats.upsert settled (${batches} batches, first connect) — skipping wa:chats_updated (wa:sync_complete handles UI refresh)`);
+      try {
+        await updateChatNames();
+        await consolidateLidChats();
+        await loadLidPhoneMapFromDB();
+        // Fetch missing group subjects
+        try { await refreshCurrentAccountGroupMetadata(200); } catch(e){}
+      } catch (err) {
+        console.warn('[WA] chats.upsert post-save error:', err.message);
       }
+      console.log(`[WA] chats.upsert settled (${batches} batches) — refreshing UI`);
+      emit('wa:sync_complete', { source: 'chats.upsert', batches });
+      if (isReconnect) emit('wa:chats_updated', {});
     }, 3000);
   });
 
@@ -1258,22 +1544,246 @@ async function startWA(options = {}) {
   return sock;
 }
 
+// ── BACKFILL PROFILE NAMES FROM MESSAGE HISTORY ───────────────────────────────────────
+async function enrichContactNamesFromMessages() {
+  const accPhone = phoneNumber;
+  if (!accPhone) return;
+  try {
+    const res = await pool.query(`
+      UPDATE wa_contacts wc
+      SET notify = src.sender_name, updated_at = NOW()
+      FROM (
+        SELECT DISTINCT ON (wc2.jid)
+          wc2.jid,
+          m.sender_name
+        FROM wa_contacts wc2
+        JOIN wa_messages m ON m.account_phone = wc2.account_phone
+          AND m.from_me = false
+          AND m.sender_name IS NOT NULL
+          AND m.sender_name != ''
+          AND m.sender_name !~* '^you$'
+          AND m.sender_name !~ '^\\+?[0-9]'
+          AND (
+            m.sender = wc2.jid
+            OR regexp_replace(split_part(COALESCE(m.sender, ''), '@', 1), '[^0-9]', '', 'g')
+              = regexp_replace(COALESCE(wc2.phone, ''), '[^0-9]', '', 'g')
+          )
+        WHERE wc2.account_phone = $1
+          AND (wc2.notify IS NULL OR wc2.notify = '')
+          AND (wc2.name IS NULL OR wc2.name = '' OR wc2.name ~ '^\\+?[0-9]')
+        ORDER BY wc2.jid, m.timestamp DESC NULLS LAST
+      ) src
+      WHERE wc.jid = src.jid AND wc.account_phone = $1
+      RETURNING wc.jid
+    `, [accPhone]);
+    if (res.rowCount > 0) {
+      console.log(`[WA] Enriched ${res.rowCount} contact names from message history`);
+    }
+
+    const chats = await pool.query(`
+      UPDATE wa_contacts wc
+      SET notify = COALESCE(NULLIF(wc.notify, ''), src.chat_name), updated_at = NOW()
+      FROM (
+        SELECT
+          wc2.jid,
+          c.name AS chat_name
+        FROM wa_contacts wc2
+        JOIN wa_chats c ON c.account_phone = wc2.account_phone
+          AND (
+            c.id = wc2.jid
+            OR regexp_replace(COALESCE(c.phone, ''), '[^0-9]', '', 'g')
+              = regexp_replace(COALESCE(wc2.phone, ''), '[^0-9]', '', 'g')
+          )
+        WHERE wc2.account_phone = $1
+          AND c.name IS NOT NULL
+          AND c.name != ''
+          AND c.name !~ '^\\+?[0-9]'
+          AND NOT c.is_group
+      ) src
+      WHERE wc.jid = src.jid
+        AND wc.account_phone = $1
+        AND (wc.notify IS NULL OR wc.notify = '')
+      RETURNING wc.jid
+    `, [accPhone]);
+    if (chats.rowCount > 0) {
+      console.log(`[WA] Enriched ${chats.rowCount} contact names from chat titles`);
+    }
+  } catch (err) {
+    console.error('[WA] enrichContactNamesFromMessages error:', err.message);
+  }
+}
+
+// ── CLEAN PHONE-FORMATTED NAMES STORED AS CONTACT NAMES ─────────────────────────────
+async function cleanupContactLabels() {
+  const accPhone = phoneNumber;
+  if (!accPhone) return;
+  try {
+    await pool.query(`
+      UPDATE wa_contacts
+      SET name = NULL, updated_at = NOW()
+      WHERE account_phone = $1
+        AND (
+          name ~* '^you$'
+          OR name ~ '^\\+?[0-9]'
+          OR regexp_replace(COALESCE(name, ''), '[^0-9]', '', 'g') = split_part(jid, '@', 1)
+        )
+    `, [accPhone]);
+    await pool.query(`
+      UPDATE wa_contacts
+      SET notify = NULL, updated_at = NOW()
+      WHERE account_phone = $1
+        AND (
+          notify ~* '^you$'
+          OR notify ~ '^\\+?[0-9]'
+        )
+    `, [accPhone]);
+    await pool.query(`
+      UPDATE wa_chats
+      SET name = NULL, updated_at = NOW()
+      WHERE account_phone = $1
+        AND name ~* '^you$'
+    `, [accPhone]);
+    await pool.query(`
+      UPDATE wa_chats
+      SET name = NULL, phone = NULL, updated_at = NOW()
+      WHERE account_phone = $1
+        AND id LIKE '%@lid'
+        AND (
+          name ~ '^\\+?[0-9]'
+          OR regexp_replace(COALESCE(name, ''), '[^0-9]', '', 'g') = split_part(id, '@', 1)
+        )
+    `, [accPhone]);
+    await pool.query(`
+      DELETE FROM wa_chats c
+      WHERE c.account_phone = $1
+        AND c.id LIKE '%@lid'
+        AND COALESCE(regexp_replace(COALESCE(c.phone, ''), '[^0-9]', '', 'g'), '') = ''
+        AND COALESCE(NULLIF(c.name, ''), (
+          SELECT NULLIF(wc.notify, '')
+          FROM wa_contacts wc
+          WHERE wc.jid = c.id AND wc.account_phone = c.account_phone
+          LIMIT 1
+        )) IS NULL
+    `, [accPhone]);
+  } catch (err) {
+    console.error('[WA] cleanupContactLabels error:', err.message);
+  }
+}
+
+// ── MERGE @lid CHATS INTO PHONE JIDS ─────────────────────────────────────────────────
+async function consolidateLidChats() {
+  const accPhone = phoneNumber;
+  if (!accPhone) return { merged: 0 };
+  try {
+    const mergedRes = await pool.query(`
+      WITH lids AS (
+        SELECT
+          c.id,
+          CASE WHEN c.name ~* '^you$' THEN NULL ELSE c.name END AS name,
+          c.last_message,
+          c.last_time,
+          c.unread,
+          NULLIF(
+            CASE
+              WHEN regexp_replace(COALESCE(wc.phone, c.phone, ''), '[^0-9]', '', 'g') ~ '^[0-9]{7,14}$'
+                AND regexp_replace(COALESCE(wc.phone, c.phone, ''), '[^0-9]', '', 'g') != split_part(c.id, '@', 1)
+              THEN regexp_replace(COALESCE(wc.phone, c.phone, ''), '[^0-9]', '', 'g')
+              ELSE NULL
+            END,
+            ''
+          ) AS phone_digits
+        FROM wa_chats c
+        LEFT JOIN wa_contacts wc ON wc.jid = c.id AND wc.account_phone = c.account_phone
+        WHERE c.account_phone = $1 AND c.id LIKE '%@lid'
+      ),
+      resolved AS (
+        SELECT
+          id,
+          name,
+          last_message,
+          last_time,
+          unread,
+          phone_digits,
+          phone_digits || '@s.whatsapp.net' AS phone_jid
+        FROM lids
+        WHERE phone_digits IS NOT NULL
+      ),
+      moved_messages AS (
+        UPDATE wa_messages m
+        SET chat_id = r.phone_jid
+        FROM resolved r
+        WHERE m.account_phone = $1 AND m.chat_id = r.id
+        RETURNING r.id
+      ),
+      upserted AS (
+        INSERT INTO wa_chats (id, account_phone, name, phone, is_group, last_message, last_time, unread)
+        SELECT
+          r.phone_jid,
+          $1,
+          r.name,
+          CASE
+            WHEN r.phone_digits LIKE '91%' AND length(r.phone_digits) = 12
+              THEN '+91 ' || substring(r.phone_digits, 3, 5) || ' ' || substring(r.phone_digits, 8, 5)
+            ELSE '+' || r.phone_digits
+          END,
+          false,
+          COALESCE(r.last_message, ''),
+          r.last_time,
+          COALESCE(r.unread, 0)
+        FROM resolved r
+        ON CONFLICT (id, account_phone) DO UPDATE SET
+          name = COALESCE(
+            CASE WHEN EXCLUDED.name ~* '^you$' THEN NULL ELSE EXCLUDED.name END,
+            CASE WHEN wa_chats.name ~* '^you$' THEN NULL ELSE wa_chats.name END
+          ),
+          phone = COALESCE(EXCLUDED.phone, wa_chats.phone),
+          last_message = CASE WHEN EXCLUDED.last_message != '' THEN EXCLUDED.last_message ELSE wa_chats.last_message END,
+          last_time = GREATEST(COALESCE(EXCLUDED.last_time, wa_chats.last_time), COALESCE(wa_chats.last_time, EXCLUDED.last_time)),
+          unread = wa_chats.unread + EXCLUDED.unread,
+          updated_at = NOW()
+        RETURNING 1
+      ),
+      deleted AS (
+        DELETE FROM wa_chats c
+        USING resolved r
+        WHERE c.account_phone = $1 AND c.id = r.id
+        RETURNING c.id
+      )
+      SELECT COUNT(*)::int AS merged FROM resolved
+    `, [accPhone]);
+    const merged = mergedRes.rows[0]?.merged || 0;
+
+    await pool.query(`
+      UPDATE wa_contacts SET phone = NULL, updated_at = NOW()
+      WHERE account_phone = $1 AND jid LIKE '%@lid'
+        AND (
+          regexp_replace(COALESCE(phone, ''), '[^0-9]', '', 'g') = split_part(jid, '@', 1)
+          OR NOT (regexp_replace(COALESCE(phone, ''), '[^0-9]', '', 'g') ~ '^[0-9]{7,14}$')
+        )
+    `, [accPhone]);
+
+    if (merged > 0) console.log(`[WA] Consolidated ${merged} @lid chats into phone JIDs (batch)`);
+    return { merged };
+  } catch (err) {
+    console.error('[WA] consolidateLidChats error:', err.message);
+    return { merged: 0 };
+  }
+}
+
 // ── UPDATE CHAT NAMES AFTER CONTACTS SYNC ───────────────────────────────────────────
 async function updateChatNames() {
   try {
-    // Step 1: Update names from contactsStore (in-memory)
     const accPhone = phoneNumber;
     if (!accPhone) return;
     const chats = await pool.query(`SELECT id, phone, name, is_group FROM wa_chats WHERE account_phone=$1`, [accPhone]);
     let updated = 0;
     for (const chat of chats.rows) {
-      if (chat.is_group) continue;
+      if (chat.is_group || isLidJid(chat.id)) continue;
       const rawPhone = chat.id.split('@')[0].split(':')[0];
+      if (!isAllowedWaNumber(rawPhone)) continue;
       const resolvedName = getContactName(chat.id, null);
-      const displayPhone = rawPhone.startsWith('91') && rawPhone.length === 12
-        ? '+91 ' + rawPhone.slice(2, 7) + ' ' + rawPhone.slice(7)
-        : '+' + rawPhone;
-      if (resolvedName && resolvedName !== ('+' + rawPhone) && resolvedName !== rawPhone) {
+      const displayPhone = formatDisplayPhone(rawPhone);
+      if (resolvedName && resolvedName !== displayPhone && !/^\+?\d[\d\s]+$/.test(resolvedName)) {
         await pool.query(`UPDATE wa_chats SET name=$1, phone=$2 WHERE id=$3 AND account_phone=$4`, [resolvedName, displayPhone, chat.id, accPhone]);
         updated++;
       } else if (!chat.phone || chat.phone !== displayPhone) {
@@ -1281,18 +1791,19 @@ async function updateChatNames() {
       }
     }
 
-    // Step 2: For @lid chats, use wa_contacts.phone (same data as group members panel)
     await pool.query(`
       UPDATE wa_chats
       SET phone = CASE
-        WHEN wc.phone LIKE '91%' AND length(wc.phone) = 12
-          THEN '+91 ' || substring(wc.phone, 3, 5) || ' ' || substring(wc.phone, 8, 5)
+        WHEN wc.phone LIKE '91%' AND length(regexp_replace(wc.phone, '[^0-9]', '', 'g')) = 12
+          THEN '+91 ' || substring(regexp_replace(wc.phone, '[^0-9]', '', 'g'), 3, 5) || ' ' || substring(regexp_replace(wc.phone, '[^0-9]', '', 'g'), 8, 5)
         WHEN wc.phone IS NOT NULL AND wc.phone != ''
-          THEN '+' || wc.phone
+          AND regexp_replace(wc.phone, '[^0-9]', '', 'g') != split_part(wa_chats.id, '@', 1)
+          AND regexp_replace(wc.phone, '[^0-9]', '', 'g') ~ '^[0-9]{7,14}$'
+          THEN '+' || regexp_replace(wc.phone, '[^0-9]', '', 'g')
         ELSE wa_chats.phone
       END,
       name = CASE
-        WHEN (wc.name IS NOT NULL AND wc.name != '' AND wc.name NOT LIKE '+%')
+        WHEN (wc.name IS NOT NULL AND wc.name != '' AND wc.name NOT LIKE '+%' AND length(regexp_replace(wc.name, '[^0-9]', '', 'g')) < 7)
           THEN wc.name
         WHEN (wc.notify IS NOT NULL AND wc.notify != '')
           THEN wc.notify
@@ -1305,12 +1816,174 @@ async function updateChatNames() {
         AND wa_chats.id LIKE '%@lid'
         AND wc.phone IS NOT NULL
         AND wc.phone != ''
+        AND regexp_replace(wc.phone, '[^0-9]', '', 'g') != split_part(wa_chats.id, '@', 1)
+        AND regexp_replace(wc.phone, '[^0-9]', '', 'g') ~ '^[0-9]{7,14}$'
     `, [accPhone]);
 
+    await cleanupContactLabels();
+    await enrichContactNamesFromMessages();
+    await consolidateLidChats();
     console.log('[WA] Updated ' + updated + ' chat names');
   } catch (err) {
     console.error('[WA] updateChatNames error:', err.message);
   }
+}
+
+async function countPendingLids(accPhone) {
+  if (!accPhone) return 0;
+  const r = await pool.query(`
+    SELECT COUNT(*)::int AS n
+    FROM wa_contacts
+    WHERE account_phone = $1
+      AND jid LIKE '%@lid'
+      AND (
+        COALESCE(regexp_replace(phone, '[^0-9]', '', 'g'), '') = ''
+        OR regexp_replace(COALESCE(phone, ''), '[^0-9]', '', 'g') = split_part(jid, '@', 1)
+        OR NOT (regexp_replace(COALESCE(phone, ''), '[^0-9]', '', 'g') ~ '^[0-9]{7,14}$')
+      )
+  `, [accPhone]);
+  return r.rows[0]?.n || 0;
+}
+
+async function refreshLidResolutionGroupIds(accPhone) {
+  const dbGroups = await pool.query(
+    `SELECT id FROM wa_chats WHERE account_phone=$1 AND is_group=true ORDER BY updated_at DESC NULLS LAST`,
+    [accPhone]
+  );
+  lidResolutionGroupIds = [...new Set([
+    ...dbGroups.rows.map(r => r.id),
+    ...getSocketGroupIds(),
+  ])];
+  if (lidResolutionGroupCursor >= lidResolutionGroupIds.length) {
+    lidResolutionGroupCursor = 0;
+  }
+}
+
+async function processLidResolutionBatch(batchSize = LID_RESOLUTION_BATCH_SIZE) {
+  if (!sock || !isConnected) {
+    return { skipped: true, reason: 'not_connected', pending: 0 };
+  }
+  if (lidResolutionInFlight) {
+    return { skipped: true, reason: 'in_flight', pending: await countPendingLids(phoneNumber) };
+  }
+
+  const accPhone = phoneNumber;
+  if (!accPhone) return { skipped: true, reason: 'no_account', pending: 0 };
+
+  lidResolutionInFlight = true;
+  try {
+    const beforePending = await countPendingLids(accPhone);
+    if (beforePending === 0) {
+      return { resolved: 0, pending: 0, groupsScanned: 0, batchSize };
+    }
+
+    if (!lidResolutionGroupIds.length) await refreshLidResolutionGroupIds(accPhone);
+    if (!lidResolutionGroupIds.length) {
+      return { resolved: 0, pending: beforePending, groupsScanned: 0, batchSize };
+    }
+
+    const pendingContacts = [];
+    const seenJids = new Set();
+    let groupsScanned = 0;
+
+    while (
+      groupsScanned < MAX_GROUPS_PER_LID_BATCH
+      && lidResolutionGroupCursor < lidResolutionGroupIds.length
+      && pendingContacts.length < batchSize * 4
+    ) {
+      const chunk = lidResolutionGroupIds.slice(
+        lidResolutionGroupCursor,
+        lidResolutionGroupCursor + GROUP_METADATA_CONCURRENCY
+      );
+      if (!chunk.length) break;
+      lidResolutionGroupCursor += chunk.length;
+      groupsScanned += chunk.length;
+
+      await runWithConcurrency(chunk, GROUP_METADATA_CONCURRENCY, async (gid) => {
+        try {
+          if (GROUP_METADATA_DELAY_MS > 0) await sleep(GROUP_METADATA_DELAY_MS);
+          const meta = await sock.groupMetadata(gid);
+          for (const p of meta?.participants || []) {
+            const pJid = p.id;
+            if (!pJid?.endsWith('@lid') || !p.phoneNumber) continue;
+            const pNum = typeof p.phoneNumber === 'string' ? p.phoneNumber : (p.phoneNumber?.jid || '');
+            const rawPhone = String(pNum).replace(/\D/g, '');
+            if (!rawPhone || !isAllowedWaNumber(rawPhone) || seenJids.has(pJid)) continue;
+            seenJids.add(pJid);
+            pendingContacts.push({
+              jid: pJid,
+              name: p.name && !isInvalidContactLabel(p.name) ? p.name : null,
+              phone: rawPhone,
+            });
+          }
+        } catch (_) { }
+      });
+    }
+
+    if (lidResolutionGroupCursor >= lidResolutionGroupIds.length) {
+      lidResolutionGroupCursor = 0;
+    }
+
+    const upserted = await upsertGroupMemberContacts(pendingContacts, accPhone);
+    await consolidateLidChats();
+    await loadLidPhoneMapFromDB();
+
+    const afterPending = await countPendingLids(accPhone);
+    const resolved = Math.max(0, beforePending - afterPending);
+    const result = {
+      batchSize,
+      groupsScanned,
+      upserted,
+      resolved,
+      pending: afterPending,
+    };
+
+    if (resolved > 0 || upserted > 0) {
+      emit('wa:lid_batch', result);
+      emit('wa:participants_synced', { total: resolved || upserted, pending: afterPending, ...result });
+    }
+
+    console.log('[WA] LID resolution batch:', result);
+    recordActivity('lid_batch', 'LID resolution batch', result);
+    return result;
+  } finally {
+    lidResolutionInFlight = false;
+  }
+}
+
+function stopLidResolutionWorker() {
+  if (lidResolutionWorkerTimer) {
+    clearTimeout(lidResolutionWorkerTimer);
+    lidResolutionWorkerTimer = null;
+  }
+}
+
+async function tickLidResolutionWorker() {
+  if (!sock || !isConnected || !phoneNumber) {
+    stopLidResolutionWorker();
+    return;
+  }
+  try {
+    const pending = await countPendingLids(phoneNumber);
+    if (pending === 0) {
+      console.log('[WA] LID resolution worker complete');
+      stopLidResolutionWorker();
+      emit('wa:lid_resolution_complete', {});
+      return;
+    }
+    await processLidResolutionBatch(LID_RESOLUTION_BATCH_SIZE);
+  } catch (err) {
+    console.warn('[WA] LID resolution worker tick failed:', err.message);
+  }
+  lidResolutionWorkerTimer = setTimeout(tickLidResolutionWorker, LID_RESOLUTION_BATCH_DELAY_MS);
+}
+
+function startLidResolutionWorker() {
+  stopLidResolutionWorker();
+  lidResolutionGroupCursor = 0;
+  lidResolutionGroupIds = [];
+  console.log('[WA] Starting LID resolution worker (batch size ' + LID_RESOLUTION_BATCH_SIZE + ')');
+  lidResolutionWorkerTimer = setTimeout(tickLidResolutionWorker, 1500);
 }
 
 // ── SYNC ALL GROUP PARTICIPANTS → populate LID→phone in wa_contacts ────────
@@ -1329,40 +2002,38 @@ async function syncAllGroupParticipants() {
   try {
     const accPhone = phoneNumber;
     if (!accPhone) return;
-    const groups = await pool.query(`SELECT id FROM wa_chats WHERE is_group = true AND account_phone=$1`, [accPhone]);
-    if (groups.rows.length === 0) return;
-    console.log(`[WA] Syncing participants for ${groups.rows.length} groups...`);
+    let groupIds = (await pool.query(`SELECT id FROM wa_chats WHERE is_group = true AND account_phone=$1`, [accPhone])).rows.map(r => r.id);
+    if (!groupIds.length) groupIds = getSocketGroupIds();
+    if (!groupIds.length) return;
+    const groups = { rows: groupIds.map(id => ({ id })) };
+    console.log(`[WA] Syncing participants for ${groups.rows.length} groups (batch)...`);
     recordActivity('participants', 'Group participant sync started', { groups: groups.rows.length });
+    const pendingContacts = [];
     let total = 0;
-    for (const group of groups.rows) {
-      if (!isConnected) break; // Stop sync if disconnected
+
+    await runWithConcurrency(groups.rows, GROUP_METADATA_CONCURRENCY, async (group) => {
+      if (!isConnected || phoneNumber !== accPhone) return;
       try {
-        await new Promise(resolve => setTimeout(resolve, 1000));
+        if (GROUP_METADATA_DELAY_MS > 0) await new Promise(resolve => setTimeout(resolve, GROUP_METADATA_DELAY_MS));
         const meta = await sock.groupMetadata(group.id);
-        for (const p of meta.participants) {
-          if (!p.id || !p.id.endsWith('@lid')) continue;
-          if (!p.phoneNumber) continue;
+        for (const p of meta.participants || []) {
+          if (!p.id || !p.id.endsWith('@lid') || !p.phoneNumber) continue;
           const pNum = typeof p.phoneNumber === 'string' ? p.phoneNumber : (p.phoneNumber?.jid || '');
           const rawPhone = pNum.replace(/\D/g, '');
-          if (!rawPhone || rawPhone.length < 7) continue;
-          if (!isAllowedWaNumber(rawPhone)) continue;
-          await pool.query(`
-            INSERT INTO wa_contacts (jid, account_phone, name, phone, is_group_member)
-            VALUES ($1, $2, $3, $4, true)
-            ON CONFLICT (jid, account_phone) DO UPDATE SET
-              phone = EXCLUDED.phone,
-              name  = COALESCE(EXCLUDED.name, wa_contacts.name),
-              is_group_member = true,
-              updated_at = NOW()
-          `, [p.id, accPhone, null, rawPhone]);
-          total++;
+          if (!rawPhone || !isAllowedWaNumber(rawPhone)) continue;
+          pendingContacts.push({ jid: p.id, name: null, phone: rawPhone });
         }
       } catch (_) { }
-    }
+    });
+
+    total = await upsertGroupMemberContacts(pendingContacts, accPhone);
+    await consolidateLidChats();
+    await loadLidPhoneMapFromDB();
     console.log(`[WA] ✅ Group participant sync done — ${total} LID→phone entries saved`);
     recordActivity('participants', 'Group participant sync complete', { total });
     lastGroupParticipantSyncAt = Date.now();
     emit('wa:participants_synced', { total });
+    startLidResolutionWorker();
   } catch (err) {
     console.error('[WA] syncAllGroupParticipants error:', err.message);
     recordActivity('error', 'Group participant sync failed', { error: err.message });
@@ -1382,46 +2053,6 @@ function clearSession() {
 }
 
 // ── SEND MESSAGE ─────────────────────────────────────────────────────────────────────
-async function adoptUnknownAccountRows(accPhone) {
-  if (!accPhone || accPhone === 'unknown') return;
-  try {
-    await pool.query(`
-      UPDATE wa_contacts old
-      SET account_phone = $1
-      WHERE old.account_phone = 'unknown'
-        AND NOT EXISTS (
-          SELECT 1 FROM wa_contacts existing
-          WHERE existing.jid = old.jid
-            AND existing.account_phone = $1
-        )
-    `, [accPhone]);
-    await pool.query(`
-      UPDATE wa_chats old
-      SET account_phone = $1
-      WHERE old.account_phone = 'unknown'
-        AND NOT EXISTS (
-          SELECT 1 FROM wa_chats existing
-          WHERE existing.id = old.id
-            AND existing.account_phone = $1
-        )
-    `, [accPhone]);
-    await pool.query(`
-      UPDATE wa_messages old
-      SET account_phone = $1
-      WHERE old.account_phone = 'unknown'
-        AND NOT EXISTS (
-          SELECT 1 FROM wa_messages existing
-          WHERE existing.id = old.id
-            AND existing.chat_id = old.chat_id
-            AND existing.account_phone = $1
-        )
-    `, [accPhone]);
-    console.log('[WA] Adopted legacy unknown WhatsApp rows for account', accPhone);
-  } catch (e) {
-    console.warn('[WA] Legacy account adoption skipped:', e.message);
-  }
-}
-
 async function sendMessage(jid, text, quotedMsgId) {
   if (!sock || !isConnected) throw new Error('WhatsApp not connected');
   const formattedJid = formatJid(jid);
@@ -1740,24 +2371,163 @@ async function getGroupMetadata(jid, opts = {}) {
   return result;
 }
 
+function getSocketGroupIds() {
+  const ids = new Set();
+  for (const chat of liveChatsStore.values()) {
+    if (chat?.id?.endsWith('@g.us')) ids.add(chat.id);
+  }
+  for (const chat of getSocketChatsSnapshot()) {
+    if (chat?.id?.endsWith('@g.us')) ids.add(chat.id);
+  }
+  return [...ids];
+}
+
+async function countAccountChats(accPhone) {
+  if (!accPhone) return 0;
+  const r = await pool.query(`SELECT COUNT(*)::int AS n FROM wa_chats WHERE account_phone=$1`, [accPhone]);
+  return parseInt(r.rows[0]?.n || 0, 10);
+}
+
+/**
+ * Rebuild wa_chats / wa_contacts from the live Baileys socket store.
+ * Needed after DB purge while still connected — messaging-history.set does not replay.
+ */
+async function resyncDirectoryFromSocket(options = {}) {
+  if (!sock || !isConnected) throw new Error('WhatsApp not connected');
+  const accPhone = phoneNumber;
+  if (!accPhone) throw new Error('Connected WhatsApp account is not known yet');
+
+  // Baileys 7 removed sock.chats — pull directory via app-state resync instead.
+  if (typeof sock.resyncAppState === 'function') {
+    console.log('[WA] Triggering app-state resync to reload chat/contact directory...');
+    await sock.resyncAppState(ALL_WA_PATCH_NAMES, false);
+    await sleep(2000);
+  }
+
+  const rawChats = getSocketChatsSnapshot();
+  let chatsSaved = 0;
+  let contactsSaved = 0;
+
+  for (const entry of Object.values(contactsStore)) {
+    if (!entry?.id) continue;
+    await saveContact({
+      id: entry.id,
+      name: entry.name,
+      notify: entry.notify,
+      phoneNumber: entry.phoneJid || (entry.phone ? `${entry.phone}@s.whatsapp.net` : undefined),
+    });
+    contactsSaved++;
+  }
+
+  for (const chat of rawChats) {
+    if (!chat?.id || isNonChatJid(chat.id)) continue;
+    const isGroup = chat.id.endsWith('@g.us');
+    const name = isGroup
+      ? (chat.name || chat.subject || null)
+      : getContactName(chat.id, chat.name || chat.notify);
+    const ts = toDate(chat.conversationTimestamp);
+    await saveChat(chat.id, name, '', ts, Number(chat.unreadCount || 0), isGroup);
+    chatsSaved++;
+  }
+
+  for (const row of liveChatsStore.values()) {
+    if (!row?.id || isNonChatJid(row.id)) continue;
+    await saveChat(row.id, row.name, row.last_message || '', row.last_time, row.unread || 0, !!row.is_group);
+  }
+
+  await updateChatNames();
+  await enrichContactNamesFromMessages();
+  let consolidated = await consolidateLidChats();
+  await loadLidPhoneMapFromDB();
+
+  const dbGroups = await pool.query(
+    `SELECT id FROM wa_chats WHERE account_phone=$1 AND is_group=true`,
+    [accPhone]
+  );
+  const groupIds = [...new Set([
+    ...dbGroups.rows.map(r => r.id),
+    ...getSocketGroupIds(),
+  ])];
+
+  const groupLimit = Math.min(groupIds.length, Math.max(1, parseInt(options.groupLimit, 10) || 100));
+  const targetGroups = groupIds.slice(0, groupLimit);
+  const pendingContacts = [];
+  let lidUpdated = 0;
+
+  await runWithConcurrency(targetGroups, GROUP_METADATA_CONCURRENCY, async (gid) => {
+    try {
+      if (GROUP_METADATA_DELAY_MS > 0) await sleep(GROUP_METADATA_DELAY_MS);
+      const meta = await sock.groupMetadata(gid);
+      if (meta?.subject) {
+        await saveChat(gid, meta.subject, '', null, 0, true);
+      }
+      for (const p of meta?.participants || []) {
+        if (!p.id) continue;
+        const pNum = typeof p.phoneNumber === 'string' ? p.phoneNumber : (p.phoneNumber?.jid || '');
+        const rawPhone = String(pNum || '').replace(/\D/g, '');
+        const contactName = p.name && !isInvalidContactLabel(p.name) ? p.name : null;
+        if (p.id.endsWith('@lid') && rawPhone && isAllowedWaNumber(rawPhone)) {
+          pendingContacts.push({ jid: p.id, name: contactName, phone: rawPhone });
+          lidUpdated++;
+        } else {
+          await saveContact({
+            id: p.id,
+            name: contactName,
+            phoneNumber: pNum || undefined,
+          });
+        }
+      }
+    } catch (err) {
+      console.warn(`[WA] resync group metadata skipped for ${gid}:`, err.message);
+    }
+  });
+  await upsertGroupMemberContacts(pendingContacts, accPhone);
+
+  await updateChatNames();
+  consolidated = await consolidateLidChats();
+  await loadLidPhoneMapFromDB();
+
+  const result = {
+    socket_chats: rawChats.length,
+    chats_saved: chatsSaved,
+    contacts_saved: contactsSaved,
+    groups_scanned: groupLimit,
+    lid_contacts_updated: lidUpdated,
+    lid_chats_merged: consolidated.merged || 0,
+    db_chats: await countAccountChats(accPhone),
+  };
+  console.log('[WA] Directory resync from socket:', result);
+  recordActivity('resync', 'Directory resync from socket', result);
+  emit('wa:sync_complete', result);
+  return result;
+}
+
 async function refreshCurrentAccountGroupMetadata(limit = 25) {
   if (!sock || !isConnected) throw new Error('WhatsApp not connected');
   const accPhone = phoneNumber;
   if (!accPhone) throw new Error('Connected WhatsApp account is not known yet');
-  const groups = await pool.query(`
+  const maxGroups = Math.max(1, Math.min(parseInt(limit, 10) || 25, 100));
+  let groupIds = (await pool.query(`
     SELECT id, name
     FROM wa_chats
     WHERE account_phone=$1
       AND is_group=true
     ORDER BY updated_at DESC NULLS LAST, last_time DESC NULLS LAST
     LIMIT $2
-  `, [accPhone, Math.max(1, Math.min(parseInt(limit, 10) || 25, 100))]);
+  `, [accPhone, maxGroups])).rows.map(r => r.id);
+
+  if (!groupIds.length) {
+    groupIds = getSocketGroupIds().slice(0, maxGroups);
+  }
+
+  const groups = { rows: groupIds.map(id => ({ id, name: null })) };
 
   let groupsUpdated = 0;
-  let contactsUpdated = 0;
-  for (const row of groups.rows) {
+  const pendingContacts = [];
+
+  await runWithConcurrency(groups.rows, GROUP_METADATA_CONCURRENCY, async (row) => {
     try {
-      await new Promise(resolve => setTimeout(resolve, 250));
+      if (GROUP_METADATA_DELAY_MS > 0) await new Promise(resolve => setTimeout(resolve, GROUP_METADATA_DELAY_MS));
       const meta = await sock.groupMetadata(row.id);
       if (meta?.subject) {
         await pool.query(
@@ -1772,27 +2542,18 @@ async function refreshCurrentAccountGroupMetadata(limit = 25) {
         if (!p.id || !p.id.endsWith('@lid') || !p.phoneNumber) continue;
         const pNum = typeof p.phoneNumber === 'string' ? p.phoneNumber : (p.phoneNumber?.jid || '');
         const rawPhone = pNum.replace(/\D/g, '');
-        if (!rawPhone || rawPhone.length < 7) continue;
-        if (!isAllowedWaNumber(rawPhone)) continue;
-        await pool.query(`
-          INSERT INTO wa_contacts (jid, account_phone, name, phone, is_group_member)
-          VALUES ($1, $2, $3, $4, true)
-          ON CONFLICT (jid, account_phone) DO UPDATE SET
-            phone = EXCLUDED.phone,
-            name = COALESCE(EXCLUDED.name, wa_contacts.name),
-            is_group_member = true,
-            updated_at = NOW()
-        `, [p.id, accPhone, null, rawPhone]);
-        if (!contactsStore[p.id]) contactsStore[p.id] = { id: p.id };
-        contactsStore[p.id].phoneJid = rawPhone + '@s.whatsapp.net';
-        contactsUpdated++;
+        if (!rawPhone || !isAllowedWaNumber(rawPhone)) continue;
+        pendingContacts.push({ jid: p.id, name: null, phone: rawPhone });
       }
     } catch (err) {
       console.warn(`[WA] Group metadata refresh skipped for ${row.id}:`, err.message);
     }
-  }
+  });
+
+  const contactsUpdated = await upsertGroupMemberContacts(pendingContacts, accPhone);
 
   await updateChatNames();
+  await consolidateLidChats();
   emit('wa:participants_synced', { total: contactsUpdated });
   return { groups_checked: groups.rows.length, groups_updated: groupsUpdated, lid_contacts_updated: contactsUpdated };
 }
@@ -1840,6 +2601,7 @@ async function downloadMedia(msgId) {
 // ── LOGOUT ────────────────────────────────────────────────────────────────────
 async function logout() {
   console.log('[WA] Logging out...');
+  stopLidResolutionWorker();
   stopWatchdog();
   allowQrGeneration = false;
   currentState = 'DISCONNECTED';
@@ -1848,6 +2610,8 @@ async function logout() {
     sock = null;
     isConnected = false;
     qrString = null;
+    pairingCode = null;
+    pairingPhone = null;
     phoneNumber = null;
     userJid = null;
     clearContactsStore();
@@ -1867,6 +2631,8 @@ function getStatus() {
     phone: phoneNumber,
     name: sock?.user?.name || null,
     hasQR: !!qrString,
+    hasPairingCode: !!pairingCode,
+    pairingPhone,
     hasSession: hasSavedSession(),
     state: currentState,
     activity: activityBuffer[activityBuffer.length - 1] || null,
@@ -1881,6 +2647,8 @@ async function getQR() {
 
 async function requestQR() {
   allowQrGeneration = true;
+  pairingCode = null;
+  pairingPhone = null;
   recordActivity('qr', 'QR requested');
   if (reconnectTimer) {
     clearTimeout(reconnectTimer);
@@ -1914,6 +2682,52 @@ async function requestQR() {
   }
 
   return getQR();
+}
+
+function normalizePairingPhone(value) {
+  let digits = String(value || '').replace(/\D/g, '');
+  if (digits.length === 10) digits = '91' + digits;
+  if (digits.startsWith('0') && digits.length > 10) digits = digits.replace(/^0+/, '');
+  if (!isAllowedWaNumber(digits)) return '';
+  return digits;
+}
+
+async function requestPhonePairingCode(value) {
+  const phone = normalizePairingPhone(value);
+  if (!phone) throw new Error('Enter a valid WhatsApp phone number with country code');
+  if (isConnected) throw new Error('WhatsApp is already connected');
+
+  allowQrGeneration = true;
+  pairingCode = null;
+  pairingPhone = phone;
+  recordActivity('pairing', 'Phone pairing code requested', { phone });
+
+  if (reconnectTimer) {
+    clearTimeout(reconnectTimer);
+    reconnectTimer = null;
+  }
+
+  if (!sock || startInProgress) {
+    await startWA({ allowQR: true });
+  }
+
+  const startedAt = Date.now();
+  while (!sock && !isConnected && Date.now() - startedAt < 15000) {
+    await sleep(250);
+  }
+
+  if (!sock) throw new Error('WhatsApp socket is not ready yet');
+  if (isConnected) throw new Error('WhatsApp is already connected');
+  if (typeof sock.requestPairingCode !== 'function') {
+    throw new Error('Phone-number pairing is not supported by this WhatsApp engine version');
+  }
+
+  const code = await sock.requestPairingCode(phone);
+  pairingCode = String(code || '').trim();
+  if (!pairingCode) throw new Error('Could not generate pairing code');
+  recordActivity('pairing', 'Phone pairing code generated', { phone });
+  emit('wa:pairing_code', { phone, code: pairingCode });
+  return { phone, code: pairingCode };
 }
 
 function getConnectedPhone() {
@@ -2052,6 +2866,15 @@ function getLiveChats() {
 }
 
 function getSocketChatsSnapshot() {
+  // Baileys 7 no longer exposes sock.chats — use in-memory live store populated by events.
+  if (liveChatsStore.size) {
+    return Array.from(liveChatsStore.values()).map(row => ({
+      id: row.id,
+      name: row.name,
+      conversationTimestamp: row.last_time,
+      unreadCount: row.unread,
+    }));
+  }
   if (!sock || !sock.chats) return [];
   const source = sock.chats;
   try {
@@ -2130,6 +2953,6 @@ function waFormatPhoneFromJid(jid) {
   return '+' + digits;
 }
 
-module.exports = { startWA, sendMessage, sendMediaMessage, logout, getStatus, getQR, requestQR, setIO, getGroupMetadata, refreshCurrentAccountGroupMetadata, downloadMedia, msgCache, importExportedChat, getConnectedPhone, getLiveChats, getLiveMessages };
+module.exports = { startWA, sendMessage, sendMediaMessage, logout, getStatus, getQR, requestQR, requestPhonePairingCode, setIO, getGroupMetadata, refreshCurrentAccountGroupMetadata, resyncDirectoryFromSocket, processLidResolutionBatch, startLidResolutionWorker, stopLidResolutionWorker, downloadMedia, msgCache, importExportedChat, getConnectedPhone, getLiveChats, getLiveMessages };
 
 

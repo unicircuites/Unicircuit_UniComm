@@ -13,7 +13,7 @@ async function section(title, sql, params = []) {
 
 async function main() {
   const account = String(arg('account', '')).replace(/\D/g, '');
-  const oldAccount = String(arg('old', '9545073545')).replace(/\D/g, '');
+  const oldAccount = String(arg('old', '')).replace(/\D/g, '');
   const search = arg('search', 'Attendance');
 
   console.log('[WA DB Audit]', {

@@ -5559,7 +5559,7 @@
               <span class="live-pulse"></span>
               <span style="font-size:12.5px;font-weight:600;color:var(--green2);">WhatsApp Connected</span>
               <span id="wa-phone-display" style="font-size:12px;color:var(--muted);"></span>
-              <span id="wa-sync-status" style="font-size:11px;color:var(--muted);margin-left:4px;"></span>
+              <span id="wa-sync-status" style="font-size:12px;color:var(--text);font-weight:600;margin-left:8px;flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;"></span>
               <button class="btn btn-green btn-xs" id="wa-sync-btn" onclick="waSync()" style="margin-left:auto;"><i
                   class="fas fa-sync-alt"></i> Sync</button>
               <button class="btn btn-ghost btn-xs" onclick="waRefreshChats()"><i class="fas fa-redo"></i>
@@ -20691,6 +20691,7 @@ ${plainText}`;
     let socket = null; // Unified alias for waSocket
     let waActiveJid = null;
     let waAllChats = [];
+    var waConnectedPhone = null; // digits-only phone for the currently linked WA session (never hardcoded)
     var waLidMap = {};
     var waOlderLoading = false;
     var waHasOlderMessages = false;
@@ -20709,18 +20710,54 @@ ${plainText}`;
     function waIsAllowedWaNumber(value) {
       var digits = String(value || '').replace(/\D/g, '');
       if (!digits) return false;
-      return /^91[6-9]\d{9}$/.test(digits) || /^0\d{1,10}$/.test(digits);
+      if (digits.length >= 15) return false; // LID — internal WA identifier
+      if (digits.length < 7)   return false; // too short
+      if (/^0{5,}$/.test(digits)) return false;
+      return true; // valid international phone number
     }
 
     function waFormatPhoneForDisplay(value) {
       var digits = String(value || '').replace(/\D/g, '');
       if (!digits || waIsLikelyLidNumber(digits) || !waIsAllowedWaNumber(digits)) return '';
-      if (/^91[6-9]\d{9}$/.test(digits)) {
+      // Indian mobile: 91 + 10 digits
+      if (digits.startsWith('91') && digits.length === 12) {
         return '+91 ' + digits.slice(2, 7) + ' ' + digits.slice(7);
       }
-      // Extension format, keep leading zero as-is
+      // Extension starting with 0
       if (digits.startsWith('0')) return digits;
-      return '';
+      // International
+      return '+' + digits;
+    }
+
+    function waIsPhoneLikeLabel(value, phoneDigits) {
+      var text = String(value || '').trim();
+      if (!text || text.indexOf('@lid') !== -1) return false;
+      var digits = text.replace(/\D/g, '');
+      if (!digits) return false;
+      if (phoneDigits && digits === phoneDigits) return true;
+      if (/^\+?\d[\d\s\-().]+$/.test(text) && digits.length >= 7) return true;
+      return false;
+    }
+
+    function waIsGroupishLabel(value, groupIdLocal) {
+      var text = String(value || '').trim();
+      if (!text) return true;
+      if (/^\d+$/.test(text)) return true;
+      if (waIsPhoneLikeLabel(text, '')) return true;
+      if (waIsAllowedWaNumber(text.replace(/\D/g, ''))) return true;
+      var localDigits = String(groupIdLocal || '').replace(/\D/g, '');
+      if (localDigits && text.replace(/\D/g, '') === localDigits) return true;
+      return false;
+    }
+
+    function waIsRealContactLabel(name, idLocal, phoneDigits) {
+      var n = String(name || '').trim();
+      if (!n || /^you$/i.test(n) || /^(unknown|unknown whatsapp contact)$/i.test(n)) return false;
+      if (n.indexOf('@lid') !== -1 || waIsLikelyLidNumber(n)) return false;
+      var digits = n.replace(/\D/g, '');
+      if (idLocal && digits && digits === idLocal) return false;
+      if (waIsPhoneLikeLabel(n, phoneDigits || '')) return false;
+      return true;
     }
 
     function waResolveJidDisplay(jid, fallbackName) {
@@ -20728,26 +20765,45 @@ ${plainText}`;
       var raw = jid.split('@')[0];
       var chat = waAllChats.find(function (c) { return waNormalizeJid(c.id) === jid; });
       var mapped = jid.endsWith('@lid') ? waLidMap[raw] : null;
-      var phone = (mapped && mapped.phone) || (chat && chat.phone) || '';
-      var formattedPhone = waFormatPhoneForDisplay(phone || (!jid.endsWith('@lid') ? raw : ''));
-      var name = fallbackName || (mapped && mapped.name) || (chat && chat.name) || '';
-      var nameDigits = String(name || '').replace(/\D/g, '');
+      var phoneDigits = String((mapped && mapped.phone) || (chat && chat.phone) || '').replace(/\D/g, '');
+      if (!phoneDigits && !jid.endsWith('@lid')) phoneDigits = raw.replace(/\D/g, '');
+      var formattedPhone = waFormatPhoneForDisplay(phoneDigits);
+      var notify = (chat && chat.notify) || (mapped && mapped.name) || '';
+      var name = fallbackName || (chat && chat.name) || notify || '';
 
       if (jid.endsWith('@g.us')) {
-        // If group subject is missing, we might fall back to raw numeric IDs.
-        // For the UI, never show numeric-only fallback; show a friendly label.
         if (!name || !name.trim() || /^\d+$/.test(String(name).trim())) return 'Group';
         return name;
       }
 
-      if (
-        name &&
-        !/^(unknown|unknown whatsapp contact)$/i.test(String(name).trim()) &&
-        !waIsLikelyLidNumber(name) &&
-        !String(name).includes('@lid') &&
-        (!nameDigits || waIsAllowedWaNumber(nameDigits))
-      ) return name;
+      if (waIsRealContactLabel(name, raw, phoneDigits)) return name;
+      if (waIsRealContactLabel(notify, raw, phoneDigits)) return notify;
       return formattedPhone || '';
+    }
+
+    function waIsConnectedBarVisible() {
+      var statusBar = document.getElementById('wa-status-bar');
+      return !!(statusBar && statusBar.style.display !== 'none');
+    }
+
+    function waSetSyncStatus(text) {
+      var msg = String(text || '').trim();
+      var syncEl = document.getElementById('wa-sync-status');
+      if (syncEl) {
+        syncEl.textContent = msg;
+        syncEl.title = msg;
+      }
+    }
+
+    function waFormatResolutionStatus(stats, renderedCount) {
+      if (!stats) return '';
+      var total = parseInt(stats.total || 0, 10) || 0;
+      var loaded = parseInt(stats.loaded || 0, 10) || 0;
+      var pending = parseInt(stats.pending || 0, 10) || 0;
+      if (total <= 0) return '';
+      var visible = Math.min(total || loaded, Math.max(loaded, parseInt(renderedCount || 0, 10) || 0));
+      return visible + '/' + total + ' chats/contacts loaded' +
+        (pending > 0 ? ' · ' + pending + ' LID conversions remaining (batch 100)' : ' · conversion complete');
     }
 
     function waSetConnectionStatus(text, level) {
@@ -20757,9 +20813,7 @@ ${plainText}`;
         .replace(/&/g, '&amp;')
         .replace(/</g, '&lt;')
         .replace(/>/g, '&gt;');
-      var syncEl = document.getElementById('wa-sync-status');
       var connWrap = document.getElementById('wa-connection-status');
-      if (syncEl) syncEl.textContent = msg;
       if (connWrap) {
         var color = tone === 'error' ? 'var(--red2)' : tone === 'success' ? 'var(--green2)' : tone === 'warn' ? 'var(--gold)' : 'var(--muted2)';
         var icon = tone === 'error' ? 'fas fa-exclamation-circle' : tone === 'success' ? 'fas fa-check-circle' : tone === 'warn' ? 'fas fa-exclamation-triangle' : 'fas fa-circle-notch fa-spin';
@@ -20873,13 +20927,11 @@ ${plainText}`;
         // Clear any pending disconnect banner timeout
         clearTimeout(window._waDisconnectTimeout);
         waOnConnected(phone, name);
-        waSetConnectionStatus('Connected. Click Reload to load chats.', 'success');
-        // Reload LID map after connect — backend will sync group participants in ~8s
-        // Reload immediately for existing data, then again after sync completes
-        waLoadLidMap();
-        setTimeout(waLoadLidMap, 12000); // reload after backend group sync finishes
+        waSetSyncStatus('Connected. Loading chats...');
+        setTimeout(waLoadLidMap, 12000);
       });
       waSocket.on('wa:disconnected', (payload) => {
+        waStopResolutionPolling();
         var reason = payload && payload.reason ? String(payload.reason) : '';
         waSetConnectionStatus(reason ? ('Disconnected: ' + reason) : 'Disconnected. Reconnecting...', 'warn');
         // Only show connect banner if disconnected for more than 5 seconds
@@ -20905,6 +20957,8 @@ ${plainText}`;
           const unreadEl = document.getElementById('wa-unread-total');
           if (unreadEl) { unreadEl.textContent = '0'; unreadEl.style.display = 'none'; }
           window.waCurrentChat = null;
+          waConnectedPhone = null;
+          waLidMap = {};
           waAllChats = [];
           waActiveJid = null;
         }, 5000);
@@ -20918,13 +20972,23 @@ ${plainText}`;
 
         // Update local chat info for immediate sorting and preview (mobile-like behavior)
         var chat = waAllChats.find(function (c) { return c.id === cleanJid; });
+        var wasFirst = waAllChats.length > 0 && waAllChats[0].id === cleanJid;
         if (chat) {
+          var prevLastTime = chat.last_time;
           chat.last_message = waCleanMessagePreview(msg.body);
           chat.last_time = msg.ts || new Date().toISOString();
           if (cleanJid !== waActiveJid) {
             chat.unread = (chat.unread || 0) + 1;
           }
-          waRenderChats(waAllChats);
+          // Incremental update: patch only this chat row's preview + time in-place.
+          // Only do a full list rebuild when the chat needs to move to the top
+          // (i.e. it wasn't already first) — that changes sort order.
+          var nowFirst = new Date(chat.last_time).getTime() >= (waAllChats[0] ? new Date(waAllChats[0].last_time || 0).getTime() : 0);
+          if (!wasFirst && nowFirst) {
+            waRenderChats(waAllChats); // sort changed — full rebuild needed
+          } else {
+            waPatchChatRow(chat); // just update the one row
+          }
         }
 
         if (waIsActiveSocketChat(cleanJid, msg)) {
@@ -20940,23 +21004,48 @@ ${plainText}`;
           notify("New WhatsApp from " + sender, sub, "var(--green)", "fab fa-whatsapp");
         }
       });
-      waSocket.on('wa:chats_updated', () => { });
+      waSocket.on('wa:chats_updated', () => { waLoadChats(); });
       waSocket.on('wa:sync_complete', () => {
         console.log('[WA-UI] Full sync complete — loading all chats');
-        waSetConnectionStatus('Sync complete. Click Reload to fetch chats.', 'success');
+        waSetSyncStatus('Sync complete. Refreshing chats...');
+        waLoadLidMap().catch(function () {});
+        waLoadChats({ force: true });
+        if (waActiveJid) waLoadActiveMessages({ showLoader: false });
       });
       waSocket.on('wa:participants_synced', function (data) {
-        console.log('[WA] Group participants synced — reloading LID map (' + (data.total || 0) + ' entries)');
-        waLoadLidMap(); // Reload so all new LID→phone mappings are available immediately
+        console.log('[WA] Group participants synced — reloading LID map (' + (data.resolved || data.total || 0) + ' resolved, ' + (data.pending || '?') + ' pending)');
+        waLoadLidMap();
+        waLoadResolutionStats(waAllChats.length).then(function () {
+          waLoadChats({ force: true });
+        });
+      });
+      waSocket.on('wa:lid_batch', function (data) {
+        console.log('[WA] LID batch complete:', data);
+        waLoadLidMap();
+        waLoadResolutionStats(waAllChats.length).then(function () {
+          waLoadChats({ force: true });
+        });
+      });
+      waSocket.on('wa:lid_resolution_complete', function () {
+        waLoadResolutionStats(waAllChats.length).then(function (stats) {
+          if (stats) waApplyResolutionStats(stats, waAllChats.length);
+          else waSetSyncStatus('All LID conversions complete');
+          waLoadChats({ force: true });
+        });
       });
       waSocket.on('wa:syncing', (payload) => {
         const status = payload && payload.status ? String(payload.status) : '';
         const detail = payload && payload.detail ? String(payload.detail) : '';
         const stage = payload && payload.stage ? String(payload.stage) : '';
         if (status === 'done') {
-          waSetConnectionStatus('Done', 'success');
+          if (!waIsConnectedBarVisible()) waSetConnectionStatus('Done', 'success');
           return;
         }
+        if (waIsConnectedBarVisible() && (stage === 'lid_batch' || stage === 'participants' || stage === 'sync')) {
+          waLoadResolutionStats(waAllChats.length);
+          return;
+        }
+        if (waIsConnectedBarVisible()) return;
         const tone = /error|failed|disconnect/i.test(detail + ' ' + stage) ? 'warn' : /connected|complete|done/i.test(detail + ' ' + stage) ? 'success' : 'info';
         waSetConnectionStatus(detail || (stage ? ('WhatsApp: ' + stage) : 'Syncing...'), tone);
       });
@@ -21269,8 +21358,9 @@ ${plainText}`;
         const data = await res.json();
         if (data.connected) {
           waOnConnected(data.phone, data.name);
-          waSetConnectionStatus('Connected. Click Reload to load chats.', 'success');
+          waSetSyncStatus('Connected. Loading chats...');
         } else {
+          waConnectedPhone = null;
           waSetConnectionStatus('Not connected. Requesting QR...', 'warn');
           const cb = document.getElementById('wa-connect-banner');
           if (cb) cb.style.display = 'block';
@@ -21287,13 +21377,49 @@ ${plainText}`;
       }
     }
 
+    function waNormalizeConnectedPhone(phone) {
+      return String(phone || '').split('@')[0].split(':')[0].replace(/\D/g, '') || null;
+    }
+
+    function waResetLinkedAccountCaches() {
+      waStopResolutionPolling();
+      waAllChats = [];
+      waActiveJid = null;
+      waLidMap = {};
+      waOlderLoading = false;
+      waHasOlderMessages = false;
+      waReplyTo = null;
+      waRenderedMessages = {};
+      window.waCurrentChat = null;
+      const area = document.getElementById('wa-chat-area');
+      if (area) area.innerHTML = '';
+      const titleEl = document.getElementById('wa-active-title');
+      if (titleEl) titleEl.textContent = 'Select a chat to start';
+      const phoneEl = document.getElementById('wa-active-phone');
+      if (phoneEl) phoneEl.textContent = '';
+      const countEl = document.getElementById('wa-chat-count');
+      if (countEl) countEl.textContent = '0 chats';
+      const unreadEl = document.getElementById('wa-unread-total');
+      if (unreadEl) { unreadEl.textContent = '0'; unreadEl.style.display = 'none'; }
+    }
+
     function waOnConnected(phone, name) {
+      const nextPhone = waNormalizeConnectedPhone(phone);
+      if (waConnectedPhone && nextPhone && waConnectedPhone !== nextPhone) {
+        waResetLinkedAccountCaches();
+        notify('WhatsApp account switched', 'Loading chats for +' + nextPhone, 'var(--green2)', 'fab fa-whatsapp');
+      }
+      waConnectedPhone = nextPhone;
+
       const cb = document.getElementById('wa-connect-banner');
       const sb = document.getElementById('wa-status-bar');
       const ph = document.getElementById('wa-phone-display');
       if (cb) cb.style.display = 'none';
       if (sb) sb.style.display = 'block';
-      if (ph) ph.textContent = '+' + phone + (name ? ' - ' + name : '');
+      if (ph) ph.textContent = (nextPhone ? '+' + nextPhone : String(phone || '')) + (name ? ' - ' + name : '');
+      waSetSyncStatus('Loading chats...');
+      waLoadLidMap().catch(function () {});
+      waLoadChats({ force: true });
     }
 
     async function waGetQR() {
@@ -21343,6 +21469,7 @@ ${plainText}`;
     let _waLoadChatsInFlight = false;
     let _waLoadChatsQueued = false;
     let _waLoadChatsSeq = 0;
+    let _waResolutionPollTimer = null;
 
     function waLoadChats(opts) {
       opts = opts || {};
@@ -21360,15 +21487,23 @@ ${plainText}`;
       (Array.isArray(chats) ? chats : []).forEach(function (chat) {
         if (!chat || !chat.id) return;
         var id = String(chat.id);
+        if (id === 'status@broadcast' || id.endsWith('@newsletter') || id.endsWith('@broadcast')) return;
         var isGroup = !!chat.is_group || id.endsWith('@g.us');
+        // Group-only members are contacts, not standalone chats.
+        if (!isGroup && chat.is_group_member && !chat.last_time && !String(chat.last_message || '').trim()) return;
+        var idLocal = id.split('@')[0].split(':')[0].replace(/\D/g, '');
         var digits = String(chat.phone || '').replace(/\D/g, '');
+        if (digits && id.endsWith('@lid') && digits === idLocal) digits = '';
         if (!digits && !isGroup) {
-          digits = id.endsWith('@lid') ? '' : id.split('@')[0].split(':')[0].replace(/\D/g, '');
+          digits = id.endsWith('@lid') ? '' : idLocal;
         }
+        var fallbackName = String(chat.name || chat.notify || '').trim();
+        var hasNamedLidFallback = !isGroup && id.endsWith('@lid') && !digits &&
+          waIsRealContactLabel(fallbackName, idLocal, digits);
         // Hard frontend guard: never show raw @lid row when no real phone is available
-        if (!isGroup && id.endsWith('@lid') && !digits) return;
-        // Hard frontend rule: only +91 or 0-extension for individual chats
-        if (!isGroup && !waIsAllowedWaNumber(digits)) return;
+        if (!isGroup && id.endsWith('@lid') && !digits && !hasNamedLidFallback) return;
+        // Filter: skip LIDs (15+ digits) and numbers too short to be real phones
+        if (!isGroup && !waIsAllowedWaNumber(digits) && !hasNamedLidFallback) return;
         var key = isGroup ? ('group:' + id) : (digits ? ('phone:' + digits) : ('id:' + id));
         var existing = byId[key];
         if (!existing) {
@@ -21384,35 +21519,115 @@ ${plainText}`;
       return Object.keys(byId).map(function (id) { return byId[id]; });
     }
 
+    function waStopResolutionPolling() {
+      if (_waResolutionPollTimer) {
+        clearTimeout(_waResolutionPollTimer);
+        _waResolutionPollTimer = null;
+      }
+    }
+
+    async function waRunLidResolutionBatch(batchSize) {
+      try {
+        var res = await fetch(API_BASE + '/wa/resolve-lids?batch=' + (batchSize || 100), {
+          method: 'POST',
+          headers: getAuthHeaders(),
+        });
+        if (!res.ok) return null;
+        return await res.json();
+      } catch (_) {
+        return null;
+      }
+    }
+
+    function waConvoListIsPlaceholder() {
+      var el = document.getElementById('wa-convo-list');
+      if (!el) return false;
+      return /Connect WhatsApp to see chats/i.test(el.textContent || '');
+    }
+
+    function waApplyResolutionStats(stats, renderedCount) {
+      if (!stats) return;
+      var pending = parseInt(stats.pending || 0, 10) || 0;
+      var loaded = parseInt(stats.loaded || 0, 10) || 0;
+      var text = waFormatResolutionStatus(stats, renderedCount);
+      if (text) waSetSyncStatus(text);
+      // Stats can advance while chat renders are skipped — recover the list if still empty.
+      if ((waAllChats.length === 0 || waConvoListIsPlaceholder()) && loaded > 0) {
+        waLoadChats({ force: true });
+      }
+      waStopResolutionPolling();
+      if (pending > 0) {
+        _waResolutionPollTimer = setTimeout(async function () {
+          await waRunLidResolutionBatch(100);
+          waLoadChats();
+        }, 3000);
+      }
+    }
+
+    async function waLoadResolutionStats(renderedCount) {
+      try {
+        var res = await fetch(API_BASE + '/wa/resolution-stats?_=' + Date.now(), { headers: getAuthHeaders(), cache: 'no-store' });
+        if (!res.ok) return null;
+        var stats = await res.json();
+        waApplyResolutionStats(stats, renderedCount);
+        return stats;
+      } catch (_) {
+        return null;
+      }
+    }
+
     async function _waDoLoadChats(opts) {
       opts = opts || {};
       if (_waLoadChatsInFlight) {
-        // A fetch is already in progress — re-schedule once it finishes
+        // A fetch is already in progress — queue one retry when it finishes.
+        // Do NOT bump seq here; that was invalidating in-flight renders while LID
+        // polling/socket events kept arriving, leaving the list stuck on the placeholder.
         _waLoadChatsQueued = true;
-        if (opts.force) _waLoadChatsSeq++;
         return;
       }
       _waLoadChatsInFlight = true;
       _waLoadChatsQueued = false;
-      waSetConnectionStatus('Refreshing chat list...', 'info');
+      if (waIsConnectedBarVisible()) {
+        var existing = document.getElementById('wa-sync-status');
+        if (!existing || !existing.textContent || existing.textContent.indexOf('/') === -1) {
+          waSetSyncStatus('Loading chats...');
+        }
+      }
       var seq = ++_waLoadChatsSeq;
       try {
+        // Fetch chats first; lid-map + resolution stats are best-effort extras.
         const res = await fetch(API_BASE + '/wa/chats?_=' + Date.now(), { headers: getAuthHeaders(), cache: 'no-store' });
         if (res.status === 401) {
-          // Token expired — redirect to login
           localStorage.clear(); sessionStorage.clear();
           window.location.href = 'login.html';
           return;
         }
+        if (!res.ok) {
+          var errBody = await res.json().catch(function () { return {}; });
+          throw new Error(errBody.error || ('Failed to load chats (' + res.status + ')'));
+        }
+        var chats = waDedupeChats(await res.json());
         if (seq !== _waLoadChatsSeq) return;
-        waAllChats = waDedupeChats(await res.json());
+        waAllChats = chats;
         waRenderChats(waAllChats);
-        waSetConnectionStatus('Latest chats loaded', 'success');
-      } catch (_) { } finally {
+        waLoadLidMap().catch(function () {});
+        var statsRes = await fetch(API_BASE + '/wa/resolution-stats?_=' + Date.now(), { headers: getAuthHeaders(), cache: 'no-store' }).catch(function () { return null; });
+        var resolutionStats = statsRes && statsRes.ok ? await statsRes.json().catch(function () { return null; }) : null;
+        if (resolutionStats) waApplyResolutionStats(resolutionStats, waAllChats.length);
+        else if (waIsConnectedBarVisible()) waSetSyncStatus('Latest chats loaded');
+      } catch (err) {
+        console.error('[WA-UI] waLoadChats failed:', err);
+        if (waIsConnectedBarVisible() && (waAllChats.length === 0 || waConvoListIsPlaceholder())) {
+          var listEl = document.getElementById('wa-convo-list');
+          if (listEl) {
+            listEl.innerHTML = '<div style="text-align:center;padding:30px;color:var(--red2);font-size:12.5px;">Could not load chats. Click Reload to retry.</div>';
+          }
+        }
+      } finally {
         _waLoadChatsInFlight = false;
         if (_waLoadChatsQueued) {
           _waLoadChatsQueued = false;
-          _waDoLoadChats(opts);
+          _waDoLoadChats({ force: true });
         }
       }
     }
@@ -21421,11 +21636,12 @@ ${plainText}`;
       var el = document.getElementById('wa-convo-list');
       if (!el) return;
 
-      // Sort chats chronologically: most recent at the top
+      // Recent conversations first, then alphabetical for contacts without activity
       chats.sort(function (a, b) {
         var ta = a.last_time ? new Date(a.last_time).getTime() : 0;
         var tb = b.last_time ? new Date(b.last_time).getTime() : 0;
-        return tb - ta;
+        if (tb !== ta) return tb - ta;
+        return String(a.name || '').localeCompare(String(b.name || ''));
       });
 
       var totalUnread = waAllChats.reduce(function (s, c) { return s + (c.unread || 0); }, 0);
@@ -21437,7 +21653,14 @@ ${plainText}`;
       el.innerHTML = chats.map(function (c) {
         var isRealGroup = String(c.id || '').endsWith('@g.us');
         var rawId = c.id.split('@')[0].split(':')[0];
-        var displayName = waResolveJidDisplay(c.id, c.name || c.phone || rawId);
+        var displayName = (c.name && String(c.name).trim())
+          ? String(c.name).trim()
+          : waResolveJidDisplay(c.id, c.notify || c.phone || rawId);
+        var unresolvedNamedLid = !isRealGroup && String(c.id || '').endsWith('@lid') &&
+          waIsRealContactLabel(displayName, rawId, String(c.phone || '').replace(/\D/g, ''));
+        // Never render anonymous raw @lid JIDs; named contacts can be shown while
+        // phone resolution catches up for a newly linked account.
+        if (!isRealGroup && String(c.id || '').endsWith('@lid') && !unresolvedNamedLid) return '';
         if (!isRealGroup && !displayName) return '';
         // Format Indian numbers: 91XXXXXXXXXX -> +91 XXXXX XXXXX
         if (displayName && /^\+?91\d{10}$/.test(displayName)) {
@@ -21448,7 +21671,14 @@ ${plainText}`;
         } else if (!isRealGroup && displayName && /^\d{10,15}$/.test(displayName)) {
           displayName = '';
         }
-        if (isRealGroup && (!displayName || !String(displayName).trim())) displayName = 'Group';
+        if (isRealGroup) {
+          var groupIdLocal = String(c.id || '').split('@')[0].split(':')[0];
+          if (!displayName || !String(displayName).trim() || waIsGroupishLabel(displayName, groupIdLocal)) {
+            displayName = (c.name && String(c.name).trim() && !waIsGroupishLabel(c.name, groupIdLocal))
+              ? String(c.name).trim()
+              : 'Group';
+          }
+        }
         if (!isRealGroup && !displayName) return '';
         var name = displayName;
         // Show GRP only for real WhatsApp groups (@g.us), not for contact-only group members.
@@ -21471,7 +21701,7 @@ ${plainText}`;
             time = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
           }
         }
-        var unread = c.unread > 0 ? '<span style="min-width:18px;height:18px;border-radius:9px;background:#25D366;color:#fff;font-size:10px;font-weight:700;display:flex;align-items:center;justify-content:center;padding:0 4px;">' + c.unread + '</span>' : '';
+        var unread = c.unread > 0 ? '<span data-wa-unread style="min-width:18px;height:18px;border-radius:9px;background:#25D366;color:#fff;font-size:10px;font-weight:700;display:flex;align-items:center;justify-content:center;padding:0 4px;">' + c.unread + '</span>' : '<span data-wa-unread style="display:none;min-width:18px;height:18px;border-radius:9px;background:#25D366;color:#fff;font-size:10px;font-weight:700;align-items:center;justify-content:center;padding:0 4px;"></span>';
         var isActive = waActiveJid === c.id;
         var bg = isActive ? 'background:rgba(37,211,102,0.06);border-left:3px solid #25D366;' : '';
         // Last message preview — WhatsApp style: "~ SenderName: message" for groups
@@ -21479,30 +21709,98 @@ ${plainText}`;
         var lastMsgDisplay = lastMsg;
         // Truncate
         if (lastMsgDisplay.length > 45) lastMsgDisplay = lastMsgDisplay.substring(0, 45) + '...';
-        return '<div onclick="waOpenChat(\'' + c.id + '\',\'' + name.replace(/'/g, "\\'") + '\',\'' + (c.phone || '') + '\')" ' +
+        return '<div data-wa-jid="' + escHtml(c.id) + '" onclick="waOpenChat(\'' + c.id + '\',\'' + name.replace(/'/g, "\\'") + '\',\'' + (c.phone || '') + '\')" ' +
           'style="padding:10px 14px;border-bottom:1px solid var(--border);cursor:pointer;display:flex;gap:10px;align-items:center;' + bg + '" ' +
           'onmouseover="if(this.style.borderLeft!==\'3px solid rgb(37, 211, 102)\')this.style.background=\'rgba(255,255,255,0.03)\'" ' +
           'onmouseout="if(this.style.borderLeft!==\'3px solid rgb(37, 211, 102)\')this.style.background=\'\'">' +
           '<div style="width:40px;height:40px;border-radius:50%;background:rgba(37,211,102,0.15);display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:700;color:#25D366;flex-shrink:0;">' + initials + '</div>' +
           '<div style="flex:1;min-width:0;">' +
           '<div style="display:flex;justify-content:space-between;align-items:center;gap:4px;">' +
-          '<span style="font-size:13px;font-weight:' + (c.unread ? '700' : '500') + ';color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:150px;">' + name + '</span>' +
+          '<span data-wa-name style="font-size:13px;font-weight:' + (c.unread ? '700' : '500') + ';color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:150px;">' + name + '</span>' +
           (grpBadge ? grpBadge : '') +
-          '<span style="font-size:10.5px;color:var(--muted);flex-shrink:0;">' + time + '</span>' +
+          '<span data-wa-time style="font-size:10.5px;color:var(--muted);flex-shrink:0;">' + time + '</span>' +
           '</div>' +
           '<div style="display:flex;justify-content:space-between;align-items:center;margin-top:2px;">' +
-          '<span style="font-size:11.5px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:170px;">' + escHtml(lastMsgDisplay) + '</span>' +
+          '<span data-wa-preview style="font-size:11.5px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:170px;">' + escHtml(lastMsgDisplay) + '</span>' +
           unread +
           '</div>' +
           '</div></div>';
       }).join('');
       if (!el.innerHTML.trim()) {
-        el.innerHTML = '<div style="text-align:center;padding:30px;color:var(--muted);font-size:12.5px;">No valid chats found (+91 / 0-extension only).</div>';
+        el.innerHTML = '<div style="text-align:center;padding:30px;color:var(--muted);font-size:12.5px;">No valid chats found.</div>';
       }
     }
     function waFilterChats(q) {
       if (!q) { waRenderChats(waAllChats); return; }
       waRenderChats(waAllChats.filter(function (c) { return (c.name || '').toLowerCase().includes(q.toLowerCase()) || (c.phone || '').includes(q); }));
+    }
+
+    /**
+     * waPatchChatRow — surgically update a single chat row's preview text,
+     * timestamp, and unread badge without rebuilding the whole list.
+     * Falls back to a full waRenderChats if the row can't be found in the DOM.
+     */
+    function waPatchChatRow(chat) {
+      var el = document.getElementById('wa-convo-list');
+      if (!el) return;
+
+      // Find the existing row by looking for the onclick that contains the chat id
+      var rows = el.querySelectorAll('[data-wa-jid]');
+      var row = null;
+      for (var i = 0; i < rows.length; i++) {
+        if (rows[i].getAttribute('data-wa-jid') === chat.id) { row = rows[i]; break; }
+      }
+      if (!row) {
+        // Row not in DOM yet (new chat) — full rebuild
+        waRenderChats(waAllChats);
+        return;
+      }
+
+      // Update last-message preview
+      var previewEl = row.querySelector('[data-wa-preview]');
+      if (previewEl) {
+        var preview = waPreviewForChat(chat);
+        if (preview.length > 45) preview = preview.substring(0, 45) + '...';
+        previewEl.textContent = preview;
+      }
+
+      // Update timestamp
+      var timeEl = row.querySelector('[data-wa-time]');
+      if (timeEl && chat.last_time) {
+        var d = new Date(chat.last_time);
+        var now = new Date();
+        var today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+        var yesterday = new Date(today); yesterday.setDate(yesterday.getDate() - 1);
+        var targetDate = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+        var timeStr;
+        if (targetDate.getTime() === today.getTime()) {
+          timeStr = d.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
+        } else if (targetDate.getTime() === yesterday.getTime()) {
+          timeStr = 'Yesterday';
+        } else {
+          timeStr = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+        }
+        timeEl.textContent = timeStr;
+      }
+
+      // Update unread badge
+      var unreadEl = row.querySelector('[data-wa-unread]');
+      if (unreadEl) {
+        if (chat.unread > 0) {
+          unreadEl.textContent = chat.unread;
+          unreadEl.style.display = 'flex';
+          // Bold the name when unread
+          var nameEl = row.querySelector('[data-wa-name]');
+          if (nameEl) nameEl.style.fontWeight = '700';
+        } else {
+          unreadEl.style.display = 'none';
+        }
+      }
+
+      // Update total unread badge in header
+      var totalUnread = waAllChats.reduce(function (s, c) { return s + (c.unread || 0); }, 0);
+      var badge = document.getElementById('wa-unread-total');
+      if (badge) { badge.textContent = totalUnread; badge.style.display = totalUnread ? 'inline-flex' : 'none'; }
     }
 
     let _waLoadMessagesSeq = 0;
@@ -21539,9 +21837,22 @@ ${plainText}`;
         waHasOlderMessages = Array.isArray(msgs) && msgs.length >= 100;
         area.innerHTML = '';
         waRenderedMessages = {};
-        (Array.isArray(msgs) ? msgs : []).forEach(function (m) {
-          waAppendMessage(waMessageFromRow(m));
-        });
+
+        if (!Array.isArray(msgs) || !msgs.length) {
+          area.innerHTML = '<div style="text-align:center;padding:40px 20px;color:var(--muted);font-size:13px;">' +
+            '<i class="fab fa-whatsapp" style="font-size:32px;color:rgba(37,211,102,0.35);display:block;margin-bottom:12px;"></i>' +
+            'No messages yet. Send a message or wait for WhatsApp sync to finish.</div>';
+        } else {
+          // Batch-render all messages into a DocumentFragment — single DOM write
+          var frag = document.createDocumentFragment();
+          var tempArea = { appendChild: function(n){ frag.appendChild(n); }, lastElementChild: null, scrollTop: 0, scrollHeight: 0 };
+          msgs.forEach(function (m) {
+            waAppendMessage(waMessageFromRow(m), false, tempArea);
+            tempArea.lastElementChild = frag.lastElementChild || null;
+          });
+          area.appendChild(frag);
+        }
+
         if (opts.preserveScroll) {
           area.scrollTop = Math.min(area.scrollTop, area.scrollHeight);
         } else {
@@ -21753,8 +22064,8 @@ ${plainText}`;
       }
       return null;
     }
-    function waAppendMessage(msg, prepend) {
-      var area = document.getElementById('wa-chat-area');
+    function waAppendMessage(msg, prepend, targetArea) {
+      var area = targetArea || document.getElementById('wa-chat-area');
       if (!area) return;
       var rawTime =
         msg.timestamp ||
@@ -22495,10 +22806,12 @@ ${plainText}`;
         if (res.status === 401) { localStorage.clear(); sessionStorage.clear(); window.location.href = 'login.html'; return; }
         var data = await res.json();
         if (res.ok) {
-          // Reload chats to show latest messages
-          await waLoadChats();
-          var s = data.stats;
-          var msg = 'Groups: ' + s.groups + ' | Numbers: ' + s.indian_numbers + ' | Unread: ' + ((parseInt(s.unread_individual) || 0) + (parseInt(s.unread_groups) || 0));
+          await waLoadChats({ force: true });
+          var s = data.stats || {};
+          var rs = data.resync || {};
+          var msg = 'Groups: ' + (s.groups || 0) + ' | Numbers: ' + (s.indian_numbers || 0) + ' | Unread: ' + ((parseInt(s.unread_individual) || 0) + (parseInt(s.unread_groups) || 0));
+          if (rs.db_chats != null) msg += ' | DB chats: ' + rs.db_chats;
+          if (rs.lid_contacts_updated) msg += ' | LID mapped: ' + rs.lid_contacts_updated;
           notify('Chats refreshed', msg, 'var(--green)', 'fas fa-check-circle');
         } else {
           notify('Sync failed', data.error, 'var(--red)', 'fas fa-exclamation-circle');
@@ -22591,6 +22904,7 @@ ${plainText}`;
     async function waLogout() {
       if (!confirm('Disconnect WhatsApp? You will need to scan QR again.\n\nThis will remove the device from your phone\'s linked devices.')) return;
       try {
+        waStopResolutionPolling();
         notify('Logging out from WhatsApp...', 'Please wait', 'var(--gold)', 'fab fa-whatsapp');
         await fetch(API_BASE + '/wa/logout', { method: 'POST', headers: getAuthHeaders() });
         var sb = document.getElementById('wa-status-bar');
@@ -22603,6 +22917,8 @@ ${plainText}`;
         if (qb) qb.style.display = 'inline-flex';
         document.getElementById('wa-convo-list').innerHTML = '<div style="text-align:center;padding:40px;color:var(--muted);">Connect WhatsApp to see chats</div>';
         document.getElementById('wa-chat-area').innerHTML = '';
+        waConnectedPhone = null;
+        waLidMap = {};
         waActiveJid = null; waAllChats = [];
         notify('WhatsApp disconnected', 'Device removed from phone. Check your phone\'s linked devices after 10 seconds.', 'var(--green2)', 'fab fa-whatsapp');
       } catch (_) {
@@ -22614,6 +22930,9 @@ ${plainText}`;
       const btn = event?.target;
       if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Resetting...'; }
       try {
+        waStopResolutionPolling();
+        waConnectedPhone = null;
+        waLidMap = {};
         // Force logout on backend (clears socket + session)
         await fetch(API_BASE + '/wa/logout', { method: 'POST', headers: getAuthHeaders() });
 

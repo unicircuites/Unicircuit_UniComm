@@ -17,22 +17,99 @@ function normalizeDigits(value) {
 function isAllowedWaNumber(value) {
   const digits = normalizeDigits(value);
   if (!digits) return false;
-  // Allowed:
-  // 1) Indian WhatsApp mobiles: 91 + 10 digits (starting 6-9)
-  // 2) Internal extension style: starts with 0
-  return /^91[6-9]\d{9}$/.test(digits) || /^0\d{1,10}$/.test(digits);
+  // A LID is a 15+ digit internal WhatsApp identifier — never a real phone number.
+  // Any other number between 7 and 15 digits is a valid phone number from any country.
+  if (digits.length >= 15) return false; // LID — not a real phone
+  if (digits.length < 7)   return false; // too short to be a phone
+  if (/^0{5,}$/.test(digits)) return false; // all zeros
+  return true; // valid international phone number
 }
 
 function formatDisplayPhone(value) {
   const digits = normalizeDigits(value);
   if (!digits) return '';
+  // Indian mobile: 91 + 10 digits
   if (digits.startsWith('91') && digits.length === 12) {
     return `+91 ${digits.slice(2, 7)} ${digits.slice(7)}`;
   }
+  // Extension starting with 0 — show as-is
   if (digits.startsWith('0')) {
     return digits;
   }
+  // All other international numbers — show with +
   return `+${digits}`;
+}
+
+function isPhoneLikeText(value, phoneDigits) {
+  const text = String(value || '').trim();
+  if (!text || text.includes('@lid')) return false;
+  const digits = normalizeDigits(text);
+  if (!digits) return false;
+  if (phoneDigits && digits === phoneDigits) return true;
+  if (/^\+?\d[\d\s\-().]+$/.test(text) && digits.length >= 7) return true;
+  return false;
+}
+
+function isInvalidContactLabel(value) {
+  const text = String(value || '').trim();
+  if (!text) return true;
+  if (/^you$/i.test(text)) return true;
+  if (/^(unknown|unknown whatsapp contact)$/i.test(text)) return true;
+  return false;
+}
+
+function isGroupishLabel(candidate, groupIdLocal) {
+  const text = String(candidate || '').trim();
+  if (!text) return true;
+  if (/^\d+$/.test(text)) return true;
+  if (isPhoneLikeText(text, '')) return true;
+  if (isAllowedWaNumber(normalizeDigits(text))) return true;
+  const localDigits = normalizeDigits(groupIdLocal || '');
+  if (localDigits && normalizeDigits(text) === localDigits) return true;
+  return false;
+}
+
+function pickContactLabel(row, phoneDigits, isGroup) {
+  const name = String(row.name || '').trim();
+  const notify = String(row.notify || '').trim();
+  const verified = String(row.verified_name || row.verifiedName || '').trim();
+  const msgName = String(row.msg_name || '').trim();
+  const crmName = String(row.crm_name || '').trim();
+  const chatName = String(row.chat_name || '').trim();
+  const groupIdLocal = isGroup ? String(row.id || '').split('@')[0].split(':')[0] : '';
+  const candidates = isGroup
+    ? [chatName, name]
+    : [name, notify, verified, msgName, crmName, chatName];
+
+  for (const candidate of candidates) {
+    if (!candidate || isInvalidContactLabel(candidate)) continue;
+    if (isGroup) {
+      if (isGroupishLabel(candidate, groupIdLocal)) continue;
+      return candidate;
+    }
+    if (!isGroup && isPhoneLikeText(candidate, phoneDigits)) continue;
+    if (!isGroup && isAllowedWaNumber(normalizeDigits(candidate))) continue;
+    return candidate;
+  }
+
+  if (isGroup) return 'Group';
+  if (phoneDigits && isAllowedWaNumber(phoneDigits)) return formatDisplayPhone(phoneDigits);
+  return '';
+}
+
+function isNamedLidFallback(id, phoneDigits, label) {
+  if (!String(id || '').endsWith('@lid') || phoneDigits || !label) return false;
+  if (isInvalidContactLabel(label)) return false;
+  const idLocal = id.split('@')[0].split(':')[0];
+  const labelDigits = normalizeDigits(label);
+  if (labelDigits && labelDigits === idLocal) return false;
+  if (isPhoneLikeText(label, '')) return false;
+  return true;
+}
+
+function isNonChatJid(jid) {
+  const id = String(jid || '');
+  return id === 'status@broadcast' || id.endsWith('@newsletter') || id.endsWith('@broadcast');
 }
 
 function canonicalizeChats(rows) {
@@ -40,34 +117,38 @@ function canonicalizeChats(rows) {
   for (const row of Array.isArray(rows) ? rows : []) {
     if (!row?.id) continue;
     const id = String(row.id);
-    // Hard rule: only @g.us JIDs are real WhatsApp groups.
-    // Ignore stale/incorrect DB flags that mark number chats as groups.
+    if (isNonChatJid(id)) continue;
     const isGroup = id.endsWith('@g.us');
     const idLocal = id.split('@')[0].split(':')[0];
-    const phoneDigits = normalizeDigits(row.phone || (id.endsWith('@lid') ? '' : idLocal));
+    const rawPhoneDigits = normalizeDigits(row.phone || (id.endsWith('@lid') ? '' : idLocal));
+    const phoneDigits = id.endsWith('@lid') && rawPhoneDigits === idLocal ? '' : rawPhoneDigits;
     const allowedNumber = isAllowedWaNumber(phoneDigits);
+    const displayLabel = pickContactLabel(row, phoneDigits, isGroup);
+    const hasNamedLidFallback = isNamedLidFallback(id, phoneDigits, displayLabel);
 
-    // Hard rule: no raw @lid chat should be exposed when it can't be mapped to a phone number.
-    if (!isGroup && id.endsWith('@lid') && !phoneDigits) continue;
-    // Hard rule: for individual chats show only +91 numbers or 0-extension numbers.
-    if (!isGroup && !allowedNumber) continue;
+    // ── Hard exclusion rules ──────────────────────────────────────────────
+    // 1. Raw @lid with no phone and no real saved/profile name
+    if (!isGroup && id.endsWith('@lid') && !phoneDigits && !hasNamedLidFallback) continue;
+    // 2. Individual chats need a resolved phone or a real saved/profile name
+    if (!isGroup && !allowedNumber && !hasNamedLidFallback) continue;
+    // 3. Never expose @lid rows whose only label is the LID number itself
+    if (!isGroup && id.includes('@lid') && !hasNamedLidFallback && !phoneDigits) continue;
+    if (!isGroup && !displayLabel) continue;
+    // Group-only members belong in group info, not the main chat list.
+    if (!isGroup && row.is_group_member && !row.last_time && !String(row.last_message || '').trim()) continue;
 
     const normalizedId = !isGroup && phoneDigits ? `${phoneDigits}@s.whatsapp.net` : id;
     const key = isGroup ? `group:${normalizedId}` : (phoneDigits ? `phone:${phoneDigits}` : `id:${normalizedId}`);
     const lastTs = row.last_time ? new Date(row.last_time).getTime() : 0;
     const unread = Number(row.unread || 0);
-    const cleanName = String(row.name || '').trim();
-    const numericName = normalizeDigits(cleanName);
-    const safeName = !cleanName || /@lid/i.test(cleanName) || (numericName && !isAllowedWaNumber(numericName))
-      ? null
-      : cleanName;
     const normalizedRow = {
       ...row,
       id: normalizedId,
-      phone: !isGroup && phoneDigits ? formatDisplayPhone(phoneDigits) : row.phone,
-      name: safeName || (!isGroup && phoneDigits ? formatDisplayPhone(phoneDigits) : row.name),
+      phone: !isGroup && phoneDigits ? formatDisplayPhone(phoneDigits) : (isGroup ? null : row.phone),
+      name: displayLabel,
       _lastTs: Number.isFinite(lastTs) ? lastTs : 0,
       _unread: Number.isFinite(unread) ? unread : 0,
+      _sortName: displayLabel.toLowerCase(),
     };
 
     const existing = map.get(key);
@@ -86,11 +167,12 @@ function canonicalizeChats(rows) {
   }
 
   return Array.from(map.values())
-    .map(({ _lastTs, _unread, ...row }) => row)
+    .map(({ _lastTs, _unread, _sortName, ...row }) => row)
     .sort((a, b) => {
       const ta = a.last_time ? new Date(a.last_time).getTime() : 0;
       const tb = b.last_time ? new Date(b.last_time).getTime() : 0;
-      return tb - ta;
+      if (tb !== ta) return tb - ta;
+      return String(a.name || '').localeCompare(String(b.name || ''));
     });
 }
 
@@ -184,14 +266,64 @@ router.get('/chats', authenticate, async (req, res) => {
       ORDER BY chats DESC
     `) : null;
     const result = await pool.query(`
-      WITH chat_rows AS (
+      WITH enriched_contacts AS (
+        SELECT
+          wc.jid,
+          wc.account_phone,
+          wc.name,
+          wc.notify,
+          wc.phone,
+          wc.is_group_member,
+          wc.updated_at,
+          msg.sender_name AS msg_name,
+          NULLIF(trim(concat(crm.fname, ' ', crm.lname)), '') AS crm_name
+        FROM wa_contacts wc
+        LEFT JOIN LATERAL (
+          SELECT m.sender_name
+          FROM wa_messages m
+          WHERE m.account_phone = wc.account_phone
+            AND m.from_me = false
+            AND m.sender_name IS NOT NULL
+            AND m.sender_name != ''
+            AND m.sender_name !~* '^you$'
+            AND m.sender_name !~ '^\\+?[0-9]'
+            AND (
+              m.sender = wc.jid
+              OR regexp_replace(split_part(COALESCE(m.sender, ''), '@', 1), '[^0-9]', '', 'g')
+                = regexp_replace(COALESCE(wc.phone, ''), '[^0-9]', '', 'g')
+            )
+          ORDER BY m.timestamp DESC NULLS LAST
+          LIMIT 1
+        ) msg ON true
+        LEFT JOIN LATERAL (
+          SELECT c.fname, c.lname
+          FROM contacts c
+          WHERE regexp_replace(COALESCE(c.phone, c.wa, ''), '[^0-9]', '', 'g') != ''
+            AND (
+              regexp_replace(COALESCE(c.phone, c.wa, ''), '[^0-9]', '', 'g')
+                = regexp_replace(COALESCE(wc.phone, ''), '[^0-9]', '', 'g')
+              OR right(regexp_replace(COALESCE(c.phone, c.wa, ''), '[^0-9]', '', 'g'), 10)
+                = right(regexp_replace(COALESCE(wc.phone, ''), '[^0-9]', '', 'g'), 10)
+            )
+          LIMIT 1
+        ) crm ON true
+        WHERE wc.account_phone = $1
+      ),
+      chat_rows AS (
         SELECT
           c.id,
           c.account_phone,
-          COALESCE(c.name, wc.name, wc.notify) AS name,
-          COALESCE(c.phone, wc.phone) AS phone,
+          CASE WHEN c.is_group THEN c.name ELSE COALESCE(ec.name, wc.name, c.name) END AS name,
+          COALESCE(ec.notify, wc.notify) AS notify,
+          ec.msg_name,
+          ec.crm_name,
+          CASE WHEN c.is_group THEN c.name END AS chat_name,
+          COALESCE(
+            NULLIF(regexp_replace(COALESCE(c.phone, ec.phone, wc.phone, ''), '[^0-9]', '', 'g'), ''),
+            CASE WHEN c.id NOT LIKE '%@lid' THEN split_part(c.id, '@', 1) ELSE NULL END
+          ) AS phone,
           c.is_group,
-          COALESCE(wc.is_group_member, false) AS is_group_member,
+          COALESCE(ec.is_group_member, wc.is_group_member, false) AS is_group_member,
           COALESCE(NULLIF(latest.body, ''), NULLIF(c.last_message, ''), c.last_message) AS last_message,
           COALESCE(latest.timestamp, c.last_time) AS last_time,
           c.unread,
@@ -207,48 +339,73 @@ router.get('/chats', authenticate, async (req, res) => {
           LIMIT 1
         ) latest ON true
         LEFT JOIN wa_contacts wc
-          ON wc.jid = c.id
-         AND wc.account_phone = c.account_phone
+          ON wc.jid = c.id AND wc.account_phone = c.account_phone
+        LEFT JOIN enriched_contacts ec
+          ON ec.jid = c.id AND ec.account_phone = c.account_phone
         WHERE c.account_phone = $1
+          AND c.id NOT LIKE '%@newsletter'
+          AND c.id NOT LIKE '%@broadcast'
+          AND c.id <> 'status@broadcast'
           AND NOT EXISTS (
             SELECT 1 FROM wa_chat_blocklist b
             WHERE b.account_phone = c.account_phone
               AND b.chat_id = c.id
           )
+          AND NOT (c.id LIKE '%@lid' AND COALESCE(regexp_replace(c.phone, '[^0-9]', '', 'g'), '') = ''
+                   AND COALESCE(c.name, '') = '')
       ),
       contact_rows AS (
         SELECT
           CASE
-            WHEN regexp_replace(COALESCE(wc.phone, ''), '[^0-9]', '', 'g') ~ '^[0-9]{7,15}$'
-              THEN regexp_replace(wc.phone, '[^0-9]', '', 'g') || '@s.whatsapp.net'
-            ELSE wc.jid
+            WHEN regexp_replace(COALESCE(ec.phone, ''), '[^0-9]', '', 'g') ~ '^[0-9]{7,15}$'
+              THEN regexp_replace(ec.phone, '[^0-9]', '', 'g') || '@s.whatsapp.net'
+            ELSE ec.jid
           END AS id,
-          wc.account_phone,
-          COALESCE(NULLIF(wc.name, ''), NULLIF(wc.notify, '')) AS name,
-          NULLIF(regexp_replace(COALESCE(wc.phone, ''), '[^0-9]', '', 'g'), '') AS phone,
-          COALESCE(wc.is_group_member, false) AS is_group_member,
+          ec.account_phone,
+          ec.name,
+          ec.notify,
+          ec.msg_name,
+          ec.crm_name,
+          NULL::text AS chat_name,
+          NULLIF(regexp_replace(COALESCE(ec.phone, ''), '[^0-9]', '', 'g'), '') AS phone,
+          COALESCE(ec.is_group_member, false) AS is_group_member,
           false AS is_group,
           '' AS last_message,
           NULL::timestamptz AS last_time,
           0 AS unread,
-          wc.updated_at,
+          ec.updated_at,
           NULL::timestamptz AS imported_last_ts,
           1 AS sort_bucket
-        FROM wa_contacts wc
-        WHERE wc.account_phone = $1
-          AND wc.jid IS NOT NULL
-          AND wc.jid <> ''
+        FROM enriched_contacts ec
+        WHERE ec.account_phone = $1
+          AND ec.jid IS NOT NULL
+          AND ec.jid <> ''
+          AND ec.jid NOT LIKE '%@newsletter'
+          AND ec.jid NOT LIKE '%@broadcast'
+          AND ec.jid <> 'status@broadcast'
+          -- Only list contacts with a real resolved phone (never the raw LID number).
+          AND regexp_replace(COALESCE(ec.phone, ''), '[^0-9]', '', 'g') ~ '^[0-9]{7,14}$'
+          AND regexp_replace(COALESCE(ec.phone, ''), '[^0-9]', '', 'g') <> split_part(ec.jid, '@', 1)
+          -- Hide anonymous raw @lid entries, but allow named contacts while
+          -- WhatsApp phone resolution catches up for a newly linked account.
+          AND NOT (
+            ec.jid LIKE '%@lid'
+            AND COALESCE(regexp_replace(ec.phone, '[^0-9]', '', 'g'), '') = ''
+            AND COALESCE(NULLIF(ec.name, ''), NULLIF(ec.notify, '')) IS NULL
+          )
+          -- Group-only members are not chats; they appear under Group Info instead.
+          AND COALESCE(ec.is_group_member, false) = false
           AND NOT EXISTS (
             SELECT 1
             FROM wa_chats c
-            WHERE c.account_phone = wc.account_phone
+            WHERE c.account_phone = ec.account_phone
               AND (
-                c.id = wc.jid
+                c.id = ec.jid
                 OR (
-                  regexp_replace(COALESCE(wc.phone, ''), '[^0-9]', '', 'g') <> ''
+                  regexp_replace(COALESCE(ec.phone, ''), '[^0-9]', '', 'g') <> ''
                   AND (
-                    c.id = regexp_replace(wc.phone, '[^0-9]', '', 'g') || '@s.whatsapp.net'
-                    OR regexp_replace(COALESCE(c.phone, ''), '[^0-9]', '', 'g') = regexp_replace(wc.phone, '[^0-9]', '', 'g')
+                    c.id = regexp_replace(ec.phone, '[^0-9]', '', 'g') || '@s.whatsapp.net'
+                    OR regexp_replace(COALESCE(c.phone, ''), '[^0-9]', '', 'g') = regexp_replace(ec.phone, '[^0-9]', '', 'g')
                   )
                 )
               )
@@ -292,12 +449,110 @@ router.get('/chats-live', authenticate, async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
+router.get('/resolution-stats', authenticate, async (req, res) => {
+  try {
+    const accountPhone = connectedAccount(res);
+    if (!accountPhone) return;
+    const result = await pool.query(`
+      WITH raw_items AS (
+        SELECT
+          id,
+          COALESCE(name, '') AS name,
+          COALESCE(phone, '') AS phone,
+          COALESCE(is_group, false) AS is_group,
+          updated_at
+        FROM wa_chats
+        WHERE account_phone = $1
+        UNION ALL
+        SELECT
+          jid AS id,
+          COALESCE(NULLIF(name, ''), NULLIF(notify, ''), '') AS name,
+          COALESCE(phone, '') AS phone,
+          false AS is_group,
+          updated_at
+        FROM wa_contacts
+        WHERE account_phone = $1
+      ),
+      keyed AS (
+        SELECT DISTINCT ON (
+          CASE
+            WHEN id LIKE '%@g.us' THEN 'group:' || id
+            WHEN COALESCE(regexp_replace(phone, '[^0-9]', '', 'g'), '') != ''
+              THEN 'phone:' || regexp_replace(phone, '[^0-9]', '', 'g')
+            ELSE 'id:' || id
+          END
+        )
+          id,
+          name,
+          regexp_replace(COALESCE(phone, ''), '[^0-9]', '', 'g') AS phone_digits,
+          is_group,
+          updated_at
+        FROM raw_items
+        WHERE id IS NOT NULL AND id != ''
+        ORDER BY
+          CASE
+            WHEN id LIKE '%@g.us' THEN 'group:' || id
+            WHEN COALESCE(regexp_replace(phone, '[^0-9]', '', 'g'), '') != ''
+              THEN 'phone:' || regexp_replace(phone, '[^0-9]', '', 'g')
+            ELSE 'id:' || id
+          END,
+          updated_at DESC NULLS LAST
+      )
+      SELECT
+        COUNT(*)::int AS total,
+        COUNT(*) FILTER (
+          WHERE is_group
+            OR (phone_digits ~ '^[0-9]{7,14}$')
+            OR (id NOT LIKE '%@lid' AND split_part(id, '@', 1) ~ '^[0-9]{7,14}$')
+            OR (id LIKE '%@lid' AND COALESCE(phone_digits, '') = '' AND NULLIF(name, '') IS NOT NULL)
+        )::int AS loaded,
+        COUNT(*) FILTER (
+          WHERE id LIKE '%@lid'
+            AND COALESCE(phone_digits, '') = ''
+        )::int AS lid_pending,
+        COUNT(*) FILTER (
+          WHERE id LIKE '%@lid'
+            AND COALESCE(phone_digits, '') = ''
+            AND NULLIF(name, '') IS NOT NULL
+        )::int AS named_lid_pending,
+        COUNT(*) FILTER (
+          WHERE id LIKE '%@lid'
+            AND COALESCE(phone_digits, '') = ''
+            AND NULLIF(name, '') IS NULL
+        )::int AS hidden_lid_pending
+      FROM keyed
+    `, [accountPhone]);
+    const stats = result.rows[0] || {};
+    res.json({
+      account_phone: accountPhone,
+      total: Number(stats.total || 0),
+      loaded: Number(stats.loaded || 0),
+      pending: Number(stats.lid_pending || 0),
+      named_pending: Number(stats.named_lid_pending || 0),
+      hidden_pending: Number(stats.hidden_lid_pending || 0),
+    });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+router.post('/resolve-lids', authenticate, async (req, res) => {
+  if (!wa.getStatus().connected) return res.status(400).json({ error: 'WhatsApp not connected' });
+  try {
+    const accountPhone = connectedAccount(res);
+    if (!accountPhone) return;
+    const batch = Math.max(1, Math.min(parseInt(req.body?.batch || req.query?.batch || 100, 10) || 100, 200));
+    const result = await wa.processLidResolutionBatch(batch);
+    res.json({ success: true, account_phone: accountPhone, ...result });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
 router.post('/sync', authenticate, async (req, res) => {
   if (!wa.getStatus().connected) return res.status(400).json({ error: 'WhatsApp not connected' });
   try {
     const accountPhone = connectedAccount(res);
     if (!accountPhone) return;
-    const metadata = await wa.refreshCurrentAccountGroupMetadata(50).catch(err => ({ error: err.message }));
+    const resync = await wa.resyncDirectoryFromSocket({ groupLimit: 100 }).catch(err => ({ error: err.message }));
+    const metadata = await wa.refreshCurrentAccountGroupMetadata(100).catch(err => ({ error: err.message }));
+    wa.startLidResolutionWorker();
     const stats = await pool.query(`
       SELECT
         COUNT(*) FILTER (WHERE is_group) AS groups,
@@ -309,7 +564,7 @@ router.post('/sync', authenticate, async (req, res) => {
       FROM wa_chats
       WHERE account_phone = $1
     `, [accountPhone]);
-    res.json({ success: true, stats: stats.rows[0], metadata });
+    res.json({ success: true, stats: stats.rows[0], metadata, resync });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
@@ -394,46 +649,48 @@ router.get('/messages/:jid', authenticate, async (req, res) => {
       [accountPhone, jid]
     );
     if (blocked.rowCount) return res.json([]);
-    // If this is a group chat, populate LID phone numbers from group metadata first
+    // If this is a group chat, populate LID phone numbers from group metadata in the background.
+    // We do NOT await this — messages are returned immediately, contacts update async.
     if (jid.endsWith('@g.us')) {
-      try {
-        const groupMeta = await wa.getGroupMetadata(jid, { participantsLimit: 2000, participantsOffset: 0 });
-        let updated = 0;
-        const accPhone = accountPhone;
-        for (const p of groupMeta.participants) {
-          if (p.jid && p.jid.endsWith('@lid') && p.phone) {
-            const realPhone = p.phone.replace(/[^0-9]/g, '');
-            if (realPhone && realPhone.length >= 7) {
-              await pool.query(`
-                INSERT INTO wa_contacts (jid, account_phone, name, phone)
-                VALUES ($1, $2, $3, $4)
-                ON CONFLICT (jid, account_phone) DO UPDATE SET
-                  phone = EXCLUDED.phone,
-                  name = COALESCE(EXCLUDED.name, wa_contacts.name),
-                  updated_at = NOW()
-              `, [p.jid, accPhone, p.name, realPhone]);
-              updated++;
+      setImmediate(async () => {
+        try {
+          const groupMeta = await wa.getGroupMetadata(jid, { participantsLimit: 2000, participantsOffset: 0 });
+          let updated = 0;
+          for (const p of groupMeta.participants) {
+            if (p.jid && p.jid.endsWith('@lid') && p.phone) {
+              const realPhone = p.phone.replace(/[^0-9]/g, '');
+              if (realPhone && realPhone.length >= 7) {
+                await pool.query(`
+                  INSERT INTO wa_contacts (jid, account_phone, name, phone)
+                  VALUES ($1, $2, $3, $4)
+                  ON CONFLICT (jid, account_phone) DO UPDATE SET
+                    phone = EXCLUDED.phone,
+                    name = COALESCE(EXCLUDED.name, wa_contacts.name),
+                    updated_at = NOW()
+                `, [p.jid, accountPhone, p.name, realPhone]);
+                updated++;
+              }
             }
           }
+          if (updated > 0) console.log(`[WA] Updated ${updated} LID contacts for group ${jid}`);
+        } catch (metaErr) {
+          console.warn(`[WA] Failed to fetch group metadata for ${jid}:`, metaErr.message);
         }
-        if (updated > 0) console.log(`[WA] Updated ${updated} LID contacts for group ${jid}`);
-      } catch (metaErr) {
-        console.warn(`[WA] Failed to fetch group metadata for ${jid}:`, metaErr.message);
-      }
+      });
     }
     
-    // For @lid JIDs, also search by the LID number as phone JID
-    // e.g. 183357119950912@lid -> also try 183357119950912@s.whatsapp.net
-    const lidNum = jid.endsWith('@lid') ? jid.split('@')[0] : null;
+    const jidLocal = jid.split('@')[0].split(':')[0];
+    const phoneDigits = jid.endsWith('@s.whatsapp.net') ? jidLocal : null;
+    const lidNum = jid.endsWith('@lid') ? jidLocal : null;
     const beforeIsValid = before && !Number.isNaN(before.getTime());
     const result = await pool.query(
       `SELECT m.*,
         CASE
           WHEN m.sender LIKE '%@lid' AND c.phone IS NOT NULL AND c.phone ~ '^[0-9]{7,}$'
             THEN CASE
-              WHEN c.phone LIKE '91%' AND length(c.phone) = 12
-              THEN '+91 ' || substring(c.phone, 3, 5) || ' ' || substring(c.phone, 8, 5)
-              ELSE '+' || c.phone
+              WHEN c.phone LIKE '91%' AND length(regexp_replace(c.phone, '[^0-9]', '', 'g')) = 12
+              THEN '+91 ' || substring(regexp_replace(c.phone, '[^0-9]', '', 'g'), 3, 5) || ' ' || substring(regexp_replace(c.phone, '[^0-9]', '', 'g'), 8, 5)
+              ELSE '+' || regexp_replace(c.phone, '[^0-9]', '', 'g')
             END
           WHEN m.sender NOT LIKE '%@lid' AND m.sender NOT LIKE '%@g.us' AND m.sender IS NOT NULL
             THEN CASE
@@ -452,13 +709,25 @@ router.get('/messages/:jid', authenticate, async (req, res) => {
                 chat_id = $3 || '@s.whatsapp.net'
                 OR chat_id LIKE $3 || ':%@s.whatsapp.net'
               ))
+              OR ($6::text IS NOT NULL AND chat_id IN (
+                SELECT wc.jid FROM wa_contacts wc
+                WHERE wc.account_phone = $4
+                  AND regexp_replace(COALESCE(wc.phone, ''), '[^0-9]', '', 'g') = $6
+                  AND wc.jid LIKE '%@lid'
+              ))
+              OR ($6::text IS NOT NULL AND chat_id IN (
+                SELECT wc.id FROM wa_chats wc
+                WHERE wc.account_phone = $4
+                  AND regexp_replace(COALESCE(wc.phone, ''), '[^0-9]', '', 'g') = $6
+                  AND wc.id LIKE '%@lid'
+              ))
             )
             AND ($5::timestamptz IS NULL OR timestamp < $5::timestamptz)
          ORDER BY timestamp DESC LIMIT $2
        ) m
        LEFT JOIN wa_contacts c ON c.jid = m.sender AND c.account_phone=$4
        ORDER BY m.timestamp ASC`,
-      [jid, limit, lidNum, accountPhone, beforeIsValid ? before.toISOString() : null]
+      [jid, limit, lidNum, accountPhone, beforeIsValid ? before.toISOString() : null, phoneDigits]
     );
     if (WA_DEBUG_ACCOUNT_SCOPE) {
       console.log('[WA-SCOPE] /api/wa/messages', {
@@ -481,10 +750,12 @@ router.get('/messages/:jid', authenticate, async (req, res) => {
         } : null,
       });
     }
-    const accPhone = accountPhone;
-    await pool.query(`UPDATE wa_messages SET is_read=true WHERE chat_id=$1 AND account_phone=$2 AND from_me=false`, [jid, accPhone]);
-    await pool.query(`UPDATE wa_chats SET unread=0 WHERE id=$1 AND account_phone=$2`, [jid, accPhone]);
     res.json(result.rows);
+    // Fire-and-forget: mark messages read after responding — don't block the response
+    Promise.all([
+      pool.query(`UPDATE wa_messages SET is_read=true WHERE chat_id=$1 AND account_phone=$2 AND from_me=false AND is_read=false`, [jid, accountPhone]),
+      pool.query(`UPDATE wa_chats SET unread=0 WHERE id=$1 AND account_phone=$2 AND unread>0`, [jid, accountPhone]),
+    ]).catch(() => {});
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
