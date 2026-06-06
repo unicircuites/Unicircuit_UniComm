@@ -21,6 +21,21 @@ try {
 } catch (e) {
   console.warn('[Outlook] Could not log OAuth env:', e.message);
 }
+
+process.on('uncaughtException', (err) => {
+  console.error('===================================================');
+  console.error('[GLOBAL] Uncaught Exception:', err);
+  console.error('Stack:', err.stack);
+  console.error('===================================================');
+});
+
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('===================================================');
+  console.error('[GLOBAL] Unhandled Rejection at:', promise);
+  console.error('Reason:', reason);
+  console.error('===================================================');
+});
+
 const express = require('express');
 const cors = require('cors');
 const path = require('path');

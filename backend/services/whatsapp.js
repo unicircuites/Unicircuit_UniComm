@@ -73,6 +73,11 @@ const groupMetadataCache = new Map();
 const AUTH_DIR = path.join(__dirname, '../wa_auth');
 const SYNC_FULL_HISTORY = String(process.env.WA_SYNC_FULL_HISTORY || 'false').toLowerCase() === 'true';
 
+let historySyncState = {
+  totalMessagesLoaded: 0,
+  chatMessageCounts: {}
+};
+
 function hasSavedSession() {
   return fs.existsSync(path.join(AUTH_DIR, 'creds.json'));
 }
@@ -154,6 +159,7 @@ function pushLiveMessage(jid, message) {
   liveMessagesStore.set(key, list);
 }
 
+let updateLiveChatDebounceTimer = null;
 function updateLiveChatRow(chat) {
   if (!chat?.id) return;
   const key = formatJid(chat.id);
@@ -165,6 +171,13 @@ function updateLiveChatRow(chat) {
     unread: Number(chat.unread ?? existing.unread ?? 0),
   };
   liveChatsStore.set(key, merged);
+
+  if (!updateLiveChatDebounceTimer) {
+    updateLiveChatDebounceTimer = setTimeout(() => {
+      emit('wa:chats_updated', {});
+      updateLiveChatDebounceTimer = null;
+    }, 2000); // 2-second debounce to avoid spamming the frontend
+  }
 }
 
 function readPhoneFromAuthCreds() {
@@ -374,8 +387,8 @@ function getContactName(jid, pushName) {
   return formatDisplayPhone(local);
 }
 
-const GROUP_METADATA_CONCURRENCY = 6;
-const GROUP_METADATA_DELAY_MS = 80;
+const GROUP_METADATA_CONCURRENCY = 2;
+const GROUP_METADATA_DELAY_MS = 500;
 const LID_CONTACT_BATCH_SIZE = 200;
 const LID_RESOLUTION_BATCH_SIZE = 100;
 const LID_RESOLUTION_BATCH_DELAY_MS = 2500;
@@ -384,6 +397,25 @@ let lidResolutionWorkerTimer = null;
 let lidResolutionInFlight = false;
 let lidResolutionGroupCursor = 0;
 let lidResolutionGroupIds = [];
+let lidResolutionExhausted = false;
+let lidResolutionCooldownUntil = 0;
+
+// ── HISTORY SYNC QUEUE ─────────────────────────────────────────────────────────────────
+const historySyncQueue = [];
+let isProcessingHistoryQueue = false;
+let totalHistoryChunksReceived = 0;
+let historyChunksProcessed = 0;
+
+function isLidResolutionExhausted() {
+  return lidResolutionExhausted;
+}
+
+function getLidResolutionCooldownMins() {
+  if (lidResolutionCooldownUntil > Date.now()) {
+    return Math.ceil((lidResolutionCooldownUntil - Date.now()) / 60000);
+  }
+  return 0;
+}
 
 async function runWithConcurrency(items, limit, worker) {
   const list = Array.isArray(items) ? items : [];
@@ -1154,20 +1186,29 @@ async function startWA(options = {}) {
         startLidResolutionWorker();
       }, 4000);
 
-      // If DB was purged while session stayed alive, history sync won't replay — refill from socket.
-      setTimeout(async () => {
-        if (generation !== socketGeneration || !isConnected || !phoneNumber) return;
-        try {
-          const dbCount = await countAccountChats(phoneNumber);
-          const socketCount = getSocketChatsSnapshot().length;
-          if (dbCount === 0 && socketCount > 0) {
-            console.log(`[WA] DB empty (${dbCount}) but socket has ${socketCount} chats — resyncing directory`);
-            await resyncDirectoryFromSocket({ groupLimit: 80 });
+      // If DB is empty after connect, wait for history sync to arrive then resync.
+      // Retries up to 6 times (max ~90s) to handle slow WhatsApp history delivery.
+      (async () => {
+        const delays = [8000, 15000, 20000, 20000, 15000, 12000];
+        for (const delay of delays) {
+          await new Promise(r => setTimeout(r, delay));
+          if (generation !== socketGeneration || !isConnected || !phoneNumber) return;
+          try {
+            const dbCount = await countAccountChats(phoneNumber);
+            if (dbCount > 0) return; // already populated (history sync did it)
+            const socketCount = getSocketChatsSnapshot().length;
+            if (socketCount > 0) {
+              console.log(`[WA] DB empty but socket has ${socketCount} chats — resyncing directory`);
+              await resyncDirectoryFromSocket({ groupLimit: 80 });
+              return;
+            }
+            console.log(`[WA] DB empty and socket has 0 chats — waiting for history sync...`);
+          } catch (err) {
+            console.warn('[WA] Post-connect directory resync skipped:', err.message);
+            return;
           }
-        } catch (err) {
-          console.warn('[WA] Post-connect directory resync skipped:', err.message);
         }
-      }, 8000);
+      })();
     }
 
     if (connection === 'close') {
@@ -1228,21 +1269,43 @@ async function startWA(options = {}) {
 
   sock.ev.on('creds.update', saveCreds);
 
-  // ── CONTACTS SYNC ──────────────────────────────────────────────────────────────────────
-  sock.ev.on('contacts.upsert', async (contacts) => {
-    console.log(`[WA] contacts.upsert count=${contacts.length}`);
-    for (const c of contacts) {
-      await saveContact(c);
+  // ── GENERIC EVENT TASK QUEUE ───────────────────────────────────────────────────────────
+  // Prevents heavy array iterations from stalling the Baileys event loop
+  const bgTaskQueue = [];
+  let isProcessingBgTasks = false;
+  async function processBgTasks() {
+    if (isProcessingBgTasks) return;
+    isProcessingBgTasks = true;
+    while (bgTaskQueue.length > 0) {
+      const task = bgTaskQueue.shift();
+      try { await task(); } catch (err) { console.error('[WA] BG Task Error:', err.message); }
+      await new Promise(r => setTimeout(r, 10)); // Yield to event loop
     }
-    // Update chat names with resolved contact names
-    await updateChatNames();
+    isProcessingBgTasks = false;
+  }
+  function enqueueBgTask(task) {
+    bgTaskQueue.push(task);
+    processBgTasks().catch(console.error);
+  }
+
+  // ── CONTACTS SYNC ──────────────────────────────────────────────────────────────────────
+  sock.ev.on('contacts.upsert', (contacts) => {
+    enqueueBgTask(async () => {
+      console.log(`[WA] contacts.upsert count=${contacts.length}`);
+      for (const c of contacts) {
+        await saveContact(c);
+      }
+      await updateChatNames();
+    });
   });
 
-  sock.ev.on('contacts.update', async (updates) => {
-    for (const c of updates) {
-      await saveContact(c);
-    }
-    await enrichContactNamesFromMessages();
+  sock.ev.on('contacts.update', (updates) => {
+    enqueueBgTask(async () => {
+      for (const c of updates) {
+        await saveContact(c);
+      }
+      await enrichContactNamesFromMessages();
+    });
   });
 
   sock.ev.on('lid-mapping.update', async ({ lid, pn }) => {
@@ -1254,30 +1317,114 @@ async function startWA(options = {}) {
     await consolidateLidChats();
   });
 
-  // ── HISTORY SYNC ───────────────────────────────────────────────────────────────────────
-  sock.ev.on('messaging-history.set', async ({ chats, contacts, messages, isLatest }) => {
-    const yieldEventLoop = () => new Promise(resolve => setImmediate(resolve));
+  async function processHistoryQueue() {
+    if (isProcessingHistoryQueue) return;
+    isProcessingHistoryQueue = true;
+    
+    while (historySyncQueue.length > 0) {
+      const { chats, contacts, messages, isLatest } = historySyncQueue.shift();
+      historyChunksProcessed++;
+      const yieldEventLoop = () => new Promise(resolve => setTimeout(resolve, 10));
 
-    if (!SYNC_FULL_HISTORY) {
-      console.log(`[WA] Directory sync chunk — chats=${chats.length} contacts=${contacts?.length || 0} messages=${messages.length} isLatest=${isLatest}`);
-      recordActivity('sync', 'Directory sync chunk', { chats: chats.length, contacts: contacts?.length || 0, messages: messages.length, isLatest: !!isLatest });
+      if (!SYNC_FULL_HISTORY) {
+        console.log(`[WA] Directory sync chunk ${historyChunksProcessed}/${totalHistoryChunksReceived} — chats=${chats.length} contacts=${contacts?.length || 0} messages=${messages.length} isLatest=${isLatest}`);
+        recordActivity('sync', `Directory sync chunk ${historyChunksProcessed}/${totalHistoryChunksReceived}`, { chats: chats.length, contacts: contacts?.length || 0, messages: messages.length, isLatest: !!isLatest });
+        
+        if (contacts?.length) {
+          for (let i = 0; i < contacts.length; i++) {
+            await saveContact(contacts[i]);
+            if (i % 50 === 0) await yieldEventLoop();
+          }
+        }
+        for (let i = 0; i < chats.length; i++) {
+          const chat = chats[i];
+          if (!chat?.id || isNonChatJid(chat.id)) continue;
+          const isGroup = chat.id.endsWith('@g.us');
+          const name = isGroup
+            ? (chat.subject || chat.name || null)
+            : getContactName(chat.id, chat.name || chat.notify);
+          const ts = toDate(chat.conversationTimestamp);
+          await saveChat(chat.id, name, '', ts, 0, isGroup);
+          if (i % 50 === 0) await yieldEventLoop();
+        }
+        let saved = 0;
+        for (let i = 0; i < messages.length; i++) {
+          const msg = messages[i];
+          if (msg.key && msg.key.id && msg.message) {
+            msgCache.set(msg.key.id, msg);
+            if (msgCache.size > MAX_CACHE) msgCache.delete(msgCache.keys().next().value);
+          }
+          if (!isRealMessage(msg)) continue;
+          const jid = msg.key?.remoteJid;
+          if (!jid || isNonChatJid(jid)) continue;
+          const result = await saveMessage(msg);
+          if (result) {
+            saved++;
+            historySyncState.totalMessagesLoaded++;
+            historySyncState.chatMessageCounts[jid] = (historySyncState.chatMessageCounts[jid] || 0) + 1;
+            const isGroup = jid.endsWith('@g.us');
+            const name = isGroup ? null : getContactName(jid, msg.key.fromMe ? null : msg.pushName);
+            await saveChat(jid, name, result.body, result.ts, 0, isGroup);
+          }
+          if (i % 50 === 0) await yieldEventLoop();
+        }
+        
+        if (saved > 0) {
+          console.log(`[WA] Directory chunk saved — ${saved} messages`);
+          let maxJid = null; let maxCount = 0;
+          let currentChunkCounts = {};
+          for (let i = 0; i < messages.length; i++) {
+             const jid = messages[i]?.key?.remoteJid;
+             if (jid && isRealMessage(messages[i])) {
+                currentChunkCounts[jid] = (currentChunkCounts[jid] || 0) + 1;
+             }
+          }
+          for (const [jid, count] of Object.entries(currentChunkCounts)) {
+             if (count > maxCount) { maxCount = count; maxJid = jid; }
+          }
+          emit('wa:history_sync_progress', {
+            totalChatsDiscovered: Object.keys(historySyncState.chatMessageCounts).length,
+            totalMessagesLoaded: historySyncState.totalMessagesLoaded,
+            latestActiveChat: maxJid ? getContactName(maxJid) : null,
+            latestActiveChatMessagesLoaded: maxJid ? historySyncState.chatMessageCounts[maxJid] : 0,
+            chunksProcessed: historyChunksProcessed,
+            chunksTotal: totalHistoryChunksReceived
+          });
+        }
+        if (isLatest && historySyncQueue.length === 0) {
+          enqueueBgTask(async () => await updateChatNames());
+          await consolidateLidChats();
+          await loadLidPhoneMapFromDB();
+          recordActivity('sync', 'Directory sync complete');
+          emit('wa:sync_complete', {});
+        }
+        continue;
+      }
+      
+      console.log(`[WA] History chunk ${historyChunksProcessed}/${totalHistoryChunksReceived} — chats=${chats.length} contacts=${contacts?.length || 0} messages=${messages.length} isLatest=${isLatest}`);
+      recordActivity('sync', `History sync chunk ${historyChunksProcessed}/${totalHistoryChunksReceived}`, { chats: chats.length, contacts: contacts?.length || 0, messages: messages.length, isLatest: !!isLatest });
+
+      // 1. Save contacts FIRST (needed for name resolution)
       if (contacts?.length) {
         for (let i = 0; i < contacts.length; i++) {
           await saveContact(contacts[i]);
           if (i % 50 === 0) await yieldEventLoop();
         }
       }
+
+      // 2. Save chats with resolved names
       for (let i = 0; i < chats.length; i++) {
         const chat = chats[i];
-        if (!chat?.id || isNonChatJid(chat.id)) continue;
         const isGroup = chat.id.endsWith('@g.us');
         const name = isGroup
-          ? (chat.name || chat.subject || null)
-          : getContactName(chat.id, chat.name || chat.notify);
+          ? (chat.name || null)
+          : getContactName(chat.id, chat.name);
         const ts = toDate(chat.conversationTimestamp);
         await saveChat(chat.id, name, '', ts, 0, isGroup);
         if (i % 50 === 0) await yieldEventLoop();
       }
+
+      // 3. Save real messages + cache for media download
       let saved = 0;
       for (let i = 0; i < messages.length; i++) {
         const msg = messages[i];
@@ -1291,114 +1438,92 @@ async function startWA(options = {}) {
         const result = await saveMessage(msg);
         if (result) {
           saved++;
+          historySyncState.totalMessagesLoaded++;
+          historySyncState.chatMessageCounts[jid] = (historySyncState.chatMessageCounts[jid] || 0) + 1;
           const isGroup = jid.endsWith('@g.us');
           const name = isGroup ? null : getContactName(jid, msg.key.fromMe ? null : msg.pushName);
           await saveChat(jid, name, result.body, result.ts, 0, isGroup);
         }
         if (i % 50 === 0) await yieldEventLoop();
       }
-      if (saved > 0) console.log(`[WA] Directory chunk saved — ${saved} messages`);
-      if (isLatest) {
-        await updateChatNames();
+      
+      if (saved > 0) {
+        console.log(`[WA] Chunk saved — ${saved} messages`);
+        let maxJid = null; let maxCount = 0;
+        let currentChunkCounts = {};
+        for (let i = 0; i < messages.length; i++) {
+           const jid = messages[i]?.key?.remoteJid;
+           if (jid && isRealMessage(messages[i])) {
+              currentChunkCounts[jid] = (currentChunkCounts[jid] || 0) + 1;
+           }
+        }
+        for (const [jid, count] of Object.entries(currentChunkCounts)) {
+           if (count > maxCount) { maxCount = count; maxJid = jid; }
+        }
+        emit('wa:history_sync_progress', {
+          totalChatsDiscovered: Object.keys(historySyncState.chatMessageCounts).length,
+          totalMessagesLoaded: historySyncState.totalMessagesLoaded,
+          latestActiveChat: maxJid ? getContactName(maxJid) : null,
+          latestActiveChatMessagesLoaded: maxJid ? historySyncState.chatMessageCounts[maxJid] : 0,
+          chunksProcessed: historyChunksProcessed,
+          chunksTotal: totalHistoryChunksReceived
+        });
+      }
+      // 4. Only refresh frontend on FINAL chunk (isLatest=true)
+      if (isLatest && historySyncQueue.length === 0) {
+        console.log('[WA] ✅ Full history sync complete — refreshing UI');
+        enqueueBgTask(async () => await updateChatNames());
         await consolidateLidChats();
         await loadLidPhoneMapFromDB();
-        recordActivity('sync', 'Directory sync complete');
+        // try { await refreshCurrentAccountGroupMetadata(200); } catch(e){} // Removed to prevent rate limit timeout
+        recordActivity('sync', 'Full history sync complete');
         emit('wa:sync_complete', {});
       }
-      return;
     }
-    console.log(`[WA] History chunk — chats=${chats.length} contacts=${contacts?.length || 0} messages=${messages.length} isLatest=${isLatest}`);
-    recordActivity('sync', 'History sync chunk', { chats: chats.length, contacts: contacts?.length || 0, messages: messages.length, isLatest: !!isLatest });
+    isProcessingHistoryQueue = false;
+  }
 
-    // 1. Save contacts FIRST (needed for name resolution)
-    if (contacts?.length) {
-      for (let i = 0; i < contacts.length; i++) {
-        await saveContact(contacts[i]);
-        if (i % 50 === 0) await yieldEventLoop();
-      }
-    }
-
-    // 2. Save chats with resolved names
-    for (let i = 0; i < chats.length; i++) {
-      const chat = chats[i];
-      const isGroup = chat.id.endsWith('@g.us');
-      const name = isGroup
-        ? (chat.name || null)
-        : getContactName(chat.id, chat.name);
-      const ts = toDate(chat.conversationTimestamp);
-      await saveChat(chat.id, name, '', ts, 0, isGroup);
-      if (i % 50 === 0) await yieldEventLoop();
-    }
-
-    // 3. Save real messages + cache for media download
-    let saved = 0;
-    for (let i = 0; i < messages.length; i++) {
-      const msg = messages[i];
-      if (msg.key && msg.key.id && msg.message) {
-        msgCache.set(msg.key.id, msg);
-        if (msgCache.size > MAX_CACHE) msgCache.delete(msgCache.keys().next().value);
-      }
-      if (!isRealMessage(msg)) continue;
-      const jid = msg.key?.remoteJid;
-      if (!jid || isNonChatJid(jid)) continue;
-      const result = await saveMessage(msg);
-      if (result) {
-        saved++;
-        const isGroup = jid.endsWith('@g.us');
-        const name = isGroup ? null : getContactName(jid, msg.key.fromMe ? null : msg.pushName);
-        await saveChat(jid, name, result.body, result.ts, 0, isGroup);
-      }
-      if (i % 50 === 0) await yieldEventLoop();
-    }
-    console.log(`[WA] Chunk saved — ${saved} messages`);
-
-    // 4. Only refresh frontend on FINAL chunk (isLatest=true)
-    if (isLatest) {
-      console.log('[WA] ✅ Full history sync complete — refreshing UI');
-      await updateChatNames();
-      await consolidateLidChats();
-      await loadLidPhoneMapFromDB();
-      // Fetch missing group subjects so they don't show up as 'Group' in UI
-      try { await refreshCurrentAccountGroupMetadata(200); } catch(e){}
-      recordActivity('sync', 'Full history sync complete');
-      emit('wa:sync_complete', {});
-    }
+  sock.ev.on('messaging-history.set', (payload) => {
+    totalHistoryChunksReceived++;
+    historySyncQueue.push(payload);
+    processHistoryQueue().catch(err => console.error('[WA] History sync error:', err));
   });
 
   // ── CHAT LIST UPDATES ──────────────────────────────────────────────────────────────────
   // Track whether we already have data so reconnect chats.upsert doesn't cause duplicate renders
   let chatsUpsertDebounce = null;
   let chatsBatchCount = 0;
-  sock.ev.on('chats.upsert', async (chats) => {
-    chatsBatchCount++;
-    for (const chat of chats) {
-      const isGroup = chat.id.endsWith('@g.us');
-      const name = isGroup
-        ? (chat.name || null)
-        : getContactName(chat.id, chat.name);
-      await saveChat(chat.id, name, '', toDate(chat.conversationTimestamp), 0, isGroup);
-    }
-    // Debounce: wait 3s after the last batch before refreshing the UI.
-    // On FIRST connect: suppress — messaging-history.set isLatest=true fires wa:sync_complete instead.
-    // On RECONNECT: Baileys replays chats, data already in DB → emit once after batch settles.
-    if (chatsUpsertDebounce) clearTimeout(chatsUpsertDebounce);
-    chatsUpsertDebounce = setTimeout(async () => {
-      const batches = chatsBatchCount;
-      chatsBatchCount = 0;
-      chatsUpsertDebounce = null;
-      try {
-        await updateChatNames();
-        await consolidateLidChats();
-        await loadLidPhoneMapFromDB();
-        // Fetch missing group subjects
-        try { await refreshCurrentAccountGroupMetadata(200); } catch(e){}
-      } catch (err) {
-        console.warn('[WA] chats.upsert post-save error:', err.message);
+  sock.ev.on('chats.upsert', (chats) => {
+    console.log(`[WA] chats.upsert fired: ${chats.length} chats`);
+    enqueueBgTask(async () => {
+      chatsBatchCount++;
+      for (const chat of chats) {
+        const isGroup = chat.id.endsWith('@g.us');
+        const name = isGroup
+          ? (chat.name || null)
+          : getContactName(chat.id, chat.name);
+        await saveChat(chat.id, name, '', toDate(chat.conversationTimestamp), 0, isGroup);
       }
-      console.log(`[WA] chats.upsert settled (${batches} batches) — refreshing UI`);
-      emit('wa:sync_complete', { source: 'chats.upsert', batches });
-      if (isReconnect) emit('wa:chats_updated', {});
-    }, 3000);
+      // Debounce: wait 3s after the last batch before refreshing the UI.
+      if (chatsUpsertDebounce) clearTimeout(chatsUpsertDebounce);
+      chatsUpsertDebounce = setTimeout(async () => {
+        const batches = chatsBatchCount;
+        chatsBatchCount = 0;
+        chatsUpsertDebounce = null;
+        try {
+          enqueueBgTask(async () => await updateChatNames());
+          await consolidateLidChats();
+          await loadLidPhoneMapFromDB();
+          // Fetch missing group subjects
+          try { await refreshCurrentAccountGroupMetadata(200); } catch(e){}
+        } catch (err) {
+          console.warn('[WA] chats.upsert post-save error:', err.message);
+        }
+        console.log(`[WA] chats.upsert settled (${batches} batches) — refreshing UI`);
+        emit('wa:sync_complete', { source: 'chats.upsert', batches });
+        emit('wa:chats_updated', {});
+      }, 3000);
+    });
   });
 
   // ── REAL-TIME MESSAGES ───────────────────────────────────────────────────────────────
@@ -1545,7 +1670,26 @@ async function startWA(options = {}) {
 }
 
 // ── BACKFILL PROFILE NAMES FROM MESSAGE HISTORY ───────────────────────────────────────
+let isEnrichingContactNames = false;
+let needsEnrichContactNames = false;
 async function enrichContactNamesFromMessages() {
+  if (isEnrichingContactNames) {
+    needsEnrichContactNames = true;
+    return;
+  }
+  isEnrichingContactNames = true;
+  try {
+    do {
+      needsEnrichContactNames = false;
+      await _inner_enrichContactNamesFromMessages();
+    } while (needsEnrichContactNames);
+  } catch(e) {
+    console.error('[WA] enrichContactNames wrapper error:', e.message);
+  }
+  isEnrichingContactNames = false;
+}
+
+async function _inner_enrichContactNamesFromMessages() {
   const accPhone = phoneNumber;
   if (!accPhone) return;
   try {
@@ -1671,7 +1815,29 @@ async function cleanupContactLabels() {
 }
 
 // ── MERGE @lid CHATS INTO PHONE JIDS ─────────────────────────────────────────────────
+let isConsolidating = false;
+let needsConsolidation = false;
 async function consolidateLidChats() {
+  if (isConsolidating) {
+    needsConsolidation = true;
+    return { merged: 0 };
+  }
+  isConsolidating = true;
+  let totalMerged = 0;
+  try {
+    do {
+      needsConsolidation = false;
+      const res = await _inner_consolidateLidChats();
+      if (res && res.merged) totalMerged += res.merged;
+    } while (needsConsolidation);
+  } catch(e) {
+    console.error('[WA] consolidate wrapper error:', e.message);
+  }
+  isConsolidating = false;
+  return { merged: totalMerged };
+}
+
+async function _inner_consolidateLidChats() {
   const accPhone = phoneNumber;
   if (!accPhone) return { merged: 0 };
   try {
@@ -1771,7 +1937,26 @@ async function consolidateLidChats() {
 }
 
 // ── UPDATE CHAT NAMES AFTER CONTACTS SYNC ───────────────────────────────────────────
+let isUpdatingChatNames = false;
+let needsUpdateChatNames = false;
 async function updateChatNames() {
+  if (isUpdatingChatNames) {
+    needsUpdateChatNames = true;
+    return;
+  }
+  isUpdatingChatNames = true;
+  try {
+    do {
+      needsUpdateChatNames = false;
+      await _inner_updateChatNames();
+    } while (needsUpdateChatNames);
+  } catch(e) {
+    console.error('[WA] updateChatNames wrapper error:', e.message);
+  }
+  isUpdatingChatNames = false;
+}
+
+async function _inner_updateChatNames() {
   try {
     const accPhone = phoneNumber;
     if (!accPhone) return;
@@ -1856,6 +2041,7 @@ async function refreshLidResolutionGroupIds(accPhone) {
   ])];
   if (lidResolutionGroupCursor >= lidResolutionGroupIds.length) {
     lidResolutionGroupCursor = 0;
+    lidResolutionExhausted = false;
   }
 }
 
@@ -1863,6 +2049,11 @@ async function processLidResolutionBatch(batchSize = LID_RESOLUTION_BATCH_SIZE) 
   if (!sock || !isConnected) {
     return { skipped: true, reason: 'not_connected', pending: 0 };
   }
+  if (lidResolutionCooldownUntil && Date.now() < lidResolutionCooldownUntil) {
+    const minsLeft = Math.ceil((lidResolutionCooldownUntil - Date.now()) / 60000);
+    return { skipped: true, reason: `cooldown (${minsLeft}m left)`, pending: await countPendingLids(phoneNumber) };
+  }
+
   if (lidResolutionInFlight) {
     return { skipped: true, reason: 'in_flight', pending: await countPendingLids(phoneNumber) };
   }
@@ -1885,6 +2076,7 @@ async function processLidResolutionBatch(batchSize = LID_RESOLUTION_BATCH_SIZE) 
     const pendingContacts = [];
     const seenJids = new Set();
     let groupsScanned = 0;
+    let hitRateLimit = false;
 
     while (
       groupsScanned < MAX_GROUPS_PER_LID_BATCH
@@ -1899,8 +2091,8 @@ async function processLidResolutionBatch(batchSize = LID_RESOLUTION_BATCH_SIZE) 
       lidResolutionGroupCursor += chunk.length;
       groupsScanned += chunk.length;
 
-      await runWithConcurrency(chunk, GROUP_METADATA_CONCURRENCY, async (gid) => {
-        try {
+      try {
+        await runWithConcurrency(chunk, GROUP_METADATA_CONCURRENCY, async (gid) => {
           if (GROUP_METADATA_DELAY_MS > 0) await sleep(GROUP_METADATA_DELAY_MS);
           const meta = await sock.groupMetadata(gid);
           for (const p of meta?.participants || []) {
@@ -1916,12 +2108,23 @@ async function processLidResolutionBatch(batchSize = LID_RESOLUTION_BATCH_SIZE) 
               phone: rawPhone,
             });
           }
-        } catch (_) { }
-      });
+        });
+      } catch (err) {
+        if (err.message && err.message.includes('timed out')) {
+          hitRateLimit = true;
+          break;
+        }
+      }
     }
 
-    if (lidResolutionGroupCursor >= lidResolutionGroupIds.length) {
+    if (hitRateLimit) {
+      console.warn('[WA] Group metadata rate limit hit (timeout). Pausing LID resolution for 10 minutes.');
+      lidResolutionCooldownUntil = Date.now() + 10 * 60 * 1000;
+    }
+
+    if (lidResolutionGroupCursor >= lidResolutionGroupIds.length && !hitRateLimit) {
       lidResolutionGroupCursor = 0;
+      lidResolutionExhausted = true;
     }
 
     const upserted = await upsertGroupMemberContacts(pendingContacts, accPhone);
@@ -1964,8 +2167,14 @@ async function tickLidResolutionWorker() {
     return;
   }
   try {
+    if (isProcessingHistoryQueue || historySyncQueue.length > 0) {
+      // Pause worker if history sync is active to prevent socket congestion
+      lidResolutionWorkerTimer = setTimeout(tickLidResolutionWorker, LID_RESOLUTION_BATCH_DELAY_MS);
+      return;
+    }
+
     const pending = await countPendingLids(phoneNumber);
-    if (pending === 0) {
+    if (pending === 0 || lidResolutionExhausted) {
       console.log('[WA] LID resolution worker complete');
       stopLidResolutionWorker();
       emit('wa:lid_resolution_complete', {});
@@ -2397,12 +2606,7 @@ async function resyncDirectoryFromSocket(options = {}) {
   const accPhone = phoneNumber;
   if (!accPhone) throw new Error('Connected WhatsApp account is not known yet');
 
-  // Baileys 7 removed sock.chats — pull directory via app-state resync instead.
-  if (typeof sock.resyncAppState === 'function') {
-    console.log('[WA] Triggering app-state resync to reload chat/contact directory...');
-    await sock.resyncAppState(ALL_WA_PATCH_NAMES, false);
-    await sleep(2000);
-  }
+  // Removed crashing sock.resyncAppState call. We rebuild from the in-memory store instead.
 
   const rawChats = getSocketChatsSnapshot();
   let chatsSaved = 0;
@@ -2423,17 +2627,14 @@ async function resyncDirectoryFromSocket(options = {}) {
     if (!chat?.id || isNonChatJid(chat.id)) continue;
     const isGroup = chat.id.endsWith('@g.us');
     const name = isGroup
-      ? (chat.name || chat.subject || null)
+      ? (chat.subject || chat.name || null)
       : getContactName(chat.id, chat.name || chat.notify);
     const ts = toDate(chat.conversationTimestamp);
     await saveChat(chat.id, name, '', ts, Number(chat.unreadCount || 0), isGroup);
     chatsSaved++;
   }
 
-  for (const row of liveChatsStore.values()) {
-    if (!row?.id || isNonChatJid(row.id)) continue;
-    await saveChat(row.id, row.name, row.last_message || '', row.last_time, row.unread || 0, !!row.is_group);
-  }
+  liveChatsStore.clear();
 
   await updateChatNames();
   await enrichContactNamesFromMessages();
@@ -2846,7 +3047,7 @@ function getLiveChats() {
       if (!c?.id || c.id === 'status@broadcast') continue;
       const isGroup = c.id.endsWith('@g.us');
       const lastTs = toDate(c.conversationTimestamp);
-      const chatName = isGroup ? (c.name || c.subject || null) : getContactName(c.id, c.name || c.notify);
+      const chatName = isGroup ? (c.subject || c.name || null) : getContactName(c.id, c.name || c.notify);
       updateLiveChatRow({
         id: c.id,
         name: chatName,
@@ -2953,6 +3154,6 @@ function waFormatPhoneFromJid(jid) {
   return '+' + digits;
 }
 
-module.exports = { startWA, sendMessage, sendMediaMessage, logout, getStatus, getQR, requestQR, requestPhonePairingCode, setIO, getGroupMetadata, refreshCurrentAccountGroupMetadata, resyncDirectoryFromSocket, processLidResolutionBatch, startLidResolutionWorker, stopLidResolutionWorker, downloadMedia, msgCache, importExportedChat, getConnectedPhone, getLiveChats, getLiveMessages };
+module.exports = { startWA, sendMessage, sendMediaMessage, logout, getStatus, getQR, requestQR, requestPhonePairingCode, setIO, getGroupMetadata, refreshCurrentAccountGroupMetadata, resyncDirectoryFromSocket, processLidResolutionBatch, startLidResolutionWorker, stopLidResolutionWorker, downloadMedia, msgCache, importExportedChat, getConnectedPhone, getLiveChats, getLiveMessages, isLidResolutionExhausted, getLidResolutionCooldownMins };
 
 

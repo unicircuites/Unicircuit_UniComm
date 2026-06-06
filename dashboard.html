@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 
 <head>
@@ -20719,9 +20719,13 @@ ${plainText}`;
     function waFormatPhoneForDisplay(value) {
       var digits = String(value || '').replace(/\D/g, '');
       if (!digits || waIsLikelyLidNumber(digits) || !waIsAllowedWaNumber(digits)) return '';
-      // Indian mobile: 91 + 10 digits
+      // Indian mobile: 91 + 10 digits → +91 XXXXXXXXXX
       if (digits.startsWith('91') && digits.length === 12) {
-        return '+91 ' + digits.slice(2, 7) + ' ' + digits.slice(7);
+        return '+91 ' + digits.slice(2);
+      }
+      // Raw 10-digit Indian number (starts with 6-9) → +91 XXXXXXXXXX
+      if (/^[6-9]\d{9}$/.test(digits)) {
+        return '+91 ' + digits;
       }
       // Extension starting with 0
       if (digits.startsWith('0')) return digits;
@@ -20752,7 +20756,7 @@ ${plainText}`;
 
     function waIsRealContactLabel(name, idLocal, phoneDigits) {
       var n = String(name || '').trim();
-      if (!n || /^you$/i.test(n) || /^(unknown|unknown whatsapp contact)$/i.test(n)) return false;
+      if (!n || /^you$/i.test(n) || /^(unknown|unknown whatsapp contact|whatsapp)$/i.test(n)) return false;
       if (n.indexOf('@lid') !== -1 || waIsLikelyLidNumber(n)) return false;
       var digits = n.replace(/\D/g, '');
       if (idLocal && digits && digits === idLocal) return false;
@@ -20801,9 +20805,21 @@ ${plainText}`;
       var loaded = parseInt(stats.loaded || 0, 10) || 0;
       var pending = parseInt(stats.pending || 0, 10) || 0;
       if (total <= 0) return '';
-      var visible = Math.min(total || loaded, Math.max(loaded, parseInt(renderedCount || 0, 10) || 0));
-      return visible + '/' + total + ' chats/contacts loaded' +
-        (pending > 0 ? ' · ' + pending + ' LID conversions remaining (batch 100)' : ' · conversion complete');
+      var target = loaded > 0 ? loaded : total;
+      var domCount = document.querySelectorAll('#wa-convo-list [data-wa-jid]').length;
+      var visible = domCount > 0 ? domCount : Math.min(target, Math.max(loaded, parseInt(renderedCount || 0, 10) || 0));
+      // Done when: no pending LIDs, OR DOM list has stabilized across poll cycles
+      var isDone = pending === 0 || _waStablePollCount >= 2;
+      if (isDone) {
+        return visible + '/' + total + ' chats/contacts loaded · ✓ Loading Done';
+      }
+      if (pending > 0) {
+        if (stats.cooldown_mins > 0) {
+          return visible + '/' + total + ' chats/contacts loaded · ' + pending + ' resolving (paused ' + stats.cooldown_mins + 'm to prevent WhatsApp ban)...';
+        }
+        return visible + '/' + total + ' chats/contacts loaded · ' + pending + ' contacts resolving in background (safe to use app)...';
+      }
+      return visible + '/' + total + ' chats/contacts loaded · finalising...';
     }
 
     function waSetConnectionStatus(text, level) {
@@ -20932,6 +20948,7 @@ ${plainText}`;
       });
       waSocket.on('wa:disconnected', (payload) => {
         waStopResolutionPolling();
+        waStopStatusTicker(); // stop live DOM-count ticker on disconnect
         var reason = payload && payload.reason ? String(payload.reason) : '';
         waSetConnectionStatus(reason ? ('Disconnected: ' + reason) : 'Disconnected. Reconnecting...', 'warn');
         // Only show connect banner if disconnected for more than 5 seconds
@@ -21005,6 +21022,15 @@ ${plainText}`;
         }
       });
       waSocket.on('wa:chats_updated', () => { waLoadChats(); });
+      waSocket.on('wa:history_sync_progress', (data) => {
+        waStopStatusTicker();
+        let chunkStatus = data.chunksTotal ? `[Chunk ${data.chunksProcessed || 0} / ${data.chunksTotal}] ` : '';
+        let text = `Syncing History: ${chunkStatus}${data.totalChatsDiscovered} chats discovered | ${data.totalMessagesLoaded} total messages loaded`;
+        if (data.latestActiveChat) {
+          text += ` · Currently scanning '${data.latestActiveChat}': ${data.latestActiveChatMessagesLoaded} messages loaded...`;
+        }
+        waSetSyncStatus(text);
+      });
       waSocket.on('wa:sync_complete', () => {
         console.log('[WA-UI] Full sync complete — loading all chats');
         waSetSyncStatus('Sync complete. Refreshing chats...');
@@ -21470,6 +21496,32 @@ ${plainText}`;
     let _waLoadChatsQueued = false;
     let _waLoadChatsSeq = 0;
     let _waResolutionPollTimer = null;
+    let _waLastStats = null;          // cache of last resolution-stats payload
+    let _waStatusTickerTimer = null;  // interval that refreshes the DOM count live
+    let _waLastDomCount = -1;         // DOM chat count from previous poll cycle
+    let _waStablePollCount = 0;       // consecutive polls with unchanged DOM count
+
+    function waStopStatusTicker() {
+      if (_waStatusTickerTimer) { clearInterval(_waStatusTickerTimer); _waStatusTickerTimer = null; }
+    }
+
+    function waStartStatusTicker() {
+      waStopStatusTicker();
+      var _tickerPrevDom = -1;
+      var _tickerStableCount = 0;
+      _waStatusTickerTimer = setInterval(function () {
+        if (!_waLastStats || !waIsConnectedBarVisible()) return;
+        var text = waFormatResolutionStatus(_waLastStats, waAllChats.length);
+        if (text) waSetSyncStatus(text);
+        var domNow = document.querySelectorAll('#wa-convo-list [data-wa-jid]').length;
+        // Stop when: no LIDs pending, OR DOM count stable for 2 consecutive ticks
+        var pending = parseInt(_waLastStats.pending || 0, 10) || 0;
+        if (pending === 0) { waStopStatusTicker(); return; }
+        if (domNow === _tickerPrevDom) { _tickerStableCount++; } else { _tickerStableCount = 0; }
+        _tickerPrevDom = domNow;
+        if (_tickerStableCount >= 2) waStopStatusTicker();
+      }, 1500);
+    }
 
     function waLoadChats(opts) {
       opts = opts || {};
@@ -21524,6 +21576,8 @@ ${plainText}`;
         clearTimeout(_waResolutionPollTimer);
         _waResolutionPollTimer = null;
       }
+      _waLastDomCount = -1;
+      _waStablePollCount = 0;
     }
 
     async function waRunLidResolutionBatch(batchSize) {
@@ -21549,18 +21603,46 @@ ${plainText}`;
       if (!stats) return;
       var pending = parseInt(stats.pending || 0, 10) || 0;
       var loaded = parseInt(stats.loaded || 0, 10) || 0;
+      var total = parseInt(stats.total || 0, 10) || 0;
+      
+      var target = loaded > 0 ? loaded : total;
+      var domCount = document.querySelectorAll('#wa-convo-list [data-wa-jid]').length;
+      var visible = domCount > 0 ? domCount : Math.min(target, Math.max(loaded, parseInt(renderedCount || 0, 10) || 0));
+
+      // Cache stats so the live ticker can use them between server round-trips
+      _waLastStats = stats;
       var text = waFormatResolutionStatus(stats, renderedCount);
       if (text) waSetSyncStatus(text);
+      // Start the 1.5 s live-count ticker so the visible number updates in real-time
+      waStartStatusTicker();
       // Stats can advance while chat renders are skipped — recover the list if still empty.
       if ((waAllChats.length === 0 || waConvoListIsPlaceholder()) && loaded > 0) {
         waLoadChats({ force: true });
       }
       waStopResolutionPolling();
-      if (pending > 0) {
-        _waResolutionPollTimer = setTimeout(async function () {
-          await waRunLidResolutionBatch(100);
-          waLoadChats();
-        }, 3000);
+      if (pending > 0 && !stats.exhausted && visible < target) {
+        // Still have LIDs to resolve — keep going, but stop if the list has stabilized
+        var currentDom = document.querySelectorAll('#wa-convo-list [data-wa-jid]').length;
+        if (currentDom === _waLastDomCount) {
+          _waStablePollCount++;
+        } else {
+          _waStablePollCount = 0;
+        }
+        _waLastDomCount = currentDom;
+
+        if (_waStablePollCount < 2) {
+          // List still growing — continue polling
+          _waResolutionPollTimer = setTimeout(async function () {
+            await waRunLidResolutionBatch(100);
+            waLoadChats();
+          }, 3000);
+        }
+        // else: list is stable — stop polling, show done
+      } else if (target > 0 && parseInt(renderedCount || 0, 10) < target) {
+        // LID resolution done but not all chats rendered yet — retry loading once
+        _waResolutionPollTimer = setTimeout(function () {
+          waLoadChats({ force: true });
+        }, 2000);
       }
     }
 
@@ -21648,8 +21730,16 @@ ${plainText}`;
       var badge = document.getElementById('wa-unread-total');
       if (badge) { badge.textContent = totalUnread; badge.style.display = totalUnread ? 'inline-flex' : 'none'; }
       var count = document.getElementById('wa-chat-count');
-      if (count) count.textContent = chats.length + ' chats';
-      if (!chats.length) { el.innerHTML = '<div style="text-align:center;padding:30px;color:var(--muted);font-size:12.5px;">No chats yet.</div>'; return; }
+      if (!chats.length) { 
+        if (count) count.textContent = '0 chats';
+        el.innerHTML = '<div style="text-align:center;padding:30px;color:var(--muted);font-size:12.5px;">No chats yet.</div>'; 
+        return; 
+      }
+
+      // ── Deduplication sets (golden rule: no two rows with the same identity) ──
+      var seenPhones = new Set();   // tracks phone-digit strings for individual chats
+      var seenNames  = new Set();   // tracks final display names (groups + contacts)
+
       el.innerHTML = chats.map(function (c) {
         var isRealGroup = String(c.id || '').endsWith('@g.us');
         var rawId = c.id.split('@')[0].split(':')[0];
@@ -21658,28 +21748,57 @@ ${plainText}`;
           : waResolveJidDisplay(c.id, c.notify || c.phone || rawId);
         var unresolvedNamedLid = !isRealGroup && String(c.id || '').endsWith('@lid') &&
           waIsRealContactLabel(displayName, rawId, String(c.phone || '').replace(/\D/g, ''));
-        // Never render anonymous raw @lid JIDs; named contacts can be shown while
-        // phone resolution catches up for a newly linked account.
-        if (!isRealGroup && String(c.id || '').endsWith('@lid') && !unresolvedNamedLid) return '';
+        // Hide ANY @lid that does not have a resolved phone number.
+        // We no longer show "named" LIDs if we don't have their number.
+        var hasPhone = !!String(c.phone || '').replace(/\D/g, '');
+        if (!isRealGroup && String(c.id || '').endsWith('@lid') && !hasPhone) return '';
+        
         if (!isRealGroup && !displayName) return '';
-        // Format Indian numbers: 91XXXXXXXXXX -> +91 XXXXX XXXXX
+        // Format phone numbers for display
+        // 91XXXXXXXXXX (12 digits starting with 91) → +91 XXXXXXXXXX
         if (displayName && /^\+?91\d{10}$/.test(displayName)) {
           var d = displayName.replace(/^\+/, '');
-          displayName = '+91 ' + d.slice(2, 7) + ' ' + d.slice(7);
+          displayName = '+91 ' + d.slice(2);
+        // Raw 10-digit Indian number → +91 XXXXXXXXXX
+        } else if (!isRealGroup && displayName && /^[6-9]\d{9}$/.test(displayName)) {
+          displayName = '+91 ' + displayName;
+        // Extension starting with 0 — show as-is
         } else if (displayName && /^0\d{1,10}$/.test(displayName)) {
           displayName = displayName;
+        // Any other 10-15 digit raw number: try to format as +91 if it's a valid length, else hide
         } else if (!isRealGroup && displayName && /^\d{10,15}$/.test(displayName)) {
-          displayName = '';
+          var formatted = waFormatPhoneForDisplay(displayName);
+          displayName = formatted || '';
         }
         if (isRealGroup) {
           var groupIdLocal = String(c.id || '').split('@')[0].split(':')[0];
+          // If group has no proper name, SKIP rendering it entirely until metadata is synced
           if (!displayName || !String(displayName).trim() || waIsGroupishLabel(displayName, groupIdLocal)) {
-            displayName = (c.name && String(c.name).trim() && !waIsGroupishLabel(c.name, groupIdLocal))
-              ? String(c.name).trim()
-              : 'Group';
+            if (c.name && String(c.name).trim() && !waIsGroupishLabel(c.name, groupIdLocal)) {
+              displayName = String(c.name).trim();
+            } else {
+              return ''; // Hide unnamed groups entirely
+            }
           }
         }
         if (!isRealGroup && !displayName) return '';
+
+        // ── Phone dedup: skip if we already rendered this phone number ────────
+        if (!isRealGroup) {
+          var phoneKey = String(c.phone || '').replace(/\D/g, '') ||
+                         (String(c.id || '').endsWith('@s.whatsapp.net') ? rawId : '');
+          if (phoneKey && phoneKey.length >= 7) {
+            if (seenPhones.has(phoneKey)) return '';
+            seenPhones.add(phoneKey);
+          }
+        }
+
+        // ── Name dedup: skip if exact same display name already rendered ──────
+        // (guards against two @lid rows resolving to the identical label)
+        var nameKey = isRealGroup ? ('grp:' + c.id) : displayName.toLowerCase().trim();
+        if (seenNames.has(nameKey)) return '';
+        seenNames.add(nameKey);
+
         var name = displayName;
         // Show GRP only for real WhatsApp groups (@g.us), not for contact-only group members.
         var grpBadge = isRealGroup ? '<span style="font-size:10px;color:var(--gold);border:1px solid rgba(255, 215, 0, 0.35);padding:1px 6px;border-radius:999px;font-weight:800;white-space:nowrap;">GRP</span>' : '';
@@ -21729,6 +21848,7 @@ ${plainText}`;
       if (!el.innerHTML.trim()) {
         el.innerHTML = '<div style="text-align:center;padding:30px;color:var(--muted);font-size:12.5px;">No valid chats found.</div>';
       }
+      if (count) count.textContent = seenNames.size + ' chats';
     }
     function waFilterChats(q) {
       if (!q) { waRenderChats(waAllChats); return; }
@@ -22712,6 +22832,12 @@ ${plainText}`;
 
     async function waRefreshChats() {
       try {
+        waAllChats = [];
+        var el = document.getElementById('wa-convo-list');
+        if (el) el.innerHTML = '<div style="text-align:center;padding:30px;color:var(--muted);font-size:12.5px;"><span class="spin-loader" style="margin-right:6px;"></span>Reloading chats...</div>';
+        
+        await fetch(API_BASE + '/wa/sync', { method: 'POST', headers: getAuthHeaders() }).catch(function(){});
+        
         await waLoadChats({ force: true });
         if (waActiveJid) {
           await waLoadActiveMessages({ showLoader: false });

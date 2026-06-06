@@ -28,9 +28,9 @@ function isAllowedWaNumber(value) {
 function formatDisplayPhone(value) {
   const digits = normalizeDigits(value);
   if (!digits) return '';
-  // Indian mobile: 91 + 10 digits
+  // Indian mobile: 91 + 10 digits → +91 XXXXXXXXXX
   if (digits.startsWith('91') && digits.length === 12) {
-    return `+91 ${digits.slice(2, 7)} ${digits.slice(7)}`;
+    return `+91 ${digits.slice(2)}`;
   }
   // Extension starting with 0 — show as-is
   if (digits.startsWith('0')) {
@@ -43,7 +43,7 @@ function formatDisplayPhone(value) {
 function isPhoneLikeText(value, phoneDigits) {
   const text = String(value || '').trim();
   if (!text || text.includes('@lid')) return false;
-  const digits = normalizeDigits(text);
+  const digits = String(value || '').replace(/\D/g, '');
   if (!digits) return false;
   if (phoneDigits && digits === phoneDigits) return true;
   if (/^\+?\d[\d\s\-().]+$/.test(text) && digits.length >= 7) return true;
@@ -54,7 +54,7 @@ function isInvalidContactLabel(value) {
   const text = String(value || '').trim();
   if (!text) return true;
   if (/^you$/i.test(text)) return true;
-  if (/^(unknown|unknown whatsapp contact)$/i.test(text)) return true;
+  if (/^(unknown|unknown whatsapp contact|whatsapp)$/i.test(text)) return true;
   return false;
 }
 
@@ -127,13 +127,24 @@ function canonicalizeChats(rows) {
     const hasNamedLidFallback = isNamedLidFallback(id, phoneDigits, displayLabel);
 
     // ── Hard exclusion rules ──────────────────────────────────────────────
-    // 1. Raw @lid with no phone and no real saved/profile name
+    // 1. Raw @lid with no phone AND no proper name: hide until resolved.
+    // If it has a proper name (hasNamedLidFallback = true), we MUST show it.
     if (!isGroup && id.endsWith('@lid') && !phoneDigits && !hasNamedLidFallback) continue;
+    
     // 2. Individual chats need a resolved phone or a real saved/profile name
     if (!isGroup && !allowedNumber && !hasNamedLidFallback) continue;
+    
     // 3. Never expose @lid rows whose only label is the LID number itself
     if (!isGroup && id.includes('@lid') && !hasNamedLidFallback && !phoneDigits) continue;
+    
     if (!isGroup && !displayLabel) continue;
+    
+    // 4. Groups must have a proper name. If we don't have the subject yet, skip rendering.
+    if (isGroup && (!displayLabel || isGroupishLabel(displayLabel, idLocal))) {
+       // Only allow if row.name has actual content not equal to the id
+       if (!row.name || isGroupishLabel(row.name, idLocal)) continue;
+    }
+
     // Group-only members belong in group info, not the main chat list.
     if (!isGroup && row.is_group_member && !row.last_time && !String(row.last_message || '').trim()) continue;
 
@@ -244,7 +255,7 @@ router.get('/lid-map', authenticate, async (req, res) => {
       let phone = r.phone || '';
       if (phone && !phone.startsWith('+')) {
         if (phone.startsWith('91') && phone.length === 12) {
-          phone = '+91 ' + phone.slice(2, 7) + ' ' + phone.slice(7);
+          phone = '+91 ' + phone.slice(2);
         } else {
           phone = '+' + phone;
         }
@@ -530,6 +541,8 @@ router.get('/resolution-stats', authenticate, async (req, res) => {
       pending: Number(stats.lid_pending || 0),
       named_pending: Number(stats.named_lid_pending || 0),
       hidden_pending: Number(stats.hidden_lid_pending || 0),
+      exhausted: wa.isLidResolutionExhausted(),
+      cooldown_mins: wa.getLidResolutionCooldownMins()
     });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
@@ -689,13 +702,13 @@ router.get('/messages/:jid', authenticate, async (req, res) => {
           WHEN m.sender LIKE '%@lid' AND c.phone IS NOT NULL AND c.phone ~ '^[0-9]{7,}$'
             THEN CASE
               WHEN c.phone LIKE '91%' AND length(regexp_replace(c.phone, '[^0-9]', '', 'g')) = 12
-              THEN '+91 ' || substring(regexp_replace(c.phone, '[^0-9]', '', 'g'), 3, 5) || ' ' || substring(regexp_replace(c.phone, '[^0-9]', '', 'g'), 8, 5)
+              THEN '+91 ' || substring(regexp_replace(c.phone, '[^0-9]', '', 'g'), 3)
               ELSE '+' || regexp_replace(c.phone, '[^0-9]', '', 'g')
             END
           WHEN m.sender NOT LIKE '%@lid' AND m.sender NOT LIKE '%@g.us' AND m.sender IS NOT NULL
             THEN CASE
               WHEN split_part(m.sender,'@',1) LIKE '91%' AND length(split_part(m.sender,'@',1)) = 12
-              THEN '+91 ' || substring(split_part(m.sender,'@',1), 3, 5) || ' ' || substring(split_part(m.sender,'@',1), 8, 5)
+              THEN '+91 ' || substring(split_part(m.sender,'@',1), 3)
               ELSE '+' || split_part(m.sender,'@',1)
             END
           ELSE NULL
