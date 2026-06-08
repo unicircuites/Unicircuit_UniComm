@@ -1223,6 +1223,12 @@ async function startWA(options = {}) {
         startLidResolutionWorker();
       }, 4000);
 
+      // After connect: fetch subjects for any groups with null name in DB
+      setTimeout(async () => {
+        if (generation !== socketGeneration || !isConnected || !phoneNumber) return;
+        try { await refreshCurrentAccountGroupMetadata(200); } catch(e) {}
+      }, 12000);
+
       // If DB is empty after connect, wait for history sync to arrive then resync.
       // Retries up to 6 times (max ~90s) to handle slow WhatsApp history delivery.
       (async () => {
@@ -1538,7 +1544,7 @@ async function startWA(options = {}) {
       for (const chat of chats) {
         const isGroup = chat.id.endsWith('@g.us');
         const name = isGroup
-          ? (chat.name || null)
+          ? (chat.subject || chat.name || null)
           : getContactName(chat.id, chat.name);
         await saveChat(chat.id, name, '', toDate(chat.conversationTimestamp), 0, isGroup);
       }
@@ -2820,7 +2826,9 @@ async function refreshCurrentAccountGroupMetadata(limit = 25) {
     FROM wa_chats
     WHERE account_phone=$1
       AND is_group=true
-    ORDER BY updated_at DESC NULLS LAST, last_time DESC NULLS LAST
+    ORDER BY
+      (name IS NULL OR name = '' OR name ~ '^[0-9]{10,}$') DESC,
+      updated_at DESC NULLS LAST, last_time DESC NULLS LAST
     LIMIT $2
   `, [accPhone, maxGroups])).rows.map(r => r.id);
 
@@ -3314,6 +3322,17 @@ async function flushCachedMediaToDisk() {
   return saved;
 }
 
-module.exports = { startWA, sendMessage, sendMediaMessage, logout, getStatus, getQR, requestQR, requestPhonePairingCode, setIO, getGroupMetadata, refreshCurrentAccountGroupMetadata, resyncDirectoryFromSocket, processLidResolutionBatch, startLidResolutionWorker, stopLidResolutionWorker, downloadMedia, msgCache, importExportedChat, getConnectedPhone, getLiveChats, getLiveMessages, isLidResolutionExhausted, getLidResolutionCooldownMins, updateGroupName, flushCachedMediaToDisk };
+function getGroupSubjectFromCache(jid) {
+  // Check contactsStore first (updated by groups.upsert/update events)
+  const stored = contactsStore[jid];
+  if (stored?.name && typeof stored.name === 'string' && stored.name.trim()) return stored.name.trim();
+  // Check groupMetadataCache (populated by getGroupMetadata calls)
+  for (const [key, val] of groupMetadataCache) {
+    if (key.startsWith(jid + '::') && val?.data?.subject) return val.data.subject;
+  }
+  return null;
+}
+
+module.exports = { startWA, sendMessage, sendMediaMessage, logout, getStatus, getQR, requestQR, requestPhonePairingCode, setIO, getGroupMetadata, getGroupSubjectFromCache, refreshCurrentAccountGroupMetadata, resyncDirectoryFromSocket, processLidResolutionBatch, startLidResolutionWorker, stopLidResolutionWorker, downloadMedia, msgCache, importExportedChat, getConnectedPhone, getLiveChats, getLiveMessages, isLidResolutionExhausted, getLidResolutionCooldownMins, updateGroupName, flushCachedMediaToDisk };
 
 

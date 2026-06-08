@@ -6087,10 +6087,11 @@
                       <th>Failed</th>
                       <th>Status</th>
                       <th>Date</th>
+                      <th></th>
                     </tr>
                   </thead>
                   <tbody id="wa-broadcast-tbody">
-                    <tr><td colspan="6" style="text-align:center;padding:20px;color:var(--muted);">No WA broadcasts yet</td></tr>
+                    <tr><td colspan="7" style="text-align:center;padding:20px;color:var(--muted);">No WA broadcasts yet</td></tr>
                   </tbody>
                 </table>
               </div>
@@ -6885,7 +6886,9 @@
         <button type="button" id="bc-btn-strike" class="btn btn-ghost btn-xs"
           onmousedown="bcToolbarMousedown(event)" onclick="bcExecCmd('strikeThrough');bcUpdateActiveButtons()"
           title="Strike"><s>S</s></button>
-        <!-- Text color -->
+        <button type="button" id="bc-btn-link" class="btn btn-ghost btn-xs"
+          onmousedown="bcToolbarMousedown(event)" onclick="bcInsertLink()"
+          title="Insert link"><i class="fas fa-link"></i></button>
         <div style="position:relative;display:inline-block;">
           <button type="button" id="bc-fgcolor-btn" onmousedown="bcToolbarMousedown(event)"
             onclick="bcToggleColorPicker('fg')" title="Text color"
@@ -10918,20 +10921,57 @@ Keep it concise and professional.`;
       }));
     }
 
-    // ── Marketing Suite: WA Broadcast history ────────────────────────────────
+    var _waBroadcastMap = {};
     async function loadWaBroadcasts() {
       var tbody = document.getElementById('wa-broadcast-tbody');
       if (!tbody) return;
       try {
         var res = await fetch(API_BASE + '/wa/broadcast', { headers: getAuthHeaders() });
         var list = await res.json();
-        if (!list.length) { tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:20px;color:var(--muted);">No WA broadcasts yet</td></tr>'; return; }
+        if (!list.length) { tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:20px;color:var(--muted);">No WA broadcasts yet</td></tr>'; return; }
+        _waBroadcastMap = {};
+        list.forEach(function(b) { _waBroadcastMap[b.id] = b; });
         tbody.innerHTML = list.map(function (b) {
           var sc = b.status === 'sent' ? 'b-green' : b.status === 'sending' ? 'b-gold' : b.status === 'failed' ? 'b-red' : 'b-gray';
           var dt = b.sent_at ? new Date(b.sent_at).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: '2-digit' }) : '—';
-          return '<tr><td style="max-width:240px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;"><i class="fab fa-whatsapp" style="color:var(--green2);margin-right:5px;"></i>' + (b.message || '') + '</td><td>' + (b.total || 0) + '</td><td style="color:var(--green2);">' + (b.sent || 0) + '</td><td style="color:var(--red2);">' + (b.failed || 0) + '</td><td><span class="badge ' + sc + '">' + (b.status || 'sending') + '</span></td><td style="font-size:11px;color:var(--muted);">' + dt + '</td></tr>';
+          return '<tr style="cursor:pointer;" onclick="openWaBroadcastPreview(' + b.id + ')"><td style="max-width:220px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;"><i class="fab fa-whatsapp" style="color:var(--green2);margin-right:5px;"></i>' + escHtml(b.message || '') + '</td><td>' + (b.total||0) + '</td><td style="color:var(--green2);">' + (b.sent||0) + '</td><td style="color:var(--red2);">' + (b.failed||0) + '</td><td><span class="badge ' + sc + '">' + (b.status||'sending') + '</span></td><td style="font-size:11px;color:var(--muted);">' + dt + '</td><td><button class="btn btn-red btn-xs" onclick="event.stopPropagation();deleteWaBroadcast(' + b.id + ',this)"><i class="fas fa-trash"></i></button></td></tr>';
         }).join('');
       } catch (err) { console.error('loadWaBroadcasts:', err); }
+    }
+
+    function openWaBroadcastPreview(id) {
+      var b = _waBroadcastMap[id];
+      if (!b) return;
+      var sc = b.status === 'sent' ? 'b-green' : b.status === 'sending' ? 'b-gold' : b.status === 'failed' ? 'b-red' : 'b-gray';
+      document.getElementById('wabp-total').textContent = b.total || 0;
+      document.getElementById('wabp-sent').textContent = b.sent || 0;
+      document.getElementById('wabp-failed').textContent = b.failed || 0;
+      document.getElementById('wabp-status').innerHTML = '<span class="badge ' + sc + '">' + (b.status||'sending') + '</span>';
+      document.getElementById('wabp-date').textContent = b.sent_at ? new Date(b.sent_at).toLocaleString('en-IN', { day:'2-digit', month:'short', year:'numeric', hour:'2-digit', minute:'2-digit' }) : '—';
+      document.getElementById('wabp-message').textContent = b.full_message || b.message || '';
+      // Recipients list
+      var rcpEl = document.getElementById('wabp-recipients-list');
+      var rcps = b.recipients || [];
+      if (typeof rcps === 'string') { try { rcps = JSON.parse(rcps); } catch(_) { rcps = []; } }
+      if (rcps.length) {
+        rcpEl.innerHTML = rcps.map(function(r) {
+          var label = r.name ? '<b style="color:var(--text);">' + escHtml(r.name) + '</b> <span style="color:var(--muted);font-size:11px;">' + escHtml(r.jid) + '</span>' : escHtml(r.jid);
+          return '<div style="padding:5px 0;border-bottom:1px solid rgba(255,255,255,0.05);font-size:12px;color:var(--muted2);">' + label + '</div>';
+        }).join('');
+      } else {
+        rcpEl.innerHTML = '<div style="font-size:12px;color:var(--muted);padding:8px 0;">No recipient data (sent before tracking was added)</div>';
+      }
+      openModal('wa-broadcast-preview-modal');
+    }
+
+    async function deleteWaBroadcast(id, btn) {
+      if (!confirm('Delete this WA broadcast record?')) return;
+      if (btn) btn.disabled = true;
+      try {
+        var res = await fetch(API_BASE + '/wa/broadcast/' + id, { method: 'DELETE', headers: getAuthHeaders() });
+        if (res.ok) { delete _waBroadcastMap[id]; loadWaBroadcasts(); }
+        else { if (btn) btn.disabled = false; }
+      } catch(e) { if (btn) btn.disabled = false; }
     }
 
     async function loadBroadcasts() {
@@ -11009,7 +11049,7 @@ Keep it concise and professional.`;
         if (!res.ok) throw new Error(chats.error || 'Failed to load WhatsApp chats');
         _bcWhatsAppTargets = (Array.isArray(chats) ? chats : []).filter(function (c) {
           return c && c.id && (c.id.indexOf('@s.whatsapp.net') > -1 || c.id.indexOf('@g.us') > -1 || c.is_group);
-        }).map(function (c) {
+        }).flatMap(function (c) {
           var rawId = c.id.split('@')[0].split(':')[0];
           var isGroup = !!c.is_group || c.id.indexOf('@g.us') > -1;
           // For groups: prefer the group info panel name (waAllChats keeps it fresh from
@@ -11020,12 +11060,14 @@ Keep it concise and professional.`;
             var waChat = waAllChats.find(function (x) { return x.id === c.id; });
             var groupInfoName = waChat && waChat.name && String(waChat.name).trim();
             var chatlistName = c.name && String(c.name).trim();
-            // WA Biz logic: if group info panel name differs from chatlist name, prefer group info panel name
-            name = (groupInfoName && groupInfoName !== chatlistName) ? groupInfoName : (chatlistName || groupInfoName || rawId);
+            // Prefer waAllChats name (fresher), fall back to chatlist name
+            name = groupInfoName || chatlistName;
+            // Skip groups whose only "name" is a numeric ID or the generic 'Group' fallback
+            if (!name || /^group$/i.test(name) || /^\d{10,}$/.test(name)) return [];
           } else {
             name = (c.name && String(c.name).trim()) || c.phone || rawId;
           }
-          return { jid: c.id, name: name, isGroup: isGroup, phone: c.phone || rawId };
+          return [{ jid: c.id, name: name, isGroup: isGroup, phone: c.phone || rawId }];
         });
         bcRenderWhatsAppPicker((document.getElementById('bc-wa-search') || {}).value || '');
       } catch (err) {
@@ -11136,10 +11178,17 @@ Keep it concise and professional.`;
     }
 
     function bcHtmlToWhatsAppText(html) {
-      var div = document.createElement('div');
-      div.innerHTML = String(html || '')
+      var s = String(html || '')
         .replace(/<br\s*\/?>/gi, '\n')
-        .replace(/<\/p>|<\/div>|<\/li>|<\/tr>/gi, '\n');
+        .replace(/<\/p>|<\/div>|<\/li>|<\/tr>/gi, '\n')
+        // Convert <a href="url">text</a> → "text (url)" — preserve link for WA
+        .replace(/<a\s[^>]*href=["']([^"']+)["'][^>]*>([\s\S]*?)<\/a>/gi, function(_, href, inner) {
+          var text = inner.replace(/<[^>]+>/g, '').trim();
+          var url = href.trim();
+          return text && url !== text ? text + ' (' + url + ')' : (url || text);
+        });
+      var div = document.createElement('div');
+      div.innerHTML = s;
       return (div.textContent || div.innerText || '').replace(/\n{3,}/g, '\n\n').trim();
     }
 
@@ -11912,7 +11961,9 @@ Keep it concise and professional.`;
           var waBodyText = bcHtmlToWhatsAppText(waPayload.body || htmlBody);
           var waMessage = msgBannerBuildWhatsAppText(waBannerCfg) + waBodyText;
           var waAttachments = waPayload.attachments || [];
-          var resWa = await fetch(API_BASE + '/wa/broadcast', { method: 'POST', headers: getAuthHeaders(), body: JSON.stringify({ recipients: waRecipients, message: waMessage, delay_ms: delay, attachments: waAttachments }) });
+          var waImageUrl = (waBannerCfg.enabled && waBannerCfg.showHeader !== false && waBannerCfg.imageUrl) ? waBannerCfg.imageUrl : '';
+          var waVarFields = emailNormalizeVariableFields(bcVariableFields);
+          var resWa = await fetch(API_BASE + '/wa/broadcast', { method: 'POST', headers: getAuthHeaders(), body: JSON.stringify({ recipients: waRecipients, message: waMessage, delay_ms: delay, attachments: waAttachments, image_url: waImageUrl, variable_fields: waVarFields }) });
           var dataWa = await resWa.json();
           if (resWa.ok) {
             if (statusEl) statusEl.innerHTML = '<span style="color:var(--green2);"><i class="fas fa-check"></i> WhatsApp broadcast started — ' + dataWa.total + ' recipients queued</span>';
@@ -12338,6 +12389,18 @@ Keep it concise and professional.`;
       return true;
     }
     function bcExecCmd(cmd) { if (!_bcRestoreFocus()) return; document.execCommand(cmd, false, null); }
+    function bcInsertLink() {
+      if (!_bcRestoreFocus()) return;
+      var url = prompt('Enter URL (e.g. https://example.com)');
+      if (!url) return;
+      if (!/^https?:\/\//i.test(url)) url = 'https://' + url;
+      document.execCommand('createLink', false, url);
+      var ed = bcGetEditor();
+      if (ed) ed.querySelectorAll('a:not([data-lk])').forEach(function(a) {
+        a.style.color = '#1a73e8'; a.setAttribute('title', a.href || url); a.setAttribute('data-lk','1');
+      });
+      bcUpdateActiveButtons();
+    }
     function bcSetFont(font) {
       if (!font || !_bcRestoreFocus()) return;
       try { document.execCommand('styleWithCSS', false, true); } catch (_) { }
@@ -12581,7 +12644,7 @@ Keep it concise and professional.`;
           var subj = document.getElementById('bc-subject');
           var body = document.getElementById('bc-html');
           if (subj && t.subject) subj.value = t.subject;
-          if (body && t.html_body) body.innerHTML = t.html_body;
+          if (body && t.html_body) { body.innerHTML = t.html_body; applyLinkTooltips(body); }
           bcVariableFields = emailNormalizeVariableFields(t.variable_fields || []);
           bcRefreshVariablesPanel();
           if (t.banner_config) {
@@ -12929,6 +12992,34 @@ Keep it concise and professional.`;
     window.addEventListener('DOMContentLoaded', () => {
       // Apply saved theme
       applyTheme(localStorage.getItem('uc_theme') || 'dark');
+
+      // Auto-add title tooltip to all <a href> links inside editors
+      window.applyLinkTooltips = function(root) {
+        (root || document).querySelectorAll('a[href]:not([title])').forEach(function(a) {
+          if (a.href) a.setAttribute('title', a.href);
+        });
+      };
+      var _linkObserver = new MutationObserver(function(mutations) {
+        mutations.forEach(function(m) {
+          m.addedNodes.forEach(function(n) {
+            if (n.nodeType === 1) {
+              if (n.tagName === 'A' && n.href && !n.title) n.setAttribute('title', n.href);
+              else applyLinkTooltips(n);
+            }
+          });
+        });
+      });
+      ['bc-html', 'compose-body', 'et-html-editor'].forEach(function(id) {
+        var el = document.getElementById(id);
+        if (el) { applyLinkTooltips(el); _linkObserver.observe(el, { childList: true, subtree: true }); }
+      });
+      // Also patch on modal open since editors may not exist yet at DOMContentLoaded
+      document.addEventListener('uc:modal:open', function() {
+        ['bc-html', 'compose-body', 'et-html-editor'].forEach(function(id) {
+          var el = document.getElementById(id);
+          if (el) { applyLinkTooltips(el); _linkObserver.observe(el, { childList: true, subtree: true }); }
+        });
+      });
 
       // Restore custom dropdown options added by user
       ucSelectRestoreAll();
@@ -16105,7 +16196,12 @@ Best regards,<br>
       oaAutoRestoreSelection(id);
       const url = prompt('Enter link URL');
       if (!url) return;
-      oaAutoFmt(id, 'createLink', url);
+      const fullUrl = /^https?:\/\//i.test(url) ? url : 'https://' + url;
+      oaAutoFmt(id, 'createLink', fullUrl);
+      const ed = document.getElementById(id);
+      if (ed) ed.querySelectorAll('a:not([data-lk])').forEach(a => {
+        a.style.color = '#1a73e8'; a.setAttribute('title', a.href || fullUrl); a.setAttribute('data-lk','1');
+      });
     }
 
     function oaAutoInsertTable(id) {
@@ -24854,7 +24950,7 @@ ${plainText}`;
       if (cfg.headline) lines.push('*' + String(cfg.headline).trim() + '*');
       if (cfg.subheadline) lines.push(String(cfg.subheadline).trim());
       if (cfg.footerLine) lines.push('_' + String(cfg.footerLine).trim() + '_');
-      if (cfg.showCta && cfg.ctaText) lines.push('👉 ' + String(cfg.ctaText).trim());
+      if (cfg.showCta && cfg.ctaText) lines.push('👉 ' + String(cfg.ctaText).trim() + (cfg.ctaUrl && cfg.ctaUrl !== '#' ? '\n' + String(cfg.ctaUrl).trim() : ''));
       if (!lines.length) return '';
       return lines.join('\n') + '\n────────────────\n\n';
     }
@@ -25362,7 +25458,7 @@ ${plainText}`;
 
     function etSetHTML(html) {
       var ed = etGetEditor();
-      if (ed) ed.innerHTML = html || '';
+      if (ed) { ed.innerHTML = html || ''; applyLinkTooltips(ed); }
     }
 
     function etMarkDirty() { /* hook for future autosave */ }
@@ -25835,6 +25931,19 @@ ${plainText}`;
     function composeExecCmd(cmd) {
       if (!_composeRestoreFocus()) return;
       document.execCommand(cmd, false, null);
+      composeSaveSelection();
+      composeUpdateActiveButtons();
+    }
+    function composeInsertLink() {
+      if (!_composeRestoreFocus()) return;
+      var url = prompt('Enter URL (e.g. https://example.com)');
+      if (!url) return;
+      if (!/^https?:\/\//i.test(url)) url = 'https://' + url;
+      document.execCommand('createLink', false, url);
+      var ed = document.getElementById('compose-body');
+      if (ed) ed.querySelectorAll('a:not([data-lk])').forEach(function(a) {
+        a.style.color = '#1a73e8'; a.setAttribute('title', a.href || url); a.setAttribute('data-lk','1');
+      });
       composeSaveSelection();
       composeUpdateActiveButtons();
     }
@@ -30970,6 +31079,9 @@ ${plainText}`;
           <button type="button" id="compose-btn-strike" class="btn btn-ghost btn-xs"
             onmousedown="composeToolbarMousedown(event)"
             onclick="composeExecCmd('strikeThrough');composeUpdateActiveButtons()" title="Strike"><s>S</s></button>
+          <button type="button" id="compose-btn-link" class="btn btn-ghost btn-xs"
+            onmousedown="composeToolbarMousedown(event)" onclick="composeInsertLink()"
+            title="Insert link"><i class="fas fa-link"></i></button>
           <div style="width:1px;height:18px;background:var(--border);margin:0 2px;"></div>
           <!-- Text color picker -->
           <div style="position:relative;display:inline-block;">
@@ -31262,6 +31374,33 @@ ${plainText}`;
           <i class="fas fa-sync-alt"></i> Refresh Log
         </button>
         <button class="btn btn-ghost btn-sm" onclick="closeModal('broadcast-preview-modal')">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- WA Broadcast Preview Modal -->
+  <div class="modal-overlay" id="wa-broadcast-preview-modal">
+    <div class="modal" style="max-width:760px;">
+      <div class="modal-title">
+        <span><i class="fab fa-whatsapp" style="color:var(--green2);margin-right:8px;"></i>WA Broadcast Details</span>
+        <span class="modal-close" onclick="closeModal('wa-broadcast-preview-modal')"><i class="fas fa-times"></i></span>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:10px;margin-bottom:14px;padding:12px;background:rgba(255,255,255,0.03);border-radius:8px;border:1px solid var(--border);">
+        <div><div style="font-size:9.5px;color:var(--muted);text-transform:uppercase;letter-spacing:0.5px;">Recipients</div><div id="wabp-total" style="font-size:20px;font-weight:800;color:#fff;margin-top:3px;">0</div></div>
+        <div><div style="font-size:9.5px;color:var(--muted);text-transform:uppercase;letter-spacing:0.5px;">Sent</div><div id="wabp-sent" style="font-size:20px;font-weight:800;color:var(--green2);margin-top:3px;">0</div></div>
+        <div><div style="font-size:9.5px;color:var(--muted);text-transform:uppercase;letter-spacing:0.5px;">Failed</div><div id="wabp-failed" style="font-size:20px;font-weight:800;color:var(--red2);margin-top:3px;">0</div></div>
+        <div><div style="font-size:9.5px;color:var(--muted);text-transform:uppercase;letter-spacing:0.5px;">Status</div><div id="wabp-status" style="margin-top:5px;"></div></div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:14px;">
+        <div><div style="font-size:9.5px;color:var(--muted);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:3px;">Date</div><div id="wabp-date" style="font-size:13px;font-weight:700;color:#fff;"></div></div>
+        <div><div style="font-size:9.5px;color:var(--muted);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:3px;">Channel</div><div style="font-size:13px;font-weight:700;color:var(--green2);"><i class="fab fa-whatsapp"></i> WhatsApp</div></div>
+      </div>
+      <div style="margin-bottom:6px;font-size:9.5px;color:var(--muted);text-transform:uppercase;letter-spacing:0.5px;">Full Message</div>
+      <div id="wabp-message" style="background:rgba(255,255,255,0.04);border:1px solid var(--border);border-radius:8px;padding:12px;font-size:13px;color:var(--text);white-space:pre-wrap;max-height:180px;overflow-y:auto;margin-bottom:14px;"></div>
+      <div style="margin-bottom:6px;font-size:9.5px;color:var(--muted);text-transform:uppercase;letter-spacing:0.5px;">Recipients</div>
+      <div id="wabp-recipients-list" style="background:rgba(255,255,255,0.04);border:1px solid var(--border);border-radius:8px;padding:8px 12px;max-height:200px;overflow-y:auto;"></div>
+      <div style="display:flex;justify-content:flex-end;margin-top:14px;">
+        <button class="btn btn-ghost btn-sm" onclick="closeModal('wa-broadcast-preview-modal')">Close</button>
       </div>
     </div>
   </div>

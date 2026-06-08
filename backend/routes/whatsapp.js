@@ -115,7 +115,7 @@ function pickContactLabel(row, phoneDigits, isGroup) {
     return candidate;
   }
 
-  if (isGroup) return 'Group';
+  if (isGroup) return '';  // no name found — will be hidden until refreshed from WA
   if (phoneDigits && isAllowedWaNumber(phoneDigits)) return formatDisplayPhone(phoneDigits);
   return '';
 }
@@ -166,11 +166,9 @@ function canonicalizeChats(rows) {
     
     if (!isGroup && !displayLabel) continue;
     
-    // 4. Groups must have a proper name. If we don't have the subject yet, skip rendering.
-    if (isGroup && (!displayLabel || isGroupishLabel(displayLabel, idLocal))) {
-       // Only allow if row.name has actual content not equal to the id
-       if (!row.name || isGroupishLabel(row.name, idLocal)) continue;
-    }
+    // 4. Groups with confirmed-bad names (numeric ID stored as name, raw JID) are hidden.
+    //    Groups with null/empty name are kept but will show as pending until subject is fetched.
+    if (isGroup && row.name && isGroupishLabel(row.name, idLocal)) continue;
 
     // Group-only members belong in group info, not the main chat list.
     if (!isGroup && row.is_group_member && !row.last_time && !String(row.last_message || '').trim()) continue;
@@ -511,7 +509,24 @@ router.get('/chats', authenticate, async (req, res) => {
         sample,
       });
     }
+    // Enrich null-name groups from in-memory cache (contactsStore / groupMetadataCache)
+    // This fills names immediately without waiting for a DB round-trip
+    for (const row of result.rows) {
+      if (row.is_group && !row.name) {
+        const cached = wa.getGroupSubjectFromCache(row.id);
+        if (cached) row.name = cached;
+      }
+    }
+
     res.json(canonicalizeChats(result.rows));
+
+    // Background: fetch group subjects from WA for groups still with null name, patch DB
+    const nullNameGroups = result.rows.filter(r => r.is_group && !r.name);
+    if (nullNameGroups.length > 0) {
+      setImmediate(() => {
+        wa.refreshCurrentAccountGroupMetadata(Math.min(nullNameGroups.length + 10, 200)).catch(() => {});
+      });
+    }
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
@@ -930,22 +945,62 @@ router.post('/send', authenticate, async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-// ── WA Broadcast history (in-memory, last 100) ─────────────────────────────
-const waBroadcastHistory = [];
-let waBroadcastIdSeq = 1;
+// ── WA Broadcast History (DB-backed) ─────────────────────────────────────────
+pool.query(`
+  CREATE TABLE IF NOT EXISTS wa_broadcast_history (
+    id            SERIAL PRIMARY KEY,
+    message       TEXT,
+    full_message  TEXT,
+    recipients    JSONB,
+    total         INT DEFAULT 0,
+    sent          INT DEFAULT 0,
+    failed        INT DEFAULT 0,
+    status        VARCHAR(20) DEFAULT 'sending',
+    sent_at       TIMESTAMPTZ DEFAULT NOW()
+  )
+`).catch(e => console.error('[WA] wa_broadcast_history init:', e.message));
+// Migrate existing table if columns missing
+pool.query(`ALTER TABLE wa_broadcast_history ADD COLUMN IF NOT EXISTS full_message TEXT`).catch(()=>{});
+pool.query(`ALTER TABLE wa_broadcast_history ADD COLUMN IF NOT EXISTS recipients JSONB`).catch(()=>{});
 
-router.get('/broadcast', authenticate, (req, res) => {
-  res.json([...waBroadcastHistory].reverse());
+router.get('/broadcast', authenticate, async (req, res) => {
+  try {
+    const rows = await pool.query(`SELECT id, message, full_message, recipients, total, sent, failed, status, sent_at FROM wa_broadcast_history ORDER BY sent_at DESC LIMIT 100`);
+    res.json(rows.rows);
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+router.delete('/broadcast/:id', authenticate, async (req, res) => {
+  try {
+    await pool.query(`DELETE FROM wa_broadcast_history WHERE id=$1`, [req.params.id]);
+    res.json({ success: true });
+  } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
 router.post('/broadcast', authenticate, async (req, res) => {
-  const { recipients, message, delay_ms, attachments } = req.body;
+  const { recipients, message, delay_ms, attachments, image_url, variable_fields } = req.body;
   const targets = Array.isArray(recipients) ? recipients : [];
   const text = String(message || '').trim();
   const files = Array.isArray(attachments) ? attachments.slice(0, 10) : [];
+  const imageUrl = String(image_url || '').trim();
+  const varFields = Array.isArray(variable_fields) ? variable_fields : [];
 
   if (!targets.length) return res.status(400).json({ error: 'recipients[] required' });
-  if (!text && !files.length) return res.status(400).json({ error: 'message or attachments required' });
+  if (!text && !files.length && !imageUrl) return res.status(400).json({ error: 'message or attachments required' });
+
+  // Build fixed variable substitutions (non-recipient fields)
+  function applyVarFields(tmpl, recipientName) {
+    let out = String(tmpl || '');
+    for (const f of varFields) {
+      const key = String(f.key || '').trim();
+      if (!key) continue;
+      const val = f.source === 'recipient'
+        ? (recipientName || '')
+        : String(f.value || '').trim();
+      out = out.replace(new RegExp('\\{\\{' + key.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\}\\}', 'g'), val);
+    }
+    return out;
+  }
 
   const ownPhone = String(wa.getConnectedPhone() || '').replace(/\D/g, '');
 
@@ -978,17 +1033,31 @@ router.post('/broadcast', authenticate, async (req, res) => {
   const wait = (ms) => new Promise(resolve => setTimeout(resolve, ms));
   const delay = Math.max(500, Math.min(parseInt(delay_ms || 2000, 10) || 2000, 24 * 60 * 60 * 1000));
 
-  const histEntry = {
-    id: waBroadcastIdSeq++,
-    message: text.length > 120 ? text.slice(0, 120) + '…' : text,
-    total: normalized.length,
-    sent: 0,
-    failed: 0,
-    status: 'sending',
-    sent_at: new Date().toISOString(),
-  };
-  waBroadcastHistory.push(histEntry);
-  if (waBroadcastHistory.length > 100) waBroadcastHistory.shift();
+  const dbRow = await pool.query(
+    `INSERT INTO wa_broadcast_history (message, full_message, recipients, total, sent, failed, status, sent_at) VALUES ($1,$2,$3,$4,0,0,'sending',NOW()) RETURNING id`,
+    [text.length > 120 ? text.slice(0, 120) + '…' : text, text, JSON.stringify(normalized.map(r => ({ jid: r.jid, name: r.name }))), normalized.length]
+  );
+  const histId = dbRow.rows[0].id;
+
+  // Pre-fetch image from URL if provided (once for all recipients)
+  let imageBuf = null, imageMime = 'image/jpeg';
+  if (imageUrl) {
+    try {
+      const https = require('https'), http = require('http');
+      const proto = imageUrl.startsWith('https') ? https : http;
+      imageBuf = await new Promise((resolve, reject) => {
+        proto.get(imageUrl, res => {
+          imageMime = res.headers['content-type'] || 'image/jpeg';
+          const chunks = [];
+          res.on('data', c => chunks.push(c));
+          res.on('end', () => resolve(Buffer.concat(chunks)));
+          res.on('error', reject);
+        }).on('error', reject);
+      });
+    } catch (e) {
+      console.warn('[WA Broadcast] Could not fetch image URL:', e.message);
+    }
+  }
 
   res.json({ success: true, total: normalized.length, queued: normalized.length });
 
@@ -997,7 +1066,18 @@ router.post('/broadcast', authenticate, async (req, res) => {
     let failed = 0;
     for (let i = 0; i < normalized.length; i++) {
       const target = normalized[i];
+      const msg = applyVarFields(text, target.name);
       try {
+        if (imageBuf) {
+          await wa.sendMediaMessage(target.jid, {
+            buffer: imageBuf,
+            filename: 'image.jpg',
+            mimetype: imageMime,
+            mediaType: 'image',
+            caption: msg,
+          }, null);
+          if (files.length) await wait(800);
+        }
         if (files.length) {
           for (let f = 0; f < files.length; f++) {
             const att = files[f] || {};
@@ -1013,12 +1093,12 @@ router.post('/broadcast', authenticate, async (req, res) => {
               filename: att.name || att.fileName || 'broadcast-attachment',
               mimetype: mime,
               mediaType,
-              caption: f === 0 ? text : '',
+              caption: f === 0 && !imageBuf ? msg : '',
             }, null);
             if (f < files.length - 1) await wait(800);
           }
-        } else {
-          await wa.sendMessage(target.jid, text, null);
+        } else if (!imageBuf) {
+          await wa.sendMessage(target.jid, msg, null);
         }
         sent += 1;
       } catch (err) {
@@ -1028,9 +1108,10 @@ router.post('/broadcast', authenticate, async (req, res) => {
       if (i < normalized.length - 1) await wait(delay);
     }
     console.log(`[WA Broadcast] Done - sent:${sent} failed:${failed}`);
-    histEntry.sent = sent;
-    histEntry.failed = failed;
-    histEntry.status = failed === normalized.length ? 'failed' : 'sent';
+    await pool.query(
+      `UPDATE wa_broadcast_history SET sent=$1, failed=$2, status=$3 WHERE id=$4`,
+      [sent, failed, failed === normalized.length ? 'failed' : 'sent', histId]
+    ).catch(e => console.error('[WA Broadcast] history update:', e.message));
   })().catch(err => console.error('[WA Broadcast] Worker error:', err.message));
 });
 
@@ -1274,15 +1355,18 @@ router.get('/contacts/search', authenticate, async (req, res) => {
             OR ($3 <> '' AND regexp_replace(COALESCE(ec.phone,''),'[^0-9]','','g') LIKE $4)
           )
         UNION ALL
-        -- WA groups from wa_chats
+        -- WA groups from wa_chats (only groups with a real non-numeric name)
         SELECT c.id AS jid,
-          COALESCE(NULLIF(c.name,''), split_part(c.id,'@',1)) AS name,
+          c.name AS name,
           '' AS phone,
           true AS is_group
         FROM wa_chats c
         WHERE c.account_phone = $1
           AND c.id LIKE '%@g.us'
-          AND COALESCE(c.name,'') ILIKE $2
+          AND c.name IS NOT NULL AND c.name != ''
+          AND c.name !~ '^[0-9]{10,}$'
+          AND c.name NOT ILIKE 'group'
+          AND c.name ILIKE $2
       ) t
       ORDER BY is_group ASC, name ASC
       LIMIT 20

@@ -150,6 +150,8 @@ function validateInput(req, res, next) {
       '/api/wa/send',
       '/wa/send-media',
       '/api/wa/send-media',
+      '/wa/broadcast',
+      '/api/wa/broadcast',
       '/recordings',
       '/api/calls/recordings',
       '/api/pbx/db-recordings',
