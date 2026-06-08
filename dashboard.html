@@ -248,6 +248,24 @@
       background: var(--card2);
     }
 
+    .wa-date-divider {
+      color: rgba(255,255,255,0.6);
+      background: rgba(255,255,255,0.06);
+    }
+
+    html.light .wa-date-divider {
+      color: var(--muted);
+      background: rgba(0,0,0,0.06);
+    }
+
+    html.light #wa-progress-wrap [style*="rgba(255,255,255,0.08)"] {
+      background: rgba(0,0,0,0.1) !important;
+    }
+
+    html.light .wa-bubble button[style*="rgba(255,255,255,0.06)"] {
+      background: rgba(0,0,0,0.04) !important;
+    }
+
     html.light .wa-bubble.wa-in {
       background: var(--card2);
     }
@@ -3085,6 +3103,17 @@
       transition: width 0.8s ease;
     }
 
+    @keyframes wa-indeterminate {
+      0%   { transform: translateX(-100%) scaleX(0.5); }
+      50%  { transform: translateX(50%)   scaleX(0.6); }
+      100% { transform: translateX(200%)  scaleX(0.5); }
+    }
+    .wa-prog-indeterminate {
+      animation: wa-indeterminate 1.2s ease-in-out infinite !important;
+      width: 45% !important;
+      transform-origin: left center;
+    }
+
     /* MISC */
     .separator {
       width: 1px;
@@ -5555,23 +5584,37 @@
           <!-- Connected status bar -->
           <div id="wa-status-bar" style="display:none;margin-bottom:10px;">
             <div
-              style="background:rgba(37,211,102,0.08);border:1px solid rgba(37,211,102,0.2);border-radius:8px;padding:8px 14px;display:flex;align-items:center;gap:10px;">
-              <span class="live-pulse"></span>
-              <span style="font-size:12.5px;font-weight:600;color:var(--green2);">WhatsApp Connected</span>
-              <span id="wa-phone-display" style="font-size:12px;color:var(--muted);"></span>
-              <span id="wa-sync-status" style="font-size:12px;color:var(--text);font-weight:600;margin-left:8px;flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;"></span>
-              <button class="btn btn-green btn-xs" id="wa-sync-btn" onclick="waSync()" style="margin-left:auto;"><i
-                  class="fas fa-sync-alt"></i> Sync</button>
-              <button class="btn btn-ghost btn-xs" onclick="waRefreshChats()"><i class="fas fa-redo"></i>
-                Reload</button>
-              <button class="btn btn-blue btn-xs" onclick="waOpenImport()" title="Import WhatsApp exported .txt chat"><i
-                  class="fas fa-file-import"></i> Import Chat</button>
-              <button class="btn btn-ghost btn-xs" onclick="waCreateBackup()" title="Create a safe backup for the currently linked WhatsApp account"><i
-                  class="fas fa-archive"></i> Backup</button>
-              <button class="btn btn-ghost btn-xs" onclick="waOpenBackupInventory()" title="Load chats from a saved backup for this same WhatsApp account"><i
-                  class="fas fa-database"></i> Load Backup</button>
-              <button class="btn btn-red btn-xs" onclick="waLogout()"><i class="fas fa-sign-out-alt"></i>
-                Disconnect</button>
+              style="background:rgba(37,211,102,0.08);border:1px solid rgba(37,211,102,0.2);border-radius:8px;padding:8px 14px;display:flex;flex-direction:column;gap:5px;">
+              <div style="display:flex;align-items:center;gap:10px;">
+                <span class="live-pulse"></span>
+                <span style="font-size:12.5px;font-weight:600;color:var(--green2);">WhatsApp Connected</span>
+                <span id="wa-phone-display" style="font-size:12px;color:var(--muted);"></span>
+                <span id="wa-sync-status" style="font-size:12px;color:var(--text);font-weight:600;margin-left:8px;flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;"></span>
+                <button class="btn btn-green btn-xs" id="wa-sync-btn" onclick="waSync()" style="margin-left:auto;"><i class="fas fa-sync-alt"></i> Sync</button>
+                <button class="btn btn-ghost btn-xs" onclick="waRefreshChats()"><i class="fas fa-redo"></i> Reload</button>
+                <button class="btn btn-blue btn-xs" onclick="waOpenImport()" title="Import WhatsApp exported .txt chat"><i class="fas fa-file-import"></i> Import Chat</button>
+                <button class="btn btn-ghost btn-xs" onclick="waCreateBackup()" title="Create a safe backup for the currently linked WhatsApp account"><i class="fas fa-archive"></i> Backup</button>
+                <button class="btn btn-ghost btn-xs" onclick="waOpenBackupInventory()" title="Load chats from a saved backup for this same WhatsApp account"><i class="fas fa-database"></i> Load Backup</button>
+                <button class="btn btn-red btn-xs" onclick="waLogout()"><i class="fas fa-sign-out-alt"></i> Disconnect</button>
+                <button class="btn btn-red btn-xs" onclick="waPurgeAll()" title="Wipe all WA chats, contacts, messages, media and session — forces fresh re-sync"><i class="fas fa-trash-alt"></i> Reset WA Data</button>
+              </div>
+              <!-- Progress bars: chat loading + LID resolution -->
+              <div id="wa-progress-wrap" style="display:none;gap:6px;flex-direction:column;">
+                <div style="display:flex;align-items:center;gap:8px;">
+                  <span style="font-size:10px;color:var(--muted);white-space:nowrap;width:82px;">Chats loaded</span>
+                  <div style="flex:1;height:6px;background:rgba(255,255,255,0.08);border-radius:4px;overflow:hidden;position:relative;">
+                    <div id="wa-prog-chats" style="height:100%;background:#25D366;border-radius:4px;width:0%;transition:width 0.35s ease;"></div>
+                  </div>
+                  <span id="wa-prog-chats-pct" style="font-size:10px;font-weight:700;color:#25D366;min-width:62px;text-align:right;white-space:nowrap;">--</span>
+                </div>
+                <div style="display:flex;align-items:center;gap:8px;">
+                  <span style="font-size:10px;color:var(--muted);white-space:nowrap;width:82px;">LID resolved</span>
+                  <div style="flex:1;height:6px;background:rgba(255,255,255,0.08);border-radius:4px;overflow:hidden;position:relative;">
+                    <div id="wa-prog-lid" style="height:100%;background:#3b8cff;border-radius:4px;width:0%;transition:width 0.35s ease;"></div>
+                  </div>
+                  <span id="wa-prog-lid-pct" style="font-size:10px;font-weight:700;color:#3b8cff;min-width:62px;text-align:right;white-space:nowrap;">--</span>
+                </div>
+              </div>
             </div>
           </div>
 
@@ -5998,6 +6041,58 @@
                   <span class="stat-label">Click Rate</span>
                   <span class="stat-val" id="mkt-oto-click-rate" style="color:var(--gold2);">0%</span>
                 </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Templates List -->
+          <div style="margin-top:16px;margin-bottom:16px;">
+            <div class="card">
+              <div class="card-header">
+                <h3><i class="fas fa-file-alt" style="color:var(--gold);"></i> Email Templates</h3>
+                <div style="display:flex;gap:6px;align-items:center;">
+                  <button class="btn btn-ghost btn-xs" onclick="mktLoadTemplates()"><i class="fas fa-sync-alt"></i> Refresh</button>
+                  <button class="btn btn-gold btn-sm" onclick="openEmailTemplates()"><i class="fas fa-plus"></i> New Template</button>
+                </div>
+              </div>
+              <div style="padding:10px 0 4px;">
+                <div class="search-box" style="padding:5px 10px;margin-bottom:8px;">
+                  <i class="fas fa-search" style="font-size:10px;"></i>
+                  <input id="mkt-tmpl-search" placeholder="Search templates..." style="font-size:11.5px;" oninput="mktFilterTemplates(this.value)" />
+                </div>
+                <div id="mkt-templates-list" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:8px;max-height:220px;overflow-y:auto;padding:0 2px 4px;">
+                  <div style="text-align:center;padding:20px;color:var(--muted);font-size:12px;grid-column:1/-1;">Loading...</div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- WA Broadcast -->
+          <div style="margin-top:16px;margin-bottom:16px;">
+            <div class="card">
+              <div class="card-header">
+                <h3><i class="fab fa-whatsapp" style="color:var(--green2);"></i> WhatsApp Broadcast</h3>
+                <div style="display:flex;gap:6px;align-items:center;">
+                  <button class="btn btn-ghost btn-xs" onclick="loadWaBroadcasts()"><i class="fas fa-sync-alt"></i> Refresh</button>
+                  <button class="btn btn-green btn-sm" onclick="openModal('broadcast-modal');bcSetChannel('whatsapp');bcLoadTemplates();bcLoadGroupsDropdown();"><i class="fas fa-plus"></i> New Broadcast</button>
+                </div>
+              </div>
+              <div style="overflow-x:auto;">
+                <table class="data-table" id="wa-broadcast-table">
+                  <thead>
+                    <tr>
+                      <th>Message</th>
+                      <th>Recipients</th>
+                      <th>Sent</th>
+                      <th>Failed</th>
+                      <th>Status</th>
+                      <th>Date</th>
+                    </tr>
+                  </thead>
+                  <tbody id="wa-broadcast-tbody">
+                    <tr><td colspan="6" style="text-align:center;padding:20px;color:var(--muted);">No WA broadcasts yet</td></tr>
+                  </tbody>
+                </table>
               </div>
             </div>
           </div>
@@ -6972,8 +7067,20 @@
         <button type="button" class="btn btn-ghost btn-xs" onclick="openGroupsManager()"><i
             class="fas fa-cog"></i> Manage Groups</button>
       </div>
-      <textarea class="inp" id="bc-recipients" rows="5"
-        placeholder="john@company.com&#10;Jane Doe &lt;jane@company.com&gt;&#10;sales@client.in"></textarea>
+      <!-- WA group picker (shown only when WA channel) -->
+      <div id="bc-wa-group-tools" style="display:none;gap:6px;align-items:center;margin-bottom:8px;flex-wrap:wrap;">
+        <select id="bc-wa-group-select" class="inp" style="font-size:12px;padding:5px 8px;flex:1;min-width:160px;">
+          <option value="">— Load from a WA group —</option>
+        </select>
+        <button type="button" class="btn btn-green btn-xs" onclick="bcLoadFromWaGroup()"><i class="fas fa-users"></i> Load Group</button>
+        <button type="button" class="btn btn-ghost btn-xs" onclick="openWaGroupsManager()"><i class="fas fa-cog"></i> Manage WA Groups</button>
+      </div>
+      <div style="position:relative;">
+        <textarea class="inp" id="bc-recipients" rows="5"
+          placeholder="john@company.com&#10;Jane Doe &lt;jane@company.com&gt;&#10;sales@client.in"
+          oninput="bcRecipientsInput(this)" onkeydown="bcRecipientsKeydown(event)" autocomplete="off"></textarea>
+        <div id="bc-typeahead" style="display:none;position:absolute;left:0;right:0;top:100%;z-index:500;background:var(--card);border:1px solid var(--border2);border-radius:0 0 8px 8px;max-height:200px;overflow-y:auto;box-shadow:0 8px 24px rgba(0,0,0,0.35);"></div>
+      </div>
       <div style="margin-top:5px;display:flex;gap:8px;align-items:center;">
         <span id="bc-recipient-count" style="font-size:11px;color:var(--muted);">0 recipients</span>
         <button id="bc-load-contacts-btn" class="btn btn-ghost btn-xs" onclick="bcLoadFromContacts()"><i
@@ -7014,6 +7121,29 @@
       <button class="btn btn-ghost" onclick="closeModal('broadcast-modal')">Cancel</button>
     </div>
     <div id="bc-status" style="margin-top:10px;font-size:12px;text-align:center;"></div>
+  </div>
+</div>
+
+<!-- ██████ WA GROUPS MANAGER MODAL ██████ -->
+<div class="modal-overlay" id="wa-groups-modal">
+  <div class="modal" style="max-width:820px;width:96vw;max-height:90vh;overflow-y:auto;">
+    <div class="modal-title">
+      <span><i class="fab fa-whatsapp" style="color:#25D366;margin-right:8px;"></i>WA Broadcast Groups</span>
+      <span class="modal-close" onclick="closeModal('wa-groups-modal')"><i class="fas fa-times"></i></span>
+    </div>
+    <div style="display:grid;grid-template-columns:240px 1fr;gap:16px;min-height:420px;">
+      <!-- Left: groups list -->
+      <div style="display:flex;flex-direction:column;gap:8px;">
+        <button class="btn btn-green btn-xs" style="justify-content:center;" onclick="waGrpShowCreate()"><i class="fas fa-plus"></i> New Group</button>
+        <div id="wa-grp-list" style="flex:1;overflow-y:auto;display:flex;flex-direction:column;gap:6px;max-height:440px;">
+          <div style="text-align:center;padding:20px;color:var(--muted);font-size:12px;">Loading…</div>
+        </div>
+      </div>
+      <!-- Right: detail / create -->
+      <div id="wa-grp-detail" style="display:flex;flex-direction:column;gap:10px;">
+        <div style="text-align:center;padding:40px;color:var(--muted);font-size:13px;">Select a group or create one</div>
+      </div>
+    </div>
   </div>
 </div>
 
@@ -7062,13 +7192,25 @@
             <i class="fas fa-users"></i> Load Group
           </button>
         </div>
+        <!-- WA broadcast group picker — shown when channel is WhatsApp or Both -->
+        <div id="nc-wa-group-row" style="display:none;margin-top:6px;display:none;gap:6px;align-items:center;">
+          <select id="nc-wa-group-select" class="inp" style="flex:1;font-size:12px;padding:5px 8px;">
+            <option value="">— Load from a WA broadcast group —</option>
+          </select>
+          <button type="button" class="btn btn-green btn-xs" onclick="ncLoadFromWaGroup()">
+            <i class="fab fa-whatsapp"></i> Load WA Group
+          </button>
+          <button type="button" class="btn btn-ghost btn-xs" onclick="openWaGroupsManager()">
+            <i class="fas fa-cog"></i>
+          </button>
+        </div>
         <div style="margin-top:5px;display:flex;gap:8px;align-items:center;">
           <span id="nc-group-count" style="font-size:11px;color:var(--muted);">No group selected</span>
         </div>
       </div>
 
       <div class="form-row">
-        <div><label class="form-label">Channel</label><select class="inp" id="nc-channel">
+        <div><label class="form-label">Channel</label><select class="inp" id="nc-channel" onchange="ncToggleWaGroupRow(this.value)">
             <option>Email</option>
             <option>WhatsApp</option>
             <option>Both</option>
@@ -7385,7 +7527,7 @@ Always write in a professional yet warm Indian B2B communication style. Use form
       if (id === 'contacts') refreshContactsSection();
       if (id === 'whatsapp') checkWAStatus(true);
       if (id === 'calls') { initWASocket(); refreshPbxCallLogsLatest('nav'); }
-      if (id === 'marketing') { initWASocket(); loadMarketingData(); loadBroadcasts(); }
+      if (id === 'marketing') { initWASocket(); loadMarketingData(); loadBroadcasts(); loadWaBroadcasts(); mktLoadTemplates(); }
       if (id === 'email') { checkOutlookStatus(); loadOutlookFolders(); loadInbox(); }
       if (id === 'ai') initAIChat();
     }
@@ -7449,7 +7591,7 @@ Always write in a professional yet warm Indian B2B communication style. Use form
       if (id === 'compose-email-modal') {
         setTimeout(() => initializeComposeDraft(), 100);
       }
-      if (id === 'broadcast-modal') msgBannerMountPanel('bc');
+      if (id === 'broadcast-modal') { msgBannerMountPanel('bc'); bcEnsureContactsCache(); }
       if (id === 'email-templates-modal') msgBannerMountPanel('et');
       if (id === 'campaign-modal') msgBannerMountPanel('nc');
 
@@ -9176,7 +9318,12 @@ Always write in a professional yet warm Indian B2B communication style. Use form
             window.location.href = 'login.html';
             return;
           }
-          if (res.ok) waAllChats = await res.json();
+          if (res.status === 409) {
+            el.innerHTML = '<div style="padding:24px;text-align:center;color:var(--muted);font-size:12.5px;"><i class="fab fa-whatsapp" style="font-size:28px;color:rgba(37,211,102,0.3);display:block;margin-bottom:10px;"></i>WhatsApp not connected.<br><span style="font-size:11px;">Connect under <strong>WhatsApp Biz</strong> to see contacts here.</span></div>';
+            return;
+          }
+          if (!res.ok) throw new Error('HTTP ' + res.status);
+          waAllChats = await res.json();
         }
         filterContacts();
       } catch (_) {
@@ -9195,17 +9342,19 @@ Always write in a professional yet warm Indian B2B communication style. Use form
         return;
       }
       el.innerHTML = list.map(c => {
+        const isGroup = String(c.id || '').endsWith('@g.us');
         const name = c.name || c.phone || (c.id && c.id.split('@')[0]) || 'Chat';
         const initials = name.split(' ').map(w => w[0] || '').join('').toUpperCase().slice(0, 2) || '?';
         const time = c.last_time ? new Date(c.last_time).toLocaleString('en-IN', { dateStyle: 'short', timeStyle: 'short' }) : '';
         const unread = c.unread > 0 ? `<span class="badge b-green" style="margin-left:6px;">${c.unread}</span>` : '';
+        const subtitle = isGroup ? '<span style="font-size:10px;background:rgba(37,211,102,0.12);color:#25D366;border-radius:3px;padding:1px 5px;">Group</span>' : escHtml(c.phone || '');
         return `
     <div class="contact-card" onclick='showWaDirectoryDetail(${JSON.stringify(c.id)}, this)'>
       <div style="display:flex;align-items:center;gap:11px;">
         <div class="contact-avatar" style="background:rgba(37,211,102,0.15);color:#25D366;">${escHtml(initials)}</div>
         <div style="flex:1;min-width:0;">
           <div style="font-weight:700;font-size:13.5px;color:var(--text);">${escHtml(name)}</div>
-          <div style="font-size:11.5px;color:var(--muted);margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escHtml(c.phone || c.id || '')}</div>
+          <div style="font-size:11.5px;color:var(--muted);margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${subtitle}</div>
         </div>
         <div style="text-align:right;font-size:10px;color:var(--muted);">${escHtml(time)}${unread}</div>
       </div>
@@ -9213,7 +9362,7 @@ Always write in a professional yet warm Indian B2B communication style. Use form
       }).join('');
     }
 
-    function showWaDirectoryDetail(jid, cardEl) {
+    async function showWaDirectoryDetail(jid, cardEl) {
       if (cardEl) {
         document.querySelectorAll('#contact-list .contact-card').forEach(e => e.classList.remove('selected'));
         cardEl.classList.add('selected');
@@ -9222,20 +9371,69 @@ Always write in a professional yet warm Indian B2B communication style. Use form
       const name = c ? (c.name || c.phone || jid.split('@')[0]) : jid.split('@')[0];
       const phone = (c && c.phone) ? c.phone : '';
       const last = c && c.last_message ? String(c.last_message).slice(0, 160) : '—';
-      document.getElementById('contact-detail-panel').innerHTML = `
+      const isGroup = jid.endsWith('@g.us');
+
+      const panel = document.getElementById('contact-detail-panel');
+
+      // Render base panel immediately
+      panel.innerHTML = `
     <div class="card" style="animation:fadeUp 0.2s ease;">
       <div style="padding:18px 20px;border-bottom:1px solid var(--border);">
-        <div class="section-label"><i class="fab fa-whatsapp" style="color:#25D366;"></i> WhatsApp</div>
+        <div class="section-label"><i class="fab fa-whatsapp" style="color:#25D366;"></i> WhatsApp${isGroup ? ' <span style="font-size:10px;background:rgba(37,211,102,0.12);color:#25D366;border-radius:3px;padding:1px 6px;margin-left:4px;">Group</span>' : ''}</div>
         <div style="font-size:17px;font-weight:800;color:var(--text);margin-top:8px;">${escHtml(name)}</div>
       </div>
+      ${phone ? `<div style="color:var(--gold);font-family:'JetBrains Mono';font-size:14px;padding:4px 20px 0;">${escHtml(phone)}</div>` : ''}
       <div style="padding:14px 20px;border-bottom:1px solid var(--border);">
+        ${phone ? `<div class="stat-row"><div class="stat-label">Phone</div><div class="stat-val" style="font-size:12px;font-family:'JetBrains Mono';">${escHtml(phone)}</div></div>` : ''}
         <div class="stat-row"><div class="stat-label">JID</div><div class="stat-val" style="font-size:11px;word-break:break-all;">${escHtml(jid)}</div></div>
         <div class="stat-row"><div class="stat-label">Last message</div><div class="stat-val" style="font-size:12px;">${escHtml(last)}</div></div>
       </div>
+      ${isGroup ? `<div id="wa-group-members-section" style="padding:12px 20px;border-bottom:1px solid var(--border);"><div style="font-size:11px;color:var(--muted);"><span class="spin-loader" style="width:12px;height:12px;"></span> Loading members…</div></div>` : ''}
       <div style="padding:14px 20px;">
         <button type="button" class="btn btn-green btn-sm" onclick='openWhatsAppChatFromContacts(${JSON.stringify(jid)}, ${JSON.stringify(name)}, ${JSON.stringify(phone)})'><i class="fab fa-whatsapp"></i> Open in WhatsApp module</button>
       </div>
     </div>`;
+
+      // For groups: fetch and render members
+      if (isGroup) {
+        try {
+          const r = await fetch(`${API_BASE}/wa/group/${encodeURIComponent(jid)}?limit=500`, { headers: getAuthHeaders() });
+          const gData = r.ok ? await r.json() : null;
+          const membersEl = document.getElementById('wa-group-members-section');
+          if (!membersEl) return;
+          const members = gData && Array.isArray(gData.participants) ? gData.participants : [];
+          if (!members.length) {
+            membersEl.innerHTML = '<div style="font-size:11.5px;color:var(--muted);padding:4px 0;">No members found.</div>';
+            return;
+          }
+          membersEl.innerHTML =
+            `<div style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px;">Members (${gData.total_participants || members.length})</div>` +
+            `<div style="max-height:260px;overflow-y:auto;margin:0 -20px;padding:0 20px;">` +
+            members.map(p => {
+              const pName = escHtml(p.name || p.phone || p.jid.split('@')[0]);
+              const pPhone = escHtml(p.phone || '');
+              const adminBadge = p.admin ? '<span style="font-size:9px;color:var(--gold);border:1px solid rgba(255,215,0,0.4);border-radius:3px;padding:0 4px;margin-left:4px;">Admin</span>' : '';
+              // Check if this member has an existing chat in waAllChats
+              const pJidNorm = p.phone ? p.phone.replace(/\D/g,'') + '@s.whatsapp.net' : p.jid;
+              const hasChat = waAllChats.some(x => x.id === pJidNorm || x.id === p.jid);
+              const btnLabel = hasChat ? 'Open Chat' : 'New Chat';
+              const btnTitle = hasChat ? 'Open existing chat' : 'Start new chat';
+              // Only show button for individuals with a resolvable JID
+              const canChat = p.jid && !p.jid.endsWith('@g.us');
+              return `<div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid var(--border);">
+                <div style="width:28px;height:28px;border-radius:50%;background:rgba(37,211,102,0.12);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:#25D366;flex-shrink:0;">${pName.charAt(0).toUpperCase()}</div>
+                <div style="flex:1;min-width:0;">
+                  <div style="font-size:12.5px;font-weight:600;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${pName}${adminBadge}</div>
+                  ${pPhone ? `<div style="font-size:10.5px;color:var(--muted);font-family:'JetBrains Mono';">${pPhone}</div>` : ''}
+                </div>
+                ${canChat ? `<button type="button" class="btn btn-green btn-xs" title="${btnTitle}" onclick='openWhatsAppChatFromContacts(${JSON.stringify(pJidNorm)}, ${JSON.stringify(p.name || p.phone || '')}, ${JSON.stringify(p.phone || '')})'><i class="fab fa-whatsapp"></i> ${btnLabel}</button>` : ''}
+              </div>`;
+            }).join('') + '</div>';
+        } catch (err) {
+          const membersEl = document.getElementById('wa-group-members-section');
+          if (membersEl) membersEl.innerHTML = `<div style="font-size:11.5px;color:var(--red2);">Could not load members: ${escHtml(err.message)}</div>`;
+        }
+      }
     }
 
     function openWhatsAppChatFromContacts(jid, name, phone) {
@@ -10683,6 +10881,59 @@ Keep it concise and professional.`;
       }
     }
 
+    // ── Marketing Suite: Templates list ──────────────────────────────────────
+    var _mktAllTemplates = [];
+    async function mktLoadTemplates() {
+      var el = document.getElementById('mkt-templates-list');
+      if (!el) return;
+      el.innerHTML = '<div style="text-align:center;padding:20px;color:var(--muted);font-size:12px;grid-column:1/-1;"><span class="spin-loader"></span></div>';
+      try {
+        var res = await fetch(API_BASE + '/templates', { headers: getAuthHeaders() });
+        _mktAllTemplates = await res.json();
+        mktRenderTemplates(_mktAllTemplates);
+      } catch (err) {
+        el.innerHTML = '<div style="color:var(--red2);font-size:12px;padding:10px;grid-column:1/-1;">' + err.message + '</div>';
+      }
+    }
+    function mktRenderTemplates(templates) {
+      var el = document.getElementById('mkt-templates-list');
+      if (!el) return;
+      if (!templates.length) {
+        el.innerHTML = '<div style="text-align:center;padding:20px;color:var(--muted);font-size:12px;grid-column:1/-1;">No templates yet — click New Template</div>';
+        return;
+      }
+      el.innerHTML = templates.map(function (t) {
+        var catColor = t.category === 'Product' ? 'var(--blue2)' : t.category === 'Promotion' ? 'var(--gold2)' : t.category === 'Newsletter' ? 'var(--green2)' : 'var(--muted2)';
+        return '<div class="template-card" style="cursor:pointer;" onclick="openEmailTemplates();etLoadTemplate(' + t.id + ')">' +
+          '<div style="font-size:12px;font-weight:600;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + (t.name || 'Untitled') + '</div>' +
+          '<div style="font-size:10.5px;color:var(--muted);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + (t.subject || 'No subject') + '</div>' +
+          '<div style="margin-top:5px;"><span style="font-size:9px;color:' + catColor + ';background:rgba(255,255,255,0.06);padding:1px 6px;border-radius:4px;">' + (t.category || 'General') + '</span></div>' +
+          '</div>';
+      }).join('');
+    }
+    function mktFilterTemplates(q) {
+      if (!q) { mktRenderTemplates(_mktAllTemplates); return; }
+      mktRenderTemplates(_mktAllTemplates.filter(function (t) {
+        return (t.name || '').toLowerCase().includes(q.toLowerCase()) || (t.subject || '').toLowerCase().includes(q.toLowerCase());
+      }));
+    }
+
+    // ── Marketing Suite: WA Broadcast history ────────────────────────────────
+    async function loadWaBroadcasts() {
+      var tbody = document.getElementById('wa-broadcast-tbody');
+      if (!tbody) return;
+      try {
+        var res = await fetch(API_BASE + '/wa/broadcast', { headers: getAuthHeaders() });
+        var list = await res.json();
+        if (!list.length) { tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:20px;color:var(--muted);">No WA broadcasts yet</td></tr>'; return; }
+        tbody.innerHTML = list.map(function (b) {
+          var sc = b.status === 'sent' ? 'b-green' : b.status === 'sending' ? 'b-gold' : b.status === 'failed' ? 'b-red' : 'b-gray';
+          var dt = b.sent_at ? new Date(b.sent_at).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: '2-digit' }) : '—';
+          return '<tr><td style="max-width:240px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;"><i class="fab fa-whatsapp" style="color:var(--green2);margin-right:5px;"></i>' + (b.message || '') + '</td><td>' + (b.total || 0) + '</td><td style="color:var(--green2);">' + (b.sent || 0) + '</td><td style="color:var(--red2);">' + (b.failed || 0) + '</td><td><span class="badge ' + sc + '">' + (b.status || 'sending') + '</span></td><td style="font-size:11px;color:var(--muted);">' + dt + '</td></tr>';
+        }).join('');
+      } catch (err) { console.error('loadWaBroadcasts:', err); }
+    }
+
     async function loadBroadcasts() {
       var tbody = document.getElementById('broadcast-tbody');
       if (!tbody) return;
@@ -10723,6 +10974,8 @@ Keep it concise and professional.`;
       if (waPicker) waPicker.style.display = isWa ? 'block' : 'none';
       var groupTools = document.getElementById('bc-email-group-tools');
       if (groupTools) groupTools.style.display = isWa ? 'none' : 'flex';
+      var waGroupTools = document.getElementById('bc-wa-group-tools');
+      if (waGroupTools) { waGroupTools.style.display = isWa ? 'flex' : 'none'; if (isWa) bcLoadWaGroupsDropdown(); }
       var contactsBtn = document.getElementById('bc-load-contacts-btn');
       if (contactsBtn) contactsBtn.style.display = isWa ? 'none' : '';
       var testWrap = document.getElementById('bc-test-email-wrap');
@@ -10736,6 +10989,7 @@ Keep it concise and professional.`;
       bcUpdateIntervalPreview();
       bcUpdateCount();
       if (isWa) bcLoadWhatsAppTargets(false);
+      else bcEnsureContactsCache(); // pre-load email contacts for instant typeahead
     }
 
     async function bcLoadWhatsAppTargets(force) {
@@ -10746,6 +11000,10 @@ Keep it concise and professional.`;
       }
       if (list) list.innerHTML = '<div style="padding:14px;text-align:center;color:var(--muted);font-size:12px;"><span class="spin-loader"></span> Loading WhatsApp contacts...</div>';
       try {
+        // On force-refresh, trigger group metadata sync first so group names are up-to-date
+        if (force) {
+          await fetch(API_BASE + '/wa/sync', { method: 'POST', headers: getAuthHeaders() }).catch(function(){});
+        }
         var res = await fetch(API_BASE + '/wa/chats?_=' + Date.now(), { headers: getAuthHeaders(), cache: 'no-store' });
         var chats = await res.json();
         if (!res.ok) throw new Error(chats.error || 'Failed to load WhatsApp chats');
@@ -10753,8 +11011,21 @@ Keep it concise and professional.`;
           return c && c.id && (c.id.indexOf('@s.whatsapp.net') > -1 || c.id.indexOf('@g.us') > -1 || c.is_group);
         }).map(function (c) {
           var rawId = c.id.split('@')[0].split(':')[0];
-          var name = (typeof waResolveJidDisplay === 'function') ? waResolveJidDisplay(c.id, c.name || c.phone || rawId) : (c.name || c.phone || rawId);
-          return { jid: c.id, name: name, isGroup: !!c.is_group || c.id.indexOf('@g.us') > -1, phone: c.phone || rawId };
+          var isGroup = !!c.is_group || c.id.indexOf('@g.us') > -1;
+          // For groups: prefer the group info panel name (waAllChats keeps it fresh from
+          // getGroupMetadata, same as WA Biz panel). Fall back to DB chatlist name.
+          // For contacts: use DB name directly (already resolved via pickContactLabel).
+          var name;
+          if (isGroup) {
+            var waChat = waAllChats.find(function (x) { return x.id === c.id; });
+            var groupInfoName = waChat && waChat.name && String(waChat.name).trim();
+            var chatlistName = c.name && String(c.name).trim();
+            // WA Biz logic: if group info panel name differs from chatlist name, prefer group info panel name
+            name = (groupInfoName && groupInfoName !== chatlistName) ? groupInfoName : (chatlistName || groupInfoName || rawId);
+          } else {
+            name = (c.name && String(c.name).trim()) || c.phone || rawId;
+          }
+          return { jid: c.id, name: name, isGroup: isGroup, phone: c.phone || rawId };
         });
         bcRenderWhatsAppPicker((document.getElementById('bc-wa-search') || {}).value || '');
       } catch (err) {
@@ -10950,6 +11221,345 @@ Keep it concise and professional.`;
         var el = document.getElementById('bc-recipients');
         if (el) { el.value = lines.join('\n'); bcUpdateCount(); }
         notify('Loaded group: ' + data.name, lines.length + ' recipients', 'var(--green)', 'fas fa-users');
+      } catch (err) { notify('Error', err.message, 'var(--red)', 'fas fa-exclamation-circle'); }
+    }
+
+    // ── Typeahead autocomplete on bc-recipients ───────────────────────────────
+    var _bcTypeaheadIdx = -1;
+    var _bcContactsCache = null;
+    var _bcWaSearchTimer = null;
+    async function bcEnsureContactsCache() {
+      if (_bcContactsCache) return;
+      try {
+        var res = await fetch(API_BASE + '/contacts?limit=500', { headers: getAuthHeaders() });
+        var data = await res.json();
+        _bcContactsCache = (data.contacts || data || []).filter(function (c) { return c.email; });
+      } catch (_) { _bcContactsCache = []; }
+    }
+
+    function bcRecipientsInput(ta) {
+      bcUpdateCount();
+      var val = ta.value;
+      var pos = ta.selectionStart;
+      var lineStart = val.lastIndexOf('\n', pos - 1) + 1;
+      var token = val.slice(lineStart, pos).trim();
+      if (!token || token.length < 1) { bcHideTypeahead(); return; }
+      var q = token.toLowerCase();
+      var qDigits = token.replace(/\D/g, '');
+      var isWa = _bcChannel === 'whatsapp';
+      if (isWa) {
+        // Use backend search for WA (fast, DB-level, includes group-only contacts)
+        if (token.length < 2) { bcHideTypeahead(); return; }
+        clearTimeout(_bcWaSearchTimer);
+        _bcWaSearchTimer = setTimeout(async function () {
+          if (ta !== document.getElementById('bc-recipients')) return;
+          try {
+            var r = await fetch(API_BASE + '/wa/contacts/search?q=' + encodeURIComponent(token), { headers: getAuthHeaders() });
+            if (!r.ok) throw new Error();
+            var hits = await r.json();
+            if (!hits.length) {
+              // fallback: filter in-memory cache
+              hits = _bcWhatsAppTargets.filter(function (t) {
+                if (String(t.name || '').toLowerCase().includes(q)) return true;
+                if (qDigits.length >= 3 && String(t.phone || '').includes(qDigits)) return true;
+                return String(t.jid || '').toLowerCase().includes(q);
+              }).slice(0, 12);
+            }
+            bcShowWaTypeahead(hits, ta);
+          } catch (_) {
+            // pure in-memory fallback
+            var hits = _bcWhatsAppTargets.filter(function (t) {
+              if (String(t.name || '').toLowerCase().includes(q)) return true;
+              if (qDigits.length >= 3 && String(t.phone || '').includes(qDigits)) return true;
+              return String(t.jid || '').toLowerCase().includes(q);
+            }).slice(0, 12);
+            bcShowWaTypeahead(hits, ta);
+          }
+        }, 180);
+        return;
+      }
+      // Email channel
+      var suggestions = [];
+      if (_bcContactsCache) {
+        suggestions = _bcContactsCache.filter(function (c) {
+          var name = ((c.fname || '') + ' ' + (c.lname || '')).trim().toLowerCase();
+          return name.includes(q) || (c.email || '').toLowerCase().includes(q);
+        }).slice(0, 12).map(function (c) {
+          var name = ((c.fname || '') + ' ' + (c.lname || '')).trim();
+          return { name: name, email: c.email, display: name ? name + ' <' + c.email + '>' : c.email, jid: null, isGroup: false };
+        });
+      } else {
+        bcEnsureContactsCache();
+      }
+      if (!suggestions.length) { bcHideTypeahead(); return; }
+      _bcTypeaheadIdx = -1;
+      var el = document.getElementById('bc-typeahead');
+      if (!el) return;
+      el.innerHTML = suggestions.map(function (s, i) {
+        return '<div class="bc-ta-item" data-idx="' + i + '" onmousedown="bcTypeaheadPick(' + i + ')" style="padding:8px 12px;cursor:pointer;border-bottom:1px solid var(--border);">'
+          + '<div style="font-size:12.5px;font-weight:600;color:var(--text);">' + escHtml(s.display) + '</div></div>';
+      }).join('');
+      el._suggestions = suggestions;
+      el.style.display = 'block';
+    }
+
+    function bcShowWaTypeahead(hits, ta) {
+      if (!hits.length) { bcHideTypeahead(); return; }
+      _bcTypeaheadIdx = -1;
+      var el = document.getElementById('bc-typeahead');
+      if (!el) return;
+      // Normalise hits — could be from backend search or in-memory _bcWhatsAppTargets
+      var suggestions = hits.map(function (h) {
+        return { jid: h.jid, name: h.name || h.jid, isGroup: !!(h.isGroup || h.is_group), phone: h.phone || '' };
+      });
+      el.innerHTML = suggestions.map(function (s, i) {
+        var icon = s.isGroup ? 'fa-users' : 'fa-user';
+        return '<div class="bc-ta-item" data-idx="' + i + '" onmousedown="bcTypeaheadPick(' + i + ')" style="padding:8px 12px;cursor:pointer;display:flex;align-items:center;gap:8px;border-bottom:1px solid var(--border);">'
+          + '<i class="fas ' + icon + '" style="color:#25D366;font-size:11px;width:14px;"></i>'
+          + '<div><div style="font-size:12.5px;font-weight:600;color:var(--text);">' + escHtml(s.name || s.jid) + '</div>'
+          + '<div style="font-size:10.5px;color:var(--muted);">' + escHtml(s.jid) + '</div></div></div>';
+      }).join('');
+      el._suggestions = suggestions;
+      el.style.display = 'block';
+    }
+
+    function bcTypeaheadPick(idx) {
+      var el = document.getElementById('bc-typeahead');
+      if (!el || !el._suggestions) return;
+      var s = el._suggestions[idx];
+      if (!s) return;
+      var ta = document.getElementById('bc-recipients');
+      if (!ta) return;
+      var val = ta.value, pos = ta.selectionStart;
+      var lineStart = val.lastIndexOf('\n', pos - 1) + 1;
+      var lineEnd = val.indexOf('\n', pos);
+      if (lineEnd === -1) lineEnd = val.length;
+      var insert = (_bcChannel === 'whatsapp') ? (s.name ? s.name + ' <' + s.jid + '>' : s.jid) : s.display;
+      ta.value = val.slice(0, lineStart) + insert + val.slice(lineEnd);
+      var newPos = lineStart + insert.length;
+      ta.setSelectionRange(newPos, newPos);
+      if (_bcChannel === 'whatsapp') {
+        _bcSelectedWhatsAppJids.add(s.jid);
+      }
+      bcHideTypeahead();
+      bcUpdateCount();
+      ta.focus();
+    }
+
+    function bcRecipientsKeydown(e) {
+      var el = document.getElementById('bc-typeahead');
+      if (!el || el.style.display === 'none') return;
+      var items = el.querySelectorAll('.bc-ta-item');
+      if (e.key === 'ArrowDown') { e.preventDefault(); _bcTypeaheadIdx = Math.min(_bcTypeaheadIdx + 1, items.length - 1); bcTypeaheadHighlight(items); }
+      else if (e.key === 'ArrowUp') { e.preventDefault(); _bcTypeaheadIdx = Math.max(_bcTypeaheadIdx - 1, 0); bcTypeaheadHighlight(items); }
+      else if (e.key === 'Enter' || e.key === 'Tab') { if (_bcTypeaheadIdx >= 0) { e.preventDefault(); bcTypeaheadPick(_bcTypeaheadIdx); } else { bcHideTypeahead(); } }
+      else if (e.key === 'Escape') { bcHideTypeahead(); }
+    }
+
+    function bcTypeaheadHighlight(items) {
+      items.forEach(function (it, i) { it.style.background = i === _bcTypeaheadIdx ? 'rgba(255,255,255,0.08)' : ''; });
+    }
+
+    function bcHideTypeahead() {
+      var el = document.getElementById('bc-typeahead');
+      if (el) { el.style.display = 'none'; el._suggestions = null; }
+    }
+
+    // close typeahead when clicking outside
+    document.addEventListener('click', function (e) {
+      var ta = document.getElementById('bc-recipients');
+      var td = document.getElementById('bc-typeahead');
+      if (td && ta && !ta.contains(e.target) && !td.contains(e.target)) bcHideTypeahead();
+    });
+
+    // ── WA Broadcast Groups ────────────────────────────────────────────────────
+    async function bcLoadWaGroupsDropdown() {
+      var sel = document.getElementById('bc-wa-group-select');
+      if (!sel) return;
+      sel.innerHTML = '<option value="">— Load from a WA group —</option>';
+      try {
+        var res = await fetch(API_BASE + '/wa/groups', { headers: getAuthHeaders() });
+        if (!res.ok) return;
+        var groups = await res.json();
+        groups.forEach(function (g) {
+          var opt = document.createElement('option');
+          opt.value = g.id;
+          opt.textContent = g.name + ' (' + g.member_count + ')';
+          sel.appendChild(opt);
+        });
+      } catch (_) {}
+    }
+
+    async function bcLoadFromWaGroup() {
+      var sel = document.getElementById('bc-wa-group-select');
+      if (!sel || !sel.value) { notify('Select a WA group first', '', 'var(--red)', 'fas fa-exclamation-circle'); return; }
+      try {
+        // Validate WA is connected
+        var statusRes = await fetch(API_BASE + '/wa/status', { headers: getAuthHeaders() });
+        var statusData = await statusRes.json();
+        if (!statusData.connected) {
+          notify('WhatsApp not connected', 'Connect WhatsApp first before loading a group', 'var(--red)', 'fab fa-whatsapp');
+          return;
+        }
+        var res = await fetch(API_BASE + '/wa/groups/' + sel.value, { headers: getAuthHeaders() });
+        var data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Failed');
+        var members = data.members || [];
+        if (!members.length) {
+          notify('Empty group', '"' + (data.name || 'Group') + '" has no members. Add contacts first.', 'var(--gold)', 'fas fa-exclamation-triangle');
+          return;
+        }
+        members.forEach(function (m) { _bcSelectedWhatsAppJids.add(m.jid); });
+        var lines = members.map(function (m) { return m.name ? m.name + ' <' + m.jid + '>' : m.jid; });
+        var ta = document.getElementById('bc-recipients');
+        if (ta) {
+          var existing = ta.value.trim();
+          ta.value = existing ? existing + '\n' + lines.join('\n') : lines.join('\n');
+          bcUpdateCount();
+        }
+        notify('Loaded: ' + data.name, members.length + ' WA recipients', 'var(--green)', 'fab fa-whatsapp');
+      } catch (err) { notify('Error', err.message, 'var(--red)', 'fas fa-exclamation-circle'); }
+    }
+
+    async function openWaGroupsManager() {
+      openModal('wa-groups-modal');
+      await waGrpLoadList();
+    }
+
+    async function waGrpLoadList() {
+      var el = document.getElementById('wa-grp-list');
+      if (!el) return;
+      try {
+        var res = await fetch(API_BASE + '/wa/groups', { headers: getAuthHeaders() });
+        var groups = await res.json();
+        if (!groups.length) { el.innerHTML = '<div style="text-align:center;padding:20px;color:var(--muted);font-size:12px;">No WA groups yet.<br>Click + New Group.</div>'; return; }
+        el.innerHTML = groups.map(function (g) {
+          return '<div class="template-card" style="cursor:pointer;position:relative;" onclick="waGrpShowDetail(' + g.id + ')">'
+            + '<div style="font-size:13px;font-weight:600;color:var(--text);">' + escHtml(g.name) + '</div>'
+            + '<div style="font-size:11px;color:var(--muted);margin-top:2px;"><i class="fab fa-whatsapp" style="color:#25D366;"></i> ' + g.member_count + ' members</div>'
+            + (g.description ? '<div style="font-size:10.5px;color:var(--muted);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + escHtml(g.description) + '</div>' : '')
+            + '<button onclick="event.stopPropagation();waGrpDelete(' + g.id + ',\'' + escHtml(g.name).replace(/'/g,"\\'") + '\')" style="position:absolute;top:6px;right:6px;background:none;border:none;cursor:pointer;color:var(--muted);font-size:11px;padding:2px 5px;" onmouseover="this.style.color=\'var(--red2)\'" onmouseout="this.style.color=\'var(--muted)\'"><i class="fas fa-trash"></i></button>'
+            + '</div>';
+        }).join('');
+      } catch (e) { el.innerHTML = '<div style="color:var(--red2);padding:10px;font-size:12px;">' + e.message + '</div>'; }
+    }
+
+    function waGrpShowCreate() {
+      var det = document.getElementById('wa-grp-detail');
+      if (!det) return;
+      det.innerHTML = '<div style="font-size:13px;font-weight:700;color:var(--text);margin-bottom:12px;">Create New WA Group</div>'
+        + '<div class="form-group"><label class="form-label">Group Name *</label><input class="inp" id="wag-name" placeholder="e.g. Electrical Contractors Mumbai"></div>'
+        + '<div class="form-group"><label class="form-label">Description</label><input class="inp" id="wag-desc" placeholder="Optional"></div>'
+        + '<div style="display:flex;gap:8px;margin-top:4px;">'
+        + '<button class="btn btn-green" onclick="waGrpCreate()"><i class="fas fa-save"></i> Create</button>'
+        + '<button class="btn btn-ghost" onclick="det.innerHTML=\'<div style=\\\"text-align:center;padding:40px;color:var(--muted);font-size:13px;\\\">Select a group or create one</div>\'">Cancel</button>'
+        + '</div><div id="wag-status" style="margin-top:8px;font-size:12px;"></div>';
+    }
+
+    async function waGrpCreate() {
+      var name = (document.getElementById('wag-name') || {}).value || '';
+      var desc = (document.getElementById('wag-desc') || {}).value || '';
+      var st = document.getElementById('wag-status');
+      if (!name.trim()) { if (st) st.innerHTML = '<span style="color:var(--red2);">Name required</span>'; return; }
+      if (st) st.innerHTML = '<span class="spin-loader"></span>';
+      try {
+        var res = await fetch(API_BASE + '/wa/groups', { method: 'POST', headers: getAuthHeaders(), body: JSON.stringify({ name: name.trim(), description: desc }) });
+        var data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Failed');
+        await waGrpLoadList();
+        await waGrpShowDetail(data.id);
+        bcLoadWaGroupsDropdown();
+        notify('Group created', name, 'var(--green)', 'fab fa-whatsapp');
+      } catch (err) { if (st) st.innerHTML = '<span style="color:var(--red2);">' + err.message + '</span>'; }
+    }
+
+    async function waGrpShowDetail(id) {
+      var det = document.getElementById('wa-grp-detail');
+      if (!det) return;
+      det.innerHTML = '<div style="text-align:center;padding:20px;color:var(--muted);"><span class="spin-loader"></span></div>';
+      try {
+        var res = await fetch(API_BASE + '/wa/groups/' + id, { headers: getAuthHeaders() });
+        var data = await res.json();
+        if (!res.ok) throw new Error(data.error);
+        // make sure WA targets are loaded for the picker
+        if (!_bcWhatsAppTargets.length) await bcLoadWhatsAppTargets(false);
+        var memberJids = new Set((data.members || []).map(function (m) { return m.jid; }));
+        det.innerHTML = '<div style="font-size:14px;font-weight:700;color:var(--text);">' + escHtml(data.name) + '</div>'
+          + '<div style="font-size:11px;color:var(--muted);margin-bottom:10px;">' + (data.description || '') + '</div>'
+          // search to add members
+          + '<div style="border:1px solid var(--border2);border-radius:8px;overflow:hidden;margin-bottom:10px;">'
+          + '<div style="padding:8px;background:var(--card2);border-bottom:1px solid var(--border);">'
+          + '<div class="search-box" style="padding:4px 8px;"><i class="fas fa-search" style="font-size:10px;"></i>'
+          + '<input id="wag-search" placeholder="Search WA contacts to add…" style="font-size:12px;" oninput="waGrpRenderPicker(' + id + ',this.value)"></div></div>'
+          + '<div id="wag-picker" style="max-height:160px;overflow:auto;"></div></div>'
+          // current members
+          + '<div style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:6px;">Members (' + (data.members || []).length + ')</div>'
+          + '<div id="wag-members" style="display:flex;flex-direction:column;gap:4px;max-height:180px;overflow-y:auto;">'
+          + (data.members || []).map(function (m) {
+            var icon = m.jid.endsWith('@g.us') ? 'fa-users' : 'fa-user';
+            return '<div style="display:flex;align-items:center;gap:8px;padding:5px 8px;background:var(--card2);border-radius:6px;">'
+              + '<i class="fas ' + icon + '" style="color:#25D366;font-size:11px;width:14px;"></i>'
+              + '<div style="flex:1;min-width:0;"><div style="font-size:12px;font-weight:600;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + escHtml(m.name || m.jid) + '</div>'
+              + '<div style="font-size:10px;color:var(--muted);">' + escHtml(m.jid) + '</div></div>'
+              + '<button onclick="waGrpRemoveMember(' + id + ',\'' + escHtml(m.jid).replace(/'/g,"\\'") + '\')" style="background:none;border:none;cursor:pointer;color:var(--muted);font-size:11px;padding:2px 5px;" onmouseover="this.style.color=\'var(--red2)\'" onmouseout="this.style.color=\'var(--muted)\'"><i class="fas fa-times"></i></button>'
+              + '</div>';
+          }).join('')
+          + '</div>';
+        // store current group id and memberJids for the picker
+        det._groupId = id;
+        det._memberJids = memberJids;
+        waGrpRenderPicker(id, '');
+      } catch (err) { det.innerHTML = '<div style="color:var(--red2);">' + err.message + '</div>'; }
+    }
+
+    function waGrpRenderPicker(groupId, q) {
+      var det = document.getElementById('wa-grp-detail');
+      var el = document.getElementById('wag-picker');
+      if (!el) return;
+      var memberJids = det && det._memberJids ? det._memberJids : new Set();
+      var query = String(q || '').toLowerCase();
+      var candidates = _bcWhatsAppTargets.filter(function (t) {
+        if (memberJids.has(t.jid)) return false;
+        return !query || String(t.name || '').toLowerCase().includes(query) || String(t.phone || '').includes(query) || String(t.jid || '').includes(query);
+      }).slice(0, 30);
+      if (!candidates.length) { el.innerHTML = '<div style="padding:10px;text-align:center;color:var(--muted);font-size:12px;">' + (query ? 'No matches' : 'All contacts added or no WA contacts loaded') + '</div>'; return; }
+      el.innerHTML = candidates.map(function (t) {
+        var icon = t.isGroup ? 'fa-users' : 'fa-user';
+        return '<label style="display:flex;align-items:center;gap:8px;padding:7px 10px;border-bottom:1px solid var(--border);cursor:pointer;">'
+          + '<input type="checkbox" onchange="waGrpToggleMember(' + groupId + ',\'' + escHtml(t.jid).replace(/'/g,"\\'") + '\',\'' + escHtml(t.name || '').replace(/'/g,"\\'") + '\',this.checked)" style="width:14px;height:14px;">'
+          + '<i class="fas ' + icon + '" style="color:#25D366;font-size:11px;width:14px;"></i>'
+          + '<div style="flex:1;min-width:0;"><div style="font-size:12px;font-weight:600;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + escHtml(t.name || t.jid) + '</div>'
+          + '<div style="font-size:10px;color:var(--muted);">' + escHtml(t.jid) + '</div></div>'
+          + '</label>';
+      }).join('');
+    }
+
+    async function waGrpToggleMember(groupId, jid, name, add) {
+      try {
+        if (add) {
+          await fetch(API_BASE + '/wa/groups/' + groupId + '/members', { method: 'POST', headers: getAuthHeaders(), body: JSON.stringify({ members: [{ jid, name }] }) });
+        } else {
+          await fetch(API_BASE + '/wa/groups/' + groupId + '/members', { method: 'DELETE', headers: getAuthHeaders(), body: JSON.stringify({ jids: [jid] }) });
+        }
+        await waGrpShowDetail(groupId);
+        await waGrpLoadList();
+        bcLoadWaGroupsDropdown();
+      } catch (err) { notify('Error', err.message, 'var(--red)', 'fas fa-exclamation-circle'); }
+    }
+
+    async function waGrpRemoveMember(groupId, jid) {
+      await waGrpToggleMember(groupId, jid, '', false);
+    }
+
+    async function waGrpDelete(id, name) {
+      if (!confirm('Delete WA group "' + name + '"?')) return;
+      try {
+        await fetch(API_BASE + '/wa/groups/' + id, { method: 'DELETE', headers: getAuthHeaders() });
+        await waGrpLoadList();
+        var det = document.getElementById('wa-grp-detail');
+        if (det) det.innerHTML = '<div style="text-align:center;padding:40px;color:var(--muted);font-size:13px;">Select a group or create one</div>';
+        bcLoadWaGroupsDropdown();
+        notify('Deleted', name, 'var(--red)', 'fas fa-trash');
       } catch (err) { notify('Error', err.message, 'var(--red)', 'fas fa-exclamation-circle'); }
     }
 
@@ -11307,7 +11917,7 @@ Keep it concise and professional.`;
           if (resWa.ok) {
             if (statusEl) statusEl.innerHTML = '<span style="color:var(--green2);"><i class="fas fa-check"></i> WhatsApp broadcast started — ' + dataWa.total + ' recipients queued</span>';
             notify('WhatsApp broadcast started', dataWa.total + ' contacts/groups queued', 'var(--green)', 'fab fa-whatsapp');
-            setTimeout(function () { closeModal('broadcast-modal'); }, 1800);
+            setTimeout(function () { closeModal('broadcast-modal'); loadWaBroadcasts(); }, 1800);
           } else {
             if (statusEl) statusEl.innerHTML = '<span style="color:var(--red2);">' + (dataWa.error || 'Failed') + '</span>';
           }
@@ -11677,6 +12287,28 @@ Keep it concise and professional.`;
     }
 
     // ── BROADCAST RICH EDITOR HELPERS ─────────────────────────────────────────
+    // Paste handler: strip color styles so pasted text inherits editor theme
+    document.addEventListener('paste', function (e) {
+      var ed = e.target && (e.target.id === 'bc-html' || e.target.id === 'cl-body-editor') ? e.target : null;
+      if (!ed) return;
+      e.preventDefault();
+      var html = (e.clipboardData.getData('text/html') || '').trim();
+      var text = e.clipboardData.getData('text/plain') || '';
+      if (html) {
+        var tmp = document.createElement('div');
+        tmp.innerHTML = html;
+        tmp.querySelectorAll('[style]').forEach(function (el) {
+          el.style.color = '';
+          el.style.backgroundColor = '';
+          el.style.background = '';
+          if (!el.getAttribute('style').trim()) el.removeAttribute('style');
+        });
+        tmp.querySelectorAll('font[color]').forEach(function (el) { el.removeAttribute('color'); });
+        document.execCommand('insertHTML', false, tmp.innerHTML);
+      } else {
+        document.execCommand('insertText', false, text);
+      }
+    }, true);
     var _bcSavedSel = null;
     var _bcActiveEditorId = 'bc-html';
     function bcSetActiveEditor(id) { _bcActiveEditorId = id || 'bc-html'; }
@@ -13310,6 +13942,8 @@ Best regards,<br>
         ? (groupSel.selectedOptions[0].dataset.name || groupSel.selectedOptions[0].textContent.replace(/\s*\(\d+.*\)$/, '').trim() || 'All')
         : 'All';
       const groupId = groupSel && groupSel.value ? parseInt(groupSel.value) : null;
+      const waGroupSel = document.getElementById('nc-wa-group-select');
+      const waGroupId = waGroupSel && waGroupSel.value ? parseInt(waGroupSel.value) : null;
       const channel = document.getElementById('nc-channel').value;
       const date = document.getElementById('nc-date').value;
       const time = (document.getElementById('nc-time') || {}).value || '09:00';
@@ -13331,7 +13965,7 @@ Best regards,<br>
           body: JSON.stringify({
             name, product, segment: seg, channel, status: 'Draft', scheduled_at: scheduledAt,
             goal, ab_test_enabled: abEnabled, ab_subject_b: abSubjectB || null,
-            send_interval_ms: intervalMs, timezone, group_id: groupId,
+            send_interval_ms: intervalMs, timezone, group_id: groupId, wa_group_id: waGroupId,
           }),
         });
         const data = await res.json();
@@ -13364,6 +13998,47 @@ Best regards,<br>
       }
     }
 
+    // ── Campaign modal: WA group row toggle ────────────────────────────────
+    function ncToggleWaGroupRow(channel) {
+      var row = document.getElementById('nc-wa-group-row');
+      if (!row) return;
+      var show = channel === 'WhatsApp' || channel === 'Both';
+      row.style.display = show ? 'flex' : 'none';
+      if (show) ncLoadWaGroupsDropdown();
+    }
+
+    async function ncLoadWaGroupsDropdown() {
+      var sel = document.getElementById('nc-wa-group-select');
+      if (!sel) return;
+      sel.innerHTML = '<option value="">— Load from a WA broadcast group —</option>';
+      try {
+        var res = await fetch(API_BASE + '/wa/groups', { headers: getAuthHeaders() });
+        if (!res.ok) return;
+        var groups = await res.json();
+        groups.forEach(function (g) {
+          var opt = document.createElement('option');
+          opt.value = g.id;
+          opt.textContent = g.name + ' (' + g.member_count + ' members)';
+          sel.appendChild(opt);
+        });
+      } catch (_) {}
+    }
+
+    async function ncLoadFromWaGroup() {
+      var sel = document.getElementById('nc-wa-group-select');
+      var countEl = document.getElementById('nc-group-count');
+      if (!sel || !sel.value) { notify('Select a WA group first', '', 'var(--red)', 'fas fa-exclamation-circle'); return; }
+      try {
+        var res = await fetch(API_BASE + '/wa/groups/' + sel.value, { headers: getAuthHeaders() });
+        var data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Failed');
+        var count = (data.members || []).length;
+        if (!count) { notify('Empty WA group', '"' + data.name + '" has no members. Add contacts first.', 'var(--gold)', 'fas fa-exclamation-triangle'); return; }
+        if (countEl) countEl.textContent = data.name + ' (WA) — ' + count + ' member' + (count !== 1 ? 's' : '') + ' selected';
+        notify('WA Group loaded', data.name + ' · ' + count + ' members', 'var(--green)', 'fab fa-whatsapp');
+      } catch (err) { notify('Error', err.message, 'var(--red)', 'fas fa-exclamation-circle'); }
+    }
+
     // ── Campaign modal: load groups into dropdown ──────────────────────────
     async function ncLoadGroupsDropdown(skipReset) {
       var sel = document.getElementById('nc-group-select');
@@ -13393,6 +14068,11 @@ Best regards,<br>
       if (abCb)     abCb.checked = false;
       if (abFields) abFields.style.display = 'none';
       if (abSubB)   abSubB.value = '';
+      // Reset WA group row
+      var waRow = document.getElementById('nc-wa-group-row');
+      var ncChanSel = document.getElementById('nc-channel');
+      if (waRow) waRow.style.display = 'none';
+      if (ncChanSel) ncChanSel.value = 'Email';
       sel.innerHTML = '<option value="">— Load from a group —</option>';
       try {
         var res = await fetch(API_BASE + '/groups', { headers: getAuthHeaders() });
@@ -20747,6 +21427,7 @@ ${plainText}`;
       var text = String(value || '').trim();
       if (!text) return true;
       if (/^\d+$/.test(text)) return true;
+      if (/^group$/i.test(text)) return true;
       if (waIsPhoneLikeLabel(text, '')) return true;
       if (waIsAllowedWaNumber(text.replace(/\D/g, ''))) return true;
       var localDigits = String(groupIdLocal || '').replace(/\D/g, '');
@@ -20757,6 +21438,8 @@ ${plainText}`;
     function waIsRealContactLabel(name, idLocal, phoneDigits) {
       var n = String(name || '').trim();
       if (!n || /^you$/i.test(n) || /^(unknown|unknown whatsapp contact|whatsapp)$/i.test(n)) return false;
+      if (/^meta\s*ai$/i.test(n)) return false;
+      if (/rate.?overlimit|not-authorized|forbidden|bad.?request/i.test(n)) return false;
       if (n.indexOf('@lid') !== -1 || waIsLikelyLidNumber(n)) return false;
       var digits = n.replace(/\D/g, '');
       if (idLocal && digits && digits === idLocal) return false;
@@ -20776,7 +21459,7 @@ ${plainText}`;
       var name = fallbackName || (chat && chat.name) || notify || '';
 
       if (jid.endsWith('@g.us')) {
-        if (!name || !name.trim() || /^\d+$/.test(String(name).trim())) return 'Group';
+        if (!name || !name.trim() || /^\d+$/.test(String(name).trim()) || /^group$/i.test(String(name).trim())) return '';
         return name;
       }
 
@@ -20799,6 +21482,59 @@ ${plainText}`;
       }
     }
 
+    function waUpdateProgressBars(opts) {
+      // opts: { chatsLoaded, chatsTotal, lidsResolved, lidsTotal, done, indeterminate }
+      var wrap = document.getElementById('wa-progress-wrap');
+      if (!wrap) return;
+      var chatsLoaded  = parseInt(opts.chatsLoaded  || 0, 10);
+      var chatsTotal   = parseInt(opts.chatsTotal   || 0, 10);
+      var lidsTotal    = parseInt(opts.lidsTotal    || 0, 10);
+      var lidsResolved = parseInt(opts.lidsResolved || 0, 10);
+
+      // Always show bars once loading starts
+      wrap.style.display = 'flex';
+
+      var chatBar = document.getElementById('wa-prog-chats');
+      var chatLbl = document.getElementById('wa-prog-chats-pct');
+      var lidBar  = document.getElementById('wa-prog-lid');
+      var lidLbl  = document.getElementById('wa-prog-lid-pct');
+
+      // Indeterminate state: pulse animation while waiting for response
+      if (opts.indeterminate) {
+        if (chatBar) { chatBar.classList.add('wa-prog-indeterminate'); chatBar.style.background = '#25D366'; chatBar.style.width = '45%'; }
+        if (chatLbl) chatLbl.textContent = 'Loading…';
+        if (lidBar)  { lidBar.style.width = '0%'; lidBar.classList.remove('wa-prog-indeterminate'); }
+        if (lidLbl)  lidLbl.textContent = '--';
+        return;
+      }
+
+      // Stop indeterminate animation once we have data
+      if (chatBar) chatBar.classList.remove('wa-prog-indeterminate');
+
+      // Hide bars when fully done
+      if (opts.done && lidsTotal === 0) {
+        if (chatBar) { chatBar.style.width = '100%'; chatBar.style.background = '#25D366'; }
+        if (chatLbl) chatLbl.textContent = chatsLoaded > 0 ? chatsLoaded + '/' + chatsLoaded + ' (100%)' : '100%';
+        if (lidBar)  { lidBar.style.width = '100%'; lidBar.style.background = '#25D366'; }
+        if (lidLbl)  lidLbl.textContent = '100%';
+        setTimeout(function () { wrap.style.display = 'none'; }, 2500);
+        return;
+      }
+
+      var chatPct = chatsTotal > 0 ? Math.min(100, Math.round(chatsLoaded / chatsTotal * 100)) : (chatsLoaded > 0 ? 100 : 0);
+      var lidPct  = lidsTotal  > 0 ? Math.min(100, Math.round(lidsResolved / lidsTotal * 100)) : (chatsTotal > 0 ? 100 : 0);
+
+      if (chatBar) { chatBar.style.width = chatPct + '%'; chatBar.style.background = chatPct === 100 ? '#25D366' : '#25D366'; }
+      if (chatLbl) chatLbl.textContent = chatsTotal > 0
+        ? chatsLoaded + '/' + chatsTotal + ' (' + chatPct + '%)'
+        : (chatsLoaded > 0 ? chatsLoaded + ' chats' : '--');
+
+      if (lidBar)  { lidBar.style.width = lidPct + '%'; lidBar.style.background = lidPct === 100 ? '#25D366' : '#3b8cff'; }
+      if (lidLbl)  lidLbl.textContent = lidsTotal > 0
+        ? lidsResolved + '/' + lidsTotal + ' (' + lidPct + '%)'
+        : (chatsTotal > 0 ? '100%' : '--');
+    }
+
     function waFormatResolutionStatus(stats, renderedCount) {
       if (!stats) return '';
       var total = parseInt(stats.total || 0, 10) || 0;
@@ -20808,8 +21544,8 @@ ${plainText}`;
       var target = loaded > 0 ? loaded : total;
       var domCount = document.querySelectorAll('#wa-convo-list [data-wa-jid]').length;
       var visible = domCount > 0 ? domCount : Math.min(target, Math.max(loaded, parseInt(renderedCount || 0, 10) || 0));
-      // Done when: no pending LIDs, OR DOM list has stabilized across poll cycles
-      var isDone = pending === 0 || _waStablePollCount >= 2;
+      // Done when: no pending LIDs remain
+      var isDone = pending === 0;
       if (isDone) {
         return visible + '/' + total + ' chats/contacts loaded · ✓ Loading Done';
       }
@@ -21030,6 +21766,14 @@ ${plainText}`;
           text += ` · Currently scanning '${data.latestActiveChat}': ${data.latestActiveChatMessagesLoaded} messages loaded...`;
         }
         waSetSyncStatus(text);
+        // Show chat-loading progress during history sync
+        if (data.totalChatsDiscovered > 0) {
+          waUpdateProgressBars({
+            chatsLoaded: data.totalChatsDiscovered,
+            chatsTotal: Math.max(data.totalChatsDiscovered, data.estimatedTotal || data.totalChatsDiscovered),
+            lidsTotal: 0, lidsResolved: 0, done: false
+          });
+        }
       });
       waSocket.on('wa:sync_complete', () => {
         console.log('[WA-UI] Full sync complete — loading all chats');
@@ -21410,6 +22154,8 @@ ${plainText}`;
     function waResetLinkedAccountCaches() {
       waStopResolutionPolling();
       waAllChats = [];
+      _waChatTotal = 0;
+      _waLidPendingStart = 0;
       waActiveJid = null;
       waLidMap = {};
       waOlderLoading = false;
@@ -21500,6 +22246,8 @@ ${plainText}`;
     let _waStatusTickerTimer = null;  // interval that refreshes the DOM count live
     let _waLastDomCount = -1;         // DOM chat count from previous poll cycle
     let _waStablePollCount = 0;       // consecutive polls with unchanged DOM count
+    let _waChatTotal = 0;             // actual chat count from last successful fetch (not contacts)
+    let _waLidPendingStart = 0;       // pending count when LID resolution began (stable denominator)
 
     function waStopStatusTicker() {
       if (_waStatusTickerTimer) { clearInterval(_waStatusTickerTimer); _waStatusTickerTimer = null; }
@@ -21507,19 +22255,24 @@ ${plainText}`;
 
     function waStartStatusTicker() {
       waStopStatusTicker();
-      var _tickerPrevDom = -1;
-      var _tickerStableCount = 0;
       _waStatusTickerTimer = setInterval(function () {
         if (!_waLastStats || !waIsConnectedBarVisible()) return;
         var text = waFormatResolutionStatus(_waLastStats, waAllChats.length);
         if (text) waSetSyncStatus(text);
-        var domNow = document.querySelectorAll('#wa-convo-list [data-wa-jid]').length;
-        // Stop when: no LIDs pending, OR DOM count stable for 2 consecutive ticks
         var pending = parseInt(_waLastStats.pending || 0, 10) || 0;
-        if (pending === 0) { waStopStatusTicker(); return; }
-        if (domNow === _tickerPrevDom) { _tickerStableCount++; } else { _tickerStableCount = 0; }
-        _tickerPrevDom = domNow;
-        if (_tickerStableCount >= 2) waStopStatusTicker();
+        var domNow  = document.querySelectorAll('#wa-convo-list [data-wa-jid]').length;
+        var chatLoaded = Math.max(domNow, _waChatTotal > 0 ? _waChatTotal : 0);
+        var chatTotal  = _waChatTotal > 0 ? _waChatTotal : chatLoaded;
+        var lidDenominator = _waLidPendingStart > 0 ? _waLidPendingStart : pending;
+        var lidResolved = lidDenominator > 0 ? Math.max(0, lidDenominator - pending) : 0;
+        waUpdateProgressBars({
+          chatsLoaded: chatLoaded,
+          chatsTotal: chatTotal,
+          lidsTotal: lidDenominator,
+          lidsResolved: lidResolved,
+          done: pending === 0
+        });
+        if (pending === 0) waStopStatusTicker();
       }, 1500);
     }
 
@@ -21613,6 +22366,25 @@ ${plainText}`;
       _waLastStats = stats;
       var text = waFormatResolutionStatus(stats, renderedCount);
       if (text) waSetSyncStatus(text);
+
+      // Capture the starting denominator for LID bar (only grows, never resets mid-session)
+      if (pending > 0 && pending > _waLidPendingStart) _waLidPendingStart = pending;
+      var lidDenominator = _waLidPendingStart > 0 ? _waLidPendingStart : pending;
+      var lidResolved = lidDenominator > 0 ? Math.max(0, lidDenominator - pending) : 0;
+
+      // Chats bar: use actual rendered DOM count vs real chat total from last fetch
+      var domNow = document.querySelectorAll('#wa-convo-list [data-wa-jid]').length;
+      var chatLoaded = Math.max(domNow, _waChatTotal > 0 ? _waChatTotal : 0);
+      var chatTotal  = _waChatTotal > 0 ? _waChatTotal : chatLoaded;
+
+      // Update progress bars
+      waUpdateProgressBars({
+        chatsLoaded: chatLoaded,
+        chatsTotal: chatTotal,
+        lidsTotal: lidDenominator,
+        lidsResolved: lidResolved,
+        done: pending === 0
+      });
       // Start the 1.5 s live-count ticker so the visible number updates in real-time
       waStartStatusTicker();
       // Stats can advance while chat renders are skipped — recover the list if still empty.
@@ -21620,24 +22392,17 @@ ${plainText}`;
         waLoadChats({ force: true });
       }
       waStopResolutionPolling();
-      if (pending > 0 && !stats.exhausted && visible < target) {
-        // Still have LIDs to resolve — keep going, but stop if the list has stabilized
-        var currentDom = document.querySelectorAll('#wa-convo-list [data-wa-jid]').length;
-        if (currentDom === _waLastDomCount) {
-          _waStablePollCount++;
-        } else {
-          _waStablePollCount = 0;
-        }
-        _waLastDomCount = currentDom;
-
-        if (_waStablePollCount < 2) {
-          // List still growing — continue polling
-          _waResolutionPollTimer = setTimeout(async function () {
-            await waRunLidResolutionBatch(100);
-            waLoadChats();
-          }, 3000);
-        }
-        // else: list is stable — stop polling, show done
+      if (pending > 0 && !stats.exhausted) {
+        // Still have LIDs to resolve — keep polling to update the progress bar
+        _waResolutionPollTimer = setTimeout(async function () {
+          await waRunLidResolutionBatch(100);
+          waLoadResolutionStats(waAllChats.length);
+        }, 3000);
+      } else if (pending > 0 && stats.exhausted) {
+        // All groups scanned but LIDs remain — poll stats only (backend worker handles retry)
+        _waResolutionPollTimer = setTimeout(function () {
+          waLoadResolutionStats(waAllChats.length);
+        }, 10000);
       } else if (target > 0 && parseInt(renderedCount || 0, 10) < target) {
         // LID resolution done but not all chats rendered yet — retry loading once
         _waResolutionPollTimer = setTimeout(function () {
@@ -21675,10 +22440,15 @@ ${plainText}`;
           waSetSyncStatus('Loading chats...');
         }
       }
+      // Show indeterminate loading bar immediately — before response arrives
+      waUpdateProgressBars({ indeterminate: true });
       var seq = ++_waLoadChatsSeq;
       try {
-        // Fetch chats first; lid-map + resolution stats are best-effort extras.
-        const res = await fetch(API_BASE + '/wa/chats?_=' + Date.now(), { headers: getAuthHeaders(), cache: 'no-store' });
+        // Fetch chats + resolution-stats in parallel for faster load
+        const [res, statsRes] = await Promise.all([
+          fetch(API_BASE + '/wa/chats?_=' + Date.now(), { headers: getAuthHeaders(), cache: 'no-store' }),
+          fetch(API_BASE + '/wa/resolution-stats?_=' + Date.now(), { headers: getAuthHeaders(), cache: 'no-store' }).catch(function () { return null; })
+        ]);
         if (res.status === 401) {
           localStorage.clear(); sessionStorage.clear();
           window.location.href = 'login.html';
@@ -21691,14 +22461,20 @@ ${plainText}`;
         var chats = waDedupeChats(await res.json());
         if (seq !== _waLoadChatsSeq) return;
         waAllChats = chats;
+        _waChatTotal = chats.length;  // real chat count — not contacts
         waRenderChats(waAllChats);
         waLoadLidMap().catch(function () {});
-        var statsRes = await fetch(API_BASE + '/wa/resolution-stats?_=' + Date.now(), { headers: getAuthHeaders(), cache: 'no-store' }).catch(function () { return null; });
         var resolutionStats = statsRes && statsRes.ok ? await statsRes.json().catch(function () { return null; }) : null;
         if (resolutionStats) waApplyResolutionStats(resolutionStats, waAllChats.length);
-        else if (waIsConnectedBarVisible()) waSetSyncStatus('Latest chats loaded');
+        else if (waIsConnectedBarVisible()) {
+          waSetSyncStatus('Latest chats loaded');
+          waUpdateProgressBars({ chatsLoaded: chats.length, chatsTotal: chats.length, lidsTotal: 0, lidsResolved: 0, done: true });
+        }
       } catch (err) {
         console.error('[WA-UI] waLoadChats failed:', err);
+        // Hide progress bars on error
+        var wrap = document.getElementById('wa-progress-wrap');
+        if (wrap) wrap.style.display = 'none';
         if (waIsConnectedBarVisible() && (waAllChats.length === 0 || waConvoListIsPlaceholder())) {
           var listEl = document.getElementById('wa-convo-list');
           if (listEl) {
@@ -22062,9 +22838,12 @@ ${plainText}`;
           var gRes = await fetch(API_BASE + '/wa/group/' + encodeURIComponent(jid), { headers: getAuthHeaders() });
           var gData = await gRes.json();
           if (gRes.ok && gData.participants) {
-            var cnt = gData.participants.length;
-            if (phEl) phEl.textContent = 'Group · ' + cnt + ' members';
-            // Populate group info panel
+            var cnt = gData.total_participants || gData.participants.length;
+            var realGroupName = (gData.name && String(gData.name).trim() && !/^group$/i.test(String(gData.name).trim()))
+              ? String(gData.name).trim() : null;
+            // Always update header with confirmed name from Group Info (authoritative source)
+            if (realGroupName && titleEl) titleEl.textContent = realGroupName;
+            if (phEl) phEl.textContent = (realGroupName || 'Group') + ' · ' + cnt + ' members';
             waPopulateGroupInfo(gData);
           }
         } catch (_) { }
@@ -22313,7 +23092,8 @@ ${plainText}`;
           else displayDate = msgDateObj.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
           
           var divider = document.createElement('div');
-          divider.style.cssText = 'text-align:center; margin: 12px 0 8px 0; font-size: 11px; font-weight: 500; color: rgba(255,255,255,0.6); background: rgba(255,255,255,0.06); padding: 4px 12px; border-radius: 12px; align-self: center; max-width: fit-content; margin-left: auto; margin-right: auto;';
+          divider.style.cssText = 'text-align:center; margin: 12px 0 8px 0; font-size: 11px; font-weight: 500; padding: 4px 12px; border-radius: 12px; align-self: center; max-width: fit-content; margin-left: auto; margin-right: auto;';
+          divider.className = 'wa-date-divider';
           // Use dataset.ts so it doesn't break the lastTsAttr check for the next message (it inherits the date of the message)
           divider.dataset.ts = div.dataset.ts;
           divider.textContent = displayDate;
@@ -22882,13 +23662,16 @@ ${plainText}`;
       var giCount = document.getElementById('wa-gi-member-count');
       var giMembers = document.getElementById('wa-gi-members');
 
-      if (giAv) giAv.textContent = (gData.name || 'G').charAt(0).toUpperCase();
-      if (giName) giName.textContent = gData.name || 'Group';
+      var realName = (gData.name && String(gData.name).trim() && !/^group$/i.test(String(gData.name).trim()))
+        ? String(gData.name).trim() : null;
+
+      if (giAv) giAv.textContent = (realName || 'G').charAt(0).toUpperCase();
+      if (giName) giName.textContent = realName || 'Group';
       var totalCnt = (gData && (gData.total_participants !== undefined && gData.total_participants !== null))
         ? gData.total_participants
         : (gData.participants || []).length;
       var loadedCnt = (gData && Array.isArray(gData.participants)) ? gData.participants.length : 0;
-      if (giMeta) giMeta.textContent = 'Group · ' + totalCnt + ' members' + (gData.has_more ? (' (showing ' + loadedCnt + ')') : '');
+      if (giMeta) giMeta.textContent = (realName || 'Group') + ' · ' + totalCnt + ' members' + (gData.has_more ? (' (showing ' + loadedCnt + ')') : '');
       if (giDesc && gData.description) {
         giDesc.textContent = gData.description;
         if (giDescWrap) giDescWrap.style.display = 'block';
@@ -22896,6 +23679,27 @@ ${plainText}`;
         giDescWrap.style.display = 'none';
       }
       if (giCount) giCount.textContent = totalCnt + ' members';
+
+      // ── STRICT: update chat header + list item with the confirmed group name ──
+      if (realName && waActiveJid) {
+        // Update active chat header immediately
+        var titleEl = document.getElementById('wa-active-title');
+        if (titleEl && (titleEl.textContent === 'Group' || !titleEl.textContent.trim())) {
+          titleEl.textContent = realName;
+        }
+        var phEl = document.getElementById('wa-active-phone');
+        if (phEl && phEl.textContent.startsWith('Group ·')) {
+          phEl.textContent = 'Group · ' + totalCnt + ' members';
+        }
+        // Update the chat list item name in-place (no full reload needed)
+        var chatRow = document.querySelector('[data-wa-jid="' + CSS.escape(waActiveJid) + '"] [data-wa-name]');
+        if (chatRow && (chatRow.textContent === 'Group' || !chatRow.textContent.trim())) {
+          chatRow.textContent = realName;
+        }
+        // Update waAllChats cache so subsequent renders use real name
+        var chatEntry = waAllChats.find(function (c) { return c.id === waActiveJid; });
+        if (chatEntry) chatEntry.name = realName;
+      }
 
       if (giMembers) {
         giMembers.innerHTML = (gData.participants || []).map(function (p) {
@@ -22950,20 +23754,66 @@ ${plainText}`;
 
     async function waCreateBackup() {
       try {
-        notify('Creating WhatsApp backup...', 'Saving current account chats, messages, contacts and media', 'var(--gold)', 'fas fa-archive');
+        notify('Creating WhatsApp backup...', 'Saving chats, messages, contacts and media files', 'var(--gold)', 'fas fa-archive');
         var res = await fetch(API_BASE + '/wa/backups/create', { method: 'POST', headers: getAuthHeaders() });
         var data = await res.json();
         if (!res.ok) throw new Error(data.error || 'Backup failed');
+        // Stream the ZIP file to browser
+        var dlRes = await fetch(API_BASE + '/wa/backups/download/' + encodeURIComponent(data.fileName), { headers: getAuthHeaders() });
+        if (!dlRes.ok) throw new Error('Backup created but download failed');
+        var blob = await dlRes.blob();
+        var url = URL.createObjectURL(blob);
+        var a = document.createElement('a');
+        a.href = url; a.download = data.fileName;
+        document.body.appendChild(a); a.click();
+        setTimeout(function () { URL.revokeObjectURL(url); a.remove(); }, 1000);
         var c = data.counts || {};
-        notify('WhatsApp backup created', (c.chats || 0) + ' chats · ' + (c.messages || 0) + ' messages · ' + (data.mediaFiles || 0) + ' media files', 'var(--green2)', 'fas fa-check-circle');
+        notify('Backup downloaded ✓', (c.chats || 0) + ' chats · ' + (c.messages || 0) + ' messages · ' + (c.media || 0) + ' media files', 'var(--green2)', 'fas fa-check-circle');
       } catch (err) {
-        notify('Backup failed', err.message || 'Could not create WhatsApp backup', 'var(--red)', 'fas fa-exclamation-circle');
+        notify('Backup failed', err.message || 'Could not create backup', 'var(--red)', 'fas fa-exclamation-circle');
       }
     }
 
-    async function waOpenBackupInventory() {
-      openModal('wa-backup-modal');
-      await waLoadBackupInventory();
+    function waOpenBackupInventory() {
+      var input = document.createElement('input');
+      input.type = 'file';
+      input.accept = '.zip,application/zip';
+      input.style.display = 'none';
+      document.body.appendChild(input);
+      input.addEventListener('change', async function () {
+        var file = input.files[0];
+        input.remove();
+        if (!file) return;
+        // Validate file type
+        if (!file.name.endsWith('.zip')) {
+          notify('Invalid file', 'Please select a UniComm WhatsApp backup (.zip) file', 'var(--red)', 'fas fa-exclamation-circle');
+          return;
+        }
+        // Size check
+        var MAX_MB = 500;
+        if (file.size > MAX_MB * 1024 * 1024) {
+          notify('File too large', 'Backup must be under ' + MAX_MB + ' MB (yours: ' + (file.size / 1024 / 1024).toFixed(0) + ' MB)', 'var(--red)', 'fas fa-exclamation-circle');
+          return;
+        }
+        if (!confirm('Load WhatsApp backup?\n\n' + file.name + '\nSize: ' + (file.size / 1024 / 1024).toFixed(1) + ' MB\n\nThis will replace all current chats for the connected account.')) return;
+        notify('Loading backup...', 'Uploading ZIP and restoring chats + media', 'var(--gold)', 'fas fa-upload');
+        try {
+          var buf = await file.arrayBuffer();
+          var res = await fetch(API_BASE + '/wa/backups/upload', {
+            method: 'POST',
+            headers: getAuthHeaders({ 'Content-Type': 'application/zip' }),
+            body: buf
+          });
+          var data = await res.json();
+          if (!res.ok) throw new Error(data.error || 'Upload failed');
+          notify('Backup loaded ✓', (data.inserted?.wa_chats || 0) + ' chats · ' + (data.inserted?.wa_messages || 0) + ' messages · ' + (data.mediaFiles || 0) + ' media restored', 'var(--green2)', 'fas fa-check-circle');
+          await waLoadChats({ force: true });
+          setTimeout(function () { waLoadResolutionStats(waAllChats.length); }, 2000);
+        } catch (err) {
+          notify('Load failed', err.message || 'Could not restore backup', 'var(--red)', 'fas fa-exclamation-circle');
+        }
+      });
+      input.click();
     }
 
     function waBackupDateText(value) {
@@ -23049,6 +23899,31 @@ ${plainText}`;
         notify('WhatsApp disconnected', 'Device removed from phone. Check your phone\'s linked devices after 10 seconds.', 'var(--green2)', 'fab fa-whatsapp');
       } catch (_) {
         notify('Logout failed', 'Please try again', 'var(--red)', 'fas fa-exclamation-circle');
+      }
+    }
+
+    async function waPurgeAll() {
+      if (!confirm('⚠️ RESET WA DATA\n\nThis will permanently delete:\n• All chats, messages, contacts\n• Downloaded media\n• WhatsApp session (requires QR scan again)\n\nContinue?')) return;
+      try {
+        notify('Resetting WhatsApp data...', 'Please wait', 'var(--gold)', 'fas fa-trash-alt');
+        waStopResolutionPolling();
+        waStopStatusTicker();
+        const res = await fetch(API_BASE + '/wa/purge-all', { method: 'POST', headers: getAuthHeaders() });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Purge failed');
+        waAllChats = []; waLidMap = {}; waConnectedPhone = null; waActiveJid = null;
+        _waLidPendingStart = 0; _waChatTotal = 0;
+        var sb = document.getElementById('wa-status-bar');
+        var cb = document.getElementById('wa-connect-banner');
+        var pw = document.getElementById('wa-progress-wrap');
+        if (sb) sb.style.display = 'none';
+        if (cb) cb.style.display = 'block';
+        if (pw) pw.style.display = 'none';
+        document.getElementById('wa-convo-list').innerHTML = '<div style="text-align:center;padding:40px;color:var(--muted);">Connect WhatsApp to see chats</div>';
+        document.getElementById('wa-chat-area').innerHTML = '';
+        notify('WA data reset ✓', 'Scan QR to reconnect and start a fresh sync', 'var(--green2)', 'fab fa-whatsapp');
+      } catch (err) {
+        notify('Reset failed', err.message, 'var(--red)', 'fas fa-exclamation-circle');
       }
     }
 
@@ -23882,8 +24757,8 @@ ${plainText}`;
         + '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tr>'
         + '<td valign="middle"><table role="presentation" cellpadding="0" cellspacing="0" border="0"><tr>'
         + '<td valign="middle" style="padding-right:10px;">' + logoImg + '</td><td valign="middle">'
-        + '<div style="font-size:16px;font-weight:800;color:#fff;line-height:1.1;">' + escHtml(cfg.logoText) + '</div>'
-        + (cfg.logoSubtext ? '<div style="font-size:9px;color:#bfdbfe;letter-spacing:1px;margin-top:2px;">' + escHtml(cfg.logoSubtext) + '</div>' : '')
+        + '<div style="font-size:16px;font-weight:800;color:#fff;line-height:1.2;">' + escHtml(cfg.logoText) + '</div>'
+        + (cfg.logoSubtext ? '<div style="font-size:9px;color:#bfdbfe;letter-spacing:1px;margin-top:9px;">' + escHtml(cfg.logoSubtext) + '</div>' : '')
         + '</td></tr></table></td><td valign="middle" align="right">' + navHtml + '</td></tr></table></td></tr></table>';
     }
 
