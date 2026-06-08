@@ -10,6 +10,18 @@ Yeh file update karo taaki tower server pe deploy karte waqt kuch miss na ho.
 
 ---
 
+## Broadcast & Campaign Autocomplete / Group Improvements (Jun 2026)
+
+| Change | File |
+|---|---|
+| `GET /api/wa/contacts/search?q=` — fast DB-level autocomplete for WA typeahead | `backend/routes/whatsapp.js` |
+| Email contacts cache loaded eagerly on broadcast modal open / email channel switch | `dashboard.html` |
+| WA typeahead now hits backend search endpoint (debounced 180ms), falls back to in-memory | `dashboard.html` |
+| Campaign modal: WA broadcast group picker (shows when channel = WhatsApp / Both) | `dashboard.html` |
+| `wa_group_id` column added to campaigns table + saved in POST /api/campaigns | `backend/routes/campaigns.js` |
+
+---
+
 ## npm Packages Added (install on tower)
 
 | Package | Reason | Command |
@@ -18,6 +30,8 @@ Yeh file update karo taaki tower server pe deploy karte waqt kuch miss na ho.
 | `selfsigned` | SSL cert generation (auto-installed by gen_cert.js) | auto |
 | `node-forge` | SSL cert generation (auto-installed by gen_cert.js) | auto |
 | `jimp` | Image processing (used in scratch/send_marquee_test.js only) | not needed on tower |
+| `archiver` | Creates .zip backup files (WA backup) | `npm install archiver@7.0.1` |
+| `unzipper` | Extracts .zip backup files (WA backup restore) | `npm install unzipper@0.12.3` |
 
 ---
 
@@ -74,6 +88,13 @@ cd backend
 npm install
 pm2 restart unicomm --update-env
 ```
+
+## WhatsApp Stability Notes (Tower)
+
+- **Self-healing reconnect**: After 10 failed attempts, automatically cools down 5 min then retries — no manual pm2 restart needed for WA drops
+- **Fast QR**: Socket killed immediately on `/api/wa/qr` request, QR arrives in < 3s
+- **Account switch**: Scanning QR with a different number flushes old account's in-memory state cleanly
+- **Watchdog**: Restarts stale disconnected socket automatically (WA_WATCHDOG_ENABLED=true in .env)
 
 **SSL cert regenerate karna ho (expire ya fresh setup):**
 ```powershell

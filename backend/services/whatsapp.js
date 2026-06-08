@@ -301,10 +301,23 @@ function scheduleReconnect(reason) {
     return;
   }
   if (reconnectAttempts >= MAX_RECONNECT_ATTEMPTS) {
-    console.log(`[WA] Max reconnect attempts (${MAX_RECONNECT_ATTEMPTS}) reached. Stopping auto-reconnect.`);
-    currentState = 'DISCONNECTED';
-    recordActivity('reconnect', 'Max reconnect attempts reached', { attempts: reconnectAttempts, reason });
+    // On tower server with pm2, permanently stopping means WA stays dead until manual restart.
+    // Instead: reset counter and retry after a longer cooldown (5 min) — self-healing.
+    const cooldown = 5 * 60 * 1000;
+    console.log(`[WA] Max reconnect attempts (${MAX_RECONNECT_ATTEMPTS}) reached. Cooling down ${cooldown / 1000}s then retrying...`);
+    recordActivity('reconnect', 'Max attempts — cooldown retry', { attempts: reconnectAttempts, cooldownMs: cooldown });
     emit('wa:reconnect_failed', { attempts: reconnectAttempts });
+    reconnectAttempts = 0;
+    reconnectTimer = setTimeout(() => {
+      reconnectTimer = null;
+      if (hasSavedSession()) {
+        console.log('[WA] Cooldown complete — attempting to reconnect');
+        startWA().catch(err => {
+          console.error('[WA] Cooldown reconnect failed:', err.message);
+          scheduleReconnect('cooldown reconnect failed');
+        });
+      }
+    }, cooldown);
     return;
   }
 
@@ -351,6 +364,8 @@ function isInvalidContactLabel(value) {
   if (!text) return true;
   if (/^you$/i.test(text)) return true;
   if (/^(unknown|unknown whatsapp contact)$/i.test(text)) return true;
+  // WhatsApp rate-limit / protocol error strings must never be stored as names
+  if (/rate.?overlimit|not-authorized|forbidden|bad.?request|not.?found|timeout|internal.?server/i.test(text)) return true;
   return false;
 }
 
@@ -735,7 +750,12 @@ async function saveChat(rawJid, name, lastMsg, lastTime, unread, isGroup) {
   }
   const cleanName = String(name || '').trim();
   const groupIdLocal = jid.split('@')[0].split(':')[0];
-  const safeName = isGroupChat && (cleanName === groupIdLocal || cleanName === ('+' + groupIdLocal))
+  const safeName = isGroupChat && (
+    cleanName === groupIdLocal ||
+    cleanName === ('+' + groupIdLocal) ||
+    cleanName === jid ||                          // full JID stored as name
+    /^\d{12,}/.test(cleanName.replace(/@[a-z.]+$/i, '')) // 12+ digit prefix (group IDs)
+  )
     ? null
     : (cleanName && !isInvalidContactLabel(cleanName) ? cleanName : null);
   const ts = lastTime instanceof Date ? lastTime : toDate(lastTime);
@@ -1069,19 +1089,23 @@ async function startWA(options = {}) {
   const { state, saveCreds } = await useMultiFileAuthState(AUTH_DIR);
 
   // Scope DB writes to the real linked phone (creds.me.id), not the LID user id.
-  if (state.creds?.me?.id) {
+  const hasCreds = !!state.creds?.me?.id;
+  if (hasCreds) {
     applyConnectedAccountPhone(state.creds.me.id);
     userJid = state.creds.me.id;
+    // Only load existing data when we have a known account — skip for fresh QR scan
+    await loadContactsFromDB();
+    await loadImportedCheckpointsFromDB();
+    await updateChatNames();
   }
 
-  await loadContactsFromDB();
-  await loadImportedCheckpointsFromDB();
-  // Update chat names from contacts on every startup, scoped to the active account.
-  await updateChatNames();
-
-  let version = [2, 3000, 1017539718]; // Updated fallback to a more recent version
+  let version = [2, 3000, 1017539718]; // Recent fallback version
   try {
-    const res = await fetchLatestBaileysVersion();
+    // Cap at 5s — on tower server this can hang and delay QR generation
+    const res = await Promise.race([
+      fetchLatestBaileysVersion(),
+      new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 5000))
+    ]);
     version = res.version;
   } catch (err) {
     console.warn('[WA] Version fetch timeout/error, using fallback v' + version.join('.'));
@@ -1099,7 +1123,7 @@ async function startWA(options = {}) {
     version,
     auth: state,
     printQRInTerminal: false,
-    browser: ['UniComm Pro', 'Chrome', '120.0'],
+    browser: ['UniComm', 'Chrome', '124.0.0'],
     syncFullHistory: SYNC_FULL_HISTORY,
     // Baileys 7: when omitted, this defaults to () => !!syncFullHistory.
     // With syncFullHistory=false that SKIPS all history + app-state chat loading on QR connect.
@@ -1164,6 +1188,19 @@ async function startWA(options = {}) {
       pairingCode = null;
       pairingPhone = null;
       const rawId = sock.user?.id || '';
+
+      // Detect number switch: if a different account just connected (e.g. new QR scan),
+      // flush in-memory state so old account's contacts/chats don't bleed through.
+      const incomingPhone = normalizeAccountPhone(rawId);
+      if (phoneNumber && incomingPhone && incomingPhone !== phoneNumber) {
+        console.log(`[WA] Account switched from ${phoneNumber} → ${incomingPhone}, clearing in-memory store`);
+        clearContactsStore();
+        liveChatsStore.clear();
+        liveMessagesStore.clear();
+        importedLastTsMap = {};
+        groupMetadataCache.clear();
+        isReconnect = false; // treat as fresh connect
+      }
 
       // sock.user.id may be phone JID or @lid — always scope DB to creds.me.id phone.
       applyConnectedAccountPhone(rawId);
@@ -1261,8 +1298,9 @@ async function startWA(options = {}) {
         // Server, network, or unclassified close: retry with exponential backoff.
         scheduleReconnect(`disconnect ${code || 'unknown'}`);
       } else {
-        // Unknown error - log and don't reconnect automatically
-        console.log('[WA] Unknown disconnect code:', code, '- NOT auto-reconnecting');
+        // Unknown code — still reconnect if we have a session; don't silently die.
+        console.log('[WA] Unknown disconnect code:', code, '— reconnecting anyway');
+        if (hasSavedSession()) scheduleReconnect(`disconnect unknown code ${code}`);
       }
     }
   });
@@ -1504,7 +1542,7 @@ async function startWA(options = {}) {
           : getContactName(chat.id, chat.name);
         await saveChat(chat.id, name, '', toDate(chat.conversationTimestamp), 0, isGroup);
       }
-      // Debounce: wait 3s after the last batch before refreshing the UI.
+      // Debounce: wait 1.5s after the last batch before refreshing the UI.
       if (chatsUpsertDebounce) clearTimeout(chatsUpsertDebounce);
       chatsUpsertDebounce = setTimeout(async () => {
         const batches = chatsBatchCount;
@@ -2017,15 +2055,28 @@ async function _inner_updateChatNames() {
 async function countPendingLids(accPhone) {
   if (!accPhone) return 0;
   const r = await pool.query(`
-    SELECT COUNT(*)::int AS n
-    FROM wa_contacts
-    WHERE account_phone = $1
-      AND jid LIKE '%@lid'
-      AND (
-        COALESCE(regexp_replace(phone, '[^0-9]', '', 'g'), '') = ''
-        OR regexp_replace(COALESCE(phone, ''), '[^0-9]', '', 'g') = split_part(jid, '@', 1)
-        OR NOT (regexp_replace(COALESCE(phone, ''), '[^0-9]', '', 'g') ~ '^[0-9]{7,14}$')
-      )
+    SELECT COUNT(DISTINCT jid)::int AS n FROM (
+      -- LIDs in wa_contacts with no valid phone
+      SELECT jid FROM wa_contacts
+      WHERE account_phone = $1
+        AND jid LIKE '%@lid'
+        AND (
+          COALESCE(regexp_replace(phone, '[^0-9]', '', 'g'), '') = ''
+          OR regexp_replace(COALESCE(phone, ''), '[^0-9]', '', 'g') = split_part(jid, '@', 1)
+          OR NOT (regexp_replace(COALESCE(phone, ''), '[^0-9]', '', 'g') ~ '^[0-9]{7,14}$')
+        )
+      UNION
+      -- LIDs in wa_chats with no valid phone
+      SELECT id AS jid FROM wa_chats
+      WHERE account_phone = $1
+        AND id LIKE '%@lid'
+        AND is_group = false
+        AND (
+          COALESCE(regexp_replace(phone, '[^0-9]', '', 'g'), '') = ''
+          OR regexp_replace(COALESCE(phone, ''), '[^0-9]', '', 'g') = split_part(id, '@', 1)
+          OR NOT (regexp_replace(COALESCE(phone, ''), '[^0-9]', '', 'g') ~ '^[0-9]{7,14}$')
+        )
+    ) AS combined
   `, [accPhone]);
   return r.rows[0]?.n || 0;
 }
@@ -2067,6 +2118,15 @@ async function processLidResolutionBatch(batchSize = LID_RESOLUTION_BATCH_SIZE) 
     if (beforePending === 0) {
       return { resolved: 0, pending: 0, groupsScanned: 0, batchSize };
     }
+
+    // Ensure all @lid wa_chats entries exist in wa_contacts so we can update their phone
+    await pool.query(`
+      INSERT INTO wa_contacts (jid, account_phone, name, phone, is_group_member)
+      SELECT id, account_phone, NULLIF(name,''), NULL, false
+      FROM wa_chats
+      WHERE account_phone=$1 AND id LIKE '%@lid' AND is_group=false
+      ON CONFLICT (jid, account_phone) DO NOTHING
+    `, [accPhone]);
 
     if (!lidResolutionGroupIds.length) await refreshLidResolutionGroupIds(accPhone);
     if (!lidResolutionGroupIds.length) {
@@ -2110,7 +2170,8 @@ async function processLidResolutionBatch(batchSize = LID_RESOLUTION_BATCH_SIZE) 
           }
         });
       } catch (err) {
-        if (err.message && err.message.includes('timed out')) {
+        const errMsg = String(err?.message || '');
+        if (errMsg.includes('timed out') || /rate.?overlimit|rate.?limit|429/i.test(errMsg)) {
           hitRateLimit = true;
           break;
         }
@@ -2174,17 +2235,30 @@ async function tickLidResolutionWorker() {
     }
 
     const pending = await countPendingLids(phoneNumber);
-    if (pending === 0 || lidResolutionExhausted) {
+    if (pending === 0) {
       console.log('[WA] LID resolution worker complete');
       stopLidResolutionWorker();
       emit('wa:lid_resolution_complete', {});
+      return;
+    }
+    if (lidResolutionExhausted) {
+      // Still have unresolved LIDs — reset and start a fresh pass after a longer pause
+      console.log(`[WA] LID resolution exhausted pass but ${pending} LIDs still pending — resetting for another pass`);
+      lidResolutionExhausted = false;
+      lidResolutionGroupCursor = 0;
+      lidResolutionGroupIds = [];
+      lidResolutionWorkerTimer = setTimeout(tickLidResolutionWorker, 60 * 1000); // 1-min pause before next pass
       return;
     }
     await processLidResolutionBatch(LID_RESOLUTION_BATCH_SIZE);
   } catch (err) {
     console.warn('[WA] LID resolution worker tick failed:', err.message);
   }
-  lidResolutionWorkerTimer = setTimeout(tickLidResolutionWorker, LID_RESOLUTION_BATCH_DELAY_MS);
+  // If a cooldown is active, wait it out instead of hammering every 2.5s
+  const cooldownWait = lidResolutionCooldownUntil > Date.now()
+    ? Math.min(lidResolutionCooldownUntil - Date.now() + 2000, 15 * 60 * 1000)
+    : LID_RESOLUTION_BATCH_DELAY_MS;
+  lidResolutionWorkerTimer = setTimeout(tickLidResolutionWorker, cooldownWait);
 }
 
 function startLidResolutionWorker() {
@@ -2526,6 +2600,9 @@ async function sendMediaMessage(jid, media, quotedMsgId) {
 }
 
 // ── GROUP METADATA ───────────────────────────────────────────────────────────
+const groupMetadataRateCooldown = new Map(); // jid → cooldown-until timestamp
+const GROUP_METADATA_RATE_COOLDOWN_MS = 5 * 60 * 1000; // 5 min cooldown after rate-limit
+
 async function getGroupMetadata(jid, opts = {}) {
   if (!sock || !isConnected) throw new Error('WhatsApp not connected');
   const CACHE_TTL = 15 * 60 * 1000;
@@ -2535,7 +2612,35 @@ async function getGroupMetadata(jid, opts = {}) {
   const cached = groupMetadataCache.get(cacheKey);
   if (cached && (Date.now() - cached.ts < CACHE_TTL)) return cached.data;
 
-  const meta = await sock.groupMetadata(jid);
+  // If this group is in rate-limit cooldown, serve cached data or throw
+  const cooldownUntil = groupMetadataRateCooldown.get(jid) || 0;
+  if (Date.now() < cooldownUntil) {
+    if (cached) return cached.data; // serve stale cache rather than hammering WA
+    const waitSecs = Math.ceil((cooldownUntil - Date.now()) / 1000);
+    throw new Error(`rate-overlimit: group metadata cooldown for ${waitSecs}s`);
+  }
+
+  let meta;
+  try {
+    meta = await sock.groupMetadata(jid);
+  } catch (err) {
+    const msg = String(err?.message || err || '');
+    if (/rate.?overlimit|rate.?limit|429/i.test(msg)) {
+      groupMetadataRateCooldown.set(jid, Date.now() + GROUP_METADATA_RATE_COOLDOWN_MS);
+      console.warn(`[WA] Rate-overlimit for group ${jid} — cooldown ${GROUP_METADATA_RATE_COOLDOWN_MS / 1000}s`);
+      if (cached) return cached.data;
+    }
+    throw err;
+  }
+
+  // Baileys can return an error-like object instead of throwing — detect it
+  if (!meta || typeof meta !== 'object' || /rate.?overlimit|rate.?limit/i.test(String(meta?.message || ''))) {
+    groupMetadataRateCooldown.set(jid, Date.now() + GROUP_METADATA_RATE_COOLDOWN_MS);
+    console.warn(`[WA] Rate-overlimit object for group ${jid} — cooldown applied`);
+    if (cached) return cached.data;
+    throw new Error('rate-overlimit: WhatsApp rate limit hit for group metadata');
+  }
+
   const allParticipants = Array.isArray(meta.participants) ? meta.participants : [];
   const totalParticipants = allParticipants.length;
   const slice = (participantsLimit >= totalParticipants)
@@ -2562,6 +2667,8 @@ async function getGroupMetadata(jid, opts = {}) {
     if (displayName && displayDigits && !isAllowedWaNumber(displayDigits)) {
       displayName = null;
     }
+    // Never show WA error codes (rate-overlimit, not-authorized, etc.) as member names
+    if (displayName && isInvalidContactLabel(displayName)) displayName = null;
     displayName = displayName || phoneDisplay || null;
     return { jid: pJid, phone: phoneDisplay, name: displayName, admin: p.admin === 'admin' || p.admin === 'superadmin' };
   });
@@ -2806,10 +2913,17 @@ async function logout() {
   stopWatchdog();
   allowQrGeneration = false;
   currentState = 'DISCONNECTED';
+  // Cancel any pending reconnect so WA never auto-restarts after explicit logout
+  if (reconnectTimer) { clearTimeout(reconnectTimer); reconnectTimer = null; }
+  reconnectAttempts = 0;
+  hasConnectedBefore = false; // reset so next connect is treated as fresh
   if (sock) {
-    try { await sock.logout(); } catch (e) { console.warn('[WA] Logout error:', e.message); }
-    sock = null;
+    const s = sock;
+    sock = null; // null first to prevent event handlers from referencing it
     isConnected = false;
+    try { s.ev.removeAllListeners(); } catch (_) { }
+    try { await s.logout(); } catch (e) { console.warn('[WA] Logout error:', e.message); }
+    try { s.end?.(); } catch (_) { }
     qrString = null;
     pairingCode = null;
     pairingPhone = null;
@@ -2820,7 +2934,6 @@ async function logout() {
     liveMessagesStore.clear();
     importedLastTsMap = {};
     groupMetadataCache.clear();
-    reconnectAttempts = 0;
   }
   clearSession();
 }
@@ -2851,35 +2964,30 @@ async function requestQR() {
   pairingCode = null;
   pairingPhone = null;
   recordActivity('qr', 'QR requested');
-  if (reconnectTimer) {
-    clearTimeout(reconnectTimer);
-    reconnectTimer = null;
+
+  // Cancel any pending reconnect timer — we're taking over
+  if (reconnectTimer) { clearTimeout(reconnectTimer); reconnectTimer = null; }
+  reconnectAttempts = 0;
+
+  // If already connected, nothing to do — QR only makes sense when disconnected
+  if (isConnected) return getQR();
+
+  // Kill existing socket immediately so startWA creates a clean one
+  if (sock && !isConnected) {
+    const old = sock;
+    sock = null;
+    startInProgress = false;
+    try { old.ev.removeAllListeners(); } catch (_) { }
+    try { old.end?.(); } catch (_) { }
   }
 
-  if (!isConnected && !qrString) {
-    await startWA({ allowQR: true });
-  }
+  // Start fresh with QR allowed
+  await startWA({ allowQR: true });
 
+  // Wait up to 20s for QR (usually arrives in < 3s on a clean start)
   const startedAt = Date.now();
-  const waitBudgetMs = 30000;
-  const retryAtMs = 12000;
-  let restarted = false;
-
-  while (!qrString && !isConnected && Date.now() - startedAt < waitBudgetMs) {
-    // If WA socket did not produce QR in reasonable time, restart once.
-    if (!restarted && Date.now() - startedAt > retryAtMs && !startInProgress && !qrString) {
-      restarted = true;
-      recordActivity('qr', 'QR delayed, restarting socket once');
-      try {
-        if (sock) {
-          try { sock.ev.removeAllListeners(); } catch (_) { }
-          try { sock.end?.(); } catch (_) { }
-          sock = null;
-        }
-      } catch (_) { }
-      await startWA({ allowQR: true });
-    }
-    await sleep(300);
+  while (!qrString && !isConnected && Date.now() - startedAt < 20000) {
+    await sleep(250);
   }
 
   return getQR();
@@ -3154,6 +3262,58 @@ function waFormatPhoneFromJid(jid) {
   return '+' + digits;
 }
 
-module.exports = { startWA, sendMessage, sendMediaMessage, logout, getStatus, getQR, requestQR, requestPhonePairingCode, setIO, getGroupMetadata, refreshCurrentAccountGroupMetadata, resyncDirectoryFromSocket, processLidResolutionBatch, startLidResolutionWorker, stopLidResolutionWorker, downloadMedia, msgCache, importExportedChat, getConnectedPhone, getLiveChats, getLiveMessages, isLidResolutionExhausted, getLidResolutionCooldownMins };
+/**
+ * Persist a group's real subject into wa_chats and notify the frontend.
+ * Called whenever we get a confirmed name from groupMetadata (Group Info panel).
+ */
+async function updateGroupName(jid, subject, accPhone) {
+  if (!jid || !subject || !accPhone) return;
+  if (isInvalidContactLabel(subject)) return;
+  try {
+    await pool.query(
+      `UPDATE wa_chats SET name=$1, updated_at=NOW() WHERE id=$2 AND account_phone=$3`,
+      [subject, jid, accPhone]
+    );
+    // Keep in-memory store in sync
+    if (contactsStore[jid]) contactsStore[jid].name = subject;
+    else contactsStore[jid] = { id: jid, name: subject };
+    // Push live update so chat list re-renders with the correct name
+    emit('wa:chats_updated', {});
+  } catch (err) {
+    console.warn(`[WA] updateGroupName error for ${jid}:`, err.message);
+  }
+}
+
+// Download all cached media messages to disk so backup can include them
+async function flushCachedMediaToDisk() {
+  const mediaDir = path.join(__dirname, '../wa_media');
+  if (!fs.existsSync(mediaDir)) fs.mkdirSync(mediaDir, { recursive: true });
+  const mediaTypes = ['imageMessage', 'videoMessage', 'audioMessage', 'documentMessage', 'stickerMessage'];
+  const extMap = { imageMessage: 'jpg', videoMessage: 'mp4', audioMessage: 'ogg', stickerMessage: 'webp', documentMessage: 'bin' };
+  let saved = 0;
+  for (const [msgId, msg] of msgCache.entries()) {
+    const mtype = getContentType(msg.message);
+    if (!mediaTypes.includes(mtype)) continue;
+    const existingFiles = fs.readdirSync(mediaDir).filter(f => f.startsWith(msgId + '_'));
+    if (existingFiles.length > 0) continue; // already on disk
+    try {
+      const buf = await downloadMediaMessage(msg, 'buffer', {});
+      const ext = extMap[mtype] || 'bin';
+      const docMsg = msg.message.documentMessage;
+      const fname = docMsg?.fileName || `${msgId}.${ext}`;
+      const savedName = msgId + '_' + fname;
+      fs.writeFileSync(path.join(mediaDir, savedName), buf);
+      // Also update DB so media_path is set
+      if (phoneNumber) {
+        pool.query(`UPDATE wa_messages SET media_path=$1 WHERE id=$2 AND account_phone=$3`, [savedName, msgId, phoneNumber]).catch(() => {});
+      }
+      saved++;
+    } catch (_) {}
+  }
+  console.log(`[WA] flushCachedMediaToDisk: ${saved} media files saved`);
+  return saved;
+}
+
+module.exports = { startWA, sendMessage, sendMediaMessage, logout, getStatus, getQR, requestQR, requestPhonePairingCode, setIO, getGroupMetadata, refreshCurrentAccountGroupMetadata, resyncDirectoryFromSocket, processLidResolutionBatch, startLidResolutionWorker, stopLidResolutionWorker, downloadMedia, msgCache, importExportedChat, getConnectedPhone, getLiveChats, getLiveMessages, isLidResolutionExhausted, getLidResolutionCooldownMins, updateGroupName, flushCachedMediaToDisk };
 
 

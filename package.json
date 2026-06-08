@@ -1,10 +1,14 @@
 {
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.102.0",
     "acorn": "^8.16.0",
     "axios": "^1.16.1",
     "axios-cookiejar-support": "^7.0.0",
     "https": "^1.0.0",
     "playwright": "^1.60.0",
     "tough-cookie": "^6.0.1"
+  },
+  "devDependencies": {
+    "puppeteer": "^25.1.0"
   }
 }

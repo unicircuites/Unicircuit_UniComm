@@ -10,6 +10,19 @@ const { authenticate } = require('../middleware/auth');
 const router = express.Router();
 const WA_DEBUG_ACCOUNT_SCOPE = String(process.env.WA_DEBUG_ACCOUNT_SCOPE || 'false').toLowerCase() === 'true';
 
+// ── One-time cleanup: NULL out any wa_chats.name that is the group's own JID ──
+pool.query(`
+  UPDATE wa_chats
+  SET name = NULL
+  WHERE is_group = true
+    AND name IS NOT NULL
+    AND (
+      name = id
+      OR name = split_part(id,'@',1)
+      OR (name ~ '^[0-9]{12,}' AND name NOT LIKE '%@%')
+    )
+`).catch(e => console.error('[WA] group name cleanup:', e.message));
+
 function normalizeDigits(value) {
   return String(value || '').replace(/\D/g, '');
 }
@@ -55,6 +68,10 @@ function isInvalidContactLabel(value) {
   if (!text) return true;
   if (/^you$/i.test(text)) return true;
   if (/^(unknown|unknown whatsapp contact|whatsapp)$/i.test(text)) return true;
+  // Meta AI is WhatsApp's built-in AI assistant — never a real contact or group
+  if (/^meta\s*ai$/i.test(text)) return true;
+  // WhatsApp rate-limit / protocol error strings must never appear as names
+  if (/rate.?overlimit|not-authorized|forbidden|bad.?request|not.?found|timeout|internal.?server/i.test(text)) return true;
   return false;
 }
 
@@ -66,6 +83,12 @@ function isGroupishLabel(candidate, groupIdLocal) {
   if (isAllowedWaNumber(normalizeDigits(text))) return true;
   const localDigits = normalizeDigits(groupIdLocal || '');
   if (localDigits && normalizeDigits(text) === localDigits) return true;
+  // Generic fallback placeholder — not a real group name
+  if (/^group$/i.test(text)) return true;
+  // JID stored as name (e.g. "120363361207108410@g.us") — not a real name
+  if (text.includes('@g.us') || text.includes('@s.whatsapp.net') || text.includes('@lid')) return true;
+  // Pure numeric string with @g.us stripped — 15+ digit internal group ID stored as name
+  if (/^\d{12,}/.test(text.replace(/@[a-z.]+$/i, ''))) return true;
   return false;
 }
 
@@ -127,6 +150,10 @@ function canonicalizeChats(rows) {
     const hasNamedLidFallback = isNamedLidFallback(id, phoneDigits, displayLabel);
 
     // ── Hard exclusion rules ──────────────────────────────────────────────
+    // 0. STRICT: Meta AI is WhatsApp's built-in AI assistant — never show it
+    //    as a contact or group in the CRM chat list.
+    if (/^meta\s*ai$/i.test(displayLabel)) { console.log(`[WA-FILTER] Blocked Meta AI entry: ${id}`); continue; }
+
     // 1. Raw @lid with no phone AND no proper name: hide until resolved.
     // If it has a proper name (hasNamedLidFallback = true), we MUST show it.
     if (!isGroup && id.endsWith('@lid') && !phoneDigits && !hasNamedLidFallback) continue;
@@ -177,7 +204,43 @@ function canonicalizeChats(rows) {
     map.set(key, winner);
   }
 
-  return Array.from(map.values())
+  // ── STRICT: LOAD ONLY UNIQUE NAMES ───────────────────────────────────────
+  // Only one chat per display name is ever returned.
+  // Duplicates are DROPPED (keeping most-recent), unread counts are merged.
+  const nameMap = new Map();
+  const dupLog  = [];
+
+  for (const row of map.values()) {
+    const nameKey = String(row.name || '').trim().toLowerCase();
+    if (!nameKey) continue;
+    const existing = nameMap.get(nameKey);
+    if (!existing) {
+      nameMap.set(nameKey, row);
+    } else {
+      const ta = row._lastTs ?? (row.last_time ? new Date(row.last_time).getTime() : 0);
+      const tb = existing._lastTs ?? (existing.last_time ? new Date(existing.last_time).getTime() : 0);
+      if (ta >= tb) {
+        const merged = { ...row };
+        merged._unread = Math.max(row._unread || 0, existing._unread || 0);
+        merged.unread  = merged._unread;
+        dupLog.push(`  DROPPED  [${existing.id}]  kept  [${row.id}]  name="${row.name}"`);
+        nameMap.set(nameKey, merged);
+      } else {
+        existing._unread = Math.max(existing._unread || 0, row._unread || 0);
+        existing.unread  = existing._unread;
+        dupLog.push(`  DROPPED  [${row.id}]  kept  [${existing.id}]  name="${existing.name}"`);
+      }
+    }
+  }
+
+  if (dupLog.length > 0) {
+    console.warn(`[WA-DEDUP] ⚠️  ${dupLog.length} duplicate name(s) suppressed — UNIQUE NAMES ONLY policy:`);
+    dupLog.forEach(l => console.warn(l));
+  } else {
+    console.log(`[WA-DEDUP] ✅ All ${nameMap.size} chat names are unique.`);
+  }
+
+  return Array.from(nameMap.values())
     .map(({ _lastTs, _unread, _sortName, ...row }) => row)
     .sort((a, b) => {
       const ta = a.last_time ? new Date(a.last_time).getTime() : 0;
@@ -585,6 +648,7 @@ router.post('/backups/create', authenticate, async (req, res) => {
   try {
     const accountPhone = connectedAccount(res);
     if (!accountPhone) return;
+    await wa.flushCachedMediaToDisk().catch(() => {});
     const result = await waInventory.createBackup(accountPhone, 'manual');
     res.json({ success: true, ...result });
   } catch (err) { res.status(500).json({ error: err.message }); }
@@ -598,13 +662,77 @@ router.get('/backups', authenticate, async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
+// Stream the .zip backup file directly to the browser
+router.get('/backups/download/:fileName', authenticate, (req, res) => {
+  const fs   = require('fs');
+  const path = require('path');
+  const fileName = path.basename(String(req.params.fileName || ''));
+  if (!/^wa-backup-[a-zA-Z0-9_.-]+\.zip$/.test(fileName))
+    return res.status(400).json({ error: 'Invalid file name' });
+  const filePath = path.join(waInventory.backupDir, fileName);
+  if (!fs.existsSync(filePath)) return res.status(404).json({ error: 'Backup not found' });
+  res.setHeader('Content-Disposition', `attachment; filename="${fileName}"`);
+  res.setHeader('Content-Type', 'application/zip');
+  fs.createReadStream(filePath).pipe(res);
+});
+
+// Accept binary ZIP upload — use express.raw() locally to bypass express.json()
+router.post('/backups/upload',
+  authenticate,
+  (req, res, next) => {
+    // express.json() runs globally; for this route we need raw binary
+    // If body was already parsed (small upload), skip. Otherwise read raw.
+    if (Buffer.isBuffer(req.body) || !req.headers['content-type']?.includes('application/zip')) {
+      return next();
+    }
+    next();
+  },
+  require('express').raw({ type: 'application/zip', limit: '500mb' }),
+  async (req, res) => {
+    const fs   = require('fs');
+    const path = require('path');
+    const os   = require('os');
+    try {
+      const accountPhone = connectedAccount(res);
+      if (!accountPhone) return;
+
+      const buf = req.body;
+      if (!Buffer.isBuffer(buf) || buf.length < 4)
+        return res.status(400).json({ error: 'Invalid or empty ZIP file' });
+
+      // ZIP magic bytes: PK\x03\x04
+      if (buf[0] !== 0x50 || buf[1] !== 0x4B)
+        return res.status(400).json({ error: 'File is not a valid ZIP archive' });
+
+      if (buf.length > 500 * 1024 * 1024)
+        return res.status(413).json({ error: 'Backup too large (max 500 MB)' });
+
+      // Write to temp file, let restoreBackup read it
+      const tmpPath = path.join(os.tmpdir(), `wa-upload-${Date.now()}.zip`);
+      fs.writeFileSync(tmpPath, buf);
+      try {
+        const result = await waInventory.restoreBackup(tmpPath, accountPhone);
+        if (wa.getStatus().connected) wa.startLidResolutionWorker();
+        res.json(result);
+      } finally {
+        fs.unlink(tmpPath, () => {});
+      }
+    } catch (err) {
+      const status = err.message.includes('Restore blocked') || err.message.includes('belongs to') ? 409 : 500;
+      res.status(status).json({ error: err.message });
+    }
+  }
+);
+
 router.post('/backups/load', authenticate, async (req, res) => {
   try {
     const accountPhone = connectedAccount(res);
     if (!accountPhone) return;
     const fileName = req.body?.fileName;
     if (!fileName) return res.status(400).json({ error: 'fileName is required' });
-    const result = await waInventory.restoreBackup(fileName, accountPhone);
+    const filePath = require('path').join(waInventory.backupDir, require('path').basename(fileName));
+    const result = await waInventory.restoreBackup(filePath, accountPhone);
+    if (wa.getStatus().connected) wa.startLidResolutionWorker();
     res.json(result);
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
@@ -645,7 +773,11 @@ router.get('/group/:jid', authenticate, async (req, res) => {
     if (blocked.rowCount) return res.status(404).json({ error: 'Chat is blocked for this WhatsApp account' });
     const participantsLimit = Math.max(1, parseInt(req.query.limit || '200', 10) || 200);
     const participantsOffset = Math.max(0, parseInt(req.query.offset || '0', 10) || 0);
-    res.json(await wa.getGroupMetadata(jid, { participantsLimit, participantsOffset }));
+    const gData = await wa.getGroupMetadata(jid, { participantsLimit, participantsOffset });
+    // Group Info is the authoritative source — persist the confirmed subject to wa_chats
+    // so the chat list always shows the real name, not a stale/empty fallback.
+    if (gData?.name) setImmediate(() => wa.updateGroupName(jid, gData.name, accountPhone));
+    res.json(gData);
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
@@ -668,6 +800,8 @@ router.get('/messages/:jid', authenticate, async (req, res) => {
       setImmediate(async () => {
         try {
           const groupMeta = await wa.getGroupMetadata(jid, { participantsLimit: 2000, participantsOffset: 0 });
+          // Always persist the confirmed group subject — this is the authoritative name source
+          if (groupMeta?.name) await wa.updateGroupName(jid, groupMeta.name, accountPhone);
           let updated = 0;
           for (const p of groupMeta.participants) {
             if (p.jid && p.jid.endsWith('@lid') && p.phone) {
@@ -796,6 +930,14 @@ router.post('/send', authenticate, async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
+// ── WA Broadcast history (in-memory, last 100) ─────────────────────────────
+const waBroadcastHistory = [];
+let waBroadcastIdSeq = 1;
+
+router.get('/broadcast', authenticate, (req, res) => {
+  res.json([...waBroadcastHistory].reverse());
+});
+
 router.post('/broadcast', authenticate, async (req, res) => {
   const { recipients, message, delay_ms, attachments } = req.body;
   const targets = Array.isArray(recipients) ? recipients : [];
@@ -836,6 +978,18 @@ router.post('/broadcast', authenticate, async (req, res) => {
   const wait = (ms) => new Promise(resolve => setTimeout(resolve, ms));
   const delay = Math.max(500, Math.min(parseInt(delay_ms || 2000, 10) || 2000, 24 * 60 * 60 * 1000));
 
+  const histEntry = {
+    id: waBroadcastIdSeq++,
+    message: text.length > 120 ? text.slice(0, 120) + '…' : text,
+    total: normalized.length,
+    sent: 0,
+    failed: 0,
+    status: 'sending',
+    sent_at: new Date().toISOString(),
+  };
+  waBroadcastHistory.push(histEntry);
+  if (waBroadcastHistory.length > 100) waBroadcastHistory.shift();
+
   res.json({ success: true, total: normalized.length, queued: normalized.length });
 
   (async () => {
@@ -874,6 +1028,9 @@ router.post('/broadcast', authenticate, async (req, res) => {
       if (i < normalized.length - 1) await wait(delay);
     }
     console.log(`[WA Broadcast] Done - sent:${sent} failed:${failed}`);
+    histEntry.sent = sent;
+    histEntry.failed = failed;
+    histEntry.status = failed === normalized.length ? 'failed' : 'sent';
   })().catch(err => console.error('[WA Broadcast] Worker error:', err.message));
 });
 
@@ -938,6 +1095,205 @@ router.post('/import-chat', authenticate, async (req, res) => {
     console.error('[WA-Import] Error:', err.message);
     res.status(500).json({ error: err.message });
   }
+});
+
+// POST /api/wa/purge-all — wipe all WA DB data + media files + session
+router.post('/purge-all', authenticate, async (req, res) => {
+  const fs = require('fs');
+  const path = require('path');
+  try {
+    // 1. Stop WA socket gracefully
+    try { await wa.logout(); } catch (_) {}
+
+    // 2. Wipe DB tables
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+      for (const t of ['wa_messages', 'wa_chats', 'wa_contacts', 'wa_chat_blocklist']) {
+        await client.query(`DELETE FROM ${t}`);
+      }
+      await client.query('COMMIT');
+    } catch (e) {
+      await client.query('ROLLBACK').catch(() => {});
+      throw e;
+    } finally { client.release(); }
+
+    // 3. Wipe media files
+    const mediaDir = path.join(__dirname, '../wa_media');
+    let mediaDeleted = 0;
+    if (fs.existsSync(mediaDir)) {
+      for (const f of fs.readdirSync(mediaDir)) {
+        try { fs.unlinkSync(path.join(mediaDir, f)); mediaDeleted++; } catch (_) {}
+      }
+    }
+
+    // 4. Wipe session (auth) files
+    const authDir = path.join(__dirname, '../wa_auth');
+    let authDeleted = 0;
+    if (fs.existsSync(authDir)) {
+      for (const f of fs.readdirSync(authDir)) {
+        try { fs.unlinkSync(path.join(authDir, f)); authDeleted++; } catch (_) {}
+      }
+    }
+
+    res.json({ success: true, mediaDeleted, authDeleted });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ── WA Broadcast Groups ─────────────────────────────────────────────────────
+(async () => {
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS wa_broadcast_groups (
+        id          SERIAL PRIMARY KEY,
+        name        VARCHAR(200) NOT NULL,
+        description TEXT,
+        created_by  INT,
+        created_at  TIMESTAMPTZ DEFAULT NOW()
+      )
+    `);
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS wa_broadcast_group_members (
+        group_id   INT NOT NULL REFERENCES wa_broadcast_groups(id) ON DELETE CASCADE,
+        jid        VARCHAR(100) NOT NULL,
+        name       VARCHAR(200),
+        added_at   TIMESTAMPTZ DEFAULT NOW(),
+        PRIMARY KEY (group_id, jid)
+      )
+    `);
+  } catch (e) { console.error('[WA Groups] Table init:', e.message); }
+})();
+
+router.get('/groups', authenticate, async (req, res) => {
+  try {
+    const r = await pool.query(`
+      SELECT g.id, g.name, g.description, g.created_at,
+             COUNT(m.jid)::int AS member_count
+      FROM wa_broadcast_groups g
+      LEFT JOIN wa_broadcast_group_members m ON m.group_id = g.id
+      GROUP BY g.id ORDER BY g.name ASC
+    `);
+    res.json(r.rows);
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+router.post('/groups', authenticate, async (req, res) => {
+  const { name, description, members } = req.body;
+  if (!name || !name.trim()) return res.status(400).json({ error: 'Group name required' });
+  try {
+    const r = await pool.query(
+      `INSERT INTO wa_broadcast_groups (name, description, created_by) VALUES ($1,$2,$3) RETURNING *`,
+      [name.trim(), description || null, req.user.id]
+    );
+    const group = r.rows[0];
+    if (Array.isArray(members) && members.length) {
+      const vals = members.map((m, i) => `($1,$${i*2+2},$${i*2+3})`).join(',');
+      const params = [group.id];
+      members.forEach(m => { params.push(String(m.jid || '').trim(), String(m.name || '').trim()); });
+      await pool.query(
+        `INSERT INTO wa_broadcast_group_members (group_id,jid,name) VALUES ${vals} ON CONFLICT DO NOTHING`,
+        params
+      );
+    }
+    const cnt = await pool.query(`SELECT COUNT(*)::int AS n FROM wa_broadcast_group_members WHERE group_id=$1`, [group.id]);
+    group.member_count = cnt.rows[0].n;
+    res.status(201).json(group);
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+router.get('/groups/:id', authenticate, async (req, res) => {
+  try {
+    const g = await pool.query(`SELECT * FROM wa_broadcast_groups WHERE id=$1`, [req.params.id]);
+    if (!g.rowCount) return res.status(404).json({ error: 'Not found' });
+    const m = await pool.query(`SELECT jid, name FROM wa_broadcast_group_members WHERE group_id=$1 ORDER BY name`, [req.params.id]);
+    res.json({ ...g.rows[0], members: m.rows });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+router.delete('/groups/:id', authenticate, async (req, res) => {
+  try {
+    await pool.query(`DELETE FROM wa_broadcast_groups WHERE id=$1`, [req.params.id]);
+    res.json({ success: true });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+router.post('/groups/:id/members', authenticate, async (req, res) => {
+  const { members } = req.body; // [{jid, name}]
+  if (!Array.isArray(members) || !members.length) return res.status(400).json({ error: 'members[] required' });
+  try {
+    const vals = members.map((m, i) => `($1,$${i*2+2},$${i*2+3})`).join(',');
+    const params = [req.params.id];
+    members.forEach(m => { params.push(String(m.jid || '').trim(), String(m.name || '').trim()); });
+    await pool.query(
+      `INSERT INTO wa_broadcast_group_members (group_id,jid,name) VALUES ${vals} ON CONFLICT (group_id,jid) DO UPDATE SET name=EXCLUDED.name`,
+      params
+    );
+    res.json({ success: true });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+router.delete('/groups/:id/members', authenticate, async (req, res) => {
+  const { jids } = req.body;
+  if (!Array.isArray(jids) || !jids.length) return res.status(400).json({ error: 'jids[] required' });
+  try {
+    await pool.query(`DELETE FROM wa_broadcast_group_members WHERE group_id=$1 AND jid=ANY($2)`, [req.params.id, jids]);
+    res.json({ success: true });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// ── WA Contacts Search — GET /api/wa/contacts/search?q= ─────────────────────
+// Fast autocomplete: searches enriched_contacts + wa_chats by name or phone digits
+router.get('/contacts/search', authenticate, async (req, res) => {
+  const accountPhone = connectedAccount(res);
+  if (!accountPhone) return;
+  const q = String(req.query.q || '').trim();
+  if (!q) return res.json([]);
+  const digits = q.replace(/\D/g, '');
+  try {
+    const result = await pool.query(`
+      SELECT jid, name, phone, is_group FROM (
+        -- Individual contacts from enriched_contacts
+        SELECT
+          CASE
+            WHEN regexp_replace(COALESCE(ec.phone,''),'[^0-9]','','g') ~ '^[0-9]{7,15}$'
+              THEN regexp_replace(ec.phone,'[^0-9]','','g') || '@s.whatsapp.net'
+            ELSE ec.jid
+          END AS jid,
+          COALESCE(NULLIF(ec.crm_name,''), NULLIF(ec.name,''), NULLIF(ec.notify,''), split_part(ec.jid,'@',1)) AS name,
+          regexp_replace(COALESCE(ec.phone,''),'[^0-9]','','g') AS phone,
+          false AS is_group
+        FROM enriched_contacts ec
+        WHERE ec.account_phone = $1
+          AND ec.jid IS NOT NULL AND ec.jid <> ''
+          AND ec.jid NOT LIKE '%@newsletter' AND ec.jid NOT LIKE '%@broadcast'
+          AND regexp_replace(COALESCE(ec.phone,''),'[^0-9]','','g') ~ '^[0-9]{7,14}$'
+          AND (
+            COALESCE(ec.crm_name, ec.name, ec.notify, '') ILIKE $2
+            OR ($3 <> '' AND regexp_replace(COALESCE(ec.phone,''),'[^0-9]','','g') LIKE $4)
+          )
+        UNION ALL
+        -- WA groups from wa_chats
+        SELECT c.id AS jid,
+          COALESCE(NULLIF(c.name,''), split_part(c.id,'@',1)) AS name,
+          '' AS phone,
+          true AS is_group
+        FROM wa_chats c
+        WHERE c.account_phone = $1
+          AND c.id LIKE '%@g.us'
+          AND COALESCE(c.name,'') ILIKE $2
+      ) t
+      ORDER BY is_group ASC, name ASC
+      LIMIT 20
+    `, [accountPhone, '%' + q + '%', digits, '%' + digits + '%']);
+    res.json(result.rows.map(r => ({
+      jid: r.jid,
+      name: r.name,
+      phone: r.phone,
+      isGroup: r.is_group,
+    })));
+  } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
 module.exports = router;

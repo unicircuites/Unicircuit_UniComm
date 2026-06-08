@@ -12,6 +12,7 @@
   "dependencies": {
     "@azure/msal-node": "^5.1.5",
     "@whiskeysockets/baileys": "^7.0.0-rc.9",
+    "archiver": "^7.0.1",
     "axios": "^1.16.1",
     "bcryptjs": "2.4.3",
     "compression": "1.8.1",
@@ -28,7 +29,8 @@
     "pg": "8.11.5",
     "playwright": "^1.60.0",
     "qrcode": "^1.5.4",
-    "socket.io": "^4.8.3"
+    "socket.io": "^4.8.3",
+    "unzipper": "^0.12.3"
   },
   "devDependencies": {
     "fast-check": "^4.8.0",

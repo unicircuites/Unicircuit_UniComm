@@ -20,6 +20,7 @@ async function ensureCampaignColumns() {
     `ALTER TABLE campaigns ADD COLUMN IF NOT EXISTS send_interval_ms INT DEFAULT 180000`,
     `ALTER TABLE campaigns ADD COLUMN IF NOT EXISTS timezone VARCHAR(60) DEFAULT 'Asia/Kolkata'`,
     `ALTER TABLE campaigns ADD COLUMN IF NOT EXISTS group_id INT`,
+    `ALTER TABLE campaigns ADD COLUMN IF NOT EXISTS wa_group_id INT`,
     `ALTER TABLE campaigns ADD COLUMN IF NOT EXISTS subject TEXT`,
     `ALTER TABLE campaigns ADD COLUMN IF NOT EXISTS body TEXT`,
     `ALTER TABLE campaigns ADD COLUMN IF NOT EXISTS attachments JSONB DEFAULT '[]'`,
@@ -45,15 +46,15 @@ router.get('/', async (req, res) => {
 router.post('/', async (req, res) => {
   const { name, product, segment, channel, status, scheduled_at,
           goal, ab_test_enabled, ab_subject_b,
-          send_interval_ms, timezone, group_id } = req.body;
+          send_interval_ms, timezone, group_id, wa_group_id } = req.body;
   if (!name) return res.status(400).json({ error: 'Campaign name is required.' });
   try {
     const result = await pool.query(`
-      INSERT INTO campaigns (name,product,segment,channel,status,scheduled_at,goal,ab_test_enabled,ab_subject_b,send_interval_ms,timezone,group_id)
-      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12) RETURNING *
+      INSERT INTO campaigns (name,product,segment,channel,status,scheduled_at,goal,ab_test_enabled,ab_subject_b,send_interval_ms,timezone,group_id,wa_group_id)
+      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13) RETURNING *
     `, [name, product||null, segment||'All', channel||'Email', status||'Draft',
         scheduled_at||null, goal||null, ab_test_enabled||false, ab_subject_b||null,
-        send_interval_ms||180000, timezone||'Asia/Kolkata', group_id||null]);
+        send_interval_ms||180000, timezone||'Asia/Kolkata', group_id||null, wa_group_id||null]);
     return res.status(201).json(result.rows[0]);
   } catch (err) {
     return res.status(500).json({ error: 'Failed to create campaign.' });
