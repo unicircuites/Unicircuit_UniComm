@@ -6727,6 +6727,52 @@
               </table>
             </div>
           </div>
+        </div>        <!-- ─── USER MANAGEMENT SECTION ──────────────────────────────────────────── -->
+        <div class="section-view fu" id="sec-usermgmt">
+          <div style="max-width:860px;margin:0 auto;padding:0 4px;">
+            <!-- Add / Edit form -->
+            <div id="um-form" style="background:var(--bg3);border:1px solid var(--border2);border-radius:12px;padding:20px;margin-bottom:20px;">
+              <div style="font-size:13px;font-weight:600;color:var(--text);margin-bottom:14px;" id="um-form-title">
+                <i class="fas fa-user-plus" style="color:var(--gold);margin-right:6px;"></i>Add New User
+              </div>
+              <div class="form-row">
+                <div><label class="form-label">Name *</label><input class="inp" id="um-name" placeholder="Rajesh Kumar" /></div>
+                <div><label class="form-label">Email *</label><input class="inp" id="um-email" placeholder="user@company.com" /></div>
+              </div>
+              <div class="form-row">
+                <div>
+                  <label class="form-label">Password <span id="um-pw-hint" style="color:var(--muted);font-size:11px;">(required)</span></label>
+                  <input class="inp" id="um-password" type="password" placeholder="Min 8 characters" />
+                </div>
+                <div>
+                  <label class="form-label">Role</label>
+                  <select class="inp" id="um-role"><option value="user">User</option><option value="admin">Admin</option></select>
+                </div>
+              </div>
+              <div style="display:flex;gap:8px;margin-top:10px;">
+                <button class="btn btn-primary btn-sm" onclick="umSaveUser()"><i class="fas fa-save"></i> Save</button>
+                <button class="btn btn-ghost btn-sm" onclick="umCancelEdit()"><i class="fas fa-times"></i> Cancel</button>
+              </div>
+            </div>
+            <!-- Users table -->
+            <div style="background:var(--bg3);border:1px solid var(--border2);border-radius:12px;overflow:hidden;">
+              <table style="width:100%;border-collapse:collapse;font-size:13px;">
+                <thead>
+                  <tr style="border-bottom:1px solid var(--border2);color:var(--muted);text-align:left;background:var(--bg2);">
+                    <th style="padding:10px 14px;">User</th>
+                    <th style="padding:10px 14px;">Email</th>
+                    <th style="padding:10px 14px;">Role</th>
+                    <th style="padding:10px 14px;">Status</th>
+                    <th style="padding:10px 14px;">Last Login</th>
+                    <th style="padding:10px 14px;text-align:right;">Actions</th>
+                  </tr>
+                </thead>
+                <tbody id="um-users-tbody">
+                  <tr><td colspan="6" style="padding:24px;text-align:center;color:var(--muted);"><i class="fas fa-spinner fa-spin"></i> Loading…</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
         </div>
 
       </div><!-- /content-area -->
@@ -33569,53 +33615,7 @@ Nagpur, Maharashtra, 440017, India<br>
     </div>
   </div>
 
-<!-- ─── USER MANAGEMENT SECTION ──────────────────────────────────────────── -->
-<div class="section-view fu" id="sec-usermgmt">
-  <div style="max-width:860px;margin:0 auto;padding:0 4px;">
-    <!-- Add / Edit form -->
-    <div id="um-form" style="background:var(--bg3);border:1px solid var(--border2);border-radius:12px;padding:20px;margin-bottom:20px;">
-      <div style="font-size:13px;font-weight:600;color:var(--text);margin-bottom:14px;" id="um-form-title">
-        <i class="fas fa-user-plus" style="color:var(--gold);margin-right:6px;"></i>Add New User
-      </div>
-      <div class="form-row">
-        <div><label class="form-label">Name *</label><input class="inp" id="um-name" placeholder="Rajesh Kumar" /></div>
-        <div><label class="form-label">Email *</label><input class="inp" id="um-email" placeholder="user@company.com" /></div>
-      </div>
-      <div class="form-row">
-        <div>
-          <label class="form-label">Password <span id="um-pw-hint" style="color:var(--muted);font-size:11px;">(required)</span></label>
-          <input class="inp" id="um-password" type="password" placeholder="Min 8 characters" />
-        </div>
-        <div>
-          <label class="form-label">Role</label>
-          <select class="inp" id="um-role"><option value="user">User</option><option value="admin">Admin</option></select>
-        </div>
-      </div>
-      <div style="display:flex;gap:8px;margin-top:10px;">
-        <button class="btn btn-primary btn-sm" onclick="umSaveUser()"><i class="fas fa-save"></i> Save</button>
-        <button class="btn btn-ghost btn-sm" onclick="umCancelEdit()"><i class="fas fa-times"></i> Cancel</button>
-      </div>
-    </div>
-    <!-- Users table -->
-    <div style="background:var(--bg3);border:1px solid var(--border2);border-radius:12px;overflow:hidden;">
-      <table style="width:100%;border-collapse:collapse;font-size:13px;">
-        <thead>
-          <tr style="border-bottom:1px solid var(--border2);color:var(--muted);text-align:left;background:var(--bg2);">
-            <th style="padding:10px 14px;">User</th>
-            <th style="padding:10px 14px;">Email</th>
-            <th style="padding:10px 14px;">Role</th>
-            <th style="padding:10px 14px;">Status</th>
-            <th style="padding:10px 14px;">Last Login</th>
-            <th style="padding:10px 14px;text-align:right;">Actions</th>
-          </tr>
-        </thead>
-        <tbody id="um-users-tbody">
-          <tr><td colspan="6" style="padding:24px;text-align:center;color:var(--muted);"><i class="fas fa-spinner fa-spin"></i> Loading…</td></tr>
-        </tbody>
-      </table>
-    </div>
-  </div>
-</div>
+
 
 
 
