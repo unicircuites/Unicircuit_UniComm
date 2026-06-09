@@ -217,7 +217,8 @@ function findBestMatch(call, index, usedPaths) {
   let bestMatch = null;
   let bestDiff = Infinity;
 
-  const extensionKeys = extensions.length ? extensions : ['*'];
+  // Always include wildcard so forwarded/transferred calls match by phone+timestamp alone
+  const extensionKeys = extensions.length ? [...extensions, '*'] : ['*'];
   for (const phone of phones) {
     for (const ext of extensionKeys) {
       const candidates = index.get(indexKey(phone, ext)) || [];
