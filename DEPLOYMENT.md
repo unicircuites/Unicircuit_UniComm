@@ -529,8 +529,9 @@ Logs mein `[Graph]` aur `[MSAL]` lines dekho — exact error wahan hoga.
 
 
 
-### Step 1 — Project folder pe jao
+### Step 1 — Stop PM2 server & navigate to project folder
 ```powershell
+pm2 stop unicomm
 cd C:\UniComm\Unicircuit_UniComm-main
 ```
 
@@ -541,6 +542,7 @@ git stash push -m "tower tracked changes before deploy"
 
 ### Step 3 — Latest code GitHub se pull karo
 ```powershell
+git config core.askyesno false
 git checkout main
 git fetch origin
 git reset --hard origin/main
@@ -582,7 +584,7 @@ pm2 logs unicomm --lines 80
 ### ⚡ One-liner (sab ek saath — copy-paste ready)
 
 ```powershell
-cd C:\UniComm\Unicircuit_UniComm-main; git stash push -m "tower deploy stash"; git checkout main; git fetch origin; git reset --hard origin/main; cd backend; npm install --prefer-offline; pm2 restart unicomm --update-env; pm2 save; pm2 flush unicomm; pm2 status
+pm2 stop unicomm; cd C:\UniComm\Unicircuit_UniComm-main; git config core.askyesno false; git stash push -m "tower deploy stash"; git checkout main; git fetch origin; git reset --hard origin/main; cd backend; npm install --prefer-offline; pm2 restart unicomm --update-env; pm2 save; pm2 flush unicomm; pm2 status
 ```
 
 ---
@@ -590,7 +592,9 @@ cd C:\UniComm\Unicircuit_UniComm-main; git stash push -m "tower deploy stash"; g
 ### ✅ Deploy Checklist
 
 ```
+[ ] pm2 stop unicomm
 [ ] cd C:\UniComm\Unicircuit_UniComm-main
+[ ] git config core.askyesno false
 [ ] git stash push -m "tower tracked changes before deploy"
 [ ] git fetch origin
 [ ] git reset --hard origin/main
