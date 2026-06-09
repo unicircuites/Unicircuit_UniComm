@@ -79,17 +79,29 @@ async function reconcileCallCounts(pool) {
       const nums = [c.phone, c.wa].filter(n => n && n.length > 5).map(n => n.replace(/\s+/g, ''));
       if (nums.length === 0) continue;
 
-      // Build OR conditions for all phone variations
+      // Build conditions matching the contact's number as the EXTERNAL party only.
+      // For Inbound: contact is the caller (external → internal).
+      // For Outbound: contact is the destination (internal → external).
+      // Forwarded hops have an internal extension (≤5 digits) as caller, so they are
+      // excluded naturally — preventing double-counting forwarded call chains.
       const conditions = [];
       const params = [];
       let p = 1;
 
       nums.forEach(n => {
         const last10 = n.slice(-10);
-        conditions.push(`caller LIKE $${p} OR destination LIKE $${p}`);
+        // Inbound: caller matches (external caller)
+        conditions.push(`(call_type = 'In'  AND caller      LIKE $${p})`);
         params.push(`%${last10}`);
         p++;
-        conditions.push(`caller LIKE $${p} OR destination LIKE $${p}`);
+        conditions.push(`(call_type = 'In'  AND caller      LIKE $${p})`);
+        params.push(`%${n}%`);
+        p++;
+        // Outbound: destination matches (external destination)
+        conditions.push(`(call_type = 'Out' AND destination LIKE $${p})`);
+        params.push(`%${last10}`);
+        p++;
+        conditions.push(`(call_type = 'Out' AND destination LIKE $${p})`);
         params.push(`%${n}%`);
         p++;
       });

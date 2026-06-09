@@ -28073,6 +28073,7 @@ ${plainText}`;
     // ── Matrix PBX Telephony Integration ─────────────────────────────────────────
     let callsCurrentPage = 1;
     let callsLimit = 25;
+    let callsCachedTotal = null;   // cached total — only re-fetched on filter/search change
     let pbxCallLogCache = new Map();
 
     function pbxShowTab(tab, btn) {
@@ -28204,6 +28205,10 @@ ${plainText}`;
       const search = document.getElementById('call-search').value;
       const type = document.getElementById('call-filter-type').value;
       const fromDate = normaliseDateInputValue(document.getElementById('call-filter-from').value);
+
+      // Invalidate cached total when filters change (page=1 means new search/filter)
+      if (page === 1) callsCachedTotal = null;
+
       pbxConsoleStart(traceId, 'loadCallLogs started', { page, search, type, fromDate, callsLimit });
 
       try {
@@ -28217,6 +28222,8 @@ ${plainText}`;
           params.set('from', fromDate);
           params.set('to', fromDate);
         }
+        // Skip the expensive COUNT(*) query when we already have the total
+        if (callsCachedTotal !== null) params.set('skipCount', '1');
         pbxConsoleStep(traceId, 'fetch /calls start', {
           url: `${API_BASE}/calls?${params.toString()}`,
         });
@@ -28297,12 +28304,14 @@ ${plainText}`;
         }
 
         // Pagination info
-        const totalPages = Math.ceil(data.total / callsLimit);
+        if (data.total !== null) callsCachedTotal = data.total;
+        const resolvedTotal = callsCachedTotal ?? 0;
+        const totalPages = Math.ceil(resolvedTotal / callsLimit);
         document.getElementById('calls-page-info').textContent = `Page ${page} of ${totalPages || 1}`;
-        document.getElementById('calls-total-info').textContent = `Total: ${data.total}`;
+        document.getElementById('calls-total-info').textContent = `Total: ${resolvedTotal}`;
         document.getElementById('calls-prev').disabled = page <= 1;
         document.getElementById('calls-next').disabled = page >= totalPages;
-        pbxConsoleStep(traceId, 'pagination updated', { totalPages, page, total: data.total });
+        pbxConsoleStep(traceId, 'pagination updated', { totalPages, page, total: resolvedTotal });
 
       } catch (err) {
         if (err.name === 'AbortError') return;

@@ -277,6 +277,11 @@ async function ensureTable(retries = 3) {
         ON call_logs (recording_file)
         WHERE recording_file IS NOT NULL AND recording_file <> ''
       `).catch(() => { });
+      // Indexes for fast pagination / filtering
+      await pool.query(`CREATE INDEX IF NOT EXISTS idx_call_logs_call_date  ON call_logs (call_date DESC NULLS LAST)`).catch(() => { });
+      await pool.query(`CREATE INDEX IF NOT EXISTS idx_call_logs_call_type  ON call_logs (call_type)`).catch(() => { });
+      await pool.query(`CREATE INDEX IF NOT EXISTS idx_call_logs_caller     ON call_logs (caller)`).catch(() => { });
+      await pool.query(`CREATE INDEX IF NOT EXISTS idx_call_logs_created_at ON call_logs (created_at DESC)`).catch(() => { });
       return; // Success
     } catch (err) {
       console.warn(`[SMDR] Table ensure attempt ${i + 1} failed: ${err.message}`);

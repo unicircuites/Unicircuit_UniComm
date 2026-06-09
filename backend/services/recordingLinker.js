@@ -336,12 +336,18 @@ async function linkRecordingsToCallLogs(recordingsDir) {
     const index = buildRecordingIndex(allEntries);
     const usedPaths = new Set();
 
+    // Only mark recordings as "used" by rows that are NOT in the unlinked set.
+    // Forwarded/transferred calls generate multiple SMDR rows; the intermediate hop
+    // may already hold a recording_file that the merged/final row also needs.
+    // Excluding unlinked rows from usedPaths lets them compete for those recordings.
+    const unlinkedIds = new Set(unlinkedCalls.map(c => c.id));
     const alreadyLinked = await pool.query(`
-      SELECT recording_file FROM call_logs
+      SELECT id, recording_file FROM call_logs
       WHERE recording_file IS NOT NULL AND recording_file <> ''
         AND recording_file ~* '\\.(wav|mp3|ogg|m4a)$'
     `);
     for (const row of alreadyLinked.rows) {
+      if (unlinkedIds.has(row.id)) continue; // will be re-evaluated
       if (resolveRecordingFullPath(row.recording_file, recordingsDir)) {
         usedPaths.add(String(row.recording_file).replace(/\\/g, '/'));
       }

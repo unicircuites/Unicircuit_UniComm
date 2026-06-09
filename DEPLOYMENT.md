@@ -626,3 +626,13 @@ git stash pop                           # latest stash restore karo
 # ya specific stash:
 git stash apply "stash@{0}"
 ```
+
+---
+
+## Git Installation Path (Found locally)
+
+If `git` is not recognized on the development machine, it might be installed in the local AppData folder instead of Program Files.
+The path found locally during a previous session was:
+`C:\Users\unius\AppData\Local\Programs\Git\cmd\git.exe`
+
+You can use the PowerShell variable `$env:LOCALAPPDATA\Programs\Git\cmd\git.exe` to run it.

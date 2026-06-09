@@ -465,6 +465,7 @@ router.get('/contact/:phone', async (req, res) => {
 router.get('/', async (req, res) => {
   const limit = parseInt(req.query.limit || '50');
   const offset = parseInt(req.query.offset || '0');
+  const skipCount = req.query.skipCount === '1'; // skip COUNT(*) on page navigation
   const type = req.query.type || '';
   const search = req.query.search || '';
   const dateFrom = normalizeDateParam(req.query.from || '');
@@ -603,11 +604,13 @@ router.get('/', async (req, res) => {
       }
     });
 
-    const total = await pool.query(
-      `SELECT COUNT(*) FROM (${dedupedCallsSql}) cl WHERE ${whereStr}`,
-      params
-    );
-    return res.json({ calls: result.rows, total: parseInt(total.rows[0].count) });
+    const total = skipCount
+      ? null
+      : await pool.query(
+          `SELECT COUNT(*) FROM (${dedupedCallsSql}) cl WHERE ${whereStr}`,
+          params
+        );
+    return res.json({ calls: result.rows, total: total ? parseInt(total.rows[0].count) : null });
   } catch (err) {
     console.error('[Calls] list error:', err.message);
     return res.status(500).json({ error: 'Failed to fetch call logs.' });
