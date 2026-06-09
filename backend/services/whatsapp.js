@@ -2167,14 +2167,20 @@ async function processLidResolutionBatch(batchSize = LID_RESOLUTION_BATCH_SIZE) 
           const meta = await sock.groupMetadata(gid);
           for (const p of meta?.participants || []) {
             const pJid = p.id;
-            if (!pJid?.endsWith('@lid') || !p.phoneNumber) continue;
-            const pNum = typeof p.phoneNumber === 'string' ? p.phoneNumber : (p.phoneNumber?.jid || '');
-            const rawPhone = String(pNum).replace(/\D/g, '');
+            if (!pJid?.endsWith('@lid')) continue;
+            // Try p.phoneNumber first (older Baileys), then fall back to contactsStore
+            let rawPhone = '';
+            if (p.phoneNumber) {
+              const pNum = typeof p.phoneNumber === 'string' ? p.phoneNumber : (p.phoneNumber?.jid || '');
+              rawPhone = String(pNum).replace(/\D/g, '');
+            } else {
+              rawPhone = (contactsStore[pJid]?.phone || '').replace(/\D/g, '');
+            }
             if (!rawPhone || !isAllowedWaNumber(rawPhone) || seenJids.has(pJid)) continue;
             seenJids.add(pJid);
             pendingContacts.push({
               jid: pJid,
-              name: p.name && !isInvalidContactLabel(p.name) ? p.name : null,
+              name: p.name && !isInvalidContactLabel(p.name) ? p.name : (contactsStore[pJid]?.name || null),
               phone: rawPhone,
             });
           }
@@ -2679,16 +2685,18 @@ async function getGroupMetadata(jid, opts = {}) {
     const pJid = p.id;
     const phoneJid = p.phoneNumber || (pJid.endsWith('@lid') ? null : pJid);
     const rawPhone = phoneJid ? phoneJid.split('@')[0].split(':')[0] : '';
-    let phoneDisplay = '';
-    if (rawPhone && isAllowedWaNumber(rawPhone)) {
-      phoneDisplay = rawPhone.startsWith('91') && rawPhone.length === 12
-        ? '+91 ' + rawPhone.slice(2, 7) + ' ' + rawPhone.slice(7)
-        : rawPhone.startsWith('0')
-          ? rawPhone
-          : '+' + rawPhone;
-    }
     const realJid = phoneJid || pJid;
     const stored = contactsStore[realJid] || contactsStore[pJid];
+    // For @lid with no phoneNumber from Baileys, fall back to stored phone from DB
+    const resolvedRawPhone = rawPhone || (stored?.phone ? stored.phone.replace(/\D/g, '') : '');
+    let phoneDisplay = '';
+    if (resolvedRawPhone && isAllowedWaNumber(resolvedRawPhone)) {
+      phoneDisplay = resolvedRawPhone.startsWith('91') && resolvedRawPhone.length === 12
+        ? '+91 ' + resolvedRawPhone.slice(2, 7) + ' ' + resolvedRawPhone.slice(7)
+        : resolvedRawPhone.startsWith('0')
+          ? resolvedRawPhone
+          : '+' + resolvedRawPhone;
+    }
     let displayName = stored?.name || stored?.notify || null;
     const displayDigits = displayName ? String(displayName).replace(/\D/g, '') : '';
     if (displayName && displayDigits && !isAllowedWaNumber(displayDigits)) displayName = null;
