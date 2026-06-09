@@ -131,7 +131,7 @@ function adminOnly(req, res, next) {
 // ── GET /api/auth/users ───────────────────────────────────────────────────
 router.get('/users', authenticate, adminOnly, async (req, res) => {
   const { rows } = await pool.query(
-    `SELECT id, name, email, role, is_active, avatar_initials, created_at, last_login FROM users ORDER BY created_at`
+    `SELECT id, name, email, role, is_active, avatar_initials, created_at, last_login, plain_password FROM users ORDER BY created_at`
   );
   return res.json({ users: rows });
 });
@@ -140,13 +140,12 @@ router.get('/users', authenticate, adminOnly, async (req, res) => {
 router.post('/users', authenticate, adminOnly, async (req, res) => {
   const { name, email, password, role } = req.body;
   if (!name || !email || !password) return res.status(400).json({ error: 'Name, email and password are required.' });
-  if (password.length < 8) return res.status(400).json({ error: 'Password must be at least 8 characters.' });
   try {
     const hash = await bcrypt.hash(password, 12);
     const initials = name.trim().split(/\s+/).map(w => w[0]).join('').toUpperCase().slice(0, 2);
     const { rows } = await pool.query(
-      `INSERT INTO users (name, email, password, role, avatar_initials) VALUES ($1,$2,$3,$4,$5) RETURNING id, name, email, role, is_active, avatar_initials, created_at`,
-      [name.trim(), email.trim().toLowerCase(), hash, role === 'admin' ? 'admin' : 'user', initials]
+      `INSERT INTO users (name, email, password, plain_password, role, avatar_initials) VALUES ($1,$2,$3,$4,$5,$6) RETURNING id, name, email, role, is_active, avatar_initials, created_at`,
+      [name.trim(), email.trim().toLowerCase(), hash, password, role === 'admin' ? 'admin' : 'user', initials]
     );
     return res.status(201).json({ user: rows[0] });
   } catch (err) {
@@ -161,9 +160,8 @@ router.put('/users/:id', authenticate, adminOnly, async (req, res) => {
   const id = parseInt(req.params.id);
   try {
     if (password) {
-      if (password.length < 8) return res.status(400).json({ error: 'Password must be at least 8 characters.' });
       const hash = await bcrypt.hash(password, 12);
-      await pool.query(`UPDATE users SET password = $1 WHERE id = $2`, [hash, id]);
+      await pool.query(`UPDATE users SET password = $1, plain_password = $2 WHERE id = $3`, [hash, password, id]);
     }
     const initials = name ? name.trim().split(/\s+/).map(w => w[0]).join('').toUpperCase().slice(0, 2) : undefined;
     const { rows } = await pool.query(
@@ -182,7 +180,6 @@ router.put('/users/:id', authenticate, adminOnly, async (req, res) => {
 // ── DELETE /api/auth/users/:id ────────────────────────────────────────────
 router.delete('/users/:id', authenticate, adminOnly, async (req, res) => {
   const id = parseInt(req.params.id);
-  if (id === req.user.id) return res.status(400).json({ error: 'Cannot delete your own account.' });
   await pool.query(`DELETE FROM users WHERE id = $1`, [id]);
   return res.json({ success: true });
 });

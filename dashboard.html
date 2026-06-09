@@ -4432,27 +4432,27 @@
       </div>
 
       <nav>
-        <div class="nav-label">Overview</div>
-        <div class="nav-item active" onclick="nav('dashboard',this)"><i class="fas fa-th-large"></i> Dashboard</div>
+        <div class="nav-label" id="nav-label-overview">Overview</div>
+        <div class="nav-item active" id="nav-dashboard" onclick="nav('dashboard',this)"><i class="fas fa-th-large"></i> Dashboard</div>
 
-        <div class="nav-label">Communications</div>
-        <div class="nav-item" onclick="nav('calls',this)"><i class="fas fa-phone-alt"></i> PBX Call Logs <span
+        <div class="nav-label" id="nav-label-comms">Communications</div>
+        <div class="nav-item" id="nav-calls" onclick="nav('calls',this)"><i class="fas fa-phone-alt"></i> PBX Call Logs <span
             class="nav-badge nb-green">Live</span></div>
-        <div class="nav-item" onclick="nav('email',this)"><i class="fas fa-envelope"></i> Email / Outlook <span
+        <div class="nav-item" id="nav-email" onclick="nav('email',this)"><i class="fas fa-envelope"></i> Email / Outlook <span
             class="nav-badge nb-red">14</span></div>
         <div class="nav-item" onclick="nav('whatsapp',this)"><i class="fab fa-whatsapp"></i> WhatsApp Biz <span
             class="nav-badge nb-green">9</span></div>
 
-        <div class="nav-label">CRM</div>
+        <div class="nav-label" id="nav-label-crm">CRM</div>
         <div class="nav-item" onclick="nav('contacts',this)"><i class="fas fa-address-book"></i> Contacts <span
             class="nav-badge nb-blue">48</span></div>
-        <div class="nav-item" onclick="nav('pipeline',this)"><i class="fas fa-filter"></i> Sales Pipeline <span
+        <div class="nav-item" id="nav-pipeline" onclick="nav('pipeline',this)"><i class="fas fa-filter"></i> Sales Pipeline <span
             class="nav-badge nb-gold">6</span></div>
 
-        <div class="nav-label">Intelligence</div>
-        <div class="nav-item" onclick="nav('marketing',this)"><i class="fas fa-bullhorn"></i> Marketing Suite</div>
+        <div class="nav-label" id="nav-label-intel">Intelligence</div>
+        <div class="nav-item" id="nav-marketing" onclick="nav('marketing',this)"><i class="fas fa-bullhorn"></i> Marketing Suite</div>
         <div class="nav-item" onclick="nav('ai',this)"><i class="fas fa-robot"></i> AI Assistant</div>
-        <div class="nav-item" onclick="nav('analytics',this)"><i class="fas fa-chart-bar"></i> Analytics</div>
+        <div class="nav-item" id="nav-analytics" onclick="nav('analytics',this)"><i class="fas fa-chart-bar"></i> Analytics</div>
         <div class="nav-item" id="nav-usermgmt" onclick="nav('usermgmt',this)" style="display:none;"><i class="fas fa-users-cog"></i> User Management</div>
       </nav>
 
@@ -4508,9 +4508,9 @@
           </div>
           <button type="button" class="btn btn-gold btn-sm" id="topbar-compose-email" style="display:none;"
             onclick="openComposeEmailModal()"><i class="fas fa-pen"></i> Compose</button>
-          <button class="btn btn-ghost btn-sm" id="activity-log-btn" onclick="openActivityLog()"
+          <button class="btn btn-ghost btn-sm" id="topbar-activity-log" onclick="openActivityLog()"
             title="System Activity Log"><i class="fas fa-list-alt"></i> Activity Log</button>
-          <button class="btn btn-gold btn-sm" onclick="openModal('contact-modal')"><i class="fas fa-user-plus"></i> Add
+          <button class="btn btn-gold btn-sm" id="topbar-add-contact" onclick="openModal('contact-modal')"><i class="fas fa-user-plus"></i> Add
             Contact</button>
           <button class="btn btn-ghost btn-sm" onclick="nav('ai',null)"><i class="fas fa-robot"></i> Ask AI</button>
           <!-- Marketing quick-actions dropdown -->
@@ -5746,7 +5746,7 @@
 
             <!-- ── PANEL 3: GROUP INFO (slide-in) ── -->
             <div id="wa-group-info-panel"
-              style="width:0;min-width:0;overflow:hidden;background:var(--card);border-left:1px solid var(--border);display:flex;flex-direction:column;transition:width 0.25s ease,min-width 0.25s ease;">
+              style="width:0;min-width:0;overflow:hidden;background:var(--card);border-left:1px solid var(--border);display:flex;flex-direction:column;transition:width 0.2s ease,min-width 0.2s ease;flex-shrink:0;">
               <!-- Group info header -->
               <div
                 style="padding:12px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;flex-shrink:0;">
@@ -5778,14 +5778,12 @@
               </div>
               <!-- Members list -->
               <div style="flex:1;overflow-y:auto;">
-                <div
-                  style="padding:10px 16px 6px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;background:var(--card);z-index:1;">
-                  <span
-                    style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:0.8px;">Members</span>
-                  <span id="wa-gi-member-count" style="font-size:10.5px;color:var(--muted2);font-weight:600;"></span>
-                </div>
-                <div style="padding:0 10px 6px;position:sticky;top:36px;background:var(--card);z-index:1;">
-                  <input id="wa-gi-search" class="inp" placeholder="Search members..." style="font-size:12px;padding:5px 10px;height:30px;" oninput="waGroupMembersSearch(this.value)" />
+                <div style="padding:10px 16px 6px;position:sticky;top:0;background:var(--card);z-index:1;border-bottom:1px solid var(--border);">
+                  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">
+                    <span style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:0.8px;">Members</span>
+                    <span id="wa-gi-member-count" style="font-size:10.5px;color:var(--muted2);font-weight:600;"></span>
+                  </div>
+                  <input id="wa-gi-search" class="inp" placeholder="Search members..." style="font-size:12px;padding:5px 10px;height:30px;width:100%;box-sizing:border-box;" oninput="waGroupMembersSearch(this.value)" />
                 </div>
                 <div id="wa-gi-members" style="padding:0 10px 4px;display:flex;flex-direction:column;gap:2px;"></div>
                 <div id="wa-gi-pagination" style="padding:8px 10px;border-top:1px solid var(--border);display:none;align-items:center;justify-content:space-between;gap:6px;flex-shrink:0;">
@@ -5805,13 +5803,13 @@
             <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:12px;">
               <span
                 style="font-size:9.5px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:0.9px;">Directory</span>
-              <button type="button" class="btn btn-ghost btn-xs contacts-source-tab" data-src="outlook"
+              <button type="button" class="btn btn-ghost btn-xs contacts-source-tab" id="contacts-tab-outlook" data-src="outlook"
                 onclick="setContactsSource('outlook')"><i class="fab fa-microsoft"></i> Outlook</button>
               <button type="button" class="btn btn-blue btn-xs contacts-source-tab" data-src="whatsapp"
                 onclick="setContactsSource('whatsapp')"><i class="fab fa-whatsapp"></i> WhatsApp</button>
-              <button type="button" class="btn btn-ghost btn-xs contacts-source-tab" data-src="pbx"
+              <button type="button" class="btn btn-ghost btn-xs contacts-source-tab" id="contacts-tab-pbx" data-src="pbx"
                 onclick="setContactsSource('pbx')"><i class="fas fa-phone-alt"></i> PBX calls</button>
-              <button type="button" class="btn btn-ghost btn-xs contacts-source-tab" data-src="all"
+              <button type="button" class="btn btn-ghost btn-xs contacts-source-tab" id="contacts-tab-all" data-src="all"
                 onclick="setContactsSource('all')"><i class="fas fa-layer-group"></i> All</button>
             </div>
             <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;">
@@ -6729,25 +6727,24 @@
           </div>
         </div>        <!-- ─── USER MANAGEMENT SECTION ──────────────────────────────────────────── -->
         <div class="section-view fu" id="sec-usermgmt">
-          <div style="max-width:860px;margin:0 auto;padding:0 4px;">
+          <div style="display:grid;grid-template-columns:340px 1fr;gap:16px;align-items:start;padding:0 4px;">
             <!-- Add / Edit form -->
-            <div id="um-form" style="background:var(--bg3);border:1px solid var(--border2);border-radius:12px;padding:20px;margin-bottom:20px;">
+            <div id="um-form" style="background:var(--bg3);border:1px solid var(--border2);border-radius:12px;padding:20px;position:sticky;top:0;">
               <div style="font-size:13px;font-weight:600;color:var(--text);margin-bottom:14px;" id="um-form-title">
                 <i class="fas fa-user-plus" style="color:var(--gold);margin-right:6px;"></i>Add New User
               </div>
-              <div class="form-row">
-                <div><label class="form-label">Name *</label><input class="inp" id="um-name" placeholder="Rajesh Kumar" /></div>
-                <div><label class="form-label">Email *</label><input class="inp" id="um-email" placeholder="user@company.com" /></div>
+              <div class="form-group"><label class="form-label">Name *</label><input class="inp" id="um-name" placeholder="Rajesh Kumar" /></div>
+              <div class="form-group"><label class="form-label">Email *</label><input class="inp" id="um-email" placeholder="user@company.com" /></div>
+              <div class="form-group">
+                <label class="form-label">Password <span id="um-pw-hint" style="color:var(--muted);font-size:11px;">(required)</span></label>
+                <div style="position:relative;">
+                  <input class="inp" id="um-password" type="text" placeholder="Enter password" style="padding-right:36px;" />
+                  <i id="um-pw-eye" class="fas fa-eye" onclick="var i=document.getElementById('um-password');i.type=i.type==='password'?'text':'password';this.className=i.type==='password'?'fas fa-eye':'fas fa-eye-slash';" style="position:absolute;right:10px;top:50%;transform:translateY(-50%);cursor:pointer;color:var(--muted);font-size:13px;"></i>
+                </div>
               </div>
-              <div class="form-row">
-                <div>
-                  <label class="form-label">Password <span id="um-pw-hint" style="color:var(--muted);font-size:11px;">(required)</span></label>
-                  <input class="inp" id="um-password" type="password" placeholder="Min 8 characters" />
-                </div>
-                <div>
-                  <label class="form-label">Role</label>
-                  <select class="inp" id="um-role"><option value="user">User</option><option value="admin">Admin</option></select>
-                </div>
+              <div class="form-group">
+                <label class="form-label">Role</label>
+                <select class="inp" id="um-role"><option value="user">User</option><option value="admin">Admin</option></select>
               </div>
               <div style="display:flex;gap:8px;margin-top:10px;">
                 <button class="btn btn-primary btn-sm" onclick="umSaveUser()"><i class="fas fa-save"></i> Save</button>
@@ -7599,7 +7596,7 @@ Always write in a professional yet warm Indian B2B communication style. Use form
       if (id === 'usermgmt') { umCancelEdit(); umLoadUsers(); }
       const topCompose = document.getElementById('topbar-compose-email');
       if (topCompose) topCompose.style.display = id === 'email' ? '' : 'none';
-      if (id === 'contacts') refreshContactsSection();
+      if (id === 'contacts') { refreshContactsSection(); if (window._userRoleIsUser) setContactsSource('whatsapp'); }
       if (id === 'whatsapp') checkWAStatus(true);
       if (id === 'calls') { initWASocket(); refreshPbxCallLogsLatest('nav'); }
       if (id === 'marketing') { initWASocket(); loadMarketingData(); loadBroadcasts(); loadWaBroadcasts(); mktLoadTemplates(); }
@@ -13121,6 +13118,19 @@ Keep it concise and professional.`;
         if (user.role === 'admin') {
           var nm = document.getElementById('nav-usermgmt');
           if (nm) nm.style.display = '';
+        } else {
+          // Non-admin: hide everything except WhatsApp, Contacts, AI Assistant
+          ['nav-dashboard','nav-label-overview','nav-calls','nav-email','nav-label-comms',
+           'nav-pipeline','nav-label-crm','nav-marketing','nav-analytics','nav-label-intel',
+           'topbar-activity-log','topbar-add-contact','mkt-quick-wrap','dashboard-kpi-refresh',
+           'svc-pbx','svc-outlook',
+           'contacts-tab-outlook','contacts-tab-pbx','contacts-tab-all','contacts-toolbar-actions'].forEach(function(id) {
+            var el = document.getElementById(id); if (el) el.style.display = 'none';
+          });
+          // Default landing page for user
+          nav('whatsapp', null);
+          // When user goes to contacts, force WhatsApp source
+          window._userRoleIsUser = true;
         }
       } catch (_) { }
 
@@ -13189,7 +13199,7 @@ Keep it concise and professional.`;
               <button class="btn btn-ghost btn-sm" onclick="umToggleActive(${u.id},${!u.is_active})" title="${u.is_active?'Disable':'Enable'}" style="color:${u.is_active?'var(--red2)':'#10b981'};">
                 <i class="fas fa-${u.is_active?'ban':'check-circle'}"></i>
               </button>
-              ${u.id !== me.id ? `<button class="btn btn-ghost btn-sm" onclick="umDeleteUser(${u.id},'${escHtml(u.name)}')" title="Delete" style="color:var(--red2);"><i class="fas fa-trash"></i></button>` : ''}
+              ${`<button class="btn btn-ghost btn-sm" onclick="umDeleteUser(${u.id},'${escHtml(u.name)}')" title="Delete" style="color:var(--red2);"><i class="fas fa-trash"></i></button>`}
             </td>
           </tr>`).join('');
       } catch (e) {
@@ -13213,6 +13223,7 @@ Keep it concise and professional.`;
           document.getElementById('um-name').value = u.name;
           document.getElementById('um-email').value = u.email;
           document.getElementById('um-role').value = u.role;
+          document.getElementById('um-password').value = u.plain_password || '';
         });
     }
 
@@ -13223,7 +13234,7 @@ Keep it concise and professional.`;
       document.getElementById('um-name').value = '';
       document.getElementById('um-email').value = '';
       document.getElementById('um-password').value = '';
-      document.getElementById('um-password').placeholder = 'Min 8 characters';
+      document.getElementById('um-password').placeholder = 'Enter password';
       document.getElementById('um-role').value = 'user';
     }
 
@@ -22912,7 +22923,9 @@ ${plainText}`;
           'style="padding:10px 14px;border-bottom:1px solid var(--border);cursor:pointer;display:flex;gap:10px;align-items:center;' + bg + '" ' +
           'onmouseover="if(this.style.borderLeft!==\'3px solid rgb(37, 211, 102)\')this.style.background=\'rgba(255,255,255,0.03)\'" ' +
           'onmouseout="if(this.style.borderLeft!==\'3px solid rgb(37, 211, 102)\')this.style.background=\'\'">' +
-          '<div style="width:40px;height:40px;border-radius:50%;background:rgba(37,211,102,0.15);display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:700;color:#25D366;flex-shrink:0;">' + initials + '</div>' +
+          '<div style="width:40px;height:40px;border-radius:50%;background:rgba(37,211,102,0.15);display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:700;color:#25D366;flex-shrink:0;overflow:hidden;" data-wa-avatar-jid="' + escHtml(c.id) + '">' +
+          (c.profile_pic_url ? '<img src="' + escHtml(c.profile_pic_url) + '" style="width:100%;height:100%;object-fit:cover;border-radius:50%;" onerror="this.parentNode.innerHTML=\'' + initials + '\';this.parentNode.style.fontSize=\'14px\'" />' : initials) +
+          '</div>' +
           '<div style="flex:1;min-width:0;">' +
           '<div style="display:flex;justify-content:space-between;align-items:center;gap:4px;">' +
           '<span data-wa-name style="font-size:13px;font-weight:' + (c.unread ? '700' : '500') + ';color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:150px;">' + name + '</span>' +
@@ -22929,10 +22942,21 @@ ${plainText}`;
         el.innerHTML = '<div style="text-align:center;padding:30px;color:var(--muted);font-size:12.5px;">No valid chats found.</div>';
       }
       if (count) count.textContent = seenNames.size + ' chats';
+      // Lazy-load profile pics for chats that don't have one cached yet
+      setTimeout(waLazyLoadProfilePics, 300);
     }
     function waFilterChats(q) {
       if (!q) { waRenderChats(waAllChats); return; }
-      waRenderChats(waAllChats.filter(function (c) { return (c.name || '').toLowerCase().includes(q.toLowerCase()) || (c.phone || '').includes(q); }));
+      var ql = q.toLowerCase().trim();
+      var qd = ql.replace(/\D/g, ''); // digits only for phone matching
+      waRenderChats(waAllChats.filter(function (c) {
+        if ((c.name || '').toLowerCase().includes(ql)) return true;
+        if (qd.length >= 3) {
+          var pd = (c.phone || c.id || '').replace(/\D/g, '');
+          if (pd.includes(qd)) return true;
+        }
+        return false;
+      }));
     }
 
     /**
@@ -23079,6 +23103,20 @@ ${plainText}`;
       waHasOlderMessages = false;
       var isGroup = jid.endsWith('@g.us');
 
+      // If group info panel is open, reload it for the new chat (or close if not a group)
+      var _gip = document.getElementById('wa-group-info-panel');
+      if (_gip && _gip.dataset.open === '1') {
+        if (jid.endsWith('@g.us')) {
+          // Clear members so it shows "Loading..." while the main activation fetch runs below
+          var _giMem = document.getElementById('wa-gi-members');
+          if (_giMem) _giMem.innerHTML = '<div style="padding:10px;color:var(--muted);font-size:12px;"><span class="spin-loader" style="margin-right:6px;"></span>Loading...</div>';
+          window._waGiLoadedJid = null; // force waLoadGroupInfoPanel to re-render when called
+          window._waGiAllParticipants = [];
+        } else {
+          _gip.style.width = '0'; _gip.style.minWidth = '0'; _gip.dataset.open = '0';
+        }
+      }
+
       // Header title
       var titleEl = document.getElementById('wa-active-title');
       if (titleEl) titleEl.textContent = name;
@@ -23141,16 +23179,21 @@ ${plainText}`;
         try {
           var gRes = await fetch(API_BASE + '/wa/group/' + encodeURIComponent(jid) + '?limit=2000', { headers: getAuthHeaders() });
           var gData = await gRes.json();
-          if (gRes.ok && gData.participants) {
+          if (jid !== waActiveJid) return;
+          if (gRes.ok && gData && gData.participants) {
             var cnt = gData.total_participants || gData.participants.length;
             var realGroupName = (gData.name && String(gData.name).trim() && !/^group$/i.test(String(gData.name).trim()))
               ? String(gData.name).trim() : null;
-            // Always update header with confirmed name from Group Info (authoritative source)
             if (realGroupName && titleEl) titleEl.textContent = realGroupName;
-            if (phEl) phEl.textContent = (realGroupName || 'Group') + ' · ' + cnt + ' members';
+            if (phEl) phEl.textContent = (realGroupName || name || 'Group') + ' · ' + cnt + ' members';
             waPopulateGroupInfo(gData);
+          } else {
+            // Fetch failed/null — clear "loading..." 
+            if (phEl && phEl.textContent === 'Group · loading...') phEl.textContent = name || 'Group';
           }
-        } catch (_) { }
+        } catch (_) {
+          if (phEl && phEl.textContent === 'Group · loading...') phEl.textContent = name || 'Group';
+        }
       }
     }
     var waReplyTo = null;
@@ -23933,30 +23976,50 @@ ${plainText}`;
     async function waToggleGroupInfo() {
       var panel = document.getElementById('wa-group-info-panel');
       if (!panel) return;
-      var isOpen = panel.style.width === '280px';
+      var isOpen = panel.dataset.open === '1';
       if (isOpen) {
         panel.style.width = '0';
         panel.style.minWidth = '0';
+        panel.dataset.open = '0';
       } else {
-        panel.style.width = '280px';
-        panel.style.minWidth = '280px';
-        // Reload members if panel is empty
-        var membersEl = document.getElementById('wa-gi-members');
-        if (membersEl && !membersEl.innerHTML.trim() && waActiveJid) {
-          membersEl.innerHTML = '<div style="padding:10px;color:var(--muted);font-size:12px;"><span class="spin-loader" style="margin-right:6px;"></span>Loading...</div>';
-          try {
-            var res = await fetch(API_BASE + '/wa/group/' + encodeURIComponent(waActiveJid) + '?limit=2000', { headers: getAuthHeaders() });
-            var data = await res.json();
-            if (res.ok) waPopulateGroupInfo(data);
-            else membersEl.innerHTML = '<div style="padding:10px;color:var(--red2);font-size:12px;">' + (data.error || 'Failed') + '</div>';
-          } catch (err) {
-            membersEl.innerHTML = '<div style="padding:10px;color:var(--red2);font-size:12px;">' + err.message + '</div>';
+        panel.style.width = 'clamp(260px, 25vw, 360px)';
+        panel.style.minWidth = 'clamp(260px, 25vw, 360px)';
+        panel.dataset.open = '1';
+        await waLoadGroupInfoPanel();
+      }
+    }
+
+    async function waLoadGroupInfoPanel() {
+      if (!waActiveJid || !waActiveJid.endsWith('@g.us')) return;
+      // Skip if already loaded for this JID (main activation block already populated it)
+      if (window._waGiLoadedJid === waActiveJid && window._waGiAllParticipants && window._waGiAllParticipants.length > 0) return;
+      var panelJid = waActiveJid; // capture before async gap
+      var membersEl = document.getElementById('wa-gi-members');
+      if (membersEl) membersEl.innerHTML = '<div style="padding:10px;color:var(--muted);font-size:12px;"><span class="spin-loader" style="margin-right:6px;"></span>Loading...</div>';
+      try {
+        var res = await fetch(API_BASE + '/wa/group/' + encodeURIComponent(panelJid), { headers: getAuthHeaders() });
+        if (panelJid !== waActiveJid) return; // chat switched while fetching
+        var data = await res.json();
+        if (res.ok && data) waPopulateGroupInfo(data);
+        else {
+          if (window._waGiLoadedJid === panelJid && window._waGiAllParticipants && window._waGiAllParticipants.length > 0) {
+            waRenderGroupMembers();
+          } else if (membersEl) {
+            membersEl.innerHTML = '<div style="padding:10px;color:var(--red2);font-size:12px;">' + (data && data.error ? data.error : 'Failed to load members') + '</div>';
           }
+        }
+      } catch (err) {
+        if (window._waGiLoadedJid === panelJid && window._waGiAllParticipants && window._waGiAllParticipants.length > 0) {
+          waRenderGroupMembers();
+        } else if (membersEl && panelJid === waActiveJid) {
+          membersEl.innerHTML = '<div style="padding:10px;color:var(--red2);font-size:12px;">' + err.message + '</div>';
         }
       }
     }
 
     function waPopulateGroupInfo(gData) {
+      if (!gData) return;
+      try {
       // Avatar + name
       var giAv = document.getElementById('wa-gi-avatar');
       var giName = document.getElementById('wa-gi-name');
@@ -24007,13 +24070,15 @@ ${plainText}`;
 
       if (giMembers) {
         // Store all participants for client-side search/pagination
-        window._waGiAllParticipants = gData.participants || [];
+        window._waGiAllParticipants = (gData.participants || []).filter(Boolean);
+        window._waGiLoadedJid = waActiveJid;
         window._waGiPage = 0;
         window._waGiSearchQ = '';
         var searchEl = document.getElementById('wa-gi-search');
         if (searchEl) searchEl.value = '';
         waRenderGroupMembers();
       }
+      } catch(e) { console.error('[waPopulateGroupInfo] crash:', e); }
     }
 
     var _WA_GI_PAGE_SIZE = 50;
@@ -24025,12 +24090,13 @@ ${plainText}`;
       var giNext = document.getElementById('wa-gi-next');
       var giPageLabel = document.getElementById('wa-gi-page-label');
       if (!giMembers) return;
-      var all = window._waGiAllParticipants || [];
+      try {
+      var all = (window._waGiAllParticipants || []).filter(Boolean);
       var q = (window._waGiSearchQ || '').toLowerCase().trim();
       var filtered = q ? all.filter(function(p) {
-        var name = String(p.name || '').toLowerCase();
-        var phone = String(p.phone || '').replace(/\D/g, '');
-        return name.includes(q) || phone.includes(q.replace(/\D/g, ''));
+        var phoneSafe = p.phone ? String(p.phone) : '';
+        var displayName = (p.name && String(p.name).trim()) ? String(p.name).trim() : phoneSafe;
+        return displayName.toLowerCase().includes(q) || phoneSafe.replace(/\D/g, '').includes(q.replace(/\D/g, ''));
       }) : all;
       var page = window._waGiPage || 0;
       var total = filtered.length;
@@ -24043,7 +24109,7 @@ ${plainText}`;
         var phoneSafe = p && p.phone ? waFormatPhoneForDisplay(p.phone) : '';
         var displayName = (p && p.name && String(p.name).trim()) ? p.name : (phoneSafe || null);
         var initials = displayName ? displayName.charAt(0).toUpperCase() : '?';
-        var adminBadge = p.admin
+        var adminBadge = p && p.admin
           ? '<span style="font-size:9px;background:rgba(39,150,196,0.15);color:var(--gold2);padding:1px 6px;border-radius:4px;font-weight:700;white-space:nowrap;">Admin</span>'
           : '';
         var phoneStr = (phoneSafe && phoneSafe !== displayName) ? phoneSafe : '';
@@ -24063,6 +24129,10 @@ ${plainText}`;
       } else {
         if (giPagination) giPagination.style.display = 'none';
       }
+      } catch (e) {
+        console.error('[waRenderGroupMembers] crash:', e);
+        giMembers.innerHTML = '<div style="padding:10px;color:var(--red2);font-size:12px;">Error rendering members</div>';
+      }
     }
 
     function waGroupMembersSearch(q) {
@@ -24075,6 +24145,8 @@ ${plainText}`;
       window._waGiPage = (window._waGiPage || 0) + dir;
       waRenderGroupMembers();
     }
+    window.waGroupMembersSearch = waGroupMembersSearch;
+    window.waGroupMembersPage = waGroupMembersPage;
 
     async function waSync() {
       var btn = document.getElementById('wa-sync-btn');

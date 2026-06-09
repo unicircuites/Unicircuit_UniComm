@@ -773,6 +773,16 @@ router.post('/block-chat', authenticate, async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
+router.get('/profile-pic/:jid', authenticate, async (req, res) => {
+  try {
+    const accountPhone = connectedAccount(res);
+    if (!accountPhone) return;
+    const jid = decodeURIComponent(req.params.jid);
+    const url = await wa.getProfilePicUrl(jid, accountPhone);
+    res.json({ url: url || null });
+  } catch (err) { res.json({ url: null }); }
+});
+
 router.get('/group/:jid', authenticate, async (req, res) => {
   try {
     const accountPhone = connectedAccount(res);
@@ -818,7 +828,7 @@ router.get('/messages/:jid', authenticate, async (req, res) => {
           // Always persist the confirmed group subject — this is the authoritative name source
           if (groupMeta?.name) await wa.updateGroupName(jid, groupMeta.name, accountPhone);
           let updated = 0;
-          for (const p of groupMeta.participants) {
+          for (const p of (groupMeta?.participants || [])) {
             if (p.jid && p.jid.endsWith('@lid') && p.phone) {
               const realPhone = p.phone.replace(/[^0-9]/g, '');
               if (realPhone && realPhone.length >= 7) {

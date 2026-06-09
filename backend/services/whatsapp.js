@@ -402,18 +402,19 @@ function getContactName(jid, pushName) {
   return formatDisplayPhone(local);
 }
 
-const GROUP_METADATA_CONCURRENCY = 2;
-const GROUP_METADATA_DELAY_MS = 500;
+const GROUP_METADATA_CONCURRENCY = 1;
+const GROUP_METADATA_DELAY_MS = 1200;
 const LID_CONTACT_BATCH_SIZE = 200;
 const LID_RESOLUTION_BATCH_SIZE = 100;
-const LID_RESOLUTION_BATCH_DELAY_MS = 2500;
-const MAX_GROUPS_PER_LID_BATCH = 30;
+const LID_RESOLUTION_BATCH_DELAY_MS = 5000;
+const MAX_GROUPS_PER_LID_BATCH = 8;
 let lidResolutionWorkerTimer = null;
 let lidResolutionInFlight = false;
 let lidResolutionGroupCursor = 0;
 let lidResolutionGroupIds = [];
 let lidResolutionExhausted = false;
 let lidResolutionCooldownUntil = 0;
+let lidResolutionLastPassResolved = 0;
 
 // ── HISTORY SYNC QUEUE ─────────────────────────────────────────────────────────────────
 const historySyncQueue = [];
@@ -654,6 +655,7 @@ async function ensureTables(retries = 3) {
       await pool.query(`ALTER TABLE wa_contacts ADD COLUMN IF NOT EXISTS account_phone VARCHAR(50) DEFAULT 'unknown'`).catch(() => { });
       await pool.query(`ALTER TABLE wa_contacts ADD COLUMN IF NOT EXISTS is_group_member BOOLEAN DEFAULT FALSE`).catch(() => { });
       await pool.query(`ALTER TABLE wa_chats ADD COLUMN IF NOT EXISTS account_phone VARCHAR(50) DEFAULT 'unknown'`).catch(() => { });
+      await pool.query(`ALTER TABLE wa_chats ADD COLUMN IF NOT EXISTS profile_pic_url TEXT`).catch(() => { });
       await pool.query(`ALTER TABLE wa_messages ADD COLUMN IF NOT EXISTS account_phone VARCHAR(50) DEFAULT 'unknown'`).catch(() => { });
 
       try {
@@ -2159,6 +2161,8 @@ async function processLidResolutionBatch(batchSize = LID_RESOLUTION_BATCH_SIZE) 
 
       try {
         await runWithConcurrency(chunk, GROUP_METADATA_CONCURRENCY, async (gid) => {
+          // Skip if this JID is in rate-limit cooldown
+          if ((groupMetadataRateCooldown.get(gid) || 0) > Date.now()) return;
           if (GROUP_METADATA_DELAY_MS > 0) await sleep(GROUP_METADATA_DELAY_MS);
           const meta = await sock.groupMetadata(gid);
           for (const p of meta?.participants || []) {
@@ -2248,15 +2252,23 @@ async function tickLidResolutionWorker() {
       return;
     }
     if (lidResolutionExhausted) {
-      // Still have unresolved LIDs — reset and start a fresh pass after a longer pause
-      console.log(`[WA] LID resolution exhausted pass but ${pending} LIDs still pending — resetting for another pass`);
+      // Still have unresolved LIDs — but if we resolved nothing in the last pass, WA has no more data for us
+      const resolved = lidResolutionLastPassResolved || 0;
+      if (resolved === 0) {
+        console.log(`[WA] LID resolution: full pass with 0 new resolutions — ${pending} LIDs unresolvable from available group data. Stopping worker.`);
+        stopLidResolutionWorker();
+        return;
+      }
+      console.log(`[WA] LID resolution exhausted pass, ${pending} still pending — resetting for another pass`);
       lidResolutionExhausted = false;
       lidResolutionGroupCursor = 0;
       lidResolutionGroupIds = [];
-      lidResolutionWorkerTimer = setTimeout(tickLidResolutionWorker, 60 * 1000); // 1-min pause before next pass
+      lidResolutionLastPassResolved = 0;
+      lidResolutionWorkerTimer = setTimeout(tickLidResolutionWorker, 60 * 1000);
       return;
     }
-    await processLidResolutionBatch(LID_RESOLUTION_BATCH_SIZE);
+    const batchResult = await processLidResolutionBatch(LID_RESOLUTION_BATCH_SIZE);
+    if (batchResult && batchResult.resolved) lidResolutionLastPassResolved += batchResult.resolved;
   } catch (err) {
     console.warn('[WA] LID resolution worker tick failed:', err.message);
   }
@@ -2271,6 +2283,7 @@ function startLidResolutionWorker() {
   stopLidResolutionWorker();
   lidResolutionGroupCursor = 0;
   lidResolutionGroupIds = [];
+  lidResolutionLastPassResolved = 0;
   console.log('[WA] Starting LID resolution worker (batch size ' + LID_RESOLUTION_BATCH_SIZE + ')');
   lidResolutionWorkerTimer = setTimeout(tickLidResolutionWorker, 1500);
 }
@@ -2608,52 +2621,61 @@ async function sendMediaMessage(jid, media, quotedMsgId) {
 // ── GROUP METADATA ───────────────────────────────────────────────────────────
 const groupMetadataRateCooldown = new Map(); // jid → cooldown-until timestamp
 const GROUP_METADATA_RATE_COOLDOWN_MS = 5 * 60 * 1000; // 5 min cooldown after rate-limit
+const groupMetadataInFlight = new Map(); // jid → Promise (dedup concurrent calls)
 
 async function getGroupMetadata(jid, opts = {}) {
   if (!sock || !isConnected) throw new Error('WhatsApp not connected');
   const CACHE_TTL = 15 * 60 * 1000;
-  const participantsLimit = Math.max(1, parseInt(opts.participantsLimit || '200', 10) || 200);
-  const participantsOffset = Math.max(0, parseInt(opts.participantsOffset || '0', 10) || 0);
-  const cacheKey = `${jid}::${participantsOffset}:${participantsLimit}`;
+  const cacheKey = `${jid}::all`;
   const cached = groupMetadataCache.get(cacheKey);
   if (cached && (Date.now() - cached.ts < CACHE_TTL)) return cached.data;
 
   // If this group is in rate-limit cooldown, serve cached data or throw
   const cooldownUntil = groupMetadataRateCooldown.get(jid) || 0;
   if (Date.now() < cooldownUntil) {
-    if (cached) return cached.data; // serve stale cache rather than hammering WA
+    if (cached) return cached.data;
     const waitSecs = Math.ceil((cooldownUntil - Date.now()) / 1000);
     throw new Error(`rate-overlimit: group metadata cooldown for ${waitSecs}s`);
   }
+
+  // Dedup: if a fetch for this JID is already in-flight, wait for it instead of spawning a second
+  if (groupMetadataInFlight.has(jid)) return groupMetadataInFlight.get(jid);
+
+  let resolveInFlight, rejectInFlight;
+  const inFlightPromise = new Promise((res, rej) => { resolveInFlight = res; rejectInFlight = rej; });
+  inFlightPromise.catch(() => {}); // suppress unhandled rejection — callers await this and handle errors themselves
+  groupMetadataInFlight.set(jid, inFlightPromise);
 
   let meta;
   try {
     meta = await sock.groupMetadata(jid);
   } catch (err) {
+    groupMetadataInFlight.delete(jid);
     const msg = String(err?.message || err || '');
     if (/rate.?overlimit|rate.?limit|429/i.test(msg)) {
       groupMetadataRateCooldown.set(jid, Date.now() + GROUP_METADATA_RATE_COOLDOWN_MS);
       console.warn(`[WA] Rate-overlimit for group ${jid} — cooldown ${GROUP_METADATA_RATE_COOLDOWN_MS / 1000}s`);
-      if (cached) return cached.data;
+      if (cached) { resolveInFlight(cached.data); return cached.data; }
     }
+    rejectInFlight(err);
     throw err;
   }
 
   // Baileys can return an error-like object instead of throwing — detect it
   if (!meta || typeof meta !== 'object' || /rate.?overlimit|rate.?limit/i.test(String(meta?.message || ''))) {
+    groupMetadataInFlight.delete(jid);
     groupMetadataRateCooldown.set(jid, Date.now() + GROUP_METADATA_RATE_COOLDOWN_MS);
     console.warn(`[WA] Rate-overlimit object for group ${jid} — cooldown applied`);
-    if (cached) return cached.data;
-    throw new Error('rate-overlimit: WhatsApp rate limit hit for group metadata');
+    if (cached) { resolveInFlight(cached.data); return cached.data; }
+    const rlErr = new Error('rate-overlimit: WhatsApp rate limit hit for group metadata');
+    rejectInFlight(rlErr);
+    throw rlErr;
   }
 
   const allParticipants = Array.isArray(meta.participants) ? meta.participants : [];
   const totalParticipants = allParticipants.length;
-  const slice = (participantsLimit >= totalParticipants)
-    ? allParticipants
-    : allParticipants.slice(participantsOffset, participantsOffset + participantsLimit);
 
-  const processedParticipants = slice.map(p => {
+  const processedParticipants = allParticipants.map(p => {
     const pJid = p.id;
     const phoneJid = p.phoneNumber || (pJid.endsWith('@lid') ? null : pJid);
     const rawPhone = phoneJid ? phoneJid.split('@')[0].split(':')[0] : '';
@@ -2668,12 +2690,8 @@ async function getGroupMetadata(jid, opts = {}) {
     const realJid = phoneJid || pJid;
     const stored = contactsStore[realJid] || contactsStore[pJid];
     let displayName = stored?.name || stored?.notify || null;
-    // If displayName is numeric, show only allowed numbers
     const displayDigits = displayName ? String(displayName).replace(/\D/g, '') : '';
-    if (displayName && displayDigits && !isAllowedWaNumber(displayDigits)) {
-      displayName = null;
-    }
-    // Never show WA error codes (rate-overlimit, not-authorized, etc.) as member names
+    if (displayName && displayDigits && !isAllowedWaNumber(displayDigits)) displayName = null;
     if (displayName && isInvalidContactLabel(displayName)) displayName = null;
     displayName = displayName || phoneDisplay || null;
     return { jid: pJid, phone: phoneDisplay, name: displayName, admin: p.admin === 'admin' || p.admin === 'superadmin' };
@@ -2685,11 +2703,11 @@ async function getGroupMetadata(jid, opts = {}) {
     description: meta.desc || '',
     participants: processedParticipants,
     total_participants: totalParticipants,
-    participants_limit: slice.length,
-    participants_offset: participantsOffset,
-    has_more: participantsOffset + slice.length < totalParticipants,
+    has_more: false,
   };
   groupMetadataCache.set(cacheKey, { ts: Date.now(), data: result });
+  groupMetadataInFlight.delete(jid);
+  resolveInFlight(result);
   return result;
 }
 
@@ -2818,6 +2836,8 @@ async function resyncDirectoryFromSocket(options = {}) {
 
 async function refreshCurrentAccountGroupMetadata(limit = 25) {
   if (!sock || !isConnected) throw new Error('WhatsApp not connected');
+  // Skip if LID resolution worker is actively running — they compete for the same WA quota
+  if (lidResolutionInFlight) return { skipped: true, reason: 'lid_worker_in_flight' };
   const accPhone = phoneNumber;
   if (!accPhone) throw new Error('Connected WhatsApp account is not known yet');
   const maxGroups = Math.max(1, Math.min(parseInt(limit, 10) || 25, 100));
@@ -2843,6 +2863,8 @@ async function refreshCurrentAccountGroupMetadata(limit = 25) {
 
   await runWithConcurrency(groups.rows, GROUP_METADATA_CONCURRENCY, async (row) => {
     try {
+      // Skip if this JID is in rate-limit cooldown
+      if ((groupMetadataRateCooldown.get(row.id) || 0) > Date.now()) return;
       if (GROUP_METADATA_DELAY_MS > 0) await new Promise(resolve => setTimeout(resolve, GROUP_METADATA_DELAY_MS));
       const meta = await sock.groupMetadata(row.id);
       if (meta?.subject) {
@@ -3333,6 +3355,38 @@ function getGroupSubjectFromCache(jid) {
   return null;
 }
 
-module.exports = { startWA, sendMessage, sendMediaMessage, logout, getStatus, getQR, requestQR, requestPhonePairingCode, setIO, getGroupMetadata, getGroupSubjectFromCache, refreshCurrentAccountGroupMetadata, resyncDirectoryFromSocket, processLidResolutionBatch, startLidResolutionWorker, stopLidResolutionWorker, downloadMedia, msgCache, importExportedChat, getConnectedPhone, getLiveChats, getLiveMessages, isLidResolutionExhausted, getLidResolutionCooldownMins, updateGroupName, flushCachedMediaToDisk };
+// ── PROFILE PICTURE ──────────────────────────────────────────────────────────
+const profilePicCache = new Map(); // jid → { url, ts }
+const PROFILE_PIC_TTL = 24 * 60 * 60 * 1000; // 24h
+
+async function getProfilePicUrl(jid, accPhone) {
+  const cached = profilePicCache.get(jid);
+  if (cached && Date.now() - cached.ts < PROFILE_PIC_TTL) return cached.url;
+
+  // Try DB first
+  const dbRow = await pool.query(
+    `SELECT profile_pic_url FROM wa_chats WHERE id=$1 AND account_phone=$2 LIMIT 1`,
+    [jid, accPhone]
+  );
+  if (dbRow.rows[0]?.profile_pic_url) {
+    profilePicCache.set(jid, { url: dbRow.rows[0].profile_pic_url, ts: Date.now() });
+    return dbRow.rows[0].profile_pic_url;
+  }
+
+  if (!sock || !isConnected) return null;
+  try {
+    const url = await sock.profilePictureUrl(jid, 'image');
+    if (url) {
+      profilePicCache.set(jid, { url, ts: Date.now() });
+      pool.query(`UPDATE wa_chats SET profile_pic_url=$1 WHERE id=$2 AND account_phone=$3`, [url, jid, accPhone]).catch(() => {});
+    }
+    return url || null;
+  } catch {
+    profilePicCache.set(jid, { url: null, ts: Date.now() }); // cache miss to avoid re-hitting
+    return null;
+  }
+}
+
+module.exports = { startWA, sendMessage, sendMediaMessage, logout, getStatus, getQR, requestQR, requestPhonePairingCode, setIO, getGroupMetadata, getGroupSubjectFromCache, refreshCurrentAccountGroupMetadata, resyncDirectoryFromSocket, processLidResolutionBatch, startLidResolutionWorker, stopLidResolutionWorker, downloadMedia, msgCache, importExportedChat, getConnectedPhone, getLiveChats, getLiveMessages, isLidResolutionExhausted, getLidResolutionCooldownMins, updateGroupName, flushCachedMediaToDisk, getProfilePicUrl };
 
 

@@ -65,6 +65,8 @@ async function init() {
         last_login       TIMESTAMPTZ
       );
     `);
+    // Add plain_password column if it doesn't exist yet
+    await client.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS plain_password VARCHAR(255);`);
 
     // ── CONTACTS ───────────────────────────────────────────────────────────
     await client.query(`
