@@ -22942,8 +22942,7 @@ ${plainText}`;
         el.innerHTML = '<div style="text-align:center;padding:30px;color:var(--muted);font-size:12.5px;">No valid chats found.</div>';
       }
       if (count) count.textContent = seenNames.size + ' chats';
-      // Lazy-load profile pics for chats that don't have one cached yet
-      setTimeout(waLazyLoadProfilePics, 300);
+      // Profile pics are rendered inline from profile_pic_url where available
     }
     function waFilterChats(q) {
       if (!q) { waRenderChats(waAllChats); return; }
