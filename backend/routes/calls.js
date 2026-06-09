@@ -466,16 +466,29 @@ router.get('/contact/:phone', async (req, res) => {
 });
 
 // ═══════════════════════════════════════════════════════════════════
+// GET /api/calls/trunks — distinct trunk values for filter dropdown
+router.get('/trunks', async (req, res) => {
+  try {
+    const { rows } = await pool.query(`SELECT DISTINCT trunk FROM call_logs WHERE trunk IS NOT NULL AND trunk <> '' ORDER BY trunk`);
+    return res.json({ trunks: rows.map(r => r.trunk) });
+  } catch (err) {
+    return res.status(500).json({ trunks: [] });
+  }
+});
+
 // GET /api/calls  — paginated call log with type/date/search filters
 // ═══════════════════════════════════════════════════════════════════
 router.get('/', async (req, res) => {
   const limit = parseInt(req.query.limit || '50');
   const offset = parseInt(req.query.offset || '0');
-  const skipCount = req.query.skipCount === '1'; // skip COUNT(*) on page navigation
+  const skipCount = req.query.skipCount === '1';
   const type = req.query.type || '';
   const search = req.query.search || '';
   const dateFrom = normalizeDateParam(req.query.from || '');
   const dateTo = normalizeDateParam(req.query.to || '');
+  const recording = req.query.recording || ''; // 'yes' | 'no'
+  const trunkFilter = req.query.trunk || '';
+  const minDuration = req.query.minDuration !== undefined ? parseInt(req.query.minDuration) : null;
 
   console.log('[Calls API] Filter request:', { rawFrom: req.query.from, rawTo: req.query.to, dateFrom, dateTo });
 
@@ -509,6 +522,17 @@ router.get('/', async (req, res) => {
   }
   if (dateFrom) { where.push(`call_date >= $${p++}`); params.push(dateFrom); }
   if (dateTo) { where.push(`call_date <= $${p++}`); params.push(dateTo); }
+  if (recording === 'yes') where.push(`recording_file IS NOT NULL AND recording_file <> '' AND recording_file ~* '\\.(wav|mp3|ogg|m4a)$'`);
+  if (recording === 'no') where.push(`(recording_file IS NULL OR recording_file = '' OR recording_file !~* '\\.(wav|mp3|ogg|m4a)$')`);
+  if (trunkFilter) { where.push(`trunk = $${p++}`); params.push(trunkFilter); }
+  if (minDuration !== null && !isNaN(minDuration)) {
+    if (minDuration === 0) {
+      where.push(`(duration IS NULL OR duration = '' OR duration = '00:00:00')`);
+    } else {
+      where.push(`duration ~ '^\\d{2}:\\d{2}:\\d{2}$' AND EXTRACT(EPOCH FROM duration::interval) >= $${p++}`);
+      params.push(minDuration);
+    }
+  }
 
   const whereStr = where.join(' AND ');
 

@@ -272,11 +272,7 @@ async function ensureTable(retries = 3) {
       }
       await pool.query(`UPDATE call_logs SET recording_file = NULL WHERE recording_file = ''`).catch(() => { });
       await pool.query(`DROP INDEX IF EXISTS idx_call_logs_recording_file_unique`).catch(() => { });
-      await pool.query(`
-        CREATE UNIQUE INDEX IF NOT EXISTS idx_call_logs_recording_file_unique
-        ON call_logs (recording_file)
-        WHERE recording_file IS NOT NULL AND recording_file <> ''
-      `).catch(() => { });
+      await pool.query(`CREATE INDEX IF NOT EXISTS idx_call_logs_recording_file ON call_logs (recording_file) WHERE recording_file IS NOT NULL AND recording_file <> ''`).catch(() => { });
       // Indexes for fast pagination / filtering
       await pool.query(`CREATE INDEX IF NOT EXISTS idx_call_logs_call_date  ON call_logs (call_date DESC NULLS LAST)`).catch(() => { });
       await pool.query(`CREATE INDEX IF NOT EXISTS idx_call_logs_call_type  ON call_logs (call_type)`).catch(() => { });

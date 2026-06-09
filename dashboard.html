@@ -4820,6 +4820,21 @@
                     <option value="Missed">Missed</option>
                     <option value="Internal">Internal</option>
                   </select>
+                  <select class="inp" id="call-filter-recording" style="width:auto;font-size:12px;padding:5px 10px;" onchange="loadCallLogs()">
+                    <option value="">All Recordings</option>
+                    <option value="yes">Has Recording</option>
+                    <option value="no">No Recording</option>
+                  </select>
+                  <select class="inp" id="call-filter-trunk" style="width:auto;font-size:12px;padding:5px 10px;" onchange="loadCallLogs()">
+                    <option value="">All Trunks</option>
+                  </select>
+                  <select class="inp" id="call-filter-duration" style="width:auto;font-size:12px;padding:5px 10px;" onchange="loadCallLogs()">
+                    <option value="">Any Duration</option>
+                    <option value="0">0 sec (missed)</option>
+                    <option value="30">≥ 30 sec</option>
+                    <option value="60">≥ 1 min</option>
+                    <option value="300">≥ 5 min</option>
+                  </select>
                   <input type="date" class="inp" id="call-filter-from"
                     style="width:auto;font-size:12px;padding:5px 8px;" onchange="loadCallLogs()">
                   <button class="btn btn-ghost btn-sm" onclick="exportCallCSV()"><i class="fas fa-download"></i> Export
@@ -28097,7 +28112,7 @@ ${plainText}`;
       if (target) target.style.display = 'block';
 
       // Load data
-      if (tab === 'logs') loadCallLogs();
+      if (tab === 'logs') { loadCallLogs(); populateTrunkFilter(); }
       if (tab === 'recordings') refreshPBXRecordingsView();
       if (tab === 'backup') pbxListBackups();
     }
@@ -28180,6 +28195,21 @@ ${plainText}`;
     }
 
 
+    async function populateTrunkFilter() {
+      const sel = document.getElementById('call-filter-trunk');
+      if (sel.options.length > 1) return; // already populated
+      try {
+        const res = await fetch(`${API_BASE}/calls/trunks`, { headers: getAuthHeaders() });
+        if (!res.ok) return;
+        const { trunks } = await res.json();
+        trunks.forEach(t => {
+          const o = document.createElement('option');
+          o.value = t; o.textContent = t;
+          sel.appendChild(o);
+        });
+      } catch (_) {}
+    }
+
     function debouncedLoadCallLogs() {
 
       clearTimeout(_callSearchDebounce);
@@ -28212,16 +28242,19 @@ ${plainText}`;
       pbxConsoleStart(traceId, 'loadCallLogs started', { page, search, type, fromDate, callsLimit });
 
       try {
+        const recording = document.getElementById('call-filter-recording').value;
+        const trunk = document.getElementById('call-filter-trunk').value;
+        const duration = document.getElementById('call-filter-duration').value;
         const params = new URLSearchParams({
           offset: String((page - 1) * callsLimit),
           limit: String(callsLimit),
           search,
           type,
         });
-        if (fromDate) {
-          params.set('from', fromDate);
-          params.set('to', fromDate);
-        }
+        if (fromDate) { params.set('from', fromDate); params.set('to', fromDate); }
+        if (recording) params.set('recording', recording);
+        if (trunk) params.set('trunk', trunk);
+        if (duration !== '') params.set('minDuration', duration);
         // Skip the expensive COUNT(*) query when we already have the total
         if (callsCachedTotal !== null) params.set('skipCount', '1');
         pbxConsoleStep(traceId, 'fetch /calls start', {
