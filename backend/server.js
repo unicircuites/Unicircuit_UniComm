@@ -518,7 +518,8 @@ const apiLimiter = rateLimit({
 });
 
 // ── ROUTES ─────────────────────────────────────────────────────────────────
-app.use('/api/auth', authLimiter, require('./routes/auth'));
+app.use('/api/auth/login', authLimiter);
+app.use('/api/auth', apiLimiter, require('./routes/auth'));
 app.use('/api/contacts', apiLimiter, require('./routes/contacts'));
 app.use('/api/pipeline', apiLimiter, require('./routes/pipeline'));
 app.use('/api/calls', apiLimiter, require('./routes/calls'));
