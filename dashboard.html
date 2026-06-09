@@ -4453,6 +4453,7 @@
         <div class="nav-item" onclick="nav('marketing',this)"><i class="fas fa-bullhorn"></i> Marketing Suite</div>
         <div class="nav-item" onclick="nav('ai',this)"><i class="fas fa-robot"></i> AI Assistant</div>
         <div class="nav-item" onclick="nav('analytics',this)"><i class="fas fa-chart-bar"></i> Analytics</div>
+        <div class="nav-item" id="nav-usermgmt" onclick="nav('usermgmt',this)" style="display:none;"><i class="fas fa-users-cog"></i> User Management</div>
       </nav>
 
       <div class="user-block">
@@ -5783,7 +5784,15 @@
                     style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:0.8px;">Members</span>
                   <span id="wa-gi-member-count" style="font-size:10.5px;color:var(--muted2);font-weight:600;"></span>
                 </div>
-                <div id="wa-gi-members" style="padding:0 10px 10px;display:flex;flex-direction:column;gap:2px;"></div>
+                <div style="padding:0 10px 6px;position:sticky;top:36px;background:var(--card);z-index:1;">
+                  <input id="wa-gi-search" class="inp" placeholder="Search members..." style="font-size:12px;padding:5px 10px;height:30px;" oninput="waGroupMembersSearch(this.value)" />
+                </div>
+                <div id="wa-gi-members" style="padding:0 10px 4px;display:flex;flex-direction:column;gap:2px;"></div>
+                <div id="wa-gi-pagination" style="padding:8px 10px;border-top:1px solid var(--border);display:none;align-items:center;justify-content:space-between;gap:6px;flex-shrink:0;">
+                  <button id="wa-gi-prev" class="btn btn-ghost btn-xs" onclick="waGroupMembersPage(-1)" disabled><i class="fas fa-chevron-left"></i></button>
+                  <span id="wa-gi-page-label" style="font-size:11px;color:var(--muted);"></span>
+                  <button id="wa-gi-next" class="btn btn-ghost btn-xs" onclick="waGroupMembersPage(1)"><i class="fas fa-chevron-right"></i></button>
+                </div>
               </div>
             </div>
 
@@ -7523,6 +7532,7 @@ Always write in a professional yet warm Indian B2B communication style. Use form
       marketing: ['Marketing Suite', 'Omnichannel campaigns · AI-generated copy'],
       ai: ['AI Assistant', 'PicoClaw-powered · Unicircuit Engineering context'],
       analytics: ['Analytics', 'Communication intelligence · Client insights'],
+      usermgmt: ['User Management', 'Manage users, roles and access'],
     };
 
     function nav(id, el) {
@@ -7540,6 +7550,7 @@ Always write in a professional yet warm Indian B2B communication style. Use form
       const m = pageMeta[id] || ['', ''];
       document.getElementById('page-h').textContent = m[0];
       document.getElementById('page-sub').textContent = m[1];
+      if (id === 'usermgmt') { umCancelEdit(); umLoadUsers(); }
       const topCompose = document.getElementById('topbar-compose-email');
       if (topCompose) topCompose.style.display = id === 'email' ? '' : 'none';
       if (id === 'contacts') refreshContactsSection();
@@ -13061,6 +13072,10 @@ Keep it concise and professional.`;
         document.getElementById('sidebar-initials').textContent = user.initials || (user.name ? user.name.split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2) : 'U');
         document.getElementById('sidebar-name').textContent = user.name || 'User';
         document.getElementById('sidebar-role').textContent = (user.role === 'admin' ? 'Admin' : 'User') + ' · Unicircuit';
+        if (user.role === 'admin') {
+          var nm = document.getElementById('nav-usermgmt');
+          if (nm) nm.style.display = '';
+        }
       } catch (_) { }
 
       // Hide guard, show app
@@ -13089,6 +13104,133 @@ Keep it concise and professional.`;
         try { msgBannerInitAllPanels(); } catch (_) { }
       }, 200);
     });
+
+    // ── USER MANAGEMENT ─────────────────────────────────────────────────────────
+    let umEditingId = null;
+
+    async function openUserManagement() {
+      nav('usermgmt', document.getElementById('nav-usermgmt'));
+      umCancelEdit();
+      await umLoadUsers();
+    }
+
+    async function umLoadUsers() {
+      const tbody = document.getElementById('um-users-tbody');
+      tbody.innerHTML = '<tr><td colspan="6" style="padding:20px;text-align:center;color:var(--muted);"><i class="fas fa-spinner fa-spin"></i> Loading…</td></tr>';
+      try {
+        const res = await fetch(`${API_BASE}/auth/users`, { headers: getAuthHeaders() });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Failed');
+        const me = JSON.parse(localStorage.getItem('uc_user') || sessionStorage.getItem('uc_user') || '{}');
+        tbody.innerHTML = data.users.map(u => `
+          <tr style="border-bottom:1px solid var(--border2);">
+            <td style="padding:8px 10px;">
+              <div style="display:flex;align-items:center;gap:8px;">
+                <div style="width:30px;height:30px;border-radius:50%;background:var(--gold2);color:#000;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;">${u.avatar_initials||'?'}</div>
+                <span style="font-weight:600;color:var(--text);">${escHtml(u.name)}</span>
+              </div>
+            </td>
+            <td style="padding:8px 10px;color:var(--muted);">${escHtml(u.email)}</td>
+            <td style="padding:8px 10px;">
+              <span style="font-size:11px;padding:2px 8px;border-radius:4px;${u.role==='admin'?'background:rgba(255,193,7,0.15);color:var(--gold);':'background:var(--bg2);color:var(--muted);'}">${u.role}</span>
+            </td>
+            <td style="padding:8px 10px;">
+              <span style="font-size:11px;padding:2px 8px;border-radius:4px;${u.is_active?'background:rgba(16,185,129,0.15);color:#10b981;':'background:rgba(239,68,68,0.15);color:#ef4444;'}">${u.is_active?'Active':'Disabled'}</span>
+            </td>
+            <td style="padding:8px 10px;color:var(--muted);font-size:12px;">${u.last_login?new Date(u.last_login).toLocaleString('en-IN',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'}):'Never'}</td>
+            <td style="padding:8px 10px;text-align:right;">
+              <button class="btn btn-ghost btn-sm" onclick="umEditUser(${u.id})" title="Edit"><i class="fas fa-edit"></i></button>
+              <button class="btn btn-ghost btn-sm" onclick="umToggleActive(${u.id},${!u.is_active})" title="${u.is_active?'Disable':'Enable'}" style="color:${u.is_active?'var(--red2)':'#10b981'};">
+                <i class="fas fa-${u.is_active?'ban':'check-circle'}"></i>
+              </button>
+              ${u.id !== me.id ? `<button class="btn btn-ghost btn-sm" onclick="umDeleteUser(${u.id},'${escHtml(u.name)}')" title="Delete" style="color:var(--red2);"><i class="fas fa-trash"></i></button>` : ''}
+            </td>
+          </tr>`).join('');
+      } catch (e) {
+        tbody.innerHTML = `<tr><td colspan="6" style="padding:20px;text-align:center;color:var(--red2);">${e.message}</td></tr>`;
+      }
+    }
+
+    function umEditUser(id) {
+      // find user from rendered rows — re-fetch or store in data attr; we'll re-fetch
+      umEditingId = id;
+      document.getElementById('um-form-title').innerHTML = '<i class="fas fa-user-edit" style="color:var(--gold);margin-right:6px;"></i>Edit User';
+      document.getElementById('um-pw-hint').textContent = '(leave blank to keep current)';
+      document.getElementById('um-password').value = '';
+      document.getElementById('um-password').placeholder = 'Leave blank to keep current';
+      // load values by fetching users again
+      fetch(`${API_BASE}/auth/users`, { headers: getAuthHeaders() })
+        .then(r => r.json())
+        .then(d => {
+          const u = d.users.find(x => x.id === id);
+          if (!u) return;
+          document.getElementById('um-name').value = u.name;
+          document.getElementById('um-email').value = u.email;
+          document.getElementById('um-role').value = u.role;
+        });
+    }
+
+    function umCancelEdit() {
+      umEditingId = null;
+      document.getElementById('um-form-title').innerHTML = '<i class="fas fa-user-plus" style="color:var(--gold);margin-right:6px;"></i>Add New User';
+      document.getElementById('um-pw-hint').textContent = '(required)';
+      document.getElementById('um-name').value = '';
+      document.getElementById('um-email').value = '';
+      document.getElementById('um-password').value = '';
+      document.getElementById('um-password').placeholder = 'Min 8 characters';
+      document.getElementById('um-role').value = 'user';
+    }
+
+    async function umSaveUser() {
+      const name = document.getElementById('um-name').value.trim();
+      const email = document.getElementById('um-email').value.trim();
+      const password = document.getElementById('um-password').value;
+      const role = document.getElementById('um-role').value;
+      if (!name || !email) return notify('User Management', 'Name and email are required.', 'var(--red2)', 'fas fa-exclamation-circle');
+      if (!umEditingId && !password) return notify('User Management', 'Password is required for new users.', 'var(--red2)', 'fas fa-exclamation-circle');
+      const body = { name, email, role };
+      if (password) body.password = password;
+      try {
+        const url = umEditingId ? `${API_BASE}/auth/users/${umEditingId}` : `${API_BASE}/auth/users`;
+        const method = umEditingId ? 'PUT' : 'POST';
+        const res = await fetch(url, { method, headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Save failed');
+        notify('User Management', umEditingId ? 'User updated.' : 'User created.', '#10b981', 'fas fa-check-circle');
+        umCancelEdit();
+        await umLoadUsers();
+      } catch (e) {
+        notify('User Management', e.message, 'var(--red2)', 'fas fa-exclamation-circle');
+      }
+    }
+
+    async function umToggleActive(id, newState) {
+      try {
+        const res = await fetch(`${API_BASE}/auth/users/${id}`, {
+          method: 'PUT',
+          headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
+          body: JSON.stringify({ is_active: newState })
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Update failed');
+        await umLoadUsers();
+      } catch (e) {
+        notify('User Management', e.message, 'var(--red2)', 'fas fa-exclamation-circle');
+      }
+    }
+
+    async function umDeleteUser(id, name) {
+      if (!confirm(`Delete user "${name}"? This cannot be undone.`)) return;
+      try {
+        const res = await fetch(`${API_BASE}/auth/users/${id}`, { method: 'DELETE', headers: getAuthHeaders() });
+        if (!res.ok) { const d = await res.json(); throw new Error(d.error || 'Delete failed'); }
+        await umLoadUsers();
+      } catch (e) {
+        notify('User Management', e.message, 'var(--red2)', 'fas fa-exclamation-circle');
+      }
+    }
+
+    function escHtml(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 
     // ── LOGOUT ──────────────────────────────────────────────────────────────────
     async function doLogout() {
@@ -21791,7 +21933,12 @@ ${plainText}`;
         clearTimeout(window._waDisconnectTimeout);
         waOnConnected(phone, name);
         waSetSyncStatus('Connected. Loading chats...');
-        setTimeout(waLoadLidMap, 12000);
+        // Fire LID resolution immediately after chats load — don't wait 12 s
+        setTimeout(function() {
+          _waLidPendingStart = 0;
+          waRunLidResolutionBatch(150).then(function() { waLoadResolutionStats(waAllChats.length); });
+          waLoadLidMap();
+        }, 4000);
       });
       waSocket.on('wa:disconnected', (payload) => {
         waStopResolutionPolling();
@@ -22946,7 +23093,7 @@ ${plainText}`;
       // Load group info in background
       if (isGroup) {
         try {
-          var gRes = await fetch(API_BASE + '/wa/group/' + encodeURIComponent(jid), { headers: getAuthHeaders() });
+          var gRes = await fetch(API_BASE + '/wa/group/' + encodeURIComponent(jid) + '?limit=2000', { headers: getAuthHeaders() });
           var gData = await gRes.json();
           if (gRes.ok && gData.participants) {
             var cnt = gData.total_participants || gData.participants.length;
@@ -23724,15 +23871,15 @@ ${plainText}`;
     async function waRefreshChats() {
       try {
         waAllChats = [];
+        _waLidPendingStart = 0;
         var el = document.getElementById('wa-convo-list');
         if (el) el.innerHTML = '<div style="text-align:center;padding:30px;color:var(--muted);font-size:12.5px;"><span class="spin-loader" style="margin-right:6px;"></span>Reloading chats...</div>';
         
         await fetch(API_BASE + '/wa/sync', { method: 'POST', headers: getAuthHeaders() }).catch(function(){});
-        
         await waLoadChats({ force: true });
-        if (waActiveJid) {
-          await waLoadActiveMessages({ showLoader: false });
-        }
+        if (waActiveJid) waLoadActiveMessages({ showLoader: false });
+        // Fire LID resolution batch immediately and start polling so phones appear ASAP
+        waRunLidResolutionBatch(150).then(function() { waLoadResolutionStats(waAllChats.length); });
         waLoadLidMap();
       } catch (_) { }
     }
@@ -23752,7 +23899,7 @@ ${plainText}`;
         if (membersEl && !membersEl.innerHTML.trim() && waActiveJid) {
           membersEl.innerHTML = '<div style="padding:10px;color:var(--muted);font-size:12px;"><span class="spin-loader" style="margin-right:6px;"></span>Loading...</div>';
           try {
-            var res = await fetch(API_BASE + '/wa/group/' + encodeURIComponent(waActiveJid), { headers: getAuthHeaders() });
+            var res = await fetch(API_BASE + '/wa/group/' + encodeURIComponent(waActiveJid) + '?limit=2000', { headers: getAuthHeaders() });
             var data = await res.json();
             if (res.ok) waPopulateGroupInfo(data);
             else membersEl.innerHTML = '<div style="padding:10px;color:var(--red2);font-size:12px;">' + (data.error || 'Failed') + '</div>';
@@ -23813,30 +23960,74 @@ ${plainText}`;
       }
 
       if (giMembers) {
-        giMembers.innerHTML = (gData.participants || []).map(function (p) {
-          var phoneSafe = p && p.phone ? waFormatPhoneForDisplay(p.phone) : '';
-          var displayName = (p && p.name && String(p.name).trim()) ? p.name : (phoneSafe || null);
-          var initials = displayName ? displayName.charAt(0).toUpperCase() : '?';
-          var adminBadge = p.admin
-            ? '<span style="font-size:9px;background:rgba(39,150,196,0.15);color:var(--gold2);padding:1px 6px;border-radius:4px;font-weight:700;white-space:nowrap;">Admin</span>'
-            : '';
-          // Show phone only if it's different from the display name
-          var phoneStr = (phoneSafe && phoneSafe !== displayName) ? phoneSafe : '';
-          var phoneHtml = phoneStr
-            ? '<div style="font-size:10.5px;color:var(--muted);margin-top:1px;">' + phoneStr + '</div>'
-            : '';
-          return '<div style="display:flex;align-items:center;gap:10px;padding:7px 6px;border-radius:8px;cursor:default;transition:background 0.1s;" onmouseover="this.style.background=\'rgba(255,255,255,0.04)\'" onmouseout="this.style.background=\'\'">' +
-            '<div style="width:34px;height:34px;border-radius:50%;background:rgba(37,211,102,0.15);display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;color:#25D366;flex-shrink:0;">' + initials + '</div>' +
-            '<div style="flex:1;min-width:0;">' +
-            '<div style="display:flex;align-items:center;gap:5px;flex-wrap:wrap;">' +
-            '<span style="font-size:12.5px;color:var(--text);font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:140px;">' + (displayName || '—') + '</span>' +
-            adminBadge +
-            '</div>' +
-            phoneHtml +
-            '</div>' +
-            '</div>';
-        }).join('');
+        // Store all participants for client-side search/pagination
+        window._waGiAllParticipants = gData.participants || [];
+        window._waGiPage = 0;
+        window._waGiSearchQ = '';
+        var searchEl = document.getElementById('wa-gi-search');
+        if (searchEl) searchEl.value = '';
+        waRenderGroupMembers();
       }
+    }
+
+    var _WA_GI_PAGE_SIZE = 50;
+
+    function waRenderGroupMembers() {
+      var giMembers = document.getElementById('wa-gi-members');
+      var giPagination = document.getElementById('wa-gi-pagination');
+      var giPrev = document.getElementById('wa-gi-prev');
+      var giNext = document.getElementById('wa-gi-next');
+      var giPageLabel = document.getElementById('wa-gi-page-label');
+      if (!giMembers) return;
+      var all = window._waGiAllParticipants || [];
+      var q = (window._waGiSearchQ || '').toLowerCase().trim();
+      var filtered = q ? all.filter(function(p) {
+        var name = String(p.name || '').toLowerCase();
+        var phone = String(p.phone || '').replace(/\D/g, '');
+        return name.includes(q) || phone.includes(q.replace(/\D/g, ''));
+      }) : all;
+      var page = window._waGiPage || 0;
+      var total = filtered.length;
+      var totalPages = Math.max(1, Math.ceil(total / _WA_GI_PAGE_SIZE));
+      if (page >= totalPages) page = 0;
+      window._waGiPage = page;
+      var start = page * _WA_GI_PAGE_SIZE;
+      var slice = filtered.slice(start, start + _WA_GI_PAGE_SIZE);
+      giMembers.innerHTML = slice.map(function (p) {
+        var phoneSafe = p && p.phone ? waFormatPhoneForDisplay(p.phone) : '';
+        var displayName = (p && p.name && String(p.name).trim()) ? p.name : (phoneSafe || null);
+        var initials = displayName ? displayName.charAt(0).toUpperCase() : '?';
+        var adminBadge = p.admin
+          ? '<span style="font-size:9px;background:rgba(39,150,196,0.15);color:var(--gold2);padding:1px 6px;border-radius:4px;font-weight:700;white-space:nowrap;">Admin</span>'
+          : '';
+        var phoneStr = (phoneSafe && phoneSafe !== displayName) ? phoneSafe : '';
+        var phoneHtml = phoneStr ? '<div style="font-size:10.5px;color:var(--muted);margin-top:1px;">' + phoneStr + '</div>' : '';
+        return '<div style="display:flex;align-items:center;gap:10px;padding:7px 6px;border-radius:8px;cursor:default;">' +
+          '<div style="width:34px;height:34px;border-radius:50%;background:rgba(37,211,102,0.15);display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;color:#25D366;flex-shrink:0;">' + initials + '</div>' +
+          '<div style="flex:1;min-width:0;"><div style="display:flex;align-items:center;gap:5px;flex-wrap:wrap;">' +
+          '<span style="font-size:12.5px;color:var(--text);font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:140px;">' + (displayName || '—') + '</span>' +
+          adminBadge + '</div>' + phoneHtml + '</div></div>';
+      }).join('') || '<div style="padding:12px;color:var(--muted);font-size:12px;text-align:center;">No members match.</div>';
+      // Pagination
+      if (total > _WA_GI_PAGE_SIZE) {
+        if (giPagination) giPagination.style.display = 'flex';
+        if (giPageLabel) giPageLabel.textContent = (start + 1) + '–' + Math.min(start + _WA_GI_PAGE_SIZE, total) + ' of ' + total;
+        if (giPrev) giPrev.disabled = page === 0;
+        if (giNext) giNext.disabled = page >= totalPages - 1;
+      } else {
+        if (giPagination) giPagination.style.display = 'none';
+      }
+    }
+
+    function waGroupMembersSearch(q) {
+      window._waGiSearchQ = q;
+      window._waGiPage = 0;
+      waRenderGroupMembers();
+    }
+
+    function waGroupMembersPage(dir) {
+      window._waGiPage = (window._waGiPage || 0) + dir;
+      waRenderGroupMembers();
     }
 
     async function waSync() {
@@ -33377,6 +33568,56 @@ Nagpur, Maharashtra, 440017, India<br>
       </div>
     </div>
   </div>
+
+<!-- ─── USER MANAGEMENT SECTION ──────────────────────────────────────────── -->
+<div class="section-view fu" id="sec-usermgmt">
+  <div style="max-width:860px;margin:0 auto;padding:0 4px;">
+    <!-- Add / Edit form -->
+    <div id="um-form" style="background:var(--bg3);border:1px solid var(--border2);border-radius:12px;padding:20px;margin-bottom:20px;">
+      <div style="font-size:13px;font-weight:600;color:var(--text);margin-bottom:14px;" id="um-form-title">
+        <i class="fas fa-user-plus" style="color:var(--gold);margin-right:6px;"></i>Add New User
+      </div>
+      <div class="form-row">
+        <div><label class="form-label">Name *</label><input class="inp" id="um-name" placeholder="Rajesh Kumar" /></div>
+        <div><label class="form-label">Email *</label><input class="inp" id="um-email" placeholder="user@company.com" /></div>
+      </div>
+      <div class="form-row">
+        <div>
+          <label class="form-label">Password <span id="um-pw-hint" style="color:var(--muted);font-size:11px;">(required)</span></label>
+          <input class="inp" id="um-password" type="password" placeholder="Min 8 characters" />
+        </div>
+        <div>
+          <label class="form-label">Role</label>
+          <select class="inp" id="um-role"><option value="user">User</option><option value="admin">Admin</option></select>
+        </div>
+      </div>
+      <div style="display:flex;gap:8px;margin-top:10px;">
+        <button class="btn btn-primary btn-sm" onclick="umSaveUser()"><i class="fas fa-save"></i> Save</button>
+        <button class="btn btn-ghost btn-sm" onclick="umCancelEdit()"><i class="fas fa-times"></i> Cancel</button>
+      </div>
+    </div>
+    <!-- Users table -->
+    <div style="background:var(--bg3);border:1px solid var(--border2);border-radius:12px;overflow:hidden;">
+      <table style="width:100%;border-collapse:collapse;font-size:13px;">
+        <thead>
+          <tr style="border-bottom:1px solid var(--border2);color:var(--muted);text-align:left;background:var(--bg2);">
+            <th style="padding:10px 14px;">User</th>
+            <th style="padding:10px 14px;">Email</th>
+            <th style="padding:10px 14px;">Role</th>
+            <th style="padding:10px 14px;">Status</th>
+            <th style="padding:10px 14px;">Last Login</th>
+            <th style="padding:10px 14px;text-align:right;">Actions</th>
+          </tr>
+        </thead>
+        <tbody id="um-users-tbody">
+          <tr><td colspan="6" style="padding:24px;text-align:center;color:var(--muted);"><i class="fas fa-spinner fa-spin"></i> Loading…</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+
 
 </body>
 
