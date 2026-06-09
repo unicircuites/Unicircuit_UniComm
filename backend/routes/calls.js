@@ -27,6 +27,12 @@ const smdr = require('../services/matrixSmdr');
 const recordingLinker = require('../services/recordingLinker');
 
 
+// Fire-and-forget refresh of the deduped materialized view (non-blocking)
+function refreshCallLogView() {
+  pool.query('REFRESH MATERIALIZED VIEW CONCURRENTLY call_logs_deduped')
+    .catch(err => console.warn('[Calls] mat view refresh failed:', err.message));
+}
+
 const router = express.Router();
 router.use((req, res, next) => {
 
@@ -505,112 +511,43 @@ router.get('/', async (req, res) => {
   if (dateTo) { where.push(`call_date <= $${p++}`); params.push(dateTo); }
 
   const whereStr = where.join(' AND ');
-  // Dedup logic:
-  // 1. First remove exact duplicates (same date/trunk/caller/destination/time).
-  // 2. Then collapse Matrix PBX T/D legs — same caller + same trunk within a
-  //    120-second window are treated as one call; keep the row with the longest
-  //    duration (or highest id on tie).
-  const dedupedCallsSql = `
-    WITH base AS (
-      SELECT DISTINCT ON (
-        call_date::date,
-        COALESCE(trunk, ''),
-        regexp_replace(COALESCE(caller, ''), '[^0-9]', '', 'g'),
-        regexp_replace(COALESCE(destination, ''), '[^0-9]', '', 'g'),
-        COALESCE(call_time, TIME '00:00:00')
-      ) *
-      FROM call_logs
-      WHERE
-        -- Hide records where destination is a date (bad SMDR parse)
-        NOT (destination ~ '^\\d{2}-\\d{2}-\\d{2,4}$')
-        -- Hide records with no destination and zero/null duration (unanswered/noise)
-        AND NOT (
-          (destination IS NULL OR trim(destination) = '')
-          AND (duration IS NULL OR duration = '' OR duration = '00:00:00')
-        )
-        -- Hide zero-duration calls (not considered real calls)
-        AND NOT (duration IS NULL OR duration = '' OR duration = '00:00:00')
-      ORDER BY
-        call_date::date,
-        COALESCE(trunk, ''),
-        regexp_replace(COALESCE(caller, ''), '[^0-9]', '', 'g'),
-        regexp_replace(COALESCE(destination, ''), '[^0-9]', '', 'g'),
-        COALESCE(call_time, TIME '00:00:00'),
-        created_at DESC,
-        id DESC
-    ),
-    ranked AS (
-      SELECT *,
-        ROW_NUMBER() OVER (
-          PARTITION BY
-            call_date::date,
-            COALESCE(trunk, ''),
-            regexp_replace(COALESCE(caller, ''), '[^0-9]', '', 'g'),
-            -- Bucket call_time into 120-second windows so T/D legs from the
-            -- same Matrix PBX call collapse into one group (2-min window handles
-            -- edge cases where legs straddle a minute boundary)
-            FLOOR(EXTRACT(EPOCH FROM COALESCE(call_time, TIME '00:00:00')) / 120)
-          ORDER BY
-            -- Prefer the leg with the longest actual talk time
-            CASE
-              WHEN duration ~ '^\\d{2}:\\d{2}:\\d{2}$'
-              THEN EXTRACT(EPOCH FROM duration::interval)
-              ELSE 0
-            END DESC,
-            id DESC
-        ) AS _rn
-      FROM base
-    )
-    SELECT * FROM ranked WHERE _rn = 1
-  `;
+
   try {
     const result = await pool.query(
-      `SELECT cl.*, TO_CHAR(cl.call_date, 'YYYY-MM-DD') AS call_date_str, 
-              COALESCE(pc1.name, pc2.name) AS saved_name, 
+      `SELECT cl.*, TO_CHAR(cl.call_date, 'YYYY-MM-DD') AS call_date_str,
+              COALESCE(pc1.name, pc2.name) AS saved_name,
               COALESCE(pc1.company, pc2.company) AS saved_company,
               COALESCE(pc1.notes, pc2.notes) AS saved_notes
-       FROM (${dedupedCallsSql}) cl
+       FROM call_logs_deduped cl
        LEFT JOIN (
          SELECT DISTINCT ON (regexp_replace(phone, '[^0-9]', '', 'g'))
            regexp_replace(phone, '[^0-9]', '', 'g') AS phone_digits, phone, name, company, notes
          FROM pbx_contacts
          ORDER BY regexp_replace(phone, '[^0-9]', '', 'g'), (name IS NULL), updated_at DESC NULLS LAST, id DESC
-       ) pc1 ON (
-         pc1.phone = cl.caller
-         OR pc1.phone_digits = regexp_replace(cl.caller, '[^0-9]', '', 'g')
-       )
+       ) pc1 ON pc1.phone_digits = regexp_replace(cl.caller, '[^0-9]', '', 'g')
        LEFT JOIN (
          SELECT DISTINCT ON (regexp_replace(phone, '[^0-9]', '', 'g'))
            regexp_replace(phone, '[^0-9]', '', 'g') AS phone_digits, phone, name, company, notes
          FROM pbx_contacts
          ORDER BY regexp_replace(phone, '[^0-9]', '', 'g'), (name IS NULL), updated_at DESC NULLS LAST, id DESC
-       ) pc2 ON (
-         pc2.phone = cl.destination
-         OR pc2.phone_digits = regexp_replace(cl.destination, '[^0-9]', '', 'g')
-       )
+       ) pc2 ON pc2.phone_digits = regexp_replace(cl.destination, '[^0-9]', '', 'g')
        WHERE ${whereStr}
-       ORDER BY COALESCE(cl.call_date::timestamp + COALESCE(cl.call_time, TIME '00:00:00'), cl.created_at) DESC,
-                cl.created_at DESC,
-                cl.id DESC
+       ORDER BY cl.call_date DESC NULLS LAST, cl.call_time DESC NULLS LAST, cl.created_at DESC, cl.id DESC
        LIMIT $${p++} OFFSET $${p++}`,
       [...params, limit, offset]
     );
 
-    // Fix pg driver timezone shift by using the string representation of the date
     result.rows.forEach(r => {
-      if (r.call_date_str) {
-        r.call_date = r.call_date_str;
-        delete r.call_date_str;
-      }
+      if (r.call_date_str) { r.call_date = r.call_date_str; delete r.call_date_str; }
     });
 
     const total = skipCount
       ? null
       : await pool.query(
-          `SELECT COUNT(*) FROM (${dedupedCallsSql}) cl WHERE ${whereStr}`,
+          `SELECT COUNT(*)::int AS n FROM call_logs_deduped WHERE ${whereStr}`,
           params
         );
-    return res.json({ calls: result.rows, total: total ? parseInt(total.rows[0].count) : null });
+    return res.json({ calls: result.rows, total: total ? total.rows[0].n : null });
   } catch (err) {
     console.error('[Calls] list error:', err.message);
     return res.status(500).json({ error: 'Failed to fetch call logs.' });
@@ -631,6 +568,7 @@ router.post('/', async (req, res) => {
       duration || null, call_type || 'Out', ai_summary || null,
       call_date || null, call_time || null, trunk || null, raw_line || null
     ]);
+    refreshCallLogView();
     return res.status(201).json(result.rows[0]);
   } catch (err) {
     return res.status(500).json({ error: 'Failed to log call.' });
@@ -688,6 +626,7 @@ router.delete('/:id', async (req, res) => {
     );
 
     await client.query('COMMIT');
+    refreshCallLogView();
     return res.json({
       success: true,
       deleted: deleted.rowCount,
@@ -1401,6 +1340,7 @@ router.post('/link-recordings', async (req, res) => {
     if (!result.success) {
       return res.status(500).json({ error: result.error || result.message });
     }
+    refreshCallLogView();
     return res.json({ message: result.message, matched: result.matchedCount });
   } catch (err) {
     return res.status(500).json({ error: 'Failed to link recordings: ' + err.message });

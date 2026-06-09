@@ -3,7 +3,7 @@ const path = require('path');
 const pool = require('../db/pool');
 
 const LOCAL_STORED_DIR = path.join(__dirname, '..', 'pbx_recordings');
-const TIMESTAMP_TOLERANCE_MS = parseInt(process.env.PBX_RECORDING_MATCH_TOLERANCE_MS || '180000', 10);
+const TIMESTAMP_TOLERANCE_MS = parseInt(process.env.PBX_RECORDING_MATCH_TOLERANCE_MS || '600000', 10); // 10 min default
 const AUDIO_EXT_RE = /\.(wav|mp3|ogg|m4a)$/i;
 
 /**
@@ -128,6 +128,10 @@ function indexKey(phone, extension) {
   return `${phone}|${extension}`;
 }
 
+function phoneOnlyKey(phone) {
+  return `phone:${phone}`;
+}
+
 function addToIndex(index, phone, extension, entry) {
   if (!phone || !extension) return;
   const key = indexKey(phone, extension);
@@ -140,6 +144,10 @@ function buildRecordingIndex(entries) {
   for (const entry of entries) {
     addToIndex(index, entry.phone, entry.extension, entry);
     addToIndex(index, entry.phone, '*', entry);
+    // Also index by phone only — for forwarded calls where extension changes mid-call
+    const pk = phoneOnlyKey(entry.phone);
+    if (!index.has(pk)) index.set(pk, []);
+    index.get(pk).push(entry);
   }
   for (const list of index.values()) {
     list.sort((a, b) => a.timestampMs - b.timestampMs);
@@ -172,9 +180,13 @@ function getCallTimestamps(call) {
   if (!callEndMs) return null;
 
   const durationMs = parseDurationToMs(call.duration);
+  // For forwarded calls, the call_time stored is the answer time of the final hop.
+  // The recording is stamped at the very beginning of the original call.
+  // Use a generous start: callEndMs minus duration minus TOLERANCE to catch recordings
+  // that started before the forwarded leg was answered.
   return {
-    callStartMs: callEndMs - durationMs,
-    callEndMs
+    callStartMs: callEndMs - durationMs - TIMESTAMP_TOLERANCE_MS,
+    callEndMs: callEndMs + TIMESTAMP_TOLERANCE_MS
   };
 }
 
@@ -196,15 +208,11 @@ function getCallMatchKeys(call) {
 }
 
 function timestampMatches(recMs, callStartMs, callEndMs) {
-  const diffToStart = Math.abs(recMs - callStartMs);
-  const diffToEnd = Math.abs(recMs - callEndMs);
-  const minDiffMs = Math.min(diffToStart, diffToEnd);
-
-  if (minDiffMs <= TIMESTAMP_TOLERANCE_MS) return minDiffMs;
-  if (recMs >= callStartMs - TIMESTAMP_TOLERANCE_MS && recMs <= callEndMs + TIMESTAMP_TOLERANCE_MS) {
-    return minDiffMs;
-  }
-  return null;
+  // Window already includes tolerance (baked in by getCallTimestamps).
+  // Hard-reject anything outside the window to prevent 1h+ mismatches.
+  if (recMs < callStartMs || recMs > callEndMs) return null;
+  // Score = 0 (all matches within window are equally valid; extension penalty breaks ties)
+  return 0;
 }
 
 function findBestMatch(call, index, usedPaths) {
@@ -214,24 +222,42 @@ function findBestMatch(call, index, usedPaths) {
   const { phones, extensions } = getCallMatchKeys(call);
   if (!phones.length) return null;
 
-  let bestMatch = null;
-  let bestDiff = Infinity;
+  // Reconstruct the bare call window (without tolerance) for proximity scoring
+  const callDateValue = call.call_date_value || call.call_date;
+  let bareCallEndMs = 0;
+  if (callDateValue && call.call_time) {
+    const d = formatCallDateValue(callDateValue);
+    const time = String(call.call_time).split('.')[0];
+    const obj = new Date(`${d}T${time}`);
+    if (!Number.isNaN(obj.getTime())) bareCallEndMs = obj.getTime();
+  } else if (call.created_at) {
+    bareCallEndMs = new Date(call.created_at).getTime();
+  }
+  const durationMs = parseDurationToMs(call.duration);
+  const bareCallStartMs = bareCallEndMs - durationMs;
 
-  // Always include wildcard so forwarded/transferred calls match by phone+timestamp alone
-  const extensionKeys = extensions.length ? [...extensions, '*'] : ['*'];
+  let bestMatch = null;
+  let bestScore = Infinity;
+
   for (const phone of phones) {
-    for (const ext of extensionKeys) {
-      const candidates = index.get(indexKey(phone, ext)) || [];
+    const extensionKeys = extensions.length ? [...extensions, '*'] : ['*'];
+    const candidateSets = [
+      ...extensionKeys.map((ext, i) => ({ candidates: index.get(indexKey(phone, ext)) || [], penalty: i === 0 ? 0 : 1000 })),
+      { candidates: index.get(phoneOnlyKey(phone)) || [], penalty: 2000 }
+    ];
+
+    for (const { candidates, penalty } of candidateSets) {
       for (const rec of candidates) {
         if (usedPaths.has(rec.playbackPath)) continue;
 
-        const diff = timestampMatches(rec.timestampMs, times.callStartMs, times.callEndMs);
-        if (diff === null) continue;
+        const inWindow = timestampMatches(rec.timestampMs, times.callStartMs, times.callEndMs);
+        if (inWindow === null) continue;
 
-        const extensionPenalty = ext === '*' ? 1000 : 0;
-        const score = diff + extensionPenalty;
-        if (score < bestDiff) {
-          bestDiff = score;
+        // Use proximity to bare call start as tiebreaker (closer = better)
+        const proximity = Math.abs(rec.timestampMs - bareCallStartMs);
+        const score = proximity + penalty;
+        if (score < bestScore) {
+          bestScore = score;
           bestMatch = rec;
         }
       }
@@ -244,7 +270,7 @@ function findBestMatch(call, index, usedPaths) {
 async function loadStoredRecordingEntries() {
   const entries = [];
   const { rows } = await pool.query(`
-    SELECT original_filename, local_path, extension_number, customer_number, recording_date
+    SELECT original_filename, local_path, extension_number, customer_number, recording_date, extension_folder
     FROM pbx_recordings
     WHERE local_path IS NOT NULL AND local_path <> ''
     ORDER BY recording_date DESC NULLS LAST, id DESC
@@ -262,12 +288,17 @@ async function loadStoredRecordingEntries() {
     if (!fs.existsSync(row.local_path)) continue;
 
     const rel = path.relative(LOCAL_STORED_DIR, row.local_path).replace(/\\/g, '/');
+    // Recordings stored in the common mailbox folder (e.g. 221) cover ALL calls
+    // regardless of which extension answered — mark as shareable so multiple call
+    // log rows (390 row + forwarded extension row) can both link to the same file.
+    const isCommonMailbox = String(row.extension_folder || '').startsWith('221');
     entries.push({
       phone,
       extension,
       timestampMs,
       playbackPath: rel,
-      source: 'db'
+      source: 'db',
+      shareable: isCommonMailbox
     });
   }
 
@@ -333,6 +364,11 @@ async function linkRecordingsToCallLogs(recordingsDir) {
       };
     }
 
+    // Build set of shareable paths (common mailbox) — never block these
+    const shareablePaths = new Set(
+      allEntries.filter(e => e.shareable).map(e => e.playbackPath)
+    );
+
     const index = buildRecordingIndex(allEntries);
     const usedPaths = new Set();
 
@@ -348,8 +384,10 @@ async function linkRecordingsToCallLogs(recordingsDir) {
     `);
     for (const row of alreadyLinked.rows) {
       if (unlinkedIds.has(row.id)) continue; // will be re-evaluated
+      const p = String(row.recording_file).replace(/\\/g, '/');
+      if (shareablePaths.has(p)) continue; // common mailbox — always shareable
       if (resolveRecordingFullPath(row.recording_file, recordingsDir)) {
-        usedPaths.add(String(row.recording_file).replace(/\\/g, '/'));
+        usedPaths.add(p);
       }
     }
 
@@ -366,7 +404,9 @@ async function linkRecordingsToCallLogs(recordingsDir) {
           `UPDATE call_logs SET recording_file = $1 WHERE id = $2`,
           [bestMatch.playbackPath, call.id]
         );
-        usedPaths.add(bestMatch.playbackPath);
+        // Only mark as used if not from the common mailbox — common mailbox recordings
+        // can link to multiple rows (e.g. both the 390 row and the forwarded ext row)
+        if (!bestMatch.shareable) usedPaths.add(bestMatch.playbackPath);
         matchedCount++;
       }
 

@@ -282,6 +282,70 @@ async function ensureTable(retries = 3) {
       await pool.query(`CREATE INDEX IF NOT EXISTS idx_call_logs_call_type  ON call_logs (call_type)`).catch(() => { });
       await pool.query(`CREATE INDEX IF NOT EXISTS idx_call_logs_caller     ON call_logs (caller)`).catch(() => { });
       await pool.query(`CREATE INDEX IF NOT EXISTS idx_call_logs_created_at ON call_logs (created_at DESC)`).catch(() => { });
+
+      // ── Materialized view for fast paginated call log queries ─────────────
+      // Precomputes the expensive dedup CTE so page switches are a simple index seek.
+      await pool.query(`
+        CREATE MATERIALIZED VIEW IF NOT EXISTS call_logs_deduped AS
+        WITH base AS (
+          SELECT DISTINCT ON (
+            call_date::date,
+            COALESCE(trunk, ''),
+            regexp_replace(COALESCE(caller, ''), '[^0-9]', '', 'g'),
+            regexp_replace(COALESCE(destination, ''), '[^0-9]', '', 'g'),
+            COALESCE(call_time, TIME '00:00:00')
+          ) *
+          FROM call_logs
+          WHERE
+            NOT (destination ~ '^\\d{2}-\\d{2}-\\d{2,4}$')
+            AND NOT (
+              (destination IS NULL OR trim(destination) = '')
+              AND (duration IS NULL OR duration = '' OR duration = '00:00:00')
+            )
+            AND NOT (duration IS NULL OR duration = '' OR duration = '00:00:00')
+          ORDER BY
+            call_date::date,
+            COALESCE(trunk, ''),
+            regexp_replace(COALESCE(caller, ''), '[^0-9]', '', 'g'),
+            regexp_replace(COALESCE(destination, ''), '[^0-9]', '', 'g'),
+            COALESCE(call_time, TIME '00:00:00'),
+            created_at DESC,
+            id DESC
+        ),
+        ranked AS (
+          SELECT *,
+            ROW_NUMBER() OVER (
+              PARTITION BY
+                call_date::date,
+                COALESCE(trunk, ''),
+                regexp_replace(COALESCE(caller, ''), '[^0-9]', '', 'g'),
+                FLOOR(EXTRACT(EPOCH FROM COALESCE(call_time, TIME '00:00:00')) / 120)
+              ORDER BY
+                CASE WHEN duration ~ '^\\d{2}:\\d{2}:\\d{2}$'
+                  THEN EXTRACT(EPOCH FROM duration::interval) ELSE 0 END DESC,
+                id DESC
+            ) AS _rn
+          FROM base
+        )
+        SELECT * FROM ranked WHERE _rn = 1
+        WITH NO DATA
+      `).catch(() => { }); // ignore if already exists
+
+      // Unique index required for REFRESH CONCURRENTLY
+      await pool.query(`
+        CREATE UNIQUE INDEX IF NOT EXISTS idx_call_logs_deduped_id
+        ON call_logs_deduped (id)
+      `).catch(() => { });
+      // Indexes for fast ORDER BY and WHERE filters
+      await pool.query(`
+        CREATE INDEX IF NOT EXISTS idx_call_logs_deduped_sort
+        ON call_logs_deduped (call_date DESC NULLS LAST, call_time DESC NULLS LAST, created_at DESC, id DESC)
+      `).catch(() => { });
+      await pool.query(`CREATE INDEX IF NOT EXISTS idx_call_logs_deduped_type ON call_logs_deduped (call_type)`).catch(() => { });
+      await pool.query(`CREATE INDEX IF NOT EXISTS idx_call_logs_deduped_caller ON call_logs_deduped (caller)`).catch(() => { });
+
+      // Initial populate (non-concurrent since it may be empty)
+      await pool.query(`REFRESH MATERIALIZED VIEW call_logs_deduped`).catch(() => { });
       return; // Success
     } catch (err) {
       console.warn(`[SMDR] Table ensure attempt ${i + 1} failed: ${err.message}`);
@@ -578,17 +642,17 @@ async function saveCallLog(record) {
         const oldDest = recentCall.rows[0].destination;
         console.log(`[SMDR] Multi-hop dedupe: Updating call ${oldId} (was dest ${oldDest}) with new dest ${record.destination}`);
         
-        // Update the existing record with the final hop's details
+        // Update the existing record with the final hop's details.
+        // Keep original destination + extension (first answering ext) — recording is filed under that.
+        // Only update duration and call_time to reflect total call length.
         const updateResult = await pool.query(`
           UPDATE call_logs
-          SET call_time = $1, duration = $2, extension = $3, destination = $4, raw_line = $5, recording_file = COALESCE($6, recording_file)
-          WHERE id = $7
+          SET call_time = $1, duration = $2, raw_line = $3, recording_file = COALESCE($4, recording_file)
+          WHERE id = $5
           RETURNING *
         `, [
           record.call_time,
           record.duration,
-          cleanText(record.extension),
-          cleanText(record.destination),
           cleanRawLine,
           cleanNullableText(record.recording_file),
           oldId
@@ -598,6 +662,8 @@ async function saveCallLog(record) {
         lastSavedCallTime = new Date();
         // Emit event to update UI without duplicating Contact calls count
         emit('pbx:call', row);
+        pool.query('REFRESH MATERIALIZED VIEW CONCURRENTLY call_logs_deduped')
+          .catch(err => console.warn('[SMDR] mat view refresh failed:', err.message));
         return row;
       }
     }
@@ -649,6 +715,8 @@ async function saveCallLog(record) {
     }
 
     emit('pbx:call', row);
+    pool.query('REFRESH MATERIALIZED VIEW CONCURRENTLY call_logs_deduped')
+      .catch(err => console.warn('[SMDR] mat view refresh failed:', err.message));
     return row;
   } catch (err) {
     console.error('[SMDR] DB save error:', err.message);
