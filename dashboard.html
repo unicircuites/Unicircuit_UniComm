@@ -5719,7 +5719,7 @@
 
               <!-- Reply bar + Input -->
               <div
-                style="padding:10px 14px;border-top:1px solid var(--border);background:var(--card);display:flex;flex-direction:column;gap:6px;flex-shrink:0;">
+                style="padding:10px 14px;border-top:1px solid var(--border);background:var(--card);display:flex;flex-direction:column;gap:6px;flex-shrink:0;position:relative;">
                 <div id="wa-media-bar"
                   style="display:none;background:rgba(59,130,246,0.06);border-left:3px solid var(--blue2);padding:6px 10px;border-radius:4px;font-size:11.5px;color:var(--muted2);align-items:center;gap:8px;">
                   <i class="fas fa-file-alt" style="color:var(--blue2);font-size:11px;"></i>
@@ -5739,6 +5739,7 @@
                     style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:12px;"><i
                       class="fas fa-times"></i></button>
                 </div>
+                <div id="wa-mention-list" style="display:none;position:absolute;bottom:100%;left:0;right:0;background:var(--card);border:1px solid var(--border);border-radius:8px;max-height:200px;overflow-y:auto;z-index:60;box-shadow:0 -4px 16px rgba(0,0,0,0.3);margin-bottom:4px;"></div>
                 <div id="wa-compose-suggestions"
                   style="display:none;align-items:center;gap:6px;flex-wrap:wrap;padding:0 44px 2px 44px;"></div>
                 <div style="display:flex;gap:8px;align-items:flex-end;position:relative;">
@@ -23646,17 +23647,31 @@ ${plainText}`;
       // Message body — preserve newlines
       var bodyHtml = body.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\n/g, '<br>');
 
+      // WhatsApp text formatting
+      // Code block (``` ... ```) — must come before single backtick
+      bodyHtml = bodyHtml.replace(/```([\s\S]*?)```/g, '<pre style="background:rgba(255,255,255,0.06);border-radius:6px;padding:6px 10px;font-family:\'JetBrains Mono\',monospace;font-size:12px;white-space:pre-wrap;margin:4px 0;">$1</pre>');
+      // Inline monospace (`text`)
+      bodyHtml = bodyHtml.replace(/`([^`\n]+)`/g, '<code style="background:rgba(255,255,255,0.08);border-radius:4px;padding:1px 5px;font-family:\'JetBrains Mono\',monospace;font-size:12px;">$1</code>');
+      // Bold (*text*)
+      bodyHtml = bodyHtml.replace(/\*([^*\n]+)\*/g, '<strong>$1</strong>');
+      // Italic (_text_)
+      bodyHtml = bodyHtml.replace(/_([^_\n]+)_/g, '<em>$1</em>');
+      // Strikethrough (~text~)
+      bodyHtml = bodyHtml.replace(/~([^~\n]+)~/g, '<s>$1</s>');
+
       // Linkify URLs — cyan bold underline, opens in new tab
       bodyHtml = bodyHtml.replace(/(https?:\/\/[^\s<&"']{4,})/g,
         '<a href="$1" target="_blank" rel="noopener" style="color:#00e5ff;font-weight:700;text-decoration:underline;word-break:break-all;" onclick="event.stopPropagation()">$1</a>');
 
-      // Linkify phone numbers — 10-digit or +91 format, show "Chat with" popup on click
-      bodyHtml = bodyHtml.replace(/(\+?91[-\s]?)?(\b[6-9]\d{9}\b)/g, function(match) {
-        var digits = match.replace(/\D/g,'');
+      // Linkify phone numbers — 10-digit or +91 format (also @+91... mentions), show "Chat with" popup on click
+      bodyHtml = bodyHtml.replace(/(@)?(\+?91[-\s]?)?(\b[6-9]\d{9}\b)/g, function(match, atSign, prefix, num) {
+        var raw = (prefix || '') + num;
+        var digits = raw.replace(/\D/g,'');
         if (digits.length === 10) digits = '91' + digits;
         var jid = digits + '@s.whatsapp.net';
-        var safe = match.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
-        return '<span style="color:#00e5ff;font-weight:700;text-decoration:underline;cursor:pointer;" title="Chat with ' + safe + '" onclick="event.stopPropagation();waOpenPhonePopup(' + JSON.stringify(jid) + ',' + JSON.stringify(match.trim()) + ',event)">' + safe + '</span>';
+        var display = (atSign || '') + raw;
+        var safe = display.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+        return '<span style="color:#00e5ff;font-weight:700;text-decoration:underline;cursor:pointer;" title="Chat with ' + safe + '" onclick="event.stopPropagation();waOpenPhonePopup(' + JSON.stringify(jid) + ',' + JSON.stringify(raw.trim()) + ',event)">' + safe + '</span>';
       });
       // Robust Document Handling: Prevent duplicate filename display when no caption is present
       var showCaption = !!bodyHtml;
@@ -23837,7 +23852,14 @@ ${plainText}`;
     ];
 
     function waHandleComposerKey(event) {
-      if (event.key !== 'Enter' || event.isComposing) return;
+      if (event.key !== 'Enter' || event.isComposing) {
+        // Close mention list on Escape
+        if (event.key === 'Escape') { var ml = document.getElementById('wa-mention-list'); if (ml) ml.style.display = 'none'; }
+        return;
+      }
+      // Close mention list if open — let user pick first
+      var mentionListEl = document.getElementById('wa-mention-list');
+      if (mentionListEl && mentionListEl.style.display !== 'none') { mentionListEl.style.display = 'none'; return; }
       if (event.shiftKey) return;
       event.preventDefault();
       waSendMsg();
@@ -23852,10 +23874,64 @@ ${plainText}`;
         waComposerAiSuggestion = '';
         waComposerSuggestionText = '';
       }
+
+      // @ mention detection (only for group chats)
+      var isGroup = waActiveJid && waActiveJid.endsWith('@g.us');
+      var mentionList = document.getElementById('wa-mention-list');
+      if (isGroup && mentionList) {
+        var val = input.value || '';
+        var cursorPos = input.selectionStart || val.length;
+        var textBefore = val.slice(0, cursorPos);
+        var atMatch = textBefore.match(/@([^@\s]*)$/);
+        if (atMatch) {
+          var query = atMatch[1].toLowerCase();
+          var members = window._waGiAllParticipants || [];
+          var filtered = members.filter(function(p) {
+            var n = (p.name || p.phone || '').toLowerCase();
+            return !query || n.includes(query);
+          }).slice(0, 8);
+          if (filtered.length) {
+            mentionList.innerHTML = filtered.map(function(p, i) {
+              var display = p.name || p.phone || '';
+              var ph = p.phone || '';
+              return '<div data-mention-idx="' + i + '" onclick="waInsertMention(' + JSON.stringify(display) + ',' + JSON.stringify(ph) + ')" style="padding:8px 14px;cursor:pointer;display:flex;align-items:center;gap:10px;border-bottom:1px solid var(--border);font-size:13px;" onmouseover="this.style.background=\'var(--hover)\'" onmouseout="this.style.background=\'\'">'
+                + '<div style="width:28px;height:28px;border-radius:50%;background:rgba(37,211,102,0.15);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:#25D366;flex-shrink:0;">' + escHtml((display[0]||'?').toUpperCase()) + '</div>'
+                + '<div><div style="font-weight:600;color:var(--text);">' + escHtml(display) + '</div>' + (ph ? '<div style="font-size:11px;color:var(--muted);">' + escHtml(ph) + '</div>' : '') + '</div>'
+                + '</div>';
+            }).join('');
+            mentionList.style.display = 'block';
+          } else {
+            mentionList.style.display = 'none';
+          }
+        } else {
+          mentionList.style.display = 'none';
+        }
+      } else if (mentionList) {
+        mentionList.style.display = 'none';
+      }
+
       clearTimeout(waComposerSuggestTimer);
       waComposerSuggestTimer = setTimeout(waUpdateComposerSuggestions, 120);
       clearTimeout(waComposerAiTimer);
       waComposerAiTimer = setTimeout(waRequestComposerAiSuggestion, 1200);
+    }
+
+    function waInsertMention(name, phone) {
+      var input = document.getElementById('wa-msg-input');
+      if (!input) return;
+      var val = input.value || '';
+      var cursorPos = input.selectionStart || val.length;
+      var textBefore = val.slice(0, cursorPos);
+      // Replace the @query with @name
+      var replaced = textBefore.replace(/@([^@\s]*)$/, '@' + name + ' ');
+      input.value = replaced + val.slice(cursorPos);
+      var pos = replaced.length;
+      input.selectionStart = pos;
+      input.selectionEnd = pos;
+      input.focus();
+      var mentionList = document.getElementById('wa-mention-list');
+      if (mentionList) mentionList.style.display = 'none';
+      waComposerInput();
     }
 
     function waInsertAtCursor(el, text) {
