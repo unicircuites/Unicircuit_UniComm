@@ -520,6 +520,20 @@ router.get('/chats', authenticate, async (req, res) => {
       }
     }
 
+    // Enrich chats with labels
+    try {
+      const labelRes = await pool.query(`
+        SELECT a.chat_id, json_agg(json_build_object('id', l.id, 'name', l.name, 'color', l.color)) AS labels
+        FROM wa_label_associations a
+        JOIN wa_labels l ON l.id = a.label_id AND l.account_phone = a.account_phone
+        WHERE a.account_phone = $1
+        GROUP BY a.chat_id
+      `, [accountPhone]);
+      const labelMap = {};
+      for (const row of labelRes.rows) labelMap[row.chat_id] = row.labels;
+      for (const row of result.rows) row.labels = labelMap[row.id] || [];
+    } catch (_) {}
+
     res.json(canonicalizeChats(result.rows));
 
     // Background: fetch group subjects from WA for groups still with null name, patch DB
@@ -646,6 +660,25 @@ router.post('/sync', authenticate, async (req, res) => {
     const resync = await wa.resyncDirectoryFromSocket({ groupLimit: 100 }).catch(err => ({ error: err.message }));
     const metadata = await wa.refreshCurrentAccountGroupMetadata(100).catch(err => ({ error: err.message }));
     wa.startLidResolutionWorker();
+
+    // Backfill: upsert sender_name from messages into wa_contacts.notify where no name saved yet
+    pool.query(`
+      INSERT INTO wa_contacts (jid, account_phone, notify)
+      SELECT DISTINCT ON (m.chat_id)
+        m.chat_id AS jid, m.account_phone, m.sender_name AS notify
+      FROM wa_messages m
+      WHERE m.account_phone = $1
+        AND m.from_me = false
+        AND m.chat_id NOT LIKE '%@g.us'
+        AND m.sender_name IS NOT NULL AND m.sender_name != '' AND m.sender_name != 'Unknown'
+        AND m.sender_name !~ '^[+0-9 ()-]+$'
+      ORDER BY m.chat_id, m.timestamp DESC
+      ON CONFLICT (jid, account_phone) DO UPDATE SET
+        notify = EXCLUDED.notify,
+        updated_at = NOW()
+      WHERE (wa_contacts.name IS NULL OR wa_contacts.name = '')
+        AND (wa_contacts.notify IS NULL OR wa_contacts.notify = '')
+    `, [accountPhone]).catch(() => {});
     const stats = await pool.query(`
       SELECT
         COUNT(*) FILTER (WHERE is_group) AS groups,
@@ -935,7 +968,7 @@ router.get('/messages/:jid', authenticate, async (req, res) => {
     // Fire-and-forget: mark messages read after responding — don't block the response
     Promise.all([
       pool.query(`UPDATE wa_messages SET is_read=true WHERE chat_id=$1 AND account_phone=$2 AND from_me=false AND is_read=false`, [jid, accountPhone]),
-      pool.query(`UPDATE wa_chats SET unread=0 WHERE id=$1 AND account_phone=$2 AND unread>0`, [jid, accountPhone]),
+      wa.markChatRead(jid),
     ]).catch(() => {});
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
@@ -1397,6 +1430,91 @@ router.get('/contacts/search', authenticate, async (req, res) => {
       isGroup: r.is_group,
     })));
   } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// Mark chat read — POST /api/wa/chats/:jid/read
+router.post('/chats/:jid/read', authenticate, async (req, res) => {
+  const accountPhone = connectedAccount(res);
+  if (!accountPhone) return;
+  const jid = decodeURIComponent(req.params.jid);
+  try {
+    await wa.markChatRead(jid);
+    res.json({ ok: true });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// Mark chat unread — POST /api/wa/chats/:jid/unread
+router.post('/chats/:jid/unread', authenticate, async (req, res) => {
+  const accountPhone = connectedAccount(res);
+  if (!accountPhone) return;
+  const jid = decodeURIComponent(req.params.jid);
+  try {
+    await wa.markChatUnread(jid);
+    res.json({ ok: true });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// Get all labels — GET /api/wa/labels
+router.get('/labels', authenticate, async (req, res) => {
+  const accountPhone = connectedAccount(res);
+  if (!accountPhone) return;
+  try {
+    const labels = await pool.query(
+      `SELECT l.id, l.name, l.color,
+         COALESCE(json_agg(a.chat_id) FILTER (WHERE a.chat_id IS NOT NULL), '[]') AS chats
+       FROM wa_labels l
+       LEFT JOIN wa_label_associations a ON a.label_id=l.id AND a.account_phone=l.account_phone
+       WHERE l.account_phone=$1
+       GROUP BY l.id, l.name, l.color`, [accountPhone]);
+    res.json(labels.rows);
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// Add label to chat — POST /api/wa/chats/:jid/labels/:labelId
+router.post('/chats/:jid/labels/:labelId', authenticate, async (req, res) => {
+  const accountPhone = connectedAccount(res);
+  if (!accountPhone) return;
+  const jid = decodeURIComponent(req.params.jid);
+  const { labelId } = req.params;
+  try {
+    await wa.addChatLabel(jid, labelId);
+    await pool.query(`INSERT INTO wa_label_associations (label_id,account_phone,chat_id) VALUES ($1,$2,$3) ON CONFLICT DO NOTHING`,
+      [labelId, accountPhone, jid]);
+    res.json({ ok: true });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// Remove label from chat — DELETE /api/wa/chats/:jid/labels/:labelId
+router.delete('/chats/:jid/labels/:labelId', authenticate, async (req, res) => {
+  const accountPhone = connectedAccount(res);
+  if (!accountPhone) return;
+  const jid = decodeURIComponent(req.params.jid);
+  const { labelId } = req.params;
+  try {
+    await wa.removeChatLabel(jid, labelId);
+    await pool.query(`DELETE FROM wa_label_associations WHERE label_id=$1 AND account_phone=$2 AND chat_id=$3`,
+      [labelId, accountPhone, jid]);
+    res.json({ ok: true });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// Update WA contact name — PUT /api/wa/contacts/:jid
+router.put('/contacts/:jid', authenticate, async (req, res) => {
+  const accountPhone = connectedAccount(res);
+  if (!accountPhone) return;
+  const jid = decodeURIComponent(req.params.jid);
+  const name = String(req.body.name || '').trim();
+  if (!name) return res.status(400).json({ error: 'name required' });
+  try {
+    await pool.query(`
+      INSERT INTO wa_contacts (jid, account_phone, name)
+      VALUES ($1, $2, $3)
+      ON CONFLICT (jid, account_phone) DO UPDATE SET name = $3, updated_at = NOW()
+    `, [jid, accountPhone, name]);
+    // Also update wa_chats display name
+    await pool.query(`UPDATE wa_chats SET name=$1 WHERE id=$2 AND account_phone=$3`, [name, jid, accountPhone]);
+    res.json({ ok: true });
+  } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 module.exports = router;

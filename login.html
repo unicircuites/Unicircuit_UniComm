@@ -39,8 +39,8 @@ html.light {
   --text:   #1a2035;
   --muted:  #7a8aaa;
   --muted2: #5a6a8a;
-  --gold:   #d4880a;
-  --gold2:  #e8a020;
+  --gold:   #2563eb;
+  --gold2:  #3b82f6;
   --blue:   #2563eb;
   --green:  #059669;
   --green2: #047857;
@@ -135,13 +135,13 @@ html.light .theme-toggle{box-shadow:0 2px 10px rgba(0,0,0,0.1);}
   flex-shrink:0;
 }
 .brand-icon i{color:#fff;font-size:18px;}
-.brand-text .name{font-size:20px;font-weight:800;color:#fff;letter-spacing:-0.4px;}
+.brand-text .name{font-size:20px;font-weight:800;color:var(--text);letter-spacing:-0.4px;}
 .brand-text .name span{color:var(--gold);}
 .brand-text .sub{font-size:10.5px;color:var(--muted);margin-top:2px;letter-spacing:0.3px;}
 
 /* ── HEADING ── */
 .login-heading{margin-bottom:24px;}
-.login-heading h1{font-size:22px;font-weight:800;color:#fff;letter-spacing:-0.4px;}
+.login-heading h1{font-size:22px;font-weight:800;color:var(--text);letter-spacing:-0.4px;}
 .login-heading p{font-size:13px;color:var(--muted);margin-top:4px;}
 
 /* ── FORM ── */
@@ -351,13 +351,7 @@ html.light .theme-toggle{box-shadow:0 2px 10px rgba(0,0,0,0.1);}
 
     </form>
 
-    <!-- ADMIN ACCESS -->
-    <div class="demo-box">
-      <div class="demo-title"><i class="fas fa-lock" style="margin-right:4px;"></i>Quick Access</div>
-      <button class="use-demo" onclick="fillDemo()">
-        <i class="fas fa-bolt"></i> Sign in as Admin
-      </button>
-    </div>
+
 
   </div>
 

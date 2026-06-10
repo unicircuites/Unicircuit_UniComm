@@ -710,6 +710,26 @@ async function ensureTables(retries = 3) {
         ON wa_contacts (account_phone, jid)
       `).catch(() => {});
 
+      // Labels
+      await pool.query(`
+        CREATE TABLE IF NOT EXISTS wa_labels (
+          id           VARCHAR(50),
+          account_phone VARCHAR(50),
+          name         VARCHAR(100),
+          color        INT DEFAULT 0,
+          created_at   TIMESTAMPTZ DEFAULT NOW(),
+          PRIMARY KEY (id, account_phone)
+        )
+      `);
+      await pool.query(`
+        CREATE TABLE IF NOT EXISTS wa_label_associations (
+          label_id     VARCHAR(50),
+          account_phone VARCHAR(50),
+          chat_id      VARCHAR(100),
+          PRIMARY KEY (label_id, account_phone, chat_id)
+        )
+      `);
+
       return; // Success
     } catch (err) {
       console.warn(`[WA] Table ensure attempt ${i + 1} failed: ${err.message}`);
@@ -992,6 +1012,20 @@ async function saveMessage(msg) {
       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)
       ON CONFLICT (id, chat_id, account_phone) DO NOTHING
     `, [id, jid, accPhone, fromMe, senderJid, senderName, body, type, ts, fromMe, quotedBody, replyInfo.isReply, replyInfo.replyToMsgId, mediaPath]);
+
+    // Persist pushName as notify so chat list reflects the sender's current WA profile name
+    if (!fromMe && !jid.endsWith('@g.us') && msg.pushName && !isInvalidContactLabel(msg.pushName) && !isPhoneLikeLabel(msg.pushName, '')) {
+      const contactJid = senderJid || jid;
+      contactsStore[contactJid] = { ...(contactsStore[contactJid] || {}), notify: msg.pushName };
+      pool.query(`
+        INSERT INTO wa_contacts (jid, account_phone, notify)
+        VALUES ($1, $2, $3)
+        ON CONFLICT (jid, account_phone) DO UPDATE SET
+          notify = EXCLUDED.notify,
+          updated_at = NOW()
+        WHERE (wa_contacts.name IS NULL OR wa_contacts.name = '')
+      `, [contactJid, accPhone, msg.pushName]).catch(() => {});
+    }
 
     return { id, jid, fromMe, sender: senderJid, senderName, body, type, ts, quotedBody, isReply: replyInfo.isReply, replyToMsgId: replyInfo.replyToMsgId, mediaPath };
   } catch (err) {
@@ -1573,7 +1607,60 @@ async function startWA(options = {}) {
     });
   });
 
+  // ── CHAT READ/UNREAD SYNC FROM MOBILE ───────────────────────────────────────────────
+  // Fires when the user reads or marks-unread a chat on their phone.
+  sock.ev.on('chats.update', (updates) => {
+    const accPhone = phoneNumber;
+    if (!accPhone) return;
+    for (const update of updates) {
+      if (!update?.id || isNonChatJid(update.id)) continue;
+      const jid = normalizeRawJid(update.id);
+      // unreadCount is set (0 = read, >0 = unread count, -1 = mark-unread sentinel in some Baileys versions)
+      if (update.unreadCount !== undefined && update.unreadCount !== null) {
+        const rawUnread = Number(update.unreadCount);
+        const newUnread = rawUnread === -1 ? 1 : Math.max(0, rawUnread || 0);
+        pool.query(
+          `UPDATE wa_chats SET unread=$1 WHERE id=$2 AND account_phone=$3`,
+          [newUnread, jid, accPhone]
+        ).catch(() => {});
+        // Update in-memory liveChatsStore if present
+        const lc = liveChatsStore.get(jid);
+        if (lc) { lc.unread = newUnread; liveChatsStore.set(jid, lc); }
+        emit('wa:chat_unread_update', { jid, unread: newUnread });
+      }
+    }
+  });
+
   // ── REAL-TIME MESSAGES ───────────────────────────────────────────────────────────────
+  // ── LABEL SYNC FROM MOBILE ────────────────────────────────────────────────
+  sock.ev.on('labels.edit', (label) => {
+    const accPhone = phoneNumber;
+    if (!accPhone || !label?.id) return;
+    pool.query(`
+      INSERT INTO wa_labels (id, account_phone, name, color)
+      VALUES ($1,$2,$3,$4)
+      ON CONFLICT (id, account_phone) DO UPDATE SET name=$3, color=$4
+    `, [label.id, accPhone, label.name || '', label.color ?? 0]).catch(() => {});
+    emit('wa:labels_updated', { type: 'edit', label: { id: label.id, name: label.name, color: label.color } });
+  });
+
+  sock.ev.on('labels.association', ({ association, type }) => {
+    const accPhone = phoneNumber;
+    if (!accPhone || !association?.labelId || !association?.chatId) return;
+    const chatId = normalizeRawJid(association.chatId);
+    if (type === 'add') {
+      pool.query(`
+        INSERT INTO wa_label_associations (label_id, account_phone, chat_id)
+        VALUES ($1,$2,$3) ON CONFLICT DO NOTHING
+      `, [association.labelId, accPhone, chatId]).catch(() => {});
+    } else {
+      pool.query(`
+        DELETE FROM wa_label_associations WHERE label_id=$1 AND account_phone=$2 AND chat_id=$3
+      `, [association.labelId, accPhone, chatId]).catch(() => {});
+    }
+    emit('wa:labels_updated', { type: 'association', association: { ...association, chatId }, action: type });
+  });
+
   sock.ev.on('messages.upsert', async ({ messages, type }) => {
     for (const msg of messages) {
       // Cache for media download
@@ -1616,7 +1703,7 @@ async function startWA(options = {}) {
 
       await saveChat(jid, chatName, saved.body, saved.ts, msg.key.fromMe ? 0 : 1, isGroup);
 
-      if (type === 'notify' && isRealMessage(msg)) {
+      if (type === 'notify' && isRealMessage(msg) && !msg.key.fromMe) {
         console.log(`[WA] Emitting message to UI: ${saved.id}`);
         let quotedBody = '';
         let isReply = false;
@@ -3404,6 +3491,74 @@ async function getProfilePicUrl(jid, accPhone) {
   }
 }
 
-module.exports = { startWA, sendMessage, sendMediaMessage, logout, getStatus, getQR, requestQR, requestPhonePairingCode, setIO, getGroupMetadata, getGroupSubjectFromCache, refreshCurrentAccountGroupMetadata, resyncDirectoryFromSocket, processLidResolutionBatch, startLidResolutionWorker, stopLidResolutionWorker, downloadMedia, msgCache, importExportedChat, getConnectedPhone, getLiveChats, getLiveMessages, isLidResolutionExhausted, getLidResolutionCooldownMins, updateGroupName, flushCachedMediaToDisk, getProfilePicUrl };
+// ── MARK CHAT READ / UNREAD ───────────────────────────────────────────────────────────
+async function markChatRead(jid) {
+  if (!sock || !isConnected) throw new Error('WhatsApp not connected');
+  const accPhone = phoneNumber;
+  // Get last message key for chatModify
+  let lastMsg = null;
+  if (accPhone) {
+    try {
+      const row = await pool.query(
+        `SELECT id, from_me, sender, timestamp FROM wa_messages
+         WHERE chat_id=$1 AND account_phone=$2
+         ORDER BY timestamp DESC LIMIT 1`,
+        [jid, accPhone]
+      );
+      if (row.rows[0]) {
+        const r = row.rows[0];
+        lastMsg = { key: { remoteJid: jid, fromMe: r.from_me, id: r.id, ...(r.sender ? { participant: r.sender } : {}) }, messageTimestamp: Math.floor(new Date(r.timestamp).getTime() / 1000) };
+      }
+    } catch (_) {}
+  }
+  if (lastMsg) {
+    await sock.chatModify({ markRead: true, lastMessages: [lastMsg] }, jid).catch(() => {});
+  }
+  // Update DB
+  if (accPhone) {
+    await pool.query(`UPDATE wa_chats SET unread=0 WHERE id=$1 AND account_phone=$2`, [jid, accPhone]).catch(() => {});
+    emit('wa:chat_unread_update', { jid, unread: 0 });
+  }
+}
+
+async function markChatUnread(jid) {
+  if (!sock || !isConnected) throw new Error('WhatsApp not connected');
+  const accPhone = phoneNumber;
+  let lastMsg = null;
+  if (accPhone) {
+    try {
+      const row = await pool.query(
+        `SELECT id, from_me, sender, timestamp FROM wa_messages
+         WHERE chat_id=$1 AND account_phone=$2
+         ORDER BY timestamp DESC LIMIT 1`,
+        [jid, accPhone]
+      );
+      if (row.rows[0]) {
+        const r = row.rows[0];
+        lastMsg = { key: { remoteJid: jid, fromMe: r.from_me, id: r.id, ...(r.sender ? { participant: r.sender } : {}) }, messageTimestamp: Math.floor(new Date(r.timestamp).getTime() / 1000) };
+      }
+    } catch (_) {}
+  }
+  if (lastMsg) {
+    await sock.chatModify({ markRead: false, lastMessages: [lastMsg] }, jid).catch(() => {});
+  }
+  if (accPhone) {
+    await pool.query(`UPDATE wa_chats SET unread=GREATEST(unread,1) WHERE id=$1 AND account_phone=$2`, [jid, accPhone]).catch(() => {});
+    emit('wa:chat_unread_update', { jid, unread: 1 });
+  }
+}
+
+// ── LABELS ───────────────────────────────────────────────────────────────────────────
+async function addChatLabel(jid, labelId) {
+  if (!sock || !isConnected) throw new Error('WhatsApp not connected');
+  await sock.addChatLabel(jid, labelId);
+}
+
+async function removeChatLabel(jid, labelId) {
+  if (!sock || !isConnected) throw new Error('WhatsApp not connected');
+  await sock.removeChatLabel(jid, labelId);
+}
+
+module.exports = { startWA, sendMessage, sendMediaMessage, logout, getStatus, getQR, requestQR, requestPhonePairingCode, setIO, getGroupMetadata, getGroupSubjectFromCache, refreshCurrentAccountGroupMetadata, resyncDirectoryFromSocket, processLidResolutionBatch, startLidResolutionWorker, stopLidResolutionWorker, downloadMedia, msgCache, importExportedChat, getConnectedPhone, getLiveChats, getLiveMessages, isLidResolutionExhausted, getLidResolutionCooldownMins, updateGroupName, flushCachedMediaToDisk, getProfilePicUrl, markChatRead, markChatUnread, addChatLabel, removeChatLabel, emitEvent: emit };
 
 

@@ -5707,6 +5707,8 @@
                 <div style="display:flex;gap:6px;align-items:center;flex-shrink:0;">
                   <button class="btn btn-ghost btn-xs" id="wa-members-btn" onclick="waToggleGroupInfo()"
                     style="display:none;"><i class="fas fa-info-circle"></i> Group Info</button>
+                  <button class="btn btn-ghost btn-xs" id="wa-add-contact-btn" onclick="waAddEditContact()"
+                    style="display:none;"><i class="fas fa-user-plus"></i> <span id="wa-add-contact-label">Add Contact</span></button>
                   <button class="btn btn-ghost btn-xs" onclick="aiWADraft()"><i class="fas fa-robot"></i> AI
                     Reply</button>
                 </div>
@@ -9495,7 +9497,13 @@ Always write in a professional yet warm Indian B2B communication style. Use form
       }
       const c = waAllChats.find(x => x.id === jid);
       const name = c ? (c.name || c.phone || jid.split('@')[0]) : jid.split('@')[0];
-      const phone = (c && c.phone) ? c.phone : '';
+      let phone = (c && c.phone) ? c.phone : '';
+      // LID contact: resolve phone from waLidMap if not in waAllChats
+      if (!phone && jid.endsWith('@lid')) {
+        var lidNum = jid.split('@')[0];
+        var lidEntry = waLidMap[lidNum];
+        if (lidEntry && lidEntry.phone) phone = lidEntry.phone;
+      }
       const last = c && c.last_message ? String(c.last_message).slice(0, 160) : '—';
       const isGroup = jid.endsWith('@g.us');
 
@@ -9517,7 +9525,7 @@ Always write in a professional yet warm Indian B2B communication style. Use form
       ${isGroup ? `<div id="wa-group-members-section" style="padding:12px 20px;border-bottom:1px solid var(--border);"><div style="font-size:11px;color:var(--muted);"><span class="spin-loader" style="width:12px;height:12px;"></span> Loading members…</div></div>` : ''}
       <div style="padding:14px 20px;">
         <button type="button" class="btn btn-green btn-sm" onclick='openWhatsAppChatFromContacts(${JSON.stringify(jid)}, ${JSON.stringify(name)}, ${JSON.stringify(phone)})'><i class="fab fa-whatsapp"></i> Open in WhatsApp module</button>
-        ${!isGroup && phone ? `<button type="button" class="btn btn-gold btn-sm" style="margin-left:6px;" onclick="openQuickSaveModal('', null, ${jsArg(name !== phone ? name : '')}, '', '', ${jsArg(phone)})"><i class="fas fa-user-plus"></i> Save Contact</button>` : ''}
+        ${!isGroup ? `<button type="button" class="btn btn-gold btn-sm" style="margin-left:6px;" onclick="waAddEditContactForJid(${jsArg(jid)}, ${jsArg(name !== phone ? name : '')}, ${jsArg(phone)})"><i class="fas fa-user-plus"></i> Save Contact</button>` : ''}
       </div>
     </div>`;
 
@@ -22202,6 +22210,17 @@ ${plainText}`;
         }
 
         if (waIsActiveSocketChat(cleanJid, msg)) {
+          // Remove matching temp bubble for own messages to prevent duplicate
+          if (msg.fromMe || msg.from_me) {
+            var area = document.getElementById('wa-chat-area');
+            if (area) {
+              var tempBubbles = area.querySelectorAll('[id^="msg-temp-"]');
+              var msgBody = (msg.body || '').trim();
+              tempBubbles.forEach(function(el) {
+                if ((el.dataset.replyBody || '').trim() === msgBody) el.remove();
+              });
+            }
+          }
           waAppendMessage(msg);
           var area = document.getElementById('wa-chat-area');
           if (area) area.scrollTop = area.scrollHeight;
@@ -22215,6 +22234,19 @@ ${plainText}`;
         }
       });
       waSocket.on('wa:chats_updated', () => { waLoadChats(); });
+      waSocket.on('wa:chat_unread_update', function (data) {
+        var jid = waNormalizeJid(data && data.jid);
+        if (!jid) return;
+        var unread = typeof data.unread === 'number' ? data.unread : 0;
+        var chat = waAllChats.find(function (c) { return waNormalizeJid(c.id) === jid; });
+        if (chat) {
+          chat.unread = unread;
+          waPatchChatRow(chat);
+        }
+      });
+      waSocket.on('wa:labels_updated', function () {
+        waLoadChats();
+      });
       waSocket.on('wa:history_sync_progress', (data) => {
         waStopStatusTicker();
         let chunkStatus = data.chunksTotal ? `[Chunk ${data.chunksProcessed || 0} / ${data.chunksTotal}] ` : '';
@@ -22947,6 +22979,33 @@ ${plainText}`;
       }
     }
 
+    function waLabelColor(label) {
+      var palette = [
+        '#8b8b8b', '#e91e63', '#9c27b0', '#673ab7', '#3f51b5',
+        '#2196f3', '#00bcd4', '#009688', '#4caf50', '#8bc34a',
+        '#cddc39', '#ffc107', '#ff9800', '#ff5722', '#795548',
+        '#607d8b', '#f06292', '#ba68c8', '#4dd0e1', '#81c784'
+      ];
+      var raw = label && label.color;
+      if (typeof raw === 'string' && /^#([0-9a-f]{3}|[0-9a-f]{6})$/i.test(raw)) return raw;
+      var idx = Number(raw);
+      return palette[Number.isFinite(idx) && idx >= 0 ? idx % palette.length : 0];
+    }
+
+    function waRenderChatLabels(chat) {
+      var labels = Array.isArray(chat && chat.labels) ? chat.labels.filter(function (label) {
+        return label && String(label.name || '').trim();
+      }) : [];
+      if (!labels.length) return '';
+      return '<div data-wa-labels style="display:flex;flex-wrap:wrap;gap:4px;margin-top:5px;max-height:38px;overflow:hidden;">' +
+        labels.slice(0, 3).map(function (label) {
+          var color = waLabelColor(label);
+          return '<span title="' + escAttr(label.name || '') + '" style="display:inline-flex;align-items:center;max-width:112px;padding:1px 6px;border-radius:999px;background:' + color + '22;border:1px solid ' + color + '66;color:' + color + ';font-size:9.5px;font-weight:700;line-height:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + escHtml(label.name || '') + '</span>';
+        }).join('') +
+        (labels.length > 3 ? '<span style="font-size:9.5px;color:var(--muted);line-height:16px;">+' + (labels.length - 3) + '</span>' : '') +
+        '</div>';
+    }
+
     function waRenderChats(chats) {
       var el = document.getElementById('wa-convo-list');
       if (!el) return;
@@ -23058,6 +23117,7 @@ ${plainText}`;
           }
         }
         var unread = c.unread > 0 ? '<span data-wa-unread style="min-width:18px;height:18px;border-radius:9px;background:#25D366;color:#fff;font-size:10px;font-weight:700;display:flex;align-items:center;justify-content:center;padding:0 4px;">' + c.unread + '</span>' : '<span data-wa-unread style="display:none;min-width:18px;height:18px;border-radius:9px;background:#25D366;color:#fff;font-size:10px;font-weight:700;align-items:center;justify-content:center;padding:0 4px;"></span>';
+        var labelChips = waRenderChatLabels(c);
         var isActive = waActiveJid === c.id;
         var bg = isActive ? 'background:rgba(37,211,102,0.06);border-left:3px solid #25D366;' : '';
         // Last message preview — WhatsApp style: "~ SenderName: message" for groups
@@ -23065,16 +23125,16 @@ ${plainText}`;
         var lastMsgDisplay = lastMsg;
         // Truncate
         if (lastMsgDisplay.length > 45) lastMsgDisplay = lastMsgDisplay.substring(0, 45) + '...';
-        return '<div data-wa-jid="' + escHtml(c.id) + '" onclick="waOpenChat(\'' + c.id + '\',\'' + name.replace(/'/g, "\\'") + '\',\'' + (c.phone || '') + '\')" ' +
+        return '<div data-wa-jid="' + escAttr(c.id) + '" data-wa-name="' + escAttr(name) + '" data-wa-phone="' + escAttr(c.phone || '') + '" onclick="waOpenChat(this.dataset.waJid,this.dataset.waName,this.dataset.waPhone)" ' +
           'style="padding:10px 14px;border-bottom:1px solid var(--border);cursor:pointer;display:flex;gap:10px;align-items:center;' + bg + '" ' +
           'onmouseover="if(this.style.borderLeft!==\'3px solid rgb(37, 211, 102)\')this.style.background=\'rgba(255,255,255,0.03)\'" ' +
           'onmouseout="if(this.style.borderLeft!==\'3px solid rgb(37, 211, 102)\')this.style.background=\'\'">' +
-          '<div style="width:40px;height:40px;border-radius:50%;background:rgba(37,211,102,0.15);display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:700;color:#25D366;flex-shrink:0;overflow:hidden;" data-wa-avatar-jid="' + escHtml(c.id) + '">' +
-          (c.profile_pic_url ? '<img src="' + escHtml(c.profile_pic_url) + '" style="width:100%;height:100%;object-fit:cover;border-radius:50%;" onerror="this.parentNode.innerHTML=\'' + initials + '\';this.parentNode.style.fontSize=\'14px\'" />' : initials) +
+          '<div style="width:40px;height:40px;border-radius:50%;background:rgba(37,211,102,0.15);display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:700;color:#25D366;flex-shrink:0;overflow:hidden;" data-wa-avatar-jid="' + escAttr(c.id) + '">' +
+          (c.profile_pic_url ? '<img src="' + escAttr(c.profile_pic_url) + '" style="width:100%;height:100%;object-fit:cover;border-radius:50%;" onerror="this.parentNode.innerHTML=\'' + escAttr(initials) + '\';this.parentNode.style.fontSize=\'14px\'" />' : escHtml(initials)) +
           '</div>' +
           '<div style="flex:1;min-width:0;">' +
           '<div style="display:flex;justify-content:space-between;align-items:center;gap:4px;">' +
-          '<span data-wa-name style="font-size:13px;font-weight:' + (c.unread ? '700' : '500') + ';color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:150px;">' + name + '</span>' +
+          '<span data-wa-name style="font-size:13px;font-weight:' + (c.unread ? '700' : '500') + ';color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:150px;">' + escHtml(name) + '</span>' +
           (grpBadge ? grpBadge : '') +
           '<span data-wa-time style="font-size:10.5px;color:var(--muted);flex-shrink:0;">' + time + '</span>' +
           '</div>' +
@@ -23082,6 +23142,7 @@ ${plainText}`;
           '<span data-wa-preview style="font-size:11.5px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:170px;">' + escHtml(lastMsgDisplay) + '</span>' +
           unread +
           '</div>' +
+          labelChips +
           '</div></div>';
       }).join('');
       if (!el.innerHTML.trim()) {
@@ -23163,7 +23224,19 @@ ${plainText}`;
           if (nameEl) nameEl.style.fontWeight = '700';
         } else {
           unreadEl.style.display = 'none';
+          var readNameEl = row.querySelector('[data-wa-name]');
+          if (readNameEl) readNameEl.style.fontWeight = '500';
         }
+      }
+
+      var labelsEl = row.querySelector('[data-wa-labels]');
+      var labelsHtml = waRenderChatLabels(chat);
+      if (labelsEl) {
+        if (labelsHtml) labelsEl.outerHTML = labelsHtml;
+        else labelsEl.remove();
+      } else if (labelsHtml) {
+        var inner = row.querySelector('[style*="flex:1"]');
+        if (inner) inner.insertAdjacentHTML('beforeend', labelsHtml);
       }
 
       // Update total unread badge in header
@@ -23300,6 +23373,19 @@ ${plainText}`;
       // Group Info button
       var membersBtn = document.getElementById('wa-members-btn');
       if (membersBtn) membersBtn.style.display = isGroup ? 'inline-flex' : 'none';
+
+      // Add/Edit Contact button (only for 1-on-1 chats)
+      var addContactBtn = document.getElementById('wa-add-contact-btn');
+      var addContactLabel = document.getElementById('wa-add-contact-label');
+      if (addContactBtn && !isGroup) {
+        // Check if a CRM contact already exists for this phone
+        var chatPhone = phone || (jid.endsWith('@s.whatsapp.net') ? '+' + jid.split('@')[0] : '');
+        var existsInCrm = chatPhone && window._crmContactsByPhone && window._crmContactsByPhone[chatPhone.replace(/\D/g,'')];
+        if (addContactLabel) addContactLabel.textContent = existsInCrm ? 'Edit Contact' : 'Add Contact';
+        addContactBtn.style.display = 'inline-flex';
+      } else if (addContactBtn) {
+        addContactBtn.style.display = 'none';
+      }
 
       // Close group info panel if switching to non-group
       if (!isGroup) {
@@ -23469,10 +23555,11 @@ ${plainText}`;
     function waAppendMessage(msg, prepend, targetArea) {
       var area = targetArea || document.getElementById('wa-chat-area');
       if (!area) return;
-      // Normalize to milliseconds: handles Date objects, epoch-seconds (< 1e12), or ms
+      // Normalize to milliseconds: handles Date objects, ISO strings, epoch-seconds (< 1e12), or ms
       function toMs(v) {
         if (!v) return null;
         if (v instanceof Date) return v.getTime();
+        if (typeof v === 'string') { var d = new Date(v); return isNaN(d) ? null : d.getTime(); }
         var n = Number(v);
         return isNaN(n) ? null : (n < 1e12 ? n * 1000 : n);
       }
@@ -24155,6 +24242,103 @@ ${plainText}`;
       }
     }
 
+    function waAddEditContactForJid(jid, currentName, phone) {
+      waShowContactForm(jid, currentName, phone);
+    }
+
+    function waAddEditContact() {
+      if (!waActiveJid || waActiveJid.endsWith('@g.us')) return;
+      var chat = waAllChats.find(function(c) { return c.id === waActiveJid; });
+      var currentName = (chat && chat.name && !/^\d/.test(chat.name)) ? chat.name : '';
+      var phone = (chat && chat.phone) ? chat.phone : '';
+      if (!phone && waActiveJid.endsWith('@lid')) {
+        var le = waLidMap[waActiveJid.split('@')[0]];
+        if (le) { phone = le.phone || ''; if (!currentName) currentName = le.name || ''; }
+      }
+      if (!phone && waActiveJid.endsWith('@s.whatsapp.net')) phone = '+' + waActiveJid.split('@')[0];
+      waShowContactForm(waActiveJid, currentName, phone);
+    }
+
+    function waShowContactForm(jid, currentName, phone) {
+      var old = document.getElementById('wa-contact-form-modal'); if (old) old.remove();
+      var parts = (currentName || '').trim().split(' ');
+      var fname = parts[0] || '';
+      var lname = parts.slice(1).join(' ') || '';
+      var isEdit = !!currentName;
+      var modal = document.createElement('div');
+      modal.id = 'wa-contact-form-modal';
+      modal.style.cssText = 'position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,0.6);display:flex;align-items:center;justify-content:center;padding:16px;';
+      modal.innerHTML = `<div style="background:var(--card);border:1px solid var(--border);border-radius:14px;padding:28px;width:100%;max-width:480px;max-height:90vh;overflow-y:auto;">
+        <div style="display:flex;align-items:center;gap:12px;margin-bottom:20px;">
+          <div id="wcf-avatar" style="width:44px;height:44px;border-radius:50%;background:rgba(37,211,102,0.15);display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:800;color:#25D366;flex-shrink:0;">${escHtml((fname[0]||'?').toUpperCase())}</div>
+          <div><div style="font-weight:700;font-size:15px;">${isEdit?'Edit Contact':'Add Contact'}</div><div style="font-size:12px;color:var(--muted);">${escHtml(phone||jid)}</div></div>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px;">
+          <div><label style="font-size:11px;font-weight:600;color:var(--muted2);display:block;margin-bottom:4px;">First Name *</label><input id="wcf-fname" class="inp" style="padding-left:12px;" value="${escAttr(fname)}" placeholder="First name"></div>
+          <div><label style="font-size:11px;font-weight:600;color:var(--muted2);display:block;margin-bottom:4px;">Last Name</label><input id="wcf-lname" class="inp" style="padding-left:12px;" value="${escAttr(lname)}" placeholder="Last name"></div>
+        </div>
+        <div style="margin-bottom:12px;"><label style="font-size:11px;font-weight:600;color:var(--muted2);display:block;margin-bottom:4px;">Company</label><input id="wcf-company" class="inp" style="padding-left:12px;" placeholder="Company name"></div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px;">
+          <div><label style="font-size:11px;font-weight:600;color:var(--muted2);display:block;margin-bottom:4px;">Job Title</label><input id="wcf-job" class="inp" style="padding-left:12px;" placeholder="Job title"></div>
+          <div><label style="font-size:11px;font-weight:600;color:var(--muted2);display:block;margin-bottom:4px;">City</label><input id="wcf-city" class="inp" style="padding-left:12px;" placeholder="City"></div>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px;">
+          <div><label style="font-size:11px;font-weight:600;color:var(--muted2);display:block;margin-bottom:4px;">WhatsApp / Phone</label><input id="wcf-phone" class="inp" style="padding-left:12px;" value="${escAttr(phone)}" placeholder="+91 XXXXX XXXXX"></div>
+          <div><label style="font-size:11px;font-weight:600;color:var(--muted2);display:block;margin-bottom:4px;">Email</label><input id="wcf-email" class="inp" style="padding-left:12px;" placeholder="email@example.com"></div>
+        </div>
+        <div style="margin-bottom:18px;"><label style="font-size:11px;font-weight:600;color:var(--muted2);display:block;margin-bottom:4px;">Notes</label><textarea id="wcf-notes" class="inp" style="padding:8px 12px;resize:none;height:60px;" placeholder="Any notes..."></textarea></div>
+        <div style="display:flex;gap:8px;justify-content:flex-end;">
+          <button class="btn btn-ghost btn-sm" onclick="document.getElementById('wa-contact-form-modal').remove()">Cancel</button>
+          <button class="btn btn-green btn-sm" id="wcf-save-btn"><i class="fas fa-check"></i> Save Contact</button>
+        </div>
+      </div>`;
+      modal.querySelector('#wcf-fname').addEventListener('input', function() {
+        var av = document.getElementById('wcf-avatar');
+        if (av) av.textContent = (this.value[0]||'?').toUpperCase();
+      });
+      modal.querySelector('#wcf-save-btn').addEventListener('click', function() { waSaveFullContact(jid); });
+      modal.addEventListener('mousedown', function(e) { if (e.target === modal) modal.remove(); });
+      document.body.appendChild(modal);
+      setTimeout(function() { var i = document.getElementById('wcf-fname'); if (i) i.focus(); }, 50);
+    }
+
+    async function waSaveFullContact(jid) {
+      var fname = (document.getElementById('wcf-fname').value || '').trim();
+      var lname = (document.getElementById('wcf-lname').value || '').trim();
+      var company = (document.getElementById('wcf-company').value || '').trim();
+      var job = (document.getElementById('wcf-job').value || '').trim();
+      var city = (document.getElementById('wcf-city').value || '').trim();
+      var phone = (document.getElementById('wcf-phone').value || '').trim();
+      var email = (document.getElementById('wcf-email').value || '').trim();
+      var notes = (document.getElementById('wcf-notes').value || '').trim();
+      if (!fname) { document.getElementById('wcf-fname').focus(); showToast('First name is required', 'error'); return; }
+      var fullName = [fname, lname].filter(Boolean).join(' ');
+      var btn = document.getElementById('wcf-save-btn');
+      if (btn) { btn.disabled = true; btn.innerHTML = '<span class="spin-loader" style="width:14px;height:14px;"></span>'; }
+      try {
+        await fetch(API_BASE + '/wa/contacts/' + encodeURIComponent(jid), {
+          method: 'PUT', headers: getAuthHeaders(), body: JSON.stringify({ name: fullName })
+        });
+        await fetch(API_BASE + '/contacts', {
+          method: 'POST', headers: getAuthHeaders(),
+          body: JSON.stringify({ fname, lname: lname||'.', company: company||'WhatsApp Contact',
+            designation: job||null, city: city||null, phone: phone||null, wa: phone||null,
+            email: email||null, notes: notes||null, segment: 'Prospect', score: 50 })
+        });
+        var chat = waAllChats.find(function(c) { return c.id === jid; });
+        if (chat) { chat.name = fullName; waRenderChats(waAllChats); }
+        if (waActiveJid === jid) {
+          var titleEl = document.getElementById('wa-active-title'); if (titleEl) titleEl.textContent = fullName;
+          var addLabel = document.getElementById('wa-add-contact-label'); if (addLabel) addLabel.textContent = 'Edit Contact';
+        }
+        document.getElementById('wa-contact-form-modal').remove();
+        showToast('Contact saved', 'success');
+      } catch(err) {
+        if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fas fa-check"></i> Save Contact'; }
+        showToast(err.message || 'Save failed', 'error');
+      }
+    }
+
     async function waSendMsg() {
       var input = document.getElementById('wa-msg-input');
       var text = input.value.trim();
@@ -24201,8 +24385,9 @@ ${plainText}`;
         });
 
       } else {
+        var textTempId = 'temp-' + Date.now();
         waAppendMessage({
-          id: 'temp-' + Date.now(),
+          id: textTempId,
           fromMe: true,
           body: text,
           ts: new Date(),
@@ -24259,7 +24444,14 @@ ${plainText}`;
           };
           reader.readAsDataURL(fileToUpload);
         } else {
-          await fetch(API_BASE + '/wa/send', { method: 'POST', headers: getAuthHeaders(), body: JSON.stringify({ jid: jid, message: text, quotedMsgId: quotedId }) });
+          const sendRes = await fetch(API_BASE + '/wa/send', { method: 'POST', headers: getAuthHeaders(), body: JSON.stringify({ jid: jid, message: text, quotedMsgId: quotedId }) });
+          const sendData = sendRes.ok ? await sendRes.json() : null;
+          // Replace temp bubble with real message (correct ID + server timestamp)
+          var tempEl = document.getElementById('msg-' + textTempId);
+          if (tempEl) tempEl.remove();
+          if (sendData && sendData.message) waAppendMessage(sendData.message);
+          var chatArea = document.getElementById('wa-chat-area');
+          if (chatArea) chatArea.scrollTop = chatArea.scrollHeight;
         }
 
         var chat = waAllChats.find(function (c) { return c.id === jid; });
