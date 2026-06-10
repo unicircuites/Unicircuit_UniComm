@@ -23468,11 +23468,13 @@ ${plainText}`;
     function waAppendMessage(msg, prepend, targetArea) {
       var area = targetArea || document.getElementById('wa-chat-area');
       if (!area) return;
+      // Normalize to milliseconds: values < 1e12 are epoch-seconds, multiply by 1000
+      function toMs(v) { return v ? (v < 1e12 ? v * 1000 : v) : null; }
       var rawTime =
-        msg.timestamp ||
-        (msg.ts ? msg.ts * 1000 : null) ||
-        (msg.messageTimestamp ? msg.messageTimestamp * 1000 : null) ||
-        (msg.message_ts ? msg.message_ts * 1000 : null) ||
+        toMs(msg.timestamp) ||
+        toMs(msg.ts) ||
+        toMs(msg.messageTimestamp) ||
+        toMs(msg.message_ts) ||
         Date.now();
 
       var time = new Date(rawTime).toLocaleTimeString('en-IN', {
@@ -23557,14 +23559,26 @@ ${plainText}`;
           senderDisplay = senderPhone;
           senderPhone = ''; // Don't duplicate if phone is the display name
         } else {
-          // Fallback: show sender JID if no name or phone
-          senderDisplay = msg.sender ? msg.sender.split('@')[0] : 'Unknown';
+          // Fallback: check waLidMap for name/phone (handles left-group members)
+          var fbLidNum = msg.sender ? msg.sender.split('@')[0] : '';
+          var fbEntry = fbLidNum ? waLidMap[fbLidNum] : null;
+          if (fbEntry && fbEntry.name && !fbEntry.name.startsWith('+')) {
+            senderDisplay = fbEntry.name;
+            if (fbEntry.phone) senderPhone = fbEntry.phone;
+          } else if (fbEntry && fbEntry.phone) {
+            senderDisplay = fbEntry.phone;
+          } else if (fbLidNum && fbLidNum.length >= 15) {
+            // Raw LID — unresolvable, show placeholder
+            senderDisplay = 'Unknown';
+          } else {
+            senderDisplay = fbLidNum || 'Unknown';
+          }
         }
       }
 
       var div = document.createElement('div');
       div.id = 'msg-' + msgId;
-      div.dataset.ts = new Date(msg.ts || msg.timestamp).getTime();
+      div.dataset.ts = rawTime;
       div.dataset.msgId = msgId;
       div.dataset.replyBody = body || '';
       div.style.cssText = 'display:flex;flex-direction:column;align-items:' + (fromMe ? 'flex-end' : 'flex-start') + ';margin-bottom:3px;width:100%;';
