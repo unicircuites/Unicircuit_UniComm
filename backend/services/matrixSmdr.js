@@ -288,9 +288,8 @@ async function ensureTable(retries = 3) {
       // v3: VMS last-hop rows (390, 398) have their destination replaced with the
       //     first-hop extension from the sibling row (same caller, same 2-min window).
       const vmsListSql = VMS_EXTENSIONS.map(e => `'${e}'`).join(', ');
-      const isVmsDest = VMS_EXTENSIONS.length
-        ? `destination IN (${vmsListSql})`
-        : 'FALSE';
+      const isVmsDest = VMS_EXTENSIONS.length ? `destination IN (${vmsListSql})` : 'FALSE';
+      const isVmsDestB2 = VMS_EXTENSIONS.length ? `b2.destination IN (${vmsListSql})` : 'FALSE';
       // Drop and recreate if view is from a previous version
       const viewCheck = await pool.query(`
         SELECT definition FROM pg_matviews WHERE matviewname = 'call_logs_deduped'
@@ -326,7 +325,31 @@ async function ensureTable(retries = 3) {
             id DESC
         ),
         ranked AS (
-          SELECT *,
+          SELECT
+            id, call_date, call_time, duration, call_type, caller, extension, trunk,
+            recording_file, ai_summary, raw_line, created_at,
+            -- For VMS destinations (390/398), replace with first-hop extension
+            CASE
+              WHEN (${isVmsDest})
+              THEN COALESCE(
+                (
+                  SELECT b2.destination
+                  FROM base b2
+                  WHERE
+                    b2.call_date::date = base.call_date::date
+                    AND regexp_replace(COALESCE(b2.caller,''),'[^0-9]','','g')
+                      = regexp_replace(COALESCE(base.caller,''),'[^0-9]','','g')
+                    AND FLOOR(EXTRACT(EPOCH FROM COALESCE(b2.call_time, TIME '00:00:00')) / 120)
+                      = FLOOR(EXTRACT(EPOCH FROM COALESCE(base.call_time, TIME '00:00:00')) / 120)
+                    AND NOT (${isVmsDestB2})
+                    AND b2.id != base.id
+                  ORDER BY b2.id
+                  LIMIT 1
+                ),
+                destination
+              )
+              ELSE destination
+            END AS destination,
             ROW_NUMBER() OVER (
               PARTITION BY
                 call_date::date,
@@ -339,39 +362,8 @@ async function ensureTable(retries = 3) {
                 id DESC
             ) AS _rn
           FROM base
-        ),
-        -- For VMS rows (destination=390/398), find the first-hop extension from a
-        -- sibling row with the same caller within the same 2-minute window.
-        first_hop AS (
-          SELECT
-            r.id,
-            (
-              SELECT b2.destination
-              FROM base b2
-              WHERE
-                b2.call_date::date = r.call_date::date
-                AND regexp_replace(COALESCE(b2.caller, ''), '[^0-9]', '', 'g')
-                  = regexp_replace(COALESCE(r.caller, ''), '[^0-9]', '', 'g')
-                AND FLOOR(EXTRACT(EPOCH FROM COALESCE(b2.call_time, TIME '00:00:00')) / 120)
-                  = FLOOR(EXTRACT(EPOCH FROM COALESCE(r.call_time, TIME '00:00:00')) / 120)
-                AND NOT (${isVmsDest.replace('destination', 'b2.destination')})
-                AND b2.id != r.id
-              ORDER BY b2.id
-              LIMIT 1
-            ) AS real_dest
-          FROM ranked r
-          WHERE ${isVmsDest} AND _rn = 1
         )
-        SELECT
-          r.*,
-          CASE
-            WHEN (${isVmsDest}) AND fh.real_dest IS NOT NULL
-              THEN fh.real_dest
-            ELSE r.destination
-          END AS destination
-        FROM ranked r
-        LEFT JOIN first_hop fh ON fh.id = r.id
-        WHERE r._rn = 1
+        SELECT * FROM ranked WHERE _rn = 1
         WITH NO DATA
       `).catch(() => { }); // ignore if already exists
 
