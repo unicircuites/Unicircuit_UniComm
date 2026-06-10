@@ -23688,6 +23688,21 @@ ${plainText}`;
         var safe = display.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
         return '<span data-wa-jid="' + escAttr(jid) + '" data-wa-phone="' + escAttr(raw.trim()) + '" style="color:#00e5ff;font-weight:700;text-decoration:underline;cursor:pointer;" title="Chat with ' + safe + '" onclick="event.stopPropagation();waOpenPhonePopup(this.dataset.waJid,this.dataset.waPhone,event)">' + safe + '</span>';
       });
+
+      // Linkify @Name mentions — match against known group participants
+      bodyHtml = bodyHtml.replace(/@([\w\u00C0-\u024F][\w\u00C0-\u024F .'-]{0,40})/g, function(match, namePart) {
+        var members = window._waGiAllParticipants || [];
+        var lname = namePart.toLowerCase();
+        var p = members.find(function(m) { return m.name && m.name.toLowerCase() === lname; })
+               || members.find(function(m) { return m.name && m.name.toLowerCase().startsWith(lname); });
+        if (!p) return match; // not a known member, leave as-is
+        var ph = p.phone || '';
+        var digits = ph.replace(/\D/g,'');
+        if (digits.length === 10) digits = '91' + digits;
+        var jid = digits ? digits + '@s.whatsapp.net' : (p.jid || '');
+        var safe = '@' + namePart.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+        return '<span data-wa-jid="' + escAttr(jid) + '" data-wa-phone="' + escAttr(ph) + '" style="color:#00e5ff;font-weight:700;text-decoration:underline;cursor:pointer;" title="Chat with ' + escAttr(p.name || ph) + '" onclick="event.stopPropagation();waOpenPhonePopup(this.dataset.waJid,this.dataset.waPhone,event)">' + safe + '</span>';
+      });
       // Robust Document Handling: Prevent duplicate filename display when no caption is present
       var showCaption = !!bodyHtml;
       if (type === 'documentMessage' || type === 'imageMessage' || type === 'videoMessage') {
