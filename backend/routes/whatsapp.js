@@ -401,6 +401,7 @@ router.get('/chats', authenticate, async (req, res) => {
           c.unread,
           c.updated_at,
           c.imported_last_ts,
+          COALESCE(c.is_announce, false) AS is_announce,
           0 AS sort_bucket
         FROM wa_chats c
         LEFT JOIN LATERAL (
@@ -447,6 +448,7 @@ router.get('/chats', authenticate, async (req, res) => {
           0 AS unread,
           ec.updated_at,
           NULL::timestamptz AS imported_last_ts,
+          false AS is_announce,
           1 AS sort_bucket
         FROM enriched_contacts ec
         WHERE ec.account_phone = $1
@@ -489,7 +491,7 @@ router.get('/chats', authenticate, async (req, res) => {
         SELECT * FROM contact_rows
       )
       SELECT DISTINCT ON (account_phone, id)
-        id, account_phone, name, phone, is_group, is_group_member, last_message, last_time, unread, updated_at, imported_last_ts
+        id, account_phone, name, phone, is_group, is_group_member, last_message, last_time, unread, updated_at, imported_last_ts, is_announce
       FROM combined
       ORDER BY account_phone, id, sort_bucket ASC, last_time DESC NULLS LAST, updated_at DESC NULLS LAST
     `, [accountPhone]);
@@ -802,6 +804,13 @@ router.get('/group/:jid', authenticate, async (req, res) => {
     // Group Info is the authoritative source — persist the confirmed subject to wa_chats
     // so the chat list always shows the real name, not a stale/empty fallback.
     if (gData?.name) setImmediate(() => wa.updateGroupName(jid, gData.name, accountPhone));
+    // Persist announce status so the chat list badge (ANN/GRP) survives across sessions
+    if (gData && typeof gData.announce === 'boolean') {
+      setImmediate(() => pool.query(
+        `UPDATE wa_chats SET is_announce=$1 WHERE id=$2 AND account_phone=$3`,
+        [gData.announce, jid, accountPhone]
+      ).catch(() => {}));
+    }
     res.json(gData);
   } catch (err) { res.status(500).json({ error: err.message }); }
 });

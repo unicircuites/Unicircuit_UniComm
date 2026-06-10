@@ -9508,6 +9508,7 @@ Always write in a professional yet warm Indian B2B communication style. Use form
       ${isGroup ? `<div id="wa-group-members-section" style="padding:12px 20px;border-bottom:1px solid var(--border);"><div style="font-size:11px;color:var(--muted);"><span class="spin-loader" style="width:12px;height:12px;"></span> Loading members…</div></div>` : ''}
       <div style="padding:14px 20px;">
         <button type="button" class="btn btn-green btn-sm" onclick='openWhatsAppChatFromContacts(${JSON.stringify(jid)}, ${JSON.stringify(name)}, ${JSON.stringify(phone)})'><i class="fab fa-whatsapp"></i> Open in WhatsApp module</button>
+        ${!isGroup && phone ? `<button type="button" class="btn btn-gold btn-sm" style="margin-left:6px;" onclick='openQuickSaveModal("", null, ${JSON.stringify(name !== phone ? name : "")}, "", "", ${JSON.stringify(phone)})'><i class="fas fa-user-plus"></i> Save Contact</button>` : ''}
       </div>
     </div>`;
 
@@ -9646,7 +9647,10 @@ Always write in a professional yet warm Indian B2B communication style. Use form
           ${telHref ? `<button class="btn btn-green btn-sm" onclick="pbxDial(${jsArg(phone)})"><i class="fas fa-phone-alt"></i> Call</button>` : ''}
           <button type="button" class="btn btn-ghost btn-sm" onclick="nav('calls', null)"><i class="fas fa-list"></i> Full logs</button>
           ${name ? `<button class="btn btn-red btn-sm" onclick="deletePbxContact(${jsArg(phone)})"><i class="fas fa-trash"></i> Delete</button>` : ''}
-          ${!name ? `<button class="btn btn-gold btn-sm" onclick="pbxSaveContactModal(${jsArg(phone)})"><i class="fas fa-user-plus"></i> Save</button>` : ''}
+          ${name
+            ? `<button class="btn btn-gold btn-sm" onclick="pbxSaveContactModal(${jsArg(phone)},${jsArg(name)},${jsArg(company)},${jsArg(notes)},${jsArg(row && row.email || '')})"><i class="fas fa-pen"></i> Edit</button>`
+            : `<button class="btn btn-gold btn-sm" onclick="pbxSaveContactModal(${jsArg(phone)})"><i class="fas fa-user-plus"></i> Save</button>`
+          }
         </div>
 
         <div style="padding:16px 20px;">
@@ -9670,6 +9674,12 @@ Always write in a professional yet warm Indian B2B communication style. Use form
           const dateObj = parseDate(h);
           const date = dateObj ? dateObj.toLocaleString('en-IN', { dateStyle: 'short', timeStyle: 'short' }) : '—';
           const typeClass = h.call_type === 'Missed' ? 'b-red' : (h.call_type === 'In' ? 'b-blue' : 'b-gold');
+          // Show the other party in the call
+          const phoneDigits = String(phone).replace(/\D/g,'');
+          const callerDigits = String(h.caller || '').replace(/\D/g,'');
+          const destDigits = String(h.destination || '').replace(/\D/g,'');
+          const isThisTheCaller = callerDigits && (callerDigits === phoneDigits || callerDigits.endsWith(phoneDigits) || phoneDigits.endsWith(callerDigits));
+          const otherParty = isThisTheCaller ? (h.destination || '') : (h.caller || '');
           return `
                 <div style="display:flex;justify-content:space-between;padding:10px 0;border-bottom:1px solid rgba(255,255,255,0.03);">
                   <div>
@@ -9677,6 +9687,7 @@ Always write in a professional yet warm Indian B2B communication style. Use form
                     <div style="font-size:11px;color:var(--muted2);margin-top:2px;">
                       <span class="badge ${typeClass}" style="font-size:9px;padding:1px 4px;">${h.call_type}</span>
                       · ${h.duration}
+                      ${otherParty ? `· <span style="font-family:'JetBrains Mono';color:var(--muted);">${escHtml(otherParty)}</span>` : ''}
                     </div>
                   </div>
                   <div style="font-size:11px;color:var(--muted);">${escHtml(h.trunk || '')}</div>
@@ -15088,8 +15099,15 @@ Best regards,<br>
         closeQuickSaveModal();
         notify('Contact saved successfully', '', 'var(--green)', 'fas fa-check');
 
-        // Refresh UI
-        loadOutlookContactsDirectory();
+        // Bust caches so the new contact reflects immediately in all tabs
+        outlookContactsCache = [];
+        allMergedContactsCache = [];
+
+        // Refresh whichever contacts tab is currently active
+        if (contactsSource === 'outlook') loadOutlookContactsDirectory();
+        else if (contactsSource === 'whatsapp') renderWhatsappContactsDirectory(false);
+        else if (contactsSource === 'all') loadAllMergedContacts(true);
+        else loadOutlookContactsDirectory();
         loadInbox();
 
       } catch (err) {
@@ -15130,6 +15148,8 @@ Best regards,<br>
       document.getElementById('qs-phone').value = existingPhone || '';
       document.getElementById('qs-notes').value = '';
       document.getElementById('qs-status').style.display = 'none';
+      const _qsPhoneWarn = document.getElementById('qs-phone-warn');
+      if (_qsPhoneWarn) _qsPhoneWarn.style.display = 'none';
 
       // Setup Avatar
       const initial = (existingName || email || 'O')[0].toUpperCase();
@@ -15204,6 +15224,10 @@ Best regards,<br>
         notify('Email and at least one name field required', 'error');
         return;
       }
+
+      // Warn if no phone (won't merge with WA/PBX in All tab)
+      const phoneWarn = document.getElementById('qs-phone-warn');
+      if (phoneWarn) phoneWarn.style.display = phone ? 'none' : 'block';
 
       const status = document.getElementById('qs-status');
       status.textContent = 'Saving...';
@@ -15289,8 +15313,15 @@ Best regards,<br>
         closeQuickSaveModal();
         notify('Contact saved successfully', '', 'var(--green)', 'fas fa-check');
 
-        // Refresh UI
-        loadOutlookContactsDirectory();
+        // Bust caches so the new contact reflects immediately in all tabs
+        outlookContactsCache = [];
+        allMergedContactsCache = [];
+
+        // Refresh whichever contacts tab is currently active
+        if (contactsSource === 'outlook') loadOutlookContactsDirectory();
+        else if (contactsSource === 'whatsapp') renderWhatsappContactsDirectory(false);
+        else if (contactsSource === 'all') loadAllMergedContacts(true);
+        else loadOutlookContactsDirectory();
         loadInbox();
 
       } catch (err) {
@@ -22983,7 +23014,7 @@ ${plainText}`;
         var name = displayName;
         // Show GRP only for real WhatsApp groups (@g.us), not for contact-only group members.
         var grpBadge = isRealGroup
-          ? (c.announce
+          ? (c.announce || c.is_announce
             ? '<span style="font-size:10px;color:var(--gold2);border:1px solid rgba(255,193,7,0.35);padding:1px 6px;border-radius:999px;font-weight:800;white-space:nowrap;">ANN</span>'
             : '<span style="font-size:10px;color:var(--gold);border:1px solid rgba(255, 215, 0, 0.35);padding:1px 6px;border-radius:999px;font-weight:800;white-space:nowrap;">GRP</span>')
           : '';
@@ -23214,7 +23245,7 @@ ${plainText}`;
       var titleEl = document.getElementById('wa-active-title');
       if (titleEl) {
         if (isGroup) {
-          var hdrBadge = c && c.announce
+          var hdrBadge = c && (c.announce || c.is_announce)
             ? '<span style="font-size:10px;color:var(--gold2);border:1px solid rgba(255,193,7,0.35);padding:1px 6px;border-radius:999px;font-weight:800;margin-left:5px;">ANN</span>'
             : '<span style="font-size:10px;color:var(--gold);border:1px solid rgba(255,215,0,0.35);padding:1px 6px;border-radius:999px;font-weight:800;margin-left:5px;">GRP</span>';
           titleEl.innerHTML = name + hdrBadge;
@@ -24175,7 +24206,7 @@ ${plainText}`;
         }
         // Update waAllChats cache so subsequent renders use real name
         var chatEntry = waAllChats.find(function (c) { return c.id === waActiveJid; });
-        if (chatEntry) { chatEntry.name = realName; if (gData.announce !== undefined) chatEntry.announce = gData.announce; }
+        if (chatEntry) { chatEntry.name = realName; if (gData.announce !== undefined) { chatEntry.announce = gData.announce; chatEntry.is_announce = gData.announce; } }
       }
 
       if (giMembers) {
@@ -29156,12 +29187,12 @@ ${plainText}`;
     // PBX Contacts functionality migrated to CRM Contacts module
     // pbxShowTab('contacts') and associated functions removed from here.
 
-    function pbxSaveContactModal(phone) {
+    function pbxSaveContactModal(phone, existingName, existingCompany, existingNotes, existingEmail) {
       document.getElementById('pbx-save-phone').value = phone;
-      document.getElementById('pbx-save-name').value = '';
-      document.getElementById('pbx-save-company').value = '';
-      document.getElementById('pbx-save-notes').value = '';
-      document.getElementById('pbx-save-email').value = '';
+      document.getElementById('pbx-save-name').value = existingName || '';
+      document.getElementById('pbx-save-company').value = existingCompany || '';
+      document.getElementById('pbx-save-notes').value = existingNotes || '';
+      document.getElementById('pbx-save-email').value = existingEmail || '';
       document.getElementById('pbx-save-email-warn').style.display = 'none';
       openModal('pbx-save-contact-modal');
       setTimeout(() => document.getElementById('pbx-save-name').focus(), 100);
@@ -32786,6 +32817,7 @@ Nagpur, Maharashtra, 440017, India<br>
             <div class="oem-field">
               <div class="oem-label">Mobile phone</div>
               <input type="text" class="oem-input" id="qs-phone" placeholder="Enter phone number" />
+              <div id="qs-phone-warn" style="display:none;font-size:11px;color:#f0a500;margin-top:4px;"><i class="fas fa-exclamation-triangle"></i> Without a phone number, this contact won't merge with WhatsApp or PBX in the All tab.</div>
             </div>
           </div>
         </div>

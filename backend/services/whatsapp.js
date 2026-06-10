@@ -641,6 +641,7 @@ async function ensureTables(retries = 3) {
       await pool.query(`ALTER TABLE wa_messages ADD COLUMN IF NOT EXISTS reply_to_msg_id VARCHAR(200)`).catch(() => { });
       await pool.query(`ALTER TABLE wa_messages ADD COLUMN IF NOT EXISTS media_path TEXT`).catch(() => { });
       await pool.query(`ALTER TABLE wa_chats ADD COLUMN IF NOT EXISTS imported_last_ts TIMESTAMPTZ`).catch(() => { });
+      await pool.query(`ALTER TABLE wa_chats ADD COLUMN IF NOT EXISTS is_announce BOOLEAN DEFAULT FALSE`).catch(() => { });
       await pool.query(`
         CREATE TABLE IF NOT EXISTS wa_chat_blocklist (
           account_phone VARCHAR(50) NOT NULL,
