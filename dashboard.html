@@ -23469,8 +23469,13 @@ ${plainText}`;
     function waAppendMessage(msg, prepend, targetArea) {
       var area = targetArea || document.getElementById('wa-chat-area');
       if (!area) return;
-      // Normalize to milliseconds: values < 1e12 are epoch-seconds, multiply by 1000
-      function toMs(v) { return v ? (v < 1e12 ? v * 1000 : v) : null; }
+      // Normalize to milliseconds: handles Date objects, epoch-seconds (< 1e12), or ms
+      function toMs(v) {
+        if (!v) return null;
+        if (v instanceof Date) return v.getTime();
+        var n = Number(v);
+        return isNaN(n) ? null : (n < 1e12 ? n * 1000 : n);
+      }
       var rawTime =
         toMs(msg.timestamp) ||
         toMs(msg.ts) ||
@@ -23515,8 +23520,7 @@ ${plainText}`;
       var lastMsgEl = area.lastElementChild;
       if (!prepend && lastMsgEl && lastMsgEl.dataset.ts) {
         var lastTs = parseInt(lastMsgEl.dataset.ts);
-        var newTs = new Date(msg.ts || msg.timestamp).getTime();
-        if (newTs < lastTs) {
+        if (rawTime < lastTs) {
           // This is an old sync message, don't append to bottom of live view
           return;
         }
@@ -23678,8 +23682,8 @@ ${plainText}`;
       bodyHtml = bodyHtml.replace(/(https?:\/\/[^\s<&"']{4,})/g,
         '<a href="$1" target="_blank" rel="noopener" style="color:#00e5ff;font-weight:700;text-decoration:underline;word-break:break-all;" onclick="event.stopPropagation()">$1</a>');
 
-      // Linkify phone numbers — 10-digit or +91 format (also @+91... mentions), show "Chat with" popup on click
-      bodyHtml = bodyHtml.replace(/(@)?(\+?91[-\s]?)?(\b[6-9]\d{9}\b)/g, function(match, atSign, prefix, num) {
+      // Linkify phone numbers — 10-digit or +91 format (with optional spaces/dashes), show "Chat with" popup on click
+      bodyHtml = bodyHtml.replace(/(@)?(\+?91[-\s]?)?(\b[6-9]\d{4}[-\s]?\d{5}\b)/g, function(match, atSign, prefix, num) {
         var raw = (prefix || '') + num;
         var digits = raw.replace(/\D/g,'');
         if (digits.length === 10) digits = '91' + digits;
