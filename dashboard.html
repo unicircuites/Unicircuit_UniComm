@@ -5267,6 +5267,14 @@
               <label class="form-label">Notes</label>
               <textarea class="inp" id="pbx-save-notes" rows="2" placeholder="Any notes…"></textarea>
             </div>
+            <div class="form-group">
+              <label class="form-label" style="display:flex;align-items:center;gap:6px;">
+                Email
+                <span title="Adding email lets this PBX contact merge with matching Outlook contacts in the All view" style="cursor:help;color:var(--gold2);font-size:11px;"><i class="fas fa-info-circle"></i> for Outlook merge</span>
+              </label>
+              <input class="inp" id="pbx-save-email" type="email" placeholder="e.g. contact@example.com">
+              <div id="pbx-save-email-warn" style="display:none;font-size:11px;color:var(--gold2);margin-top:4px;"><i class="fas fa-exclamation-triangle"></i> Without email, this contact won't merge with Outlook in the All tab.</div>
+            </div>
             <div style="display:flex;gap:8px;margin-top:4px;">
               <button class="btn btn-gold" style="flex:1;justify-content:center;" onclick="pbxSaveContactSubmit()"><i
                   class="fas fa-save"></i> Save Contact</button>
@@ -9743,61 +9751,84 @@ Always write in a professional yet warm Indian B2B communication style. Use form
         const wa      = waData.status === 'fulfilled'      ? (waData.value  || []) : [];
         const pbx     = pbxData.status === 'fulfilled'     ? (pbxData.value || []) : [];
 
-        // Map: normalised 10-digit key → merged record
-        const map = new Map();
+        // ── Two-pass merge: phone first, then email ──
+        // Pass 1: bucket by normalised phone (10-digit suffix)
+        const map = new Map(); // phone-key → rec
 
-        function getOrCreate(key, phone) {
-          if (!map.has(key)) {
-            map.set(key, {
-              key,
-              phone,          // canonical phone for display (first one we see)
-              name: '',
-              email: '',
-              company: '',
-              sources: [],    // ['outlook','whatsapp','pbx']
-              outlook: null,
-              wa: null,
-              pbx: null,
-            });
-          }
-          return map.get(key);
+        function makeRec(phone) {
+          return { key: phone, phone, name: '', email: '', company: '', sources: [], outlook: null, wa: null, pbx: null };
         }
 
-        // ── Outlook ──────────────────────────────────────────
+        // Outlook
         outlook.forEach(oc => {
-          const phone = outlookPrimaryPhone(oc) || '';
-          const key = normalisePhone(phone);
-          if (!key) return;
-          const rec = getOrCreate(key, phone);
+          const phone = normalisePhone(outlookPrimaryPhone(oc) || '');
+          const email = (outlookPrimaryEmail(oc) || '').toLowerCase().trim();
+          const key = phone || ('email:' + email); // fallback key for phone-less outlook contacts
+          if (!key || key === 'email:') return;
+          if (!map.has(key)) map.set(key, makeRec(phone));
+          const rec = map.get(key);
           if (!rec.sources.includes('outlook')) rec.sources.push('outlook');
           rec.outlook = oc;
-          // Prefer Outlook's display name as it's typically the richest
-          if (!rec.name) rec.name = outlookDisplayTitle(oc) || '';
-          if (!rec.email) rec.email = outlookPrimaryEmail(oc) || '';
+          if (!rec.email && email) rec.email = email;
           if (!rec.company && oc.companyName) rec.company = oc.companyName;
+          if (!rec.name) rec.name = outlookDisplayTitle(oc) || '';
         });
 
-        // ── WhatsApp ──────────────────────────────────────────
+        // WhatsApp
         wa.forEach(c => {
-          const phone = c.phone || (c.id && c.id.split('@')[0]) || '';
-          const key = normalisePhone(phone);
-          if (!key) return;
-          const rec = getOrCreate(key, phone);
+          const raw = c.phone || (c.id && c.id.split('@')[0]) || '';
+          const phone = normalisePhone(raw);
+          if (!phone) return;
+          if (!map.has(phone)) map.set(phone, makeRec(phone));
+          const rec = map.get(phone);
           if (!rec.sources.includes('whatsapp')) rec.sources.push('whatsapp');
           rec.wa = c;
           if (!rec.name && c.name) rec.name = c.name;
+          if (!rec.phone) rec.phone = raw;
         });
 
-        // ── PBX ──────────────────────────────────────────────
+        // PBX
         pbx.forEach(p => {
-          const key = normalisePhone(p.phone);
-          if (!key) return;
-          const rec = getOrCreate(key, p.phone);
+          const phone = normalisePhone(p.phone || '');
+          const email = (p.email || '').toLowerCase().trim();
+          const key = phone || ('email:' + email);
+          if (!key || key === 'email:') return;
+          if (!map.has(key)) map.set(key, makeRec(phone));
+          const rec = map.get(key);
           if (!rec.sources.includes('pbx')) rec.sources.push('pbx');
           rec.pbx = p;
-          // PBX saved name wins if no name yet
           if (!rec.name && p.name) rec.name = p.name;
+          if (!rec.email && email) rec.email = email;
           if (!rec.company && p.company) rec.company = p.company;
+          if (!rec.phone && p.phone) rec.phone = p.phone;
+        });
+
+        // Pass 2: merge phone-keyed records with email-keyed records that share an email
+        // Build email → phone-key index from phone-keyed records
+        const emailToKey = new Map();
+        map.forEach((rec, key) => {
+          if (rec.email && !key.startsWith('email:')) emailToKey.set(rec.email, key);
+        });
+
+        // For each email-keyed record, absorb into matching phone-keyed record if email matches
+        map.forEach((rec, key) => {
+          if (!key.startsWith('email:')) return;
+          const targetKey = emailToKey.get(rec.email);
+          if (targetKey && map.has(targetKey)) {
+            const target = map.get(targetKey);
+            // Merge into target
+            if (rec.outlook && !target.outlook) { target.outlook = rec.outlook; if (!target.sources.includes('outlook')) target.sources.push('outlook'); if (!target.name) target.name = outlookDisplayTitle(rec.outlook) || ''; if (!target.company && rec.company) target.company = rec.company; }
+            if (rec.pbx && !target.pbx)         { target.pbx = rec.pbx; if (!target.sources.includes('pbx')) target.sources.push('pbx'); if (!target.name && rec.pbx.name) target.name = rec.pbx.name; }
+            map.delete(key);
+          }
+          // else: email-only record stays as its own entry
+        });
+
+        // Name priority: Outlook display name > PBX name > WA name
+        map.forEach(rec => {
+          if (rec.outlook) rec.name = outlookDisplayTitle(rec.outlook) || rec.name;
+          else if (rec.pbx && rec.pbx.name) rec.name = rec.pbx.name || rec.name;
+          else if (rec.wa && rec.wa.name) rec.name = rec.wa.name || rec.name;
         });
 
         allMergedContactsCache = [...map.values()].sort((a, b) => {
@@ -22951,7 +22982,11 @@ ${plainText}`;
 
         var name = displayName;
         // Show GRP only for real WhatsApp groups (@g.us), not for contact-only group members.
-        var grpBadge = isRealGroup ? '<span style="font-size:10px;color:var(--gold);border:1px solid rgba(255, 215, 0, 0.35);padding:1px 6px;border-radius:999px;font-weight:800;white-space:nowrap;">GRP</span>' : '';
+        var grpBadge = isRealGroup
+          ? (c.announce
+            ? '<span style="font-size:10px;color:var(--gold2);border:1px solid rgba(255,193,7,0.35);padding:1px 6px;border-radius:999px;font-weight:800;white-space:nowrap;">ANN</span>'
+            : '<span style="font-size:10px;color:var(--gold);border:1px solid rgba(255, 215, 0, 0.35);padding:1px 6px;border-radius:999px;font-weight:800;white-space:nowrap;">GRP</span>')
+          : '';
         var initials = name.split(' ').map(function (w) { return w[0] || ''; }).join('').toUpperCase().slice(0, 2) || '?';
         var time = '';
         if (c.last_time) {
@@ -23177,7 +23212,16 @@ ${plainText}`;
 
       // Header title
       var titleEl = document.getElementById('wa-active-title');
-      if (titleEl) titleEl.textContent = name;
+      if (titleEl) {
+        if (isGroup) {
+          var hdrBadge = c && c.announce
+            ? '<span style="font-size:10px;color:var(--gold2);border:1px solid rgba(255,193,7,0.35);padding:1px 6px;border-radius:999px;font-weight:800;margin-left:5px;">ANN</span>'
+            : '<span style="font-size:10px;color:var(--gold);border:1px solid rgba(255,215,0,0.35);padding:1px 6px;border-radius:999px;font-weight:800;margin-left:5px;">GRP</span>';
+          titleEl.innerHTML = name + hdrBadge;
+        } else {
+          titleEl.textContent = name;
+        }
+      }
 
       // Sub-header
       var phEl = document.getElementById('wa-active-phone');
@@ -24096,7 +24140,12 @@ ${plainText}`;
         ? gData.total_participants
         : (gData.participants || []).length;
       var loadedCnt = (gData && Array.isArray(gData.participants)) ? gData.participants.length : 0;
-      if (giMeta) giMeta.textContent = (realName || 'Group') + ' · ' + totalCnt + ' members' + (gData.has_more ? (' (showing ' + loadedCnt + ')') : '');
+      if (giMeta) {
+        var annBadge = gData.announce
+          ? '<span style="font-size:10px;color:var(--gold2);border:1px solid rgba(255,193,7,0.35);padding:1px 6px;border-radius:999px;font-weight:800;margin-left:5px;">ANN</span>'
+          : '<span style="font-size:10px;color:var(--gold);border:1px solid rgba(255,215,0,0.35);padding:1px 6px;border-radius:999px;font-weight:800;margin-left:5px;">GRP</span>';
+        giMeta.innerHTML = (realName || 'Group') + ' · ' + totalCnt + ' members' + (gData.has_more ? (' (showing ' + loadedCnt + ')') : '') + annBadge;
+      }
       if (giDesc && gData.description) {
         giDesc.textContent = gData.description;
         if (giDescWrap) giDescWrap.style.display = 'block';
@@ -24109,8 +24158,11 @@ ${plainText}`;
       if (realName && waActiveJid) {
         // Update active chat header immediately
         var titleEl = document.getElementById('wa-active-title');
-        if (titleEl && (titleEl.textContent === 'Group' || !titleEl.textContent.trim())) {
-          titleEl.textContent = realName;
+        if (titleEl) {
+          var hdrBadge2 = gData.announce
+            ? '<span style="font-size:10px;color:var(--gold2);border:1px solid rgba(255,193,7,0.35);padding:1px 6px;border-radius:999px;font-weight:800;margin-left:5px;">ANN</span>'
+            : '<span style="font-size:10px;color:var(--gold);border:1px solid rgba(255,215,0,0.35);padding:1px 6px;border-radius:999px;font-weight:800;margin-left:5px;">GRP</span>';
+          titleEl.innerHTML = realName + hdrBadge2;
         }
         var phEl = document.getElementById('wa-active-phone');
         if (phEl && phEl.textContent.startsWith('Group ·')) {
@@ -24123,12 +24175,21 @@ ${plainText}`;
         }
         // Update waAllChats cache so subsequent renders use real name
         var chatEntry = waAllChats.find(function (c) { return c.id === waActiveJid; });
-        if (chatEntry) chatEntry.name = realName;
+        if (chatEntry) { chatEntry.name = realName; if (gData.announce !== undefined) chatEntry.announce = gData.announce; }
       }
 
       if (giMembers) {
-        // Store all participants for client-side search/pagination
-        window._waGiAllParticipants = (gData.participants || []).filter(Boolean);
+        var allParts = (gData.participants || []).filter(Boolean);
+        var isAnnounce = gData.announce === true;
+        var weAreAdmin = allParts.some(function(p) { return p.admin && p.jid && (p.jid.split('@')[0] === connectedWaPhone || (p.phone && p.phone.replace(/\D/g,'').endsWith(connectedWaPhone))); });
+        window._waGiIsAnnounce = isAnnounce;
+        window._waGiWeAreAdmin = weAreAdmin;
+        // If announcement group and we are NOT admin: show only admins
+        if (isAnnounce && !weAreAdmin) {
+          window._waGiAllParticipants = allParts.filter(function(p) { return p.admin; });
+        } else {
+          window._waGiAllParticipants = allParts;
+        }
         window._waGiLoadedJid = waActiveJid;
         window._waGiPage = 0;
         window._waGiSearchQ = '';
@@ -24163,7 +24224,10 @@ ${plainText}`;
       window._waGiPage = page;
       var start = page * _WA_GI_PAGE_SIZE;
       var slice = filtered.slice(start, start + _WA_GI_PAGE_SIZE);
-      giMembers.innerHTML = slice.map(function (p) {
+      var announceNote = (window._waGiIsAnnounce && !window._waGiWeAreAdmin)
+        ? '<div style="margin:4px 6px 6px;padding:6px 10px;background:rgba(255,193,7,0.08);border:1px solid rgba(255,193,7,0.25);border-radius:7px;font-size:11px;color:var(--gold2);"><i class="fas fa-bullhorn" style="margin-right:5px;"></i>Announcement group — showing admins only</div>'
+        : '';
+      giMembers.innerHTML = announceNote + slice.map(function (p) {
         var phoneSafe = p && p.phone ? waFormatPhoneForDisplay(p.phone) : '';
         var displayName = (p && p.name && String(p.name).trim()) ? p.name : (phoneSafe || null);
         var initials = displayName ? displayName.charAt(0).toUpperCase() : '?';
@@ -29097,6 +29161,8 @@ ${plainText}`;
       document.getElementById('pbx-save-name').value = '';
       document.getElementById('pbx-save-company').value = '';
       document.getElementById('pbx-save-notes').value = '';
+      document.getElementById('pbx-save-email').value = '';
+      document.getElementById('pbx-save-email-warn').style.display = 'none';
       openModal('pbx-save-contact-modal');
       setTimeout(() => document.getElementById('pbx-save-name').focus(), 100);
     }
@@ -29106,14 +29172,19 @@ ${plainText}`;
       const name = document.getElementById('pbx-save-name').value.trim();
       const company = document.getElementById('pbx-save-company').value.trim();
       const notes = document.getElementById('pbx-save-notes').value.trim();
+      const email = document.getElementById('pbx-save-email').value.trim();
 
       if (!name) return notify('Required', 'Please enter a name', 'var(--red2)', 'fas fa-exclamation');
+
+      // Show warning if no email (won't merge with Outlook)
+      const warnEl = document.getElementById('pbx-save-email-warn');
+      if (warnEl) warnEl.style.display = email ? 'none' : 'block';
 
       try {
         const res = await fetch(`${API_BASE}/calls/contacts/save`, {
           method: 'POST',
           headers: getAuthHeaders(),
-          body: JSON.stringify({ phone, name, company, notes })
+          body: JSON.stringify({ phone, name, company, notes, email: email || null })
         });
         if (res.ok) {
           notify('Contact Saved', name, 'var(--green2)', 'fas fa-user-check');

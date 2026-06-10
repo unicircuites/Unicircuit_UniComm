@@ -2679,9 +2679,16 @@ async function getGroupMetadata(jid, opts = {}) {
   }
 
   const allParticipants = Array.isArray(meta.participants) ? meta.participants : [];
-  const totalParticipants = allParticipants.length;
+  // Deduplicate by JID — Baileys can return duplicates for large groups
+  const seenJids = new Set();
+  const uniqueParticipants = allParticipants.filter(p => {
+    if (!p?.id || seenJids.has(p.id)) return false;
+    seenJids.add(p.id);
+    return true;
+  });
+  const totalParticipants = uniqueParticipants.length;
 
-  const processedParticipants = allParticipants.map(p => {
+  const processedParticipants = uniqueParticipants.map(p => {
     const pJid = p.id;
     const phoneJid = p.phoneNumber || (pJid.endsWith('@lid') ? null : pJid);
     const rawPhone = phoneJid ? phoneJid.split('@')[0].split(':')[0] : '';
@@ -2712,6 +2719,7 @@ async function getGroupMetadata(jid, opts = {}) {
     participants: processedParticipants,
     total_participants: totalParticipants,
     has_more: false,
+    announce: meta.announce === true,
   };
   groupMetadataCache.set(cacheKey, { ts: Date.now(), data: result });
   groupMetadataInFlight.delete(jid);
