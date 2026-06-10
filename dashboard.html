@@ -23245,7 +23245,8 @@ ${plainText}`;
       var titleEl = document.getElementById('wa-active-title');
       if (titleEl) {
         if (isGroup) {
-          var hdrBadge = c && (c.announce || c.is_announce)
+          var _chatEntry = waAllChats.find(function(x) { return x.id === jid; });
+          var hdrBadge = (_chatEntry && (_chatEntry.announce || _chatEntry.is_announce))
             ? '<span style="font-size:10px;color:var(--gold2);border:1px solid rgba(255,193,7,0.35);padding:1px 6px;border-radius:999px;font-weight:800;margin-left:5px;">ANN</span>'
             : '<span style="font-size:10px;color:var(--gold);border:1px solid rgba(255,215,0,0.35);padding:1px 6px;border-radius:999px;font-weight:800;margin-left:5px;">GRP</span>';
           titleEl.innerHTML = name + hdrBadge;
