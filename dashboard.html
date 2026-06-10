@@ -4442,7 +4442,7 @@
             class="nav-badge nb-red">14</span></div>
         <div class="nav-item" onclick="nav('whatsapp',this)"><i class="fab fa-whatsapp"></i> WhatsApp Biz <span
             class="nav-badge nb-green">9</span></div>
-        <div class="nav-item" id="nav-wa-broadcast" style="display:none;" onclick="nav('wa-broadcast',this)"><i class="fab fa-whatsapp" style="color:var(--green2);"></i> WA Broadcast</div>
+        <div class="nav-item" id="nav-wa-broadcast" style="display:none;" onclick="nav('wa-broadcast',this)"><i class="fas fa-broadcast-tower" style="color:var(--green2);"></i> WA Broadcast</div>
 
         <div class="nav-label" id="nav-label-crm">CRM</div>
         <div class="nav-item" onclick="nav('contacts',this)"><i class="fas fa-address-book"></i> Contacts <span
@@ -5805,7 +5805,8 @@
               <div class="card-header">
                 <h3><i class="fab fa-whatsapp" style="color:var(--green2);"></i> WhatsApp Broadcast</h3>
                 <div style="display:flex;gap:6px;align-items:center;">
-                  <button class="btn btn-ghost btn-xs" onclick="loadWaBroadcasts()"><i class="fas fa-sync-alt"></i> Refresh</button>
+                  <button class="btn btn-ghost btn-xs" onclick="loadWaBroadcastsUser()"><i class="fas fa-sync-alt"></i> Refresh</button>
+                  <button class="btn btn-ghost btn-xs" onclick="openEmailTemplates()"><i class="fas fa-file-alt"></i> Templates</button>
                   <button class="btn btn-green btn-sm" onclick="openModal('broadcast-modal');bcSetChannel('whatsapp');bcLoadTemplates();bcLoadGroupsDropdown();"><i class="fas fa-plus"></i> New Broadcast</button>
                 </div>
               </div>
@@ -13183,6 +13184,9 @@ Keep it concise and professional.`;
           // Show WA Broadcast nav for user role
           var wabNav = document.getElementById('nav-wa-broadcast');
           if (wabNav) wabNav.style.display = '';
+          // Hide Email channel in broadcast modal for user role
+          var emailChanBtn = document.getElementById('bc-channel-email');
+          if (emailChanBtn) emailChanBtn.style.display = 'none';
           // Default landing page for user
           nav('dashboard', null);
           window._userRoleIsUser = true;
