@@ -285,16 +285,17 @@ async function ensureTable(retries = 3) {
 
       // ── Materialized view for fast paginated call log queries ─────────────
       // Precomputes the expensive dedup CTE so page switches are a simple index seek.
-      // v2: excludes VMS/voicemail last-hop rows (390, 398, etc.)
-      const vmsExcludeList = VMS_EXTENSIONS.map(e => `'${e}'`).join(', ');
-      const vmsExcludeClause = VMS_EXTENSIONS.length
-        ? `AND destination NOT IN (${vmsExcludeList})`
-        : '';
-      // Drop and recreate if the view definition is from a previous version (no VMS filter)
+      // v3: VMS last-hop rows (390, 398) have their destination replaced with the
+      //     first-hop extension from the sibling row (same caller, same 2-min window).
+      const vmsListSql = VMS_EXTENSIONS.map(e => `'${e}'`).join(', ');
+      const isVmsDest = VMS_EXTENSIONS.length
+        ? `destination IN (${vmsListSql})`
+        : 'FALSE';
+      // Drop and recreate if view is from a previous version
       const viewCheck = await pool.query(`
         SELECT definition FROM pg_matviews WHERE matviewname = 'call_logs_deduped'
       `).catch(() => ({ rows: [] }));
-      if (viewCheck.rows.length && !viewCheck.rows[0].definition?.includes('NOT IN')) {
+      if (viewCheck.rows.length && !viewCheck.rows[0].definition?.includes('first_hop')) {
         await pool.query(`DROP MATERIALIZED VIEW IF EXISTS call_logs_deduped CASCADE`).catch(() => { });
       }
       await pool.query(`
@@ -315,7 +316,6 @@ async function ensureTable(retries = 3) {
               AND (duration IS NULL OR duration = '' OR duration = '00:00:00')
             )
             AND NOT (duration IS NULL OR duration = '' OR duration = '00:00:00')
-            ${vmsExcludeClause}
           ORDER BY
             call_date::date,
             COALESCE(trunk, ''),
@@ -339,8 +339,39 @@ async function ensureTable(retries = 3) {
                 id DESC
             ) AS _rn
           FROM base
+        ),
+        -- For VMS rows (destination=390/398), find the first-hop extension from a
+        -- sibling row with the same caller within the same 2-minute window.
+        first_hop AS (
+          SELECT
+            r.id,
+            (
+              SELECT b2.destination
+              FROM base b2
+              WHERE
+                b2.call_date::date = r.call_date::date
+                AND regexp_replace(COALESCE(b2.caller, ''), '[^0-9]', '', 'g')
+                  = regexp_replace(COALESCE(r.caller, ''), '[^0-9]', '', 'g')
+                AND FLOOR(EXTRACT(EPOCH FROM COALESCE(b2.call_time, TIME '00:00:00')) / 120)
+                  = FLOOR(EXTRACT(EPOCH FROM COALESCE(r.call_time, TIME '00:00:00')) / 120)
+                AND NOT (${isVmsDest.replace('destination', 'b2.destination')})
+                AND b2.id != r.id
+              ORDER BY b2.id
+              LIMIT 1
+            ) AS real_dest
+          FROM ranked r
+          WHERE ${isVmsDest} AND _rn = 1
         )
-        SELECT * FROM ranked WHERE _rn = 1
+        SELECT
+          r.*,
+          CASE
+            WHEN (${isVmsDest}) AND fh.real_dest IS NOT NULL
+              THEN fh.real_dest
+            ELSE r.destination
+          END AS destination
+        FROM ranked r
+        LEFT JOIN first_hop fh ON fh.id = r.id
+        WHERE r._rn = 1
         WITH NO DATA
       `).catch(() => { }); // ignore if already exists
 
