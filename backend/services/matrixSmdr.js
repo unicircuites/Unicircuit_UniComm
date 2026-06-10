@@ -339,8 +339,8 @@ async function ensureTable(retries = 3) {
                     b2.call_date::date = base.call_date::date
                     AND regexp_replace(COALESCE(b2.caller,''),'[^0-9]','','g')
                       = regexp_replace(COALESCE(base.caller,''),'[^0-9]','','g')
-                    AND FLOOR(EXTRACT(EPOCH FROM COALESCE(b2.call_time, TIME '00:00:00')) / 120)
-                      = FLOOR(EXTRACT(EPOCH FROM COALESCE(base.call_time, TIME '00:00:00')) / 120)
+                    AND ABS(EXTRACT(EPOCH FROM COALESCE(b2.call_time, TIME '00:00:00'))
+                          - EXTRACT(EPOCH FROM COALESCE(base.call_time, TIME '00:00:00'))) <= 300
                     AND NOT (${isVmsDestB2})
                     AND b2.id != base.id
                   ORDER BY b2.id
