@@ -24213,7 +24213,7 @@ ${plainText}`;
       if (giMembers) {
         var allParts = (gData.participants || []).filter(Boolean);
         var isAnnounce = gData.announce === true;
-        var weAreAdmin = allParts.some(function(p) { return p.admin && p.jid && (p.jid.split('@')[0] === connectedWaPhone || (p.phone && p.phone.replace(/\D/g,'').endsWith(connectedWaPhone))); });
+        var weAreAdmin = allParts.some(function(p) { return p.admin && p.jid && (p.jid.split('@')[0] === waConnectedPhone || (p.phone && p.phone.replace(/\D/g,'').endsWith(waConnectedPhone || ''))); });
         window._waGiIsAnnounce = isAnnounce;
         window._waGiWeAreAdmin = weAreAdmin;
         // If announcement group and we are NOT admin: show only admins
