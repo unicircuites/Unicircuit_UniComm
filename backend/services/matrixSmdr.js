@@ -1119,7 +1119,7 @@ function startServer() {
               isPBX: isPBX,
               protocol: 'raw-tcp'
             });
-          }
+            // fall through — process this data packet immediately
         }
 
         // Process data (after handshake or if no handshaking)
