@@ -22838,10 +22838,10 @@ ${plainText}`;
           : waResolveJidDisplay(c.id, c.notify || c.phone || rawId);
         var unresolvedNamedLid = !isRealGroup && String(c.id || '').endsWith('@lid') &&
           waIsRealContactLabel(displayName, rawId, String(c.phone || '').replace(/\D/g, ''));
-        // Hide ANY @lid that does not have a resolved phone number.
-        // We no longer show "named" LIDs if we don't have their number.
+        // Hide @lid chats that have no resolved phone AND no real name (just show as number/unknown)
         var hasPhone = !!String(c.phone || '').replace(/\D/g, '');
-        if (!isRealGroup && String(c.id || '').endsWith('@lid') && !hasPhone) return '';
+        var hasRealName = !!(c.name && String(c.name).trim() && !/^\d+$/.test(String(c.name).trim()));
+        if (!isRealGroup && String(c.id || '').endsWith('@lid') && !hasPhone && !hasRealName) return '';
         
         if (!isRealGroup && !displayName) return '';
         // Format phone numbers for display
