@@ -10129,16 +10129,24 @@ Always write in a professional yet warm Indian B2B communication style. Use form
       }
       if (contactsSource === 'whatsapp') {
         const base = waAllChats || [];
-        const list = !q ? base : base.filter(c =>
+        let list = !q ? [...base] : base.filter(c =>
           (c.name || '').toLowerCase().includes(q) ||
           (c.phone || '').toLowerCase().includes(q) ||
           (c.id || '').toLowerCase().includes(q)
         );
+        if (sortVal === 'az') list.sort((a, b) => (a.name || a.phone || '').localeCompare(b.name || b.phone || ''));
+        else if (sortVal === 'za') list.sort((a, b) => (b.name || b.phone || '').localeCompare(a.name || a.phone || ''));
+        else if (sortVal === 'recent') list.sort((a, b) => (new Date(b.last_time || 0)) - (new Date(a.last_time || 0)));
+        else if (sortVal === 'oldest') list.sort((a, b) => (new Date(a.last_time || 0)) - (new Date(b.last_time || 0)));
         renderWhatsappContactsList(list);
         return;
       }
       if (contactsSource === 'pbx') {
-        const list = !q ? pbxContactsCache : pbxContactsCache.filter(r => (r.phone || '').toLowerCase().includes(q) || (r.name || '').toLowerCase().includes(q));
+        let list = !q ? [...pbxContactsCache] : pbxContactsCache.filter(r => (r.phone || '').toLowerCase().includes(q) || (r.name || '').toLowerCase().includes(q));
+        if (sortVal === 'az') list.sort((a, b) => (a.name || a.phone || '').localeCompare(b.name || b.phone || ''));
+        else if (sortVal === 'za') list.sort((a, b) => (b.name || b.phone || '').localeCompare(a.name || a.phone || ''));
+        else if (sortVal === 'recent') list.sort((a, b) => (new Date(b.last_call || 0)) - (new Date(a.last_call || 0)));
+        else if (sortVal === 'oldest') list.sort((a, b) => (new Date(a.last_call || 0)) - (new Date(b.last_call || 0)));
         renderPbxContactsList(list);
       }
       if (contactsSource === 'all') {
@@ -23750,6 +23758,31 @@ ${plainText}`;
         bubble.style.boxShadow = oldBoxShadow;
         bubble.style.borderColor = oldBorderColor;
       }, 1800);
+    }
+
+    function waOpenPhonePopup(jid, displayPhone, event) {
+      // Remove any existing popup
+      var old = document.getElementById('wa-phone-popup');
+      if (old) old.remove();
+
+      var popup = document.createElement('div');
+      popup.id = 'wa-phone-popup';
+      popup.style.cssText = 'position:fixed;z-index:9999;background:var(--card);border:1px solid var(--border);border-radius:10px;padding:10px 14px;box-shadow:0 4px 20px rgba(0,0,0,0.4);min-width:180px;';
+      popup.style.left = Math.min(event.clientX, window.innerWidth - 200) + 'px';
+      popup.style.top = (event.clientY + 8) + 'px';
+      popup.innerHTML = '<div style="font-size:11px;color:var(--muted);margin-bottom:6px;">WhatsApp number</div>'
+        + '<button class="btn btn-green btn-sm" style="width:100%;justify-content:center;" onclick="document.getElementById(\'wa-phone-popup\').remove();waOpenChat(' + JSON.stringify(jid) + ',' + JSON.stringify(displayPhone) + ',\'\')">'
+        + '<i class="fab fa-whatsapp"></i> Chat with ' + escHtml(displayPhone) + '</button>';
+
+      document.body.appendChild(popup);
+      // Close on outside click
+      setTimeout(function() {
+        document.addEventListener('click', function _close() {
+          var p = document.getElementById('wa-phone-popup');
+          if (p) p.remove();
+          document.removeEventListener('click', _close);
+        });
+      }, 10);
     }
 
     function waSetReplyFromMessage(msgId) {
