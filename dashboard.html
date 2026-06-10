@@ -5709,6 +5709,8 @@
                     style="display:none;"><i class="fas fa-info-circle"></i> Group Info</button>
                   <button class="btn btn-ghost btn-xs" id="wa-add-contact-btn" onclick="waAddEditContact()"
                     style="display:none;"><i class="fas fa-user-plus"></i> <span id="wa-add-contact-label">Add Contact</span></button>
+                  <button class="btn btn-ghost btn-xs" id="wa-labels-btn" onclick="waToggleLabelMenu(event)"
+                    style="display:none;"><i class="fas fa-tags"></i> Labels</button>
                   <button class="btn btn-ghost btn-xs" onclick="aiWADraft()"><i class="fas fa-robot"></i> AI
                     Reply</button>
                 </div>
@@ -23006,6 +23008,84 @@ ${plainText}`;
         '</div>';
     }
 
+    function waActiveChatEntry() {
+      if (!waActiveJid) return null;
+      return waAllChats.find(function (c) { return waNormalizeJid(c.id) === waNormalizeJid(waActiveJid); }) || null;
+    }
+
+    function waCloseLabelMenu() {
+      var menu = document.getElementById('wa-label-menu');
+      if (menu) menu.remove();
+    }
+
+    async function waToggleLabelMenu(ev) {
+      if (ev) ev.stopPropagation();
+      if (!waActiveJid) return;
+      var existing = document.getElementById('wa-label-menu');
+      if (existing) { existing.remove(); return; }
+      await waOpenLabelMenu(ev && ev.currentTarget);
+    }
+
+    async function waOpenLabelMenu(anchor) {
+      if (!waActiveJid) return;
+      waCloseLabelMenu();
+      var btn = anchor || document.getElementById('wa-labels-btn');
+      var rect = btn ? btn.getBoundingClientRect() : { right: window.innerWidth - 20, bottom: 80 };
+      var menu = document.createElement('div');
+      menu.id = 'wa-label-menu';
+      menu.style.cssText = 'position:fixed;top:' + (rect.bottom + 6) + 'px;right:' + Math.max(12, window.innerWidth - rect.right) + 'px;width:260px;max-height:330px;overflow:auto;background:var(--card);border:1px solid var(--border);border-radius:8px;box-shadow:0 12px 32px rgba(0,0,0,0.35);z-index:9999;padding:8px;';
+      menu.innerHTML = '<div style="padding:10px;color:var(--muted);font-size:12px;"><span class="spin-loader" style="margin-right:6px;"></span>Loading labels...</div>';
+      menu.onclick = function (e) { e.stopPropagation(); };
+      document.body.appendChild(menu);
+      try {
+        var res = await fetch(API_BASE + '/wa/labels?_=' + Date.now(), { headers: getAuthHeaders(), cache: 'no-store' });
+        var labels = await res.json();
+        if (!res.ok) throw new Error(labels.error || 'Could not load labels');
+        var chat = waActiveChatEntry() || {};
+        var activeIds = new Set((chat.labels || []).map(function (label) { return String(label.id); }));
+        if (!Array.isArray(labels) || !labels.length) {
+          menu.innerHTML = '<div style="padding:12px;color:var(--muted);font-size:12px;line-height:1.4;">No WhatsApp labels found. Create labels in WhatsApp mobile first, then reopen this menu.</div>';
+          return;
+        }
+        menu.innerHTML =
+          '<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;padding:4px 4px 8px 4px;border-bottom:1px solid var(--border);margin-bottom:6px;">' +
+            '<div style="font-size:12px;font-weight:800;color:var(--text);"><i class="fas fa-tags" style="color:#25D366;margin-right:5px;"></i>Chat Labels</div>' +
+            '<button type="button" onclick="waCloseLabelMenu()" style="background:none;border:0;color:var(--muted);cursor:pointer;padding:2px 4px;"><i class="fas fa-times"></i></button>' +
+          '</div>' +
+          labels.map(function (label) {
+            var color = waLabelColor(label);
+            var checked = activeIds.has(String(label.id)) ? ' checked' : '';
+            return '<label style="display:flex;align-items:center;gap:8px;padding:7px 6px;border-radius:6px;cursor:pointer;font-size:12px;color:var(--text);" onmouseover="this.style.background=\'rgba(255,255,255,0.04)\'" onmouseout="this.style.background=\'\'">' +
+              '<input type="checkbox" data-wa-label-id="' + escAttr(label.id) + '"' + checked + ' onchange="waSetChatLabel(this.dataset.waLabelId,this.checked)" style="accent-color:#25D366;width:14px;height:14px;">' +
+              '<span style="width:9px;height:9px;border-radius:50%;background:' + color + ';flex-shrink:0;"></span>' +
+              '<span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + escHtml(label.name || 'Unnamed label') + '</span>' +
+            '</label>';
+          }).join('');
+      } catch (err) {
+        menu.innerHTML = '<div style="padding:12px;color:var(--red2);font-size:12px;">' + escHtml(err.message) + '</div>';
+      }
+    }
+
+    async function waSetChatLabel(labelId, enabled) {
+      if (!waActiveJid || !labelId) return;
+      var chat = waActiveChatEntry();
+      var method = enabled ? 'POST' : 'DELETE';
+      try {
+        var res = await fetch(API_BASE + '/wa/chats/' + encodeURIComponent(waActiveJid) + '/labels/' + encodeURIComponent(labelId), {
+          method: method,
+          headers: getAuthHeaders()
+        });
+        var data = await res.json().catch(function () { return {}; });
+        if (!res.ok) throw new Error(data.error || 'Label update failed');
+        await waLoadChats({ force: true });
+        chat = waActiveChatEntry() || chat;
+        if (chat) waPatchChatRow(chat);
+      } catch (err) {
+        notify('WhatsApp labels', err.message, 'var(--red)', 'fas fa-tags');
+        await waOpenLabelMenu(document.getElementById('wa-labels-btn'));
+      }
+    }
+
     function waRenderChats(chats) {
       var el = document.getElementById('wa-convo-list');
       if (!el) return;
@@ -23377,6 +23457,9 @@ ${plainText}`;
       // Add/Edit Contact button (only for 1-on-1 chats)
       var addContactBtn = document.getElementById('wa-add-contact-btn');
       var addContactLabel = document.getElementById('wa-add-contact-label');
+      var labelsBtn = document.getElementById('wa-labels-btn');
+      if (labelsBtn) labelsBtn.style.display = 'inline-flex';
+      waCloseLabelMenu();
       if (addContactBtn && !isGroup) {
         // Check if a CRM contact already exists for this phone
         var chatPhone = phone || (jid.endsWith('@s.whatsapp.net') ? '+' + jid.split('@')[0] : '');

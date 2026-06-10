@@ -27,6 +27,15 @@ function normalizeDigits(value) {
   return String(value || '').replace(/\D/g, '');
 }
 
+function normalizeWaRouteJid(value) {
+  const jid = String(value || '')
+    .replace(/@g\.us@g\.us$/, '@g.us')
+    .replace(/@s\.whatsapp\.net@s\.whatsapp\.net$/, '@s.whatsapp.net');
+  return jid.includes(':') && jid.includes('@')
+    ? jid.split(':')[0] + '@' + jid.split('@').slice(1).join('@')
+    : jid;
+}
+
 function isAllowedWaNumber(value) {
   const digits = normalizeDigits(value);
   if (!digits) return false;
@@ -1436,7 +1445,7 @@ router.get('/contacts/search', authenticate, async (req, res) => {
 router.post('/chats/:jid/read', authenticate, async (req, res) => {
   const accountPhone = connectedAccount(res);
   if (!accountPhone) return;
-  const jid = decodeURIComponent(req.params.jid);
+  const jid = normalizeWaRouteJid(decodeURIComponent(req.params.jid));
   try {
     await wa.markChatRead(jid);
     res.json({ ok: true });
@@ -1447,7 +1456,7 @@ router.post('/chats/:jid/read', authenticate, async (req, res) => {
 router.post('/chats/:jid/unread', authenticate, async (req, res) => {
   const accountPhone = connectedAccount(res);
   if (!accountPhone) return;
-  const jid = decodeURIComponent(req.params.jid);
+  const jid = normalizeWaRouteJid(decodeURIComponent(req.params.jid));
   try {
     await wa.markChatUnread(jid);
     res.json({ ok: true });
@@ -1474,12 +1483,13 @@ router.get('/labels', authenticate, async (req, res) => {
 router.post('/chats/:jid/labels/:labelId', authenticate, async (req, res) => {
   const accountPhone = connectedAccount(res);
   if (!accountPhone) return;
-  const jid = decodeURIComponent(req.params.jid);
+  const jid = normalizeWaRouteJid(decodeURIComponent(req.params.jid));
   const { labelId } = req.params;
   try {
     await wa.addChatLabel(jid, labelId);
     await pool.query(`INSERT INTO wa_label_associations (label_id,account_phone,chat_id) VALUES ($1,$2,$3) ON CONFLICT DO NOTHING`,
       [labelId, accountPhone, jid]);
+    wa.emitEvent('wa:labels_updated', { type: 'association', association: { labelId, chatId: jid }, action: 'add' });
     res.json({ ok: true });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
@@ -1488,12 +1498,13 @@ router.post('/chats/:jid/labels/:labelId', authenticate, async (req, res) => {
 router.delete('/chats/:jid/labels/:labelId', authenticate, async (req, res) => {
   const accountPhone = connectedAccount(res);
   if (!accountPhone) return;
-  const jid = decodeURIComponent(req.params.jid);
+  const jid = normalizeWaRouteJid(decodeURIComponent(req.params.jid));
   const { labelId } = req.params;
   try {
     await wa.removeChatLabel(jid, labelId);
     await pool.query(`DELETE FROM wa_label_associations WHERE label_id=$1 AND account_phone=$2 AND chat_id=$3`,
       [labelId, accountPhone, jid]);
+    wa.emitEvent('wa:labels_updated', { type: 'association', association: { labelId, chatId: jid }, action: 'remove' });
     res.json({ ok: true });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
