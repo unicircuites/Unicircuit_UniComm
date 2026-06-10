@@ -189,6 +189,7 @@ async function ensurePbxContactsTable() {
   `);
   // Migrate existing table
   await pool.query(`ALTER TABLE pbx_contacts ADD COLUMN IF NOT EXISTS email VARCHAR(254)`);
+  await pool.query(`ALTER TABLE pbx_contacts ADD COLUMN IF NOT EXISTS mobile_phone VARCHAR(50)`);
 }
 ensurePbxContactsTable().catch(err => console.warn('[Calls] pbx_contacts table error:', err.message));
 
@@ -330,11 +331,12 @@ router.get('/contacts/list', async (req, res) => {
 // POST /api/calls/contacts/save  — save/update a PBX contact
 // ═══════════════════════════════════════════════════════════════════
 router.post('/contacts/save', async (req, res) => {
-  const { phone, name, company, notes, email } = req.body;
+  const { phone, name, company, notes, email, mobile_phone } = req.body;
   if (!phone) return res.status(400).json({ error: 'phone is required.' });
   try {
     const cleanPhone = phone.trim();
     const cleanEmail = email ? email.trim().toLowerCase() : null;
+    const cleanMobile = mobile_phone ? mobile_phone.trim() : null;
     const existing = await pool.query(`
       SELECT id
       FROM pbx_contacts
@@ -346,18 +348,19 @@ router.post('/contacts/save', async (req, res) => {
     const result = existing.rowCount
       ? await pool.query(`
           UPDATE pbx_contacts
-          SET name = $1, company = $2, notes = $3, email = $4, updated_at = NOW()
-          WHERE id = $5
+          SET name = $1, company = $2, notes = $3, email = $4, mobile_phone = $5, updated_at = NOW()
+          WHERE id = $6
           RETURNING *
-        `, [name || null, company || null, notes || null, cleanEmail, existing.rows[0].id])
+        `, [name || null, company || null, notes || null, cleanEmail, cleanMobile, existing.rows[0].id])
       : await pool.query(`
-          INSERT INTO pbx_contacts (phone, name, company, notes, email, updated_at)
-          VALUES ($1, $2, $3, $4, $5, NOW())
+          INSERT INTO pbx_contacts (phone, name, company, notes, email, mobile_phone, updated_at)
+          VALUES ($1, $2, $3, $4, $5, $6, NOW())
           ON CONFLICT (phone) DO UPDATE
             SET name = EXCLUDED.name, company = EXCLUDED.company,
-                notes = EXCLUDED.notes, email = EXCLUDED.email, updated_at = NOW()
+                notes = EXCLUDED.notes, email = EXCLUDED.email,
+                mobile_phone = EXCLUDED.mobile_phone, updated_at = NOW()
           RETURNING *
-        `, [cleanPhone, name || null, company || null, notes || null, cleanEmail]);
+        `, [cleanPhone, name || null, company || null, notes || null, cleanEmail, cleanMobile]);
     return res.json(result.rows[0]);
   } catch (err) {
     console.error('[Calls] save contact error:', err.message);

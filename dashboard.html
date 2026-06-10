@@ -5275,6 +5275,14 @@
               <input class="inp" id="pbx-save-email" type="email" placeholder="e.g. contact@example.com">
               <div id="pbx-save-email-warn" style="display:none;font-size:11px;color:var(--gold2);margin-top:4px;"><i class="fas fa-exclamation-triangle"></i> Without email, this contact won't merge with Outlook in the All tab.</div>
             </div>
+            <div class="form-group">
+              <label class="form-label" style="display:flex;align-items:center;gap:6px;">
+                Mobile Phone
+                <span title="Enter the full mobile number (e.g. 9545073545) so this PBX extension contact merges with WhatsApp in the All view" style="cursor:help;color:var(--green2);font-size:11px;"><i class="fas fa-info-circle"></i> for WhatsApp merge</span>
+              </label>
+              <input class="inp" id="pbx-save-mobile" type="tel" placeholder="e.g. 9545073545">
+              <div id="pbx-save-mobile-warn" style="display:none;font-size:11px;color:var(--gold2);margin-top:4px;"><i class="fas fa-exclamation-triangle"></i> Without mobile number, this contact won't merge with WhatsApp in the All tab.</div>
+            </div>
             <div style="display:flex;gap:8px;margin-top:4px;">
               <button class="btn btn-gold" style="flex:1;justify-content:center;" onclick="pbxSaveContactSubmit()"><i
                   class="fas fa-save"></i> Save Contact</button>
@@ -9508,7 +9516,7 @@ Always write in a professional yet warm Indian B2B communication style. Use form
       ${isGroup ? `<div id="wa-group-members-section" style="padding:12px 20px;border-bottom:1px solid var(--border);"><div style="font-size:11px;color:var(--muted);"><span class="spin-loader" style="width:12px;height:12px;"></span> Loading members…</div></div>` : ''}
       <div style="padding:14px 20px;">
         <button type="button" class="btn btn-green btn-sm" onclick='openWhatsAppChatFromContacts(${JSON.stringify(jid)}, ${JSON.stringify(name)}, ${JSON.stringify(phone)})'><i class="fab fa-whatsapp"></i> Open in WhatsApp module</button>
-        ${!isGroup && phone ? `<button type="button" class="btn btn-gold btn-sm" style="margin-left:6px;" onclick='openQuickSaveModal("", null, ${JSON.stringify(name !== phone ? name : "")}, "", "", ${JSON.stringify(phone)})'><i class="fas fa-user-plus"></i> Save Contact</button>` : ''}
+        ${!isGroup && phone ? `<button type="button" class="btn btn-gold btn-sm" style="margin-left:6px;" onclick="openQuickSaveModal('', null, ${jsArg(name !== phone ? name : '')}, '', '', ${jsArg(phone)})"><i class="fas fa-user-plus"></i> Save Contact</button>` : ''}
       </div>
     </div>`;
 
@@ -9648,7 +9656,7 @@ Always write in a professional yet warm Indian B2B communication style. Use form
           <button type="button" class="btn btn-ghost btn-sm" onclick="nav('calls', null)"><i class="fas fa-list"></i> Full logs</button>
           ${name ? `<button class="btn btn-red btn-sm" onclick="deletePbxContact(${jsArg(phone)})"><i class="fas fa-trash"></i> Delete</button>` : ''}
           ${name
-            ? `<button class="btn btn-gold btn-sm" onclick="pbxSaveContactModal(${jsArg(phone)},${jsArg(name)},${jsArg(company)},${jsArg(notes)},${jsArg(row && row.email || '')})"><i class="fas fa-pen"></i> Edit</button>`
+            ? `<button class="btn btn-gold btn-sm" onclick="pbxSaveContactModal(${jsArg(phone)},${jsArg(name)},${jsArg(company)},${jsArg(notes)},${jsArg(row && row.email || '')},${jsArg(row && row.mobile_phone || '')})"><i class="fas fa-pen"></i> Edit</button>`
             : `<button class="btn btn-gold btn-sm" onclick="pbxSaveContactModal(${jsArg(phone)})"><i class="fas fa-user-plus"></i> Save</button>`
           }
         </div>
@@ -9800,18 +9808,21 @@ Always write in a professional yet warm Indian B2B communication style. Use form
 
         // PBX
         pbx.forEach(p => {
-          const phone = normalisePhone(p.phone || '');
+          const extPhone = normalisePhone(p.phone || '');
+          const mobilePhone = normalisePhone(p.mobile_phone || '');
           const email = (p.email || '').toLowerCase().trim();
-          const key = phone || ('email:' + email);
+          // Use mobile_phone as primary key (merges with WA), fall back to extension, then email
+          const key = mobilePhone || extPhone || ('email:' + email);
           if (!key || key === 'email:') return;
-          if (!map.has(key)) map.set(key, makeRec(phone));
+          if (!map.has(key)) map.set(key, makeRec(mobilePhone || extPhone));
           const rec = map.get(key);
           if (!rec.sources.includes('pbx')) rec.sources.push('pbx');
           rec.pbx = p;
           if (!rec.name && p.name) rec.name = p.name;
           if (!rec.email && email) rec.email = email;
           if (!rec.company && p.company) rec.company = p.company;
-          if (!rec.phone && p.phone) rec.phone = p.phone;
+          // Display phone: prefer mobile (real number), fall back to extension
+          if (!rec.phone) rec.phone = p.mobile_phone || p.phone || '';
         });
 
         // Pass 2: merge phone-keyed records with email-keyed records that share an email
@@ -13441,9 +13452,10 @@ Keep it concise and professional.`;
         if (pRes.ok) {
           const dbDeals = await pRes.json();
           if (dbDeals.length > 0) {
-            pipelineDeals.length = 0;
-            dbDeals.forEach(d => pipelineDeals.push({ ...d, dueDate: d.due_date }));
-
+            if (typeof pipelineDeals !== 'undefined') {
+              pipelineDeals.length = 0;
+              dbDeals.forEach(d => pipelineDeals.push({ ...d, dueDate: d.due_date }));
+            }
           }
         }
 
@@ -23625,6 +23637,19 @@ ${plainText}`;
 
       // Message body — preserve newlines
       var bodyHtml = body.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\n/g, '<br>');
+
+      // Linkify URLs — cyan bold underline, opens in new tab
+      bodyHtml = bodyHtml.replace(/(https?:\/\/[^\s<&"']{4,})/g,
+        '<a href="$1" target="_blank" rel="noopener" style="color:#00e5ff;font-weight:700;text-decoration:underline;word-break:break-all;" onclick="event.stopPropagation()">$1</a>');
+
+      // Linkify phone numbers — 10-digit or +91 format, show "Chat with" popup on click
+      bodyHtml = bodyHtml.replace(/(\+?91[-\s]?)?(\b[6-9]\d{9}\b)/g, function(match) {
+        var digits = match.replace(/\D/g,'');
+        if (digits.length === 10) digits = '91' + digits;
+        var jid = digits + '@s.whatsapp.net';
+        var safe = match.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+        return '<span style="color:#00e5ff;font-weight:700;text-decoration:underline;cursor:pointer;" title="Chat with ' + safe + '" onclick="event.stopPropagation();waOpenPhonePopup(' + JSON.stringify(jid) + ',' + JSON.stringify(match.trim()) + ',event)">' + safe + '</span>';
+      });
       // Robust Document Handling: Prevent duplicate filename display when no caption is present
       var showCaption = !!bodyHtml;
       if (type === 'documentMessage' || type === 'imageMessage' || type === 'videoMessage') {
@@ -29188,13 +29213,15 @@ ${plainText}`;
     // PBX Contacts functionality migrated to CRM Contacts module
     // pbxShowTab('contacts') and associated functions removed from here.
 
-    function pbxSaveContactModal(phone, existingName, existingCompany, existingNotes, existingEmail) {
+    function pbxSaveContactModal(phone, existingName, existingCompany, existingNotes, existingEmail, existingMobile) {
       document.getElementById('pbx-save-phone').value = phone;
       document.getElementById('pbx-save-name').value = existingName || '';
       document.getElementById('pbx-save-company').value = existingCompany || '';
       document.getElementById('pbx-save-notes').value = existingNotes || '';
       document.getElementById('pbx-save-email').value = existingEmail || '';
+      document.getElementById('pbx-save-mobile').value = existingMobile || '';
       document.getElementById('pbx-save-email-warn').style.display = 'none';
+      document.getElementById('pbx-save-mobile-warn').style.display = 'none';
       openModal('pbx-save-contact-modal');
       setTimeout(() => document.getElementById('pbx-save-name').focus(), 100);
     }
@@ -29205,18 +29232,20 @@ ${plainText}`;
       const company = document.getElementById('pbx-save-company').value.trim();
       const notes = document.getElementById('pbx-save-notes').value.trim();
       const email = document.getElementById('pbx-save-email').value.trim();
+      const mobile_phone = document.getElementById('pbx-save-mobile').value.trim();
 
       if (!name) return notify('Required', 'Please enter a name', 'var(--red2)', 'fas fa-exclamation');
 
-      // Show warning if no email (won't merge with Outlook)
       const warnEl = document.getElementById('pbx-save-email-warn');
       if (warnEl) warnEl.style.display = email ? 'none' : 'block';
+      const mWarnEl = document.getElementById('pbx-save-mobile-warn');
+      if (mWarnEl) mWarnEl.style.display = mobile_phone ? 'none' : 'block';
 
       try {
         const res = await fetch(`${API_BASE}/calls/contacts/save`, {
           method: 'POST',
           headers: getAuthHeaders(),
-          body: JSON.stringify({ phone, name, company, notes, email: email || null })
+          body: JSON.stringify({ phone, name, company, notes, email: email || null, mobile_phone: mobile_phone || null })
         });
         if (res.ok) {
           notify('Contact Saved', name, 'var(--green2)', 'fas fa-user-check');
