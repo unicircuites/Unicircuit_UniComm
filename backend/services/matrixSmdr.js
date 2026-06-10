@@ -32,8 +32,8 @@ const PBX_HOST = process.env.PBX_HOST || '192.168.0.81';
 const SMDR_PORT = parseInt(process.env.SMDR_PORT || '5000');
 const CTI_PORT = parseInt(process.env.CTI_PORT || '5001');
 // VMS (voicemail) extensions — last-hop only, never a real caller destination.
-// Comma-separated list, e.g. VMS_EXTENSIONS=390,398
-const VMS_EXTENSIONS = (process.env.VMS_EXTENSIONS || '390,398')
+// Comma-separated list, e.g. VMS_EXTENSIONS=390
+const VMS_EXTENSIONS = (process.env.VMS_EXTENSIONS || '390')
   .split(',').map(e => e.trim()).filter(Boolean);
 
 // ── DEEP DEBUG: CONFIG VALIDATION ──────────────────────────────────────────
