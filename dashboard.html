@@ -4442,6 +4442,7 @@
             class="nav-badge nb-red">14</span></div>
         <div class="nav-item" onclick="nav('whatsapp',this)"><i class="fab fa-whatsapp"></i> WhatsApp Biz <span
             class="nav-badge nb-green">9</span></div>
+        <div class="nav-item" id="nav-wa-broadcast" style="display:none;" onclick="nav('wa-broadcast',this)"><i class="fab fa-whatsapp" style="color:var(--green2);"></i> WA Broadcast</div>
 
         <div class="nav-label" id="nav-label-crm">CRM</div>
         <div class="nav-item" onclick="nav('contacts',this)"><i class="fas fa-address-book"></i> Contacts <span
@@ -5794,6 +5795,39 @@
               </div>
             </div>
 
+          </div>
+        </div>
+
+        <!-- ██████ WA BROADCAST (user role) ██████ -->
+        <div class="section-view fu" id="sec-wa-broadcast">
+          <div style="padding:8px 0 16px;">
+            <div class="card">
+              <div class="card-header">
+                <h3><i class="fab fa-whatsapp" style="color:var(--green2);"></i> WhatsApp Broadcast</h3>
+                <div style="display:flex;gap:6px;align-items:center;">
+                  <button class="btn btn-ghost btn-xs" onclick="loadWaBroadcasts()"><i class="fas fa-sync-alt"></i> Refresh</button>
+                  <button class="btn btn-green btn-sm" onclick="openModal('broadcast-modal');bcSetChannel('whatsapp');bcLoadTemplates();bcLoadGroupsDropdown();"><i class="fas fa-plus"></i> New Broadcast</button>
+                </div>
+              </div>
+              <div style="overflow-x:auto;">
+                <table class="data-table" id="wa-broadcast-table-user">
+                  <thead>
+                    <tr>
+                      <th>Message</th>
+                      <th>Recipients</th>
+                      <th>Sent</th>
+                      <th>Failed</th>
+                      <th>Status</th>
+                      <th>Date</th>
+                      <th></th>
+                    </tr>
+                  </thead>
+                  <tbody id="wa-broadcast-tbody-user">
+                    <tr><td colspan="7" style="text-align:center;padding:20px;color:var(--muted);">No WA broadcasts yet</td></tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
           </div>
         </div>
 
@@ -7573,6 +7607,7 @@ Always write in a professional yet warm Indian B2B communication style. Use form
       contacts: ['Contacts', 'Outlook, WhatsApp & PBX directories'],
       pipeline: ['Sales Pipeline', 'Deal tracking · Lead scoring · AI insights'],
       marketing: ['Marketing Suite', 'Omnichannel campaigns · AI-generated copy'],
+      'wa-broadcast': ['WA Broadcast', 'WhatsApp broadcasts · Send & track campaigns'],
       ai: ['AI Assistant', 'PicoClaw-powered · Unicircuit Engineering context'],
       analytics: ['Analytics', 'Communication intelligence · Client insights'],
       usermgmt: ['User Management', 'Manage users, roles and access'],
@@ -7600,6 +7635,7 @@ Always write in a professional yet warm Indian B2B communication style. Use form
       if (id === 'whatsapp') checkWAStatus(true);
       if (id === 'calls') { initWASocket(); refreshPbxCallLogsLatest('nav'); }
       if (id === 'marketing') { initWASocket(); loadMarketingData(); loadBroadcasts(); loadWaBroadcasts(); mktLoadTemplates(); }
+      if (id === 'wa-broadcast') { initWASocket(); loadWaBroadcastsUser(); }
       if (id === 'email') { checkOutlookStatus(); loadOutlookFolders(); loadInbox(); }
       if (id === 'ai') initAIChat();
     }
@@ -11008,6 +11044,23 @@ Keep it concise and professional.`;
       } catch (err) { console.error('loadWaBroadcasts:', err); }
     }
 
+    async function loadWaBroadcastsUser() {
+      var tbody = document.getElementById('wa-broadcast-tbody-user');
+      if (!tbody) return;
+      tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:20px;color:var(--muted);"><span class="spin-loader"></span></td></tr>';
+      try {
+        var res = await fetch(API_BASE + '/wa/broadcast', { headers: getAuthHeaders() });
+        var list = await res.json();
+        if (!list.length) { tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:20px;color:var(--muted);">No WA broadcasts yet</td></tr>'; return; }
+        list.forEach(function(b) { _waBroadcastMap[b.id] = b; });
+        tbody.innerHTML = list.map(function (b) {
+          var sc = b.status === 'sent' ? 'b-green' : b.status === 'sending' ? 'b-gold' : b.status === 'failed' ? 'b-red' : 'b-gray';
+          var dt = b.sent_at ? new Date(b.sent_at).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: '2-digit' }) : '—';
+          return '<tr style="cursor:pointer;" onclick="openWaBroadcastPreview(' + b.id + ')"><td style="max-width:220px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;"><i class="fab fa-whatsapp" style="color:var(--green2);margin-right:5px;"></i>' + escHtml(b.message || '') + '</td><td>' + (b.total||0) + '</td><td style="color:var(--green2);">' + (b.sent||0) + '</td><td style="color:var(--red2);">' + (b.failed||0) + '</td><td><span class="badge ' + sc + '">' + (b.status||'sending') + '</span></td><td style="font-size:11px;color:var(--muted);">' + dt + '</td><td><button class="btn btn-red btn-xs" onclick="event.stopPropagation();deleteWaBroadcast(' + b.id + ',this)"><i class="fas fa-trash"></i></button></td></tr>';
+        }).join('');
+      } catch (err) { console.error('loadWaBroadcastsUser:', err); tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:20px;color:var(--red2);">Error loading broadcasts</td></tr>'; }
+    }
+
     function openWaBroadcastPreview(id) {
       var b = _waBroadcastMap[id];
       if (!b) return;
@@ -13127,6 +13180,9 @@ Keep it concise and professional.`;
            'contacts-toolbar-actions'].forEach(function(id) {
             var el = document.getElementById(id); if (el) el.style.display = 'none';
           });
+          // Show WA Broadcast nav for user role
+          var wabNav = document.getElementById('nav-wa-broadcast');
+          if (wabNav) wabNav.style.display = '';
           // Default landing page for user
           nav('dashboard', null);
           window._userRoleIsUser = true;
