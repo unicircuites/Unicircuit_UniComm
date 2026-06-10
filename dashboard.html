@@ -23257,6 +23257,7 @@ ${plainText}`;
           if (_giMem) _giMem.innerHTML = '<div style="padding:10px;color:var(--muted);font-size:12px;"><span class="spin-loader" style="margin-right:6px;"></span>Loading...</div>';
           window._waGiLoadedJid = null; // force waLoadGroupInfoPanel to re-render when called
           window._waGiAllParticipants = [];
+          window._waGiParticipantsFetching = false;
         } else {
           _gip.style.width = '0'; _gip.style.minWidth = '0'; _gip.dataset.open = '0';
         }
@@ -23900,6 +23901,20 @@ ${plainText}`;
         if (atMatch) {
           var query = atMatch[1].toLowerCase();
           var members = window._waGiAllParticipants || [];
+          // Lazy-load participants if not yet fetched (user hasn't opened Group Info panel)
+          if (!members.length && !window._waGiParticipantsFetching) {
+            window._waGiParticipantsFetching = true;
+            fetch(API_BASE + '/wa/group/' + encodeURIComponent(waActiveJid) + '?limit=2000', { headers: getAuthHeaders() })
+              .then(function(r) { return r.json(); })
+              .then(function(d) {
+                if (d && Array.isArray(d.participants)) {
+                  window._waGiAllParticipants = d.participants.filter(Boolean);
+                  window._waGiLoadedJid = waActiveJid;
+                }
+              })
+              .catch(function() {})
+              .finally(function() { window._waGiParticipantsFetching = false; });
+          }
           var filtered = members.filter(function(p) {
             var n = (p.name || p.phone || '').toLowerCase();
             return !query || n.includes(query);
@@ -23908,7 +23923,7 @@ ${plainText}`;
             mentionList.innerHTML = filtered.map(function(p, i) {
               var display = p.name || p.phone || '';
               var ph = p.phone || '';
-              return '<div data-mention-idx="' + i + '" onmousedown="event.preventDefault();waInsertMention(' + JSON.stringify(display) + ',' + JSON.stringify(ph) + ')" style="padding:8px 14px;cursor:pointer;display:flex;align-items:center;gap:10px;border-bottom:1px solid var(--border);font-size:13px;" onmouseover="this.style.background=\'var(--hover)\'" onmouseout="this.style.background=\'\'">'
+              return '<div data-mention-name="' + escAttr(display) + '" data-mention-phone="' + escAttr(ph) + '" onmousedown="event.preventDefault();waInsertMention(this.dataset.mentionName,this.dataset.mentionPhone)" style="padding:8px 14px;cursor:pointer;display:flex;align-items:center;gap:10px;border-bottom:1px solid var(--border);font-size:13px;" onmouseover="this.style.background=\'var(--hover)\'" onmouseout="this.style.background=\'\'">'
                 + '<div style="width:28px;height:28px;border-radius:50%;background:rgba(37,211,102,0.15);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:#25D366;flex-shrink:0;">' + escHtml((display[0]||'?').toUpperCase()) + '</div>'
                 + '<div><div style="font-weight:600;color:var(--text);">' + escHtml(display) + '</div>' + (ph ? '<div style="font-size:11px;color:var(--muted);">' + escHtml(ph) + '</div>' : '') + '</div>'
                 + '</div>';
