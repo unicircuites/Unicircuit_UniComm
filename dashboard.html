@@ -7596,7 +7596,7 @@ Always write in a professional yet warm Indian B2B communication style. Use form
       if (id === 'usermgmt') { umCancelEdit(); umLoadUsers(); }
       const topCompose = document.getElementById('topbar-compose-email');
       if (topCompose) topCompose.style.display = id === 'email' ? '' : 'none';
-      if (id === 'contacts') { refreshContactsSection(); if (window._userRoleIsUser) setContactsSource('whatsapp'); }
+      if (id === 'contacts') { refreshContactsSection(); }
       if (id === 'whatsapp') checkWAStatus(true);
       if (id === 'calls') { initWASocket(); refreshPbxCallLogsLatest('nav'); }
       if (id === 'marketing') { initWASocket(); loadMarketingData(); loadBroadcasts(); loadWaBroadcasts(); mktLoadTemplates(); }
@@ -13119,17 +13119,16 @@ Keep it concise and professional.`;
           var nm = document.getElementById('nav-usermgmt');
           if (nm) nm.style.display = '';
         } else {
-          // Non-admin: hide everything except WhatsApp, Contacts, AI Assistant
-          ['nav-dashboard','nav-label-overview','nav-calls','nav-email','nav-label-comms',
+          // Non-admin: hide everything except Dashboard, WhatsApp, Contacts, AI Assistant
+          ['nav-label-overview','nav-calls','nav-email','nav-label-comms',
            'nav-pipeline','nav-label-crm','nav-marketing','nav-analytics','nav-label-intel',
            'topbar-activity-log','topbar-add-contact','mkt-quick-wrap','dashboard-kpi-refresh',
            'svc-pbx','svc-outlook',
-           'contacts-tab-outlook','contacts-tab-pbx','contacts-tab-all','contacts-toolbar-actions'].forEach(function(id) {
+           'contacts-toolbar-actions'].forEach(function(id) {
             var el = document.getElementById(id); if (el) el.style.display = 'none';
           });
           // Default landing page for user
-          nav('whatsapp', null);
-          // When user goes to contacts, force WhatsApp source
+          nav('dashboard', null);
           window._userRoleIsUser = true;
         }
       } catch (_) { }
