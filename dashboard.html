@@ -23686,7 +23686,7 @@ ${plainText}`;
         var jid = digits + '@s.whatsapp.net';
         var display = (atSign || '') + raw;
         var safe = display.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
-        return '<span style="color:#00e5ff;font-weight:700;text-decoration:underline;cursor:pointer;" title="Chat with ' + safe + '" onclick="event.stopPropagation();waOpenPhonePopup(' + JSON.stringify(jid) + ',' + JSON.stringify(raw.trim()) + ',event)">' + safe + '</span>';
+        return '<span data-wa-jid="' + escAttr(jid) + '" data-wa-phone="' + escAttr(raw.trim()) + '" style="color:#00e5ff;font-weight:700;text-decoration:underline;cursor:pointer;" title="Chat with ' + safe + '" onclick="event.stopPropagation();waOpenPhonePopup(this.dataset.waJid,this.dataset.waPhone,event)">' + safe + '</span>';
       });
       // Robust Document Handling: Prevent duplicate filename display when no caption is present
       var showCaption = !!bodyHtml;
@@ -23801,7 +23801,7 @@ ${plainText}`;
       popup.style.left = Math.min(event.clientX, window.innerWidth - 200) + 'px';
       popup.style.top = (event.clientY + 8) + 'px';
       popup.innerHTML = '<div style="font-size:11px;color:var(--muted);margin-bottom:6px;">WhatsApp number</div>'
-        + '<button class="btn btn-green btn-sm" style="width:100%;justify-content:center;" onclick="document.getElementById(\'wa-phone-popup\').remove();waOpenChat(' + JSON.stringify(jid) + ',' + JSON.stringify(displayPhone) + ',\'\')">'
+        + '<button class="btn btn-green btn-sm" style="width:100%;justify-content:center;" data-pop-jid="' + escAttr(jid) + '" data-pop-phone="' + escAttr(displayPhone) + '" onclick="document.getElementById(\'wa-phone-popup\').remove();waOpenChat(this.dataset.popJid,this.dataset.popPhone,\'\')">'
         + '<i class="fab fa-whatsapp"></i> Chat with ' + escHtml(displayPhone) + '</button>';
 
       document.body.appendChild(popup);
