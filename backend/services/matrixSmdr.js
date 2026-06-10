@@ -31,6 +31,10 @@ function cleanNullableText(value) {
 const PBX_HOST = process.env.PBX_HOST || '192.168.0.81';
 const SMDR_PORT = parseInt(process.env.SMDR_PORT || '5000');
 const CTI_PORT = parseInt(process.env.CTI_PORT || '5001');
+// VMS (voicemail) extensions — last-hop only, never a real caller destination.
+// Comma-separated list, e.g. VMS_EXTENSIONS=390,398
+const VMS_EXTENSIONS = (process.env.VMS_EXTENSIONS || '390,398')
+  .split(',').map(e => e.trim()).filter(Boolean);
 
 // ── DEEP DEBUG: CONFIG VALIDATION ──────────────────────────────────────────
 console.log('\n[SMDR-DEBUG] ╔════════════════════════════════════════════════════════╗');
@@ -281,6 +285,18 @@ async function ensureTable(retries = 3) {
 
       // ── Materialized view for fast paginated call log queries ─────────────
       // Precomputes the expensive dedup CTE so page switches are a simple index seek.
+      // v2: excludes VMS/voicemail last-hop rows (390, 398, etc.)
+      const vmsExcludeList = VMS_EXTENSIONS.map(e => `'${e}'`).join(', ');
+      const vmsExcludeClause = VMS_EXTENSIONS.length
+        ? `AND destination NOT IN (${vmsExcludeList})`
+        : '';
+      // Drop and recreate if the view definition is from a previous version (no VMS filter)
+      const viewCheck = await pool.query(`
+        SELECT definition FROM pg_matviews WHERE matviewname = 'call_logs_deduped'
+      `).catch(() => ({ rows: [] }));
+      if (viewCheck.rows.length && !viewCheck.rows[0].definition?.includes('NOT IN')) {
+        await pool.query(`DROP MATERIALIZED VIEW IF EXISTS call_logs_deduped CASCADE`).catch(() => { });
+      }
       await pool.query(`
         CREATE MATERIALIZED VIEW IF NOT EXISTS call_logs_deduped AS
         WITH base AS (
@@ -299,6 +315,7 @@ async function ensureTable(retries = 3) {
               AND (duration IS NULL OR duration = '' OR duration = '00:00:00')
             )
             AND NOT (duration IS NULL OR duration = '' OR duration = '00:00:00')
+            ${vmsExcludeClause}
           ORDER BY
             call_date::date,
             COALESCE(trunk, ''),

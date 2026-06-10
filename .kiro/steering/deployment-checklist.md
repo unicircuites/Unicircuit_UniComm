@@ -10,6 +10,24 @@ Yeh file update karo taaki tower server pe deploy karte waqt kuch miss na ho.
 
 ---
 
+## VMS/Voicemail 390 Call Log Fix (Jun 2026)
+
+| Change | File |
+|---|---|
+| Materialized view `call_logs_deduped` now excludes VMS last-hop rows (390, 398) via `VMS_EXTENSIONS` env var | `backend/services/matrixSmdr.js` |
+| On restart, old view is auto-dropped and rebuilt with the filter | `backend/services/matrixSmdr.js` |
+| `VMS_EXTENSIONS=390,398` added to `.env.example` | `backend/.env.example` |
+| `isGroupCode` regex in call log row renderer updated to cover 398 | `dashboard.html` |
+
+**Tower .env — add this line:**
+```env
+VMS_EXTENSIONS=390,398
+```
+
+**After deploy:** `pm2 restart unicomm --update-env` will drop and rebuild the materialized view automatically. 390 rows will disappear from call log.
+
+---
+
 ## Broadcast & Campaign Autocomplete / Group Improvements (Jun 2026)
 
 | Change | File |
