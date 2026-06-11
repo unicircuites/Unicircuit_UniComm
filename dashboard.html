@@ -7708,6 +7708,10 @@ Always write in a professional yet warm Indian B2B communication style. Use form
     };
 
     function nav(id, el) {
+      // Role guard — user role cannot navigate to restricted sections
+      const _restricted = ['calls','email','pipeline','marketing','analytics','usermgmt'];
+      if (window._userRoleIsUser && _restricted.includes(id)) return;
+
       document.querySelectorAll('.section-view').forEach(s => s.classList.remove('active'));
       document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
       const sec = document.getElementById('sec-' + id);
