@@ -364,7 +364,8 @@ router.get('/chats', authenticate, async (req, res) => {
         LEFT JOIN LATERAL (
           SELECT m.sender_name
           FROM wa_messages m
-          WHERE m.account_phone = wc.account_phone
+          WHERE wc.name IS NULL AND wc.notify IS NULL
+            AND m.account_phone = wc.account_phone
             AND m.from_me = false
             AND m.sender_name IS NOT NULL
             AND m.sender_name != ''
@@ -381,7 +382,8 @@ router.get('/chats', authenticate, async (req, res) => {
         LEFT JOIN LATERAL (
           SELECT c.fname, c.lname
           FROM contacts c
-          WHERE regexp_replace(COALESCE(c.phone, c.wa, ''), '[^0-9]', '', 'g') != ''
+          WHERE wc.phone IS NOT NULL
+            AND regexp_replace(COALESCE(c.phone, c.wa, ''), '[^0-9]', '', 'g') != ''
             AND (
               regexp_replace(COALESCE(c.phone, c.wa, ''), '[^0-9]', '', 'g')
                 = regexp_replace(COALESCE(wc.phone, ''), '[^0-9]', '', 'g')

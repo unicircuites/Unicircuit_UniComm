@@ -452,7 +452,7 @@ router.get('/contact/:phone', async (req, res) => {
       ) pc2 ON (
         pc2.phone = cl.destination
         OR pc2.phone_digits = regexp_replace(cl.destination, '[^0-9]', '', 'g')
-      )
+      ) AND cl.call_type = 'Out'
       WHERE cl.caller = $1
          OR cl.destination = $1
          OR regexp_replace(cl.caller, '[^0-9]', '', 'g') = regexp_replace($1, '[^0-9]', '', 'g')
@@ -578,6 +578,7 @@ router.get('/', async (req, res) => {
          WHERE name IS NOT NULL
          ORDER BY regexp_replace(phone, '[^0-9]', '', 'g'), (name IS NULL), updated_at DESC NULLS LAST, id DESC
        ) pc2 ON pc2.phone_digits = regexp_replace(cl.destination, '[^0-9]', '', 'g')
+              AND cl.call_type = 'Out'
        WHERE ${whereStr}
        ORDER BY cl.call_date DESC NULLS LAST, cl.call_time DESC NULLS LAST, cl.created_at DESC, cl.id DESC
        LIMIT $${p++} OFFSET $${p++}`,
@@ -1286,6 +1287,7 @@ router.get('/section-summary', async (req, res) => {
         WHERE name IS NOT NULL
         ORDER BY regexp_replace(phone,'[^0-9]','','g'), id DESC
       ) pc2 ON pc2.pd = regexp_replace(cl.destination,'[^0-9]','','g')
+             AND cl.call_type = 'Out'
       WHERE NOT (cl.duration IS NULL OR cl.duration = '' OR cl.duration = '00:00:00')
         AND NOT (cl.destination ~ '^\\d{2}-\\d{2}-\\d{2,4}$')
       ORDER BY COALESCE(cl.call_date::timestamp + COALESCE(cl.call_time, TIME '00:00:00'), cl.created_at) DESC

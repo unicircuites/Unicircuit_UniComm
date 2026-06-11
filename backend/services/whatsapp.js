@@ -713,6 +713,33 @@ async function ensureTables(retries = 3) {
         ON wa_contacts (account_phone, jid)
       `).catch(() => {});
 
+      // wa_contacts: phone lookup used in enriched_contacts CTE and lid_biz LATERAL
+      await pool.query(`
+        CREATE INDEX IF NOT EXISTS idx_wa_contacts_phone
+        ON wa_contacts (account_phone, phone)
+        WHERE phone IS NOT NULL
+      `).catch(() => {});
+
+      // wa_messages: sender lookup for enriched_contacts LATERAL (sender_name resolution)
+      await pool.query(`
+        CREATE INDEX IF NOT EXISTS idx_wa_messages_sender_name
+        ON wa_messages (account_phone, sender, timestamp DESC NULLS LAST)
+        WHERE from_me = false AND sender_name IS NOT NULL AND sender_name != ''
+      `).catch(() => {});
+
+      // wa_chats: id lookup for contact_rows NOT EXISTS subquery
+      await pool.query(`
+        CREATE INDEX IF NOT EXISTS idx_wa_chats_id
+        ON wa_chats (account_phone, id)
+      `).catch(() => {});
+
+      // wa_contacts: is_group_member filter used in contact_rows
+      await pool.query(`
+        CREATE INDEX IF NOT EXISTS idx_wa_contacts_group_member
+        ON wa_contacts (account_phone, is_group_member)
+        WHERE is_group_member = false
+      `).catch(() => {});
+
       // Labels
       await pool.query(`
         CREATE TABLE IF NOT EXISTS wa_labels (

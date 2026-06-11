@@ -240,7 +240,12 @@ router.get('/overview', async (req, res) => {
 router.get('/insights', async (req, res) => {
   try {
     const { period = 'week', from, to } = req.query;
-    const accountPhone = wa.getConnectedPhone();
+    const waAccountPhone = accountPhone || await (async () => {
+      try {
+        const r = await pool.query(`SELECT account_phone FROM wa_chats GROUP BY account_phone ORDER BY COUNT(*) DESC LIMIT 1`);
+        return r.rows[0]?.account_phone || null;
+      } catch { return null; }
+    })();
 
     // Build period interval
     let intervalSql;
@@ -272,16 +277,16 @@ router.get('/insights', async (req, res) => {
       auditActivity,
     ] = await Promise.all([
       // WA unread chats list
-      accountPhone ? safeQuery(`
+      waAccountPhone ? safeQuery(`
         SELECT id AS jid, name, unread, last_message, last_time
         FROM wa_chats
         WHERE account_phone = $1 AND unread > 0
         ORDER BY last_time DESC NULLS LAST
         LIMIT 20
-      `, [accountPhone]) : Promise.resolve({ rows: [] }),
+      `, [waAccountPhone]) : Promise.resolve({ rows: [] }),
 
       // WA contacts breakdown
-      accountPhone ? safeQuery(`
+      waAccountPhone ? safeQuery(`
         SELECT
           COUNT(*)::int AS total,
           COUNT(*) FILTER (WHERE jid LIKE '%@g.us')::int AS groups,
@@ -289,17 +294,17 @@ router.get('/insights', async (req, res) => {
           COUNT(*) FILTER (WHERE jid NOT LIKE '%@g.us' AND jid NOT LIKE '%@newsletter')::int AS individual,
           COUNT(*) FILTER (WHERE is_business = true OR verified_name IS NOT NULL)::int AS business
         FROM wa_chats WHERE account_phone = $1
-      `, [accountPhone]) : Promise.resolve({ rows: [{ total:0, groups:0, announcements:0, individual:0, business:0 }] }),
+      `, [waAccountPhone]) : Promise.resolve({ rows: [{ total:0, groups:0, announcements:0, individual:0, business:0 }] }),
 
       // WA labels with chat count
-      accountPhone ? safeQuery(`
+      waAccountPhone ? safeQuery(`
         SELECT l.id, l.name, l.color, COUNT(a.chat_id)::int AS chat_count
         FROM wa_labels l
         LEFT JOIN wa_label_associations a ON a.label_id = l.id AND a.account_phone = l.account_phone
         WHERE l.account_phone = $1
         GROUP BY l.id, l.name, l.color, l.account_phone
         ORDER BY chat_count DESC
-      `, [accountPhone]) : Promise.resolve({ rows: [] }),
+      `, [waAccountPhone]) : Promise.resolve({ rows: [] }),
 
       // Call log breakdown
       safeQuery(`
@@ -347,7 +352,7 @@ router.get('/insights', async (req, res) => {
     const [todayCalls, yesterdayCalls, todayWaUnread, yesterdayActivity] = await Promise.all([
       safeQuery(`SELECT COUNT(*)::int AS total, COUNT(*) FILTER (WHERE call_type='Missed')::int AS missed FROM call_logs WHERE call_date = CURRENT_DATE`),
       safeQuery(`SELECT COUNT(*)::int AS total, COUNT(*) FILTER (WHERE call_type='Missed')::int AS missed FROM call_logs WHERE call_date = CURRENT_DATE - 1`),
-      accountPhone ? safeQuery(`SELECT COALESCE(SUM(unread),0)::int AS unread FROM wa_chats WHERE account_phone=$1`, [accountPhone]) : Promise.resolve({ rows:[{unread:0}] }),
+      waAccountPhone ? safeQuery(`SELECT COALESCE(SUM(unread),0)::int AS unread FROM wa_chats WHERE account_phone=$1`, [waAccountPhone]) : Promise.resolve({ rows:[{unread:0}] }),
       safeQuery(`SELECT COUNT(*)::int AS total FROM audit_log WHERE created_at >= CURRENT_DATE - 1 AND created_at < CURRENT_DATE`),
     ]);
 
