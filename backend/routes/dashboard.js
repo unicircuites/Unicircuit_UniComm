@@ -235,4 +235,151 @@ router.get('/overview', async (req, res) => {
   }
 });
 
+
+// GET /api/dashboard/insights?period=day|week|month|year&from=YYYY-MM-DD&to=YYYY-MM-DD
+router.get('/insights', async (req, res) => {
+  try {
+    const { period = 'week', from, to } = req.query;
+    const accountPhone = wa.getConnectedPhone();
+
+    // Build period interval
+    let intervalSql;
+    let fromTs, toTs;
+    if (from && to) {
+      fromTs = new Date(from); toTs = new Date(to); toTs.setHours(23,59,59,999);
+      intervalSql = `created_at BETWEEN '${fromTs.toISOString()}' AND '${toTs.toISOString()}'`;
+    } else {
+      const map = { day: '1 day', week: '7 days', month: '30 days', year: '365 days' };
+      const iv = map[period] || '7 days';
+      intervalSql = `created_at >= NOW() - INTERVAL '${iv}'`;
+    }
+
+    // call_date-based interval for call_logs (which use call_date not created_at)
+    let callIntervalSql;
+    if (from && to) {
+      callIntervalSql = `call_date BETWEEN '${new Date(from).toISOString().slice(0,10)}' AND '${new Date(to).toISOString().slice(0,10)}'`;
+    } else {
+      const map = { day: '1 day', week: '7 days', month: '30 days', year: '365 days' };
+      callIntervalSql = `call_date >= (NOW() - INTERVAL '${map[period] || '7 days'}')::date`;
+    }
+
+    const [
+      waUnread,
+      waContacts,
+      waLabels,
+      callStats,
+      newCalls,
+      auditActivity,
+    ] = await Promise.all([
+      // WA unread chats list
+      accountPhone ? safeQuery(`
+        SELECT id AS jid, name, unread, last_message, last_time
+        FROM wa_chats
+        WHERE account_phone = $1 AND unread > 0
+        ORDER BY last_time DESC NULLS LAST
+        LIMIT 20
+      `, [accountPhone]) : Promise.resolve({ rows: [] }),
+
+      // WA contacts breakdown
+      accountPhone ? safeQuery(`
+        SELECT
+          COUNT(*)::int AS total,
+          COUNT(*) FILTER (WHERE jid LIKE '%@g.us')::int AS groups,
+          COUNT(*) FILTER (WHERE jid LIKE '%@newsletter')::int AS announcements,
+          COUNT(*) FILTER (WHERE jid NOT LIKE '%@g.us' AND jid NOT LIKE '%@newsletter')::int AS individual,
+          COUNT(*) FILTER (WHERE is_business = true OR verified_name IS NOT NULL)::int AS business
+        FROM wa_chats WHERE account_phone = $1
+      `, [accountPhone]) : Promise.resolve({ rows: [{ total:0, groups:0, announcements:0, individual:0, business:0 }] }),
+
+      // WA labels with chat count
+      accountPhone ? safeQuery(`
+        SELECT l.id, l.name, l.color, COUNT(a.chat_id)::int AS chat_count
+        FROM wa_labels l
+        LEFT JOIN wa_label_associations a ON a.label_id = l.id AND a.account_phone = l.account_phone
+        WHERE l.account_phone = $1
+        GROUP BY l.id, l.name, l.color, l.account_phone
+        ORDER BY chat_count DESC
+      `, [accountPhone]) : Promise.resolve({ rows: [] }),
+
+      // Call log breakdown
+      safeQuery(`
+        SELECT
+          COUNT(*)::int AS total,
+          COUNT(*) FILTER (WHERE call_type = 'Missed')::int AS missed,
+          COUNT(*) FILTER (WHERE call_type = 'In')::int AS attended_in,
+          COUNT(*) FILTER (WHERE call_type = 'Out')::int AS attended_out,
+          COUNT(*) FILTER (WHERE call_type NOT IN ('Missed') AND (duration IS NULL OR duration = '' OR duration = '00:00:00'))::int AS unattended,
+          COUNT(*) FILTER (WHERE recording_file IS NOT NULL AND recording_file != '' AND recording_file ~* '\\.(wav|mp3|ogg|m4a)$')::int AS recording_captured,
+          COUNT(*) FILTER (WHERE recording_file IS NULL OR recording_file = '' OR recording_file !~* '\\.(wav|mp3|ogg|m4a)$')::int AS recording_missing
+        FROM call_logs WHERE ${callIntervalSql}
+      `),
+
+      // New calls in period (with details)
+      safeQuery(`
+        SELECT cl.id, cl.caller, cl.destination, cl.call_type, cl.duration,
+               TO_CHAR(cl.call_date,'YYYY-MM-DD') AS call_date, cl.call_time,
+               cl.recording_file,
+               pc.name AS contact_name
+        FROM call_logs cl
+        LEFT JOIN pbx_contacts pc ON pc.name IS NOT NULL
+          AND regexp_replace(pc.phone,'[^0-9]','','g') = regexp_replace(cl.caller,'[^0-9]','','g')
+        WHERE ${callIntervalSql}
+        ORDER BY cl.call_date DESC NULLS LAST, cl.call_time DESC NULLS LAST, cl.id DESC
+        LIMIT 50
+      `),
+
+      // User activity from audit_log
+      safeQuery(`
+        SELECT al.id, al.action, al.entity, al.entity_id, al.detail,
+               al.created_at, u.name AS user_name, u.email AS user_email
+        FROM audit_log al
+        LEFT JOIN users u ON u.id = al.user_id
+        WHERE al.created_at >= NOW() - INTERVAL '${
+          from && to ? '9999 days' :
+          ({ day: '1 day', week: '7 days', month: '30 days', year: '365 days' }[period] || '7 days')
+        }'${from && to ? ` AND al.created_at BETWEEN '${new Date(from).toISOString()}' AND '${toTs.toISOString()}'` : ''}
+        ORDER BY al.created_at DESC
+        LIMIT 100
+      `),
+    ]);
+
+    // Comparison: today vs yesterday (always, regardless of period filter)
+    const [todayCalls, yesterdayCalls, todayWaUnread, yesterdayActivity] = await Promise.all([
+      safeQuery(`SELECT COUNT(*)::int AS total, COUNT(*) FILTER (WHERE call_type='Missed')::int AS missed FROM call_logs WHERE call_date = CURRENT_DATE`),
+      safeQuery(`SELECT COUNT(*)::int AS total, COUNT(*) FILTER (WHERE call_type='Missed')::int AS missed FROM call_logs WHERE call_date = CURRENT_DATE - 1`),
+      accountPhone ? safeQuery(`SELECT COALESCE(SUM(unread),0)::int AS unread FROM wa_chats WHERE account_phone=$1`, [accountPhone]) : Promise.resolve({ rows:[{unread:0}] }),
+      safeQuery(`SELECT COUNT(*)::int AS total FROM audit_log WHERE created_at >= CURRENT_DATE - 1 AND created_at < CURRENT_DATE`),
+    ]);
+
+    const todayCs  = todayCalls.rows[0]     || { total:0, missed:0 };
+    const yestCs   = yesterdayCalls.rows[0] || { total:0, missed:0 };
+
+    const cs = callStats.rows[0] || {};
+    return res.json({
+      period,
+      wa_unread: waUnread.rows,
+      wa_contacts: waContacts.rows[0] || { total:0, groups:0, announcements:0, individual:0, business:0 },
+      wa_labels: waLabels.rows,
+      call_stats: {
+        total:               parseInt(cs.total || 0),
+        missed:              parseInt(cs.missed || 0),
+        attended_in:         parseInt(cs.attended_in || 0),
+        attended_out:        parseInt(cs.attended_out || 0),
+        unattended:          parseInt(cs.unattended || 0),
+        recording_captured:  parseInt(cs.recording_captured || 0),
+        recording_missing:   parseInt(cs.recording_missing || 0),
+      },
+      comparison: {
+        today:     { calls: parseInt(todayCs.total||0), missed: parseInt(todayCs.missed||0), wa_unread: parseInt(todayWaUnread.rows[0]?.unread||0) },
+        yesterday: { calls: parseInt(yestCs.total||0),  missed: parseInt(yestCs.missed||0),  activity:  parseInt(yesterdayActivity.rows[0]?.total||0) },
+      },
+      recent_calls: newCalls.rows,
+      user_activity: auditActivity.rows,
+    });
+  } catch (err) {
+    console.error('[Dashboard] Insights error:', err.message);
+    return res.status(500).json({ error: err.message });
+  }
+});
+
 module.exports = router;

@@ -10,6 +10,7 @@
   <script>window.tailwind = window.tailwind || { config: {} };</script>
   <script src="/socket.io/socket.io.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
   <script src="/gif.js"></script>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
   <link
@@ -1026,6 +1027,15 @@
       gap: 12px;
       margin-bottom: 18px;
     }
+    .ins-tab { background:transparent;border:none;color:var(--muted2);cursor:pointer;border-radius:6px;padding:4px 10px;font-size:11.5px;font-weight:600;transition:.15s; }
+    .ins-tab:hover { background:rgba(255,255,255,0.06);color:var(--text); }
+    .ins-tab.active { background:var(--gold);color:#000; }
+    .ins-stat-tile { background:var(--card2);border:1px solid var(--border2);border-radius:10px;padding:12px 14px;display:flex;flex-direction:column;gap:3px; }
+    .ins-stat-tile .ist-val { font-size:22px;font-weight:700; }
+    .ins-stat-tile .ist-lbl { font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em; }
+    .ins-row-item { display:flex;justify-content:space-between;align-items:center;padding:6px 2px;border-bottom:1px solid var(--border2);font-size:12px; }
+    .ins-row-item:last-child { border-bottom:none; }
+    .ins-act-badge { display:inline-block;padding:1px 7px;border-radius:20px;font-size:10.5px;font-weight:600; }
 
     .kpi {
       background: var(--card);
@@ -4644,31 +4654,9 @@
               </div>
             </div>
 
-            <!-- RIGHT: AI SUMMARIZER + WA PREVIEW -->
+            <!-- RIGHT: WA PREVIEW -->
             <div style="display:flex;flex-direction:column;gap:14px;">
               <div class="card fu fu2">
-                <div class="card-header">
-                  <h3><i class="fas fa-microphone-alt" style="color:var(--gold);"></i> AI Call Summarizer</h3>
-                  <span style="font-size:10px;color:var(--muted);">PicoClaw + Whisper</span>
-                </div>
-                <div class="card-body">
-                  <div
-                    style="background:rgba(255,255,255,0.03);border:1px dashed var(--border2);border-radius:9px;padding:12px;display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:11px;">
-                    <div>
-                      <div style="font-size:12.5px;font-weight:600;"><i class="fas fa-file-audio"
-                          style="color:var(--gold);margin-right:6px;"></i>BHEL_call_Apr4.mp3</div>
-                      <div style="font-size:11px;color:var(--muted);margin-top:2px;">8m 22s · Inbound · Procurement
-                      </div>
-                    </div>
-                    <button class="btn btn-gold btn-sm" onclick="doSummarizeCall('dash-summary')"><i
-                        class="fas fa-magic"></i> Run</button>
-                  </div>
-                  <div id="dash-summary" style="font-size:12px;color:var(--muted);font-style:italic;">Click Run to
-                    generate PicoClaw AI summary.</div>
-                </div>
-              </div>
-
-              <div class="card fu fu3">
                 <div class="card-header">
                   <h3><i class="fab fa-whatsapp" style="color:#25D366;"></i> Latest WA Thread</h3>
                   <button class="btn btn-ghost btn-xs" onclick="nav('whatsapp',null)">View all →</button>
@@ -4707,58 +4695,143 @@
                   Calls · WhatsApp · Email volume</div>
                 <div class="stat-row">
                   <div class="stat-label">Email</div>
-                  <div style="flex:1;margin:0 10px;">
-                    <div class="prog-bar">
-                      <div class="prog-fill" id="dash-revenue-email-fill" style="width:0%;background:var(--blue);"></div>
-                    </div>
-                  </div>
-                  <div class="stat-val" style="font-size:11.5px;" id="dash-revenue-email-val">₹0</div>
+                  <div style="flex:1;margin:0 10px;"><div class="prog-bar"><div class="prog-fill" id="dash-revenue-email-fill" style="width:0%;background:var(--blue);"></div></div></div>
+                  <div class="stat-val" style="font-size:11.5px;" id="dash-revenue-email-val">0</div>
                 </div>
                 <div class="stat-row">
                   <div class="stat-label">WhatsApp</div>
-                  <div style="flex:1;margin:0 10px;">
-                    <div class="prog-bar">
-                      <div class="prog-fill" id="dash-revenue-wa-fill" style="width:0%;background:var(--green);"></div>
-                    </div>
-                  </div>
-                  <div class="stat-val" style="font-size:11.5px;" id="dash-revenue-wa-val">₹0</div>
+                  <div style="flex:1;margin:0 10px;"><div class="prog-bar"><div class="prog-fill" id="dash-revenue-wa-fill" style="width:0%;background:var(--green);"></div></div></div>
+                  <div class="stat-val" style="font-size:11.5px;" id="dash-revenue-wa-val">0</div>
                 </div>
                 <div class="stat-row">
                   <div class="stat-label">Calls</div>
-                  <div style="flex:1;margin:0 10px;">
-                    <div class="prog-bar">
-                      <div class="prog-fill" id="dash-revenue-calls-fill" style="width:0%;background:var(--gold);"></div>
-                    </div>
-                  </div>
-                  <div class="stat-val" style="font-size:11.5px;" id="dash-revenue-calls-val">₹0</div>
+                  <div style="flex:1;margin:0 10px;"><div class="prog-bar"><div class="prog-fill" id="dash-revenue-calls-fill" style="width:0%;background:var(--gold);"></div></div></div>
+                  <div class="stat-val" style="font-size:11.5px;" id="dash-revenue-calls-val">0</div>
                 </div>
               </div>
             </div>
-            <div class="card fu fu3">
-              <div class="card-header">
-                <h3><i class="fas fa-robot" style="color:var(--cyan);"></i> AI Insights</h3>
+          </div>
+        </div>
+
+          <!-- ██████ INSIGHTS PANEL ██████ -->
+          <div id="insights-panel" style="margin-top:20px;">
+
+            <!-- Period Filter + Action Bar -->
+            <div style="display:flex;align-items:center;gap:8px;margin-bottom:14px;flex-wrap:wrap;">
+              <span style="font-size:13px;font-weight:700;color:var(--muted2);letter-spacing:.05em;text-transform:uppercase;"><i class="fas fa-chart-bar" style="color:var(--gold);margin-right:7px;"></i>Insights</span>
+              <div id="insights-period-tabs" style="display:flex;gap:3px;background:rgba(255,255,255,0.04);border-radius:8px;padding:3px;">
+                <button class="ins-tab active" data-p="day"    onclick="insightsSetPeriod('day')">Today</button>
+                <button class="ins-tab"        data-p="week"   onclick="insightsSetPeriod('week')">7 Days</button>
+                <button class="ins-tab"        data-p="month"  onclick="insightsSetPeriod('month')">30 Days</button>
+                <button class="ins-tab"        data-p="year"   onclick="insightsSetPeriod('year')">Year</button>
+                <button class="ins-tab"        data-p="custom" onclick="insightsToggleCustom()"><i class="fas fa-calendar-alt"></i> Custom</button>
               </div>
-              <div class="card-body">
-                <div class="stat-row">
-                  <div class="stat-label">Lead model</div>
-                  <div class="stat-val" style="font-size:12px;" id="dash-ai-model">PicoClaw · Live CRM analytics</div>
-                </div>
-                <div class="stat-row">
-                  <div class="stat-label">Top segment</div>
-                  <div class="stat-val" style="font-size:11.5px;color:var(--gold);" id="dash-ai-top-segment">—</div>
-                </div>
-                <div class="stat-row">
-                  <div class="stat-label">Conversion</div>
-                  <div class="stat-val" style="color:var(--green2);" id="dash-ai-conversion">0%</div>
-                </div>
-                <div class="stat-row">
-                  <div class="stat-label">Missed calls</div>
-                  <div><span class="badge b-red" id="dash-ai-churn">0</span></div>
-                </div>
-                <div style="font-size:11px;color:var(--muted);margin-top:6px;line-height:1.4;" id="dash-ai-insight-text">PicoClaw insight will appear here.</div>
-                <button class="btn btn-gold btn-sm" style="width:100%;justify-content:center;margin-top:8px;"
-                  onclick="nav('ai',null)"><i class="fas fa-robot"></i> Ask AI Assistant</button>
+              <div id="insights-custom-range" style="display:none;align-items:center;gap:6px;">
+                <input type="date" id="ins-from" style="background:var(--card2);border:1px solid var(--border2);color:var(--text);border-radius:6px;padding:3px 7px;font-size:12px;">
+                <span style="color:var(--muted);">→</span>
+                <input type="date" id="ins-to" style="background:var(--card2);border:1px solid var(--border2);color:var(--text);border-radius:6px;padding:3px 7px;font-size:12px;">
+                <button class="btn btn-gold btn-sm" onclick="insightsApplyCustom()"><i class="fas fa-check"></i></button>
               </div>
+              <div style="display:flex;gap:7px;margin-left:auto;">
+                <button class="btn btn-sm" style="background:rgba(99,102,241,0.15);color:#a5b4fc;border:1px solid rgba(99,102,241,0.3);" onclick="insightsOpenCharts()"><i class="fas fa-chart-pie"></i> Charts</button>
+                <button class="btn btn-sm" style="background:rgba(255,255,255,0.05);color:var(--muted2);" onclick="loadInsights()"><i class="fas fa-sync-alt"></i> Refresh</button>
+              </div>
+            </div>
+
+            <!-- Comparison Banner (today vs yesterday) -->
+            <div id="ins-comparison-row" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:8px;margin-bottom:14px;"></div>
+
+            <!-- Stat Tiles (clickable) -->
+            <div id="insights-stats-row" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;margin-bottom:16px;"></div>
+
+            <!-- Three panels: WA Unread / WA Labels / WA Contacts -->
+            <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;margin-bottom:14px;">
+              <div class="card" style="min-width:0;">
+                <div class="card-header" style="padding:10px 14px 8px;">
+                  <h3 style="font-size:13px;cursor:pointer;" onclick="nav('whatsapp',null)"><i class="fab fa-whatsapp" style="color:#25D366;"></i> WA Unread Chats <i class="fas fa-external-link-alt" style="font-size:9px;opacity:.5;"></i></h3>
+                  <span class="badge b-green" id="ins-wa-unread-badge">0</span>
+                </div>
+                <div id="ins-wa-unread-list" style="max-height:220px;overflow-y:auto;padding:4px 10px 8px;"></div>
+              </div>
+              <div class="card" style="min-width:0;">
+                <div class="card-header" style="padding:10px 14px 8px;">
+                  <h3 style="font-size:13px;cursor:pointer;" onclick="nav('whatsapp',null)"><i class="fas fa-tags" style="color:var(--cyan);"></i> WA Chat Labels <i class="fas fa-external-link-alt" style="font-size:9px;opacity:.5;"></i></h3>
+                </div>
+                <div id="ins-wa-labels-list" style="max-height:220px;overflow-y:auto;padding:4px 10px 8px;"></div>
+              </div>
+              <div class="card" style="min-width:0;">
+                <div class="card-header" style="padding:10px 14px 8px;">
+                  <h3 style="font-size:13px;cursor:pointer;" onclick="nav('whatsapp',null)"><i class="fas fa-address-book" style="color:var(--gold);"></i> WA Contacts <i class="fas fa-external-link-alt" style="font-size:9px;opacity:.5;"></i></h3>
+                  <span class="badge b-gold" id="ins-wa-contacts-total">0</span>
+                </div>
+                <div id="ins-wa-contacts-breakdown" style="padding:6px 14px 10px;"></div>
+              </div>
+            </div>
+
+            <!-- Call stats + Recent calls -->
+            <div style="display:grid;grid-template-columns:220px 1fr;gap:14px;margin-bottom:14px;">
+              <div class="card" style="min-width:0;">
+                <div class="card-header" style="padding:10px 14px 8px;">
+                  <h3 style="font-size:13px;cursor:pointer;" onclick="nav('calls',null)"><i class="fas fa-phone-alt" style="color:var(--gold);"></i> Call Breakdown <i class="fas fa-external-link-alt" style="font-size:9px;opacity:.5;"></i></h3>
+                </div>
+                <div id="ins-call-stats" style="padding:6px 14px 12px;"></div>
+              </div>
+              <div class="card" style="min-width:0;">
+                <div class="card-header" style="padding:10px 14px 8px;">
+                  <h3 style="font-size:13px;cursor:pointer;" onclick="nav('calls',null)"><i class="fas fa-list-alt" style="color:var(--blue2);"></i> Recent Calls <i class="fas fa-external-link-alt" style="font-size:9px;opacity:.5;"></i></h3>
+                </div>
+                <div style="overflow-x:auto;max-height:260px;overflow-y:auto;">
+                  <table class="data-table" style="font-size:11.5px;">
+                    <thead><tr><th>Date/Time</th><th>Caller</th><th>Dest</th><th>Type</th><th>Dur.</th><th>Rec.</th></tr></thead>
+                    <tbody id="ins-recent-calls-body"><tr><td colspan="6" style="text-align:center;color:var(--muted);padding:14px;">Loading…</td></tr></tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+
+            <!-- User Activity Log -->
+            <div class="card" style="margin-bottom:16px;">
+              <div class="card-header" style="padding:10px 14px 8px;">
+                <h3 style="font-size:13px;"><i class="fas fa-user-clock" style="color:var(--cyan);"></i> User Activity Log</h3>
+                <span class="badge b-cyan" id="ins-activity-count">0</span>
+              </div>
+              <div style="overflow-x:auto;max-height:280px;overflow-y:auto;">
+                <table class="data-table" style="font-size:11.5px;">
+                  <thead><tr><th>Time</th><th>User</th><th>Action</th><th>Detail</th></tr></thead>
+                  <tbody id="ins-activity-body"><tr><td colspan="4" style="text-align:center;color:var(--muted);padding:14px;">Loading…</td></tr></tbody>
+                </table>
+              </div>
+            </div>
+
+            <!-- AI Summary Card -->
+            <div class="card" id="ins-ai-summary-card">
+              <div class="card-header" style="padding:10px 14px 8px;">
+                <h3 style="font-size:13px;"><i class="fas fa-robot" style="color:var(--cyan);"></i> PicoClaw AI Summary</h3>
+                <button class="btn btn-sm" style="background:rgba(6,182,212,0.15);color:var(--cyan);border:1px solid rgba(6,182,212,0.3);" onclick="insightsAISummary()" id="ins-ai-btn"><i class="fas fa-magic"></i> Generate</button>
+              </div>
+              <div id="ins-ai-text" style="padding:12px 14px;font-size:12.5px;color:var(--muted);font-style:italic;line-height:1.7;">Click Generate to get a numbered AI analysis of all current stats.</div>
+            </div>
+
+          </div>
+        </div>
+
+        <!-- ██████ CHARTS MODAL ██████ -->
+        <div id="ins-charts-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:9999;align-items:center;justify-content:center;" onclick="if(event.target===this)insightsCloseCharts()">
+          <div style="background:var(--card);border:1px solid var(--border2);border-radius:16px;width:min(900px,95vw);max-height:90vh;overflow-y:auto;padding:20px;position:relative;">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+              <h3 style="font-size:15px;font-weight:700;"><i class="fas fa-chart-pie" style="color:var(--gold);margin-right:8px;"></i>Stats Charts</h3>
+              <div style="display:flex;gap:6px;align-items:center;">
+                <div style="display:flex;gap:3px;background:rgba(255,255,255,0.04);border-radius:8px;padding:3px;" id="chart-type-tabs">
+                  <button class="ins-tab active" data-ct="pie"  onclick="insightsRenderChart('pie')"><i class="fas fa-chart-pie"></i> Pie</button>
+                  <button class="ins-tab"        data-ct="bar"  onclick="insightsRenderChart('bar')"><i class="fas fa-chart-bar"></i> Bar</button>
+                  <button class="ins-tab"        data-ct="line" onclick="insightsRenderChart('line')"><i class="fas fa-chart-line"></i> Line</button>
+                </div>
+                <button class="btn btn-sm" style="background:rgba(255,255,255,0.05);color:var(--muted2);" onclick="insightsCloseCharts()"><i class="fas fa-times"></i></button>
+              </div>
+            </div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:18px;">
+              <div><div style="font-size:12px;font-weight:600;color:var(--muted2);margin-bottom:8px;text-align:center;">Call Breakdown</div><canvas id="ins-chart-calls" height="200"></canvas></div>
+              <div><div style="font-size:12px;font-weight:600;color:var(--muted2);margin-bottom:8px;text-align:center;">WA Contacts</div><canvas id="ins-chart-wa" height="200"></canvas></div>
             </div>
           </div>
         </div>
@@ -13502,6 +13575,7 @@ Keep it concise and professional.`;
         await refreshDashboardKpis();
         await refreshDashboardOverview({ usePicoClaw: false });
         startDashboardKpiAutoRefresh();
+        loadInsights();
 
         // Show DB connected badge
         // showDbStatus(true);  // replaced by initSystemStatus() / PostgreSQL health indicator
@@ -31653,6 +31727,350 @@ ${plainText}`;
         });
       }
     });
+
+    // ═══════════════════════════════════════════════════════════════════
+    // INSIGHTS PANEL
+    // ═══════════════════════════════════════════════════════════════════
+    let _insPeriod = 'week';
+    let _insData   = null;
+    let _insCharts = {};
+
+    function insightsSetPeriod(p) {
+      _insPeriod = p;
+      document.querySelectorAll('.ins-tab[data-p]').forEach(t => t.classList.toggle('active', t.dataset.p === p));
+      if (p !== 'custom') {
+        document.getElementById('insights-custom-range').style.display = 'none';
+        loadInsights();
+      }
+    }
+
+    function insightsToggleCustom() {
+      document.querySelectorAll('.ins-tab[data-p]').forEach(t => t.classList.toggle('active', t.dataset.p === 'custom'));
+      const el = document.getElementById('insights-custom-range');
+      el.style.display = el.style.display === 'none' ? 'flex' : 'none';
+    }
+
+    function insightsApplyCustom() {
+      const from = document.getElementById('ins-from').value;
+      const to   = document.getElementById('ins-to').value;
+      if (!from || !to) return;
+      _insPeriod = 'custom';
+      loadInsights(from, to);
+    }
+
+    async function loadInsights(from, to) {
+      let url = `${API_BASE}/dashboard/insights?period=${_insPeriod}`;
+      if (from && to) url += `&from=${from}&to=${to}`;
+      try {
+        const r = await fetch(url, { headers: getAuthHeaders() });
+        if (!r.ok) return;
+        _insData = await r.json();
+        _renderComparisonRow(_insData.comparison);
+        _renderInsightsStats(_insData);
+        _renderWaUnread(_insData.wa_unread || []);
+        _renderWaLabels(_insData.wa_labels || []);
+        _renderWaContacts(_insData.wa_contacts || {});
+        _renderCallStats(_insData.call_stats || {});
+        _renderRecentCalls(_insData.recent_calls || []);
+        _renderActivity(_insData.user_activity || []);
+      } catch (e) { console.warn('[Insights]', e.message); }
+    }
+
+    function _delta(today, yesterday) {
+      const diff = today - yesterday;
+      if (yesterday === 0) return diff > 0 ? { text: `+${diff} new`, up: true } : { text: '—', up: null };
+      const pct = Math.round((diff / yesterday) * 100);
+      return { text: (diff >= 0 ? '+' : '') + pct + '%', up: diff >= 0 };
+    }
+
+    function _renderComparisonRow(cmp) {
+      const el = document.getElementById('ins-comparison-row');
+      if (!el || !cmp) return;
+      const items = [
+        { lbl: 'Calls Today',     today: cmp.today.calls,    yesterday: cmp.yesterday.calls,    icon: 'fa-phone-alt',  color: 'var(--gold)' },
+        { lbl: 'Missed Today',    today: cmp.today.missed,   yesterday: cmp.yesterday.missed,   icon: 'fa-phone-slash', color: 'var(--red2)' },
+        { lbl: 'WA Unread',       today: cmp.today.wa_unread,yesterday: cmp.yesterday.activity, icon: 'fab fa-whatsapp', color: '#25D366' },
+      ];
+      el.innerHTML = items.map(item => {
+        const d = _delta(item.today, item.yesterday);
+        const dColor = d.up === true ? 'var(--green2)' : d.up === false ? 'var(--red2)' : 'var(--muted)';
+        return `<div style="background:var(--card2);border:1px solid var(--border2);border-radius:10px;padding:10px 14px;display:flex;justify-content:space-between;align-items:center;">
+          <div>
+            <div style="font-size:10.5px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:2px;"><i class="fas ${item.icon}" style="color:${item.color};margin-right:4px;"></i>${item.lbl}</div>
+            <div style="font-size:20px;font-weight:700;color:${item.color};">${item.today}</div>
+          </div>
+          <div style="text-align:right;">
+            <div style="font-size:10px;color:var(--muted);">vs yesterday</div>
+            <div style="font-size:13px;font-weight:700;color:${dColor};">${d.text}</div>
+            <div style="font-size:10.5px;color:var(--muted);">${item.yesterday} yesterday</div>
+          </div>
+        </div>`;
+      }).join('');
+    }
+
+    // nav targets for each stat tile
+    const _insTileNav = {
+      'WA Contacts': 'whatsapp', 'WA Unread': 'whatsapp',
+      'Total Calls': 'calls', 'Missed Calls': 'calls',
+      'Calls In': 'calls', 'Calls Out': 'calls',
+      'Unattended': 'calls', 'Rec. Captured': 'calls', 'Rec. Missing': 'calls',
+    };
+
+    function _renderInsightsStats(d) {
+      const cs = d.call_stats || {};
+      const wc = d.wa_contacts || {};
+      const tiles = [
+        { val: wc.total || 0,               lbl: 'WA Contacts',    color: '#25D366' },
+        { val: d.wa_unread?.length || 0,     lbl: 'WA Unread',      color: '#fbbf24' },
+        { val: cs.total || 0,               lbl: 'Total Calls',    color: 'var(--gold)' },
+        { val: cs.missed || 0,              lbl: 'Missed Calls',   color: 'var(--red2)' },
+        { val: cs.attended_in || 0,         lbl: 'Calls In',       color: 'var(--green2)' },
+        { val: cs.attended_out || 0,        lbl: 'Calls Out',      color: 'var(--blue2)' },
+        { val: cs.unattended || 0,          lbl: 'Unattended',     color: '#f97316' },
+        { val: cs.recording_captured || 0,  lbl: 'Rec. Captured',  color: 'var(--cyan)' },
+        { val: cs.recording_missing || 0,   lbl: 'Rec. Missing',   color: 'var(--muted2)' },
+      ];
+      document.getElementById('insights-stats-row').innerHTML = tiles.map(t => {
+        const target = _insTileNav[t.lbl];
+        const cursor = target ? 'cursor:pointer;' : '';
+        const click  = target ? `onclick="nav('${target}',null)"` : '';
+        const hint   = target ? `<div style="font-size:9px;color:var(--muted);margin-top:2px;"><i class="fas fa-external-link-alt"></i> ${target}</div>` : '';
+        return `<div class="ins-stat-tile" style="${cursor}transition:.15s;" ${click}
+          onmouseover="if('${target}')this.style.borderColor='${t.color}'"
+          onmouseout="this.style.borderColor='var(--border2)'">
+          <div class="ist-val" style="color:${t.color}">${t.val}</div>
+          <div class="ist-lbl">${t.lbl}</div>${hint}
+        </div>`;
+      }).join('');
+    }
+
+    function _renderWaUnread(rows) {
+      document.getElementById('ins-wa-unread-badge').textContent = rows.length;
+      const list = document.getElementById('ins-wa-unread-list');
+      if (!rows.length) { list.innerHTML = '<div style="color:var(--muted);font-size:12px;padding:14px 0;text-align:center;">No unread chats</div>'; return; }
+      list.innerHTML = rows.map(c => {
+        const t = c.last_time ? new Date(c.last_time).toLocaleTimeString([], { hour:'2-digit', minute:'2-digit' }) : '';
+        const d = c.last_time ? new Date(c.last_time).toLocaleDateString([], { day:'2-digit', month:'short' }) : '';
+        return `<div class="ins-row-item" style="cursor:pointer;" onclick="nav('whatsapp',null)">
+          <div style="flex:1;min-width:0;">
+            <div style="font-weight:600;font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${_esc(c.name||c.jid)}</div>
+            <div style="color:var(--muted);font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${_esc(c.last_message||'')}</div>
+          </div>
+          <div style="text-align:right;flex-shrink:0;margin-left:8px;">
+            <div style="font-size:10px;color:var(--muted2);">${d} ${t}</div>
+            <span style="background:#25D366;color:#000;border-radius:20px;padding:1px 6px;font-size:10px;font-weight:700;">${c.unread}</span>
+          </div>
+        </div>`;
+      }).join('');
+    }
+
+    function _renderWaLabels(rows) {
+      const list = document.getElementById('ins-wa-labels-list');
+      if (!rows.length) { list.innerHTML = '<div style="color:var(--muted);font-size:12px;padding:14px 0;text-align:center;">No labels</div>'; return; }
+      list.innerHTML = rows.map(l =>
+        `<div class="ins-row-item" style="cursor:pointer;" onclick="nav('whatsapp',null)">
+          <div style="display:flex;align-items:center;gap:8px;">
+            <span style="width:10px;height:10px;border-radius:50%;background:${_esc(l.color||'#888')};flex-shrink:0;display:inline-block;"></span>
+            <span style="font-size:12px;">${_esc(l.name)}</span>
+          </div>
+          <span style="background:rgba(255,255,255,0.08);border-radius:20px;padding:1px 8px;font-size:11px;">${l.chat_count}</span>
+        </div>`
+      ).join('');
+    }
+
+    function _renderWaContacts(wc) {
+      document.getElementById('ins-wa-contacts-total').textContent = wc.total || 0;
+      const rows = [
+        { lbl: 'Individual', val: wc.individual||0, color:'var(--green2)' },
+        { lbl: 'Groups',     val: wc.groups||0,     color:'var(--blue2)' },
+        { lbl: 'Channels',   val: wc.announcements||0, color:'var(--cyan)' },
+        { lbl: 'Business',   val: wc.business||0,   color:'#4FC3F7' },
+      ];
+      document.getElementById('ins-wa-contacts-breakdown').innerHTML = rows.map(r =>
+        `<div class="ins-row-item"><span style="color:var(--muted2);">${r.lbl}</span><span style="font-weight:700;color:${r.color};">${r.val}</span></div>`
+      ).join('');
+    }
+
+    function _renderCallStats(cs) {
+      const rows = [
+        { lbl:'Total',         val:cs.total||0,              color:'var(--gold)' },
+        { lbl:'Missed',        val:cs.missed||0,             color:'var(--red2)' },
+        { lbl:'Attended In',   val:cs.attended_in||0,        color:'var(--green2)' },
+        { lbl:'Attended Out',  val:cs.attended_out||0,       color:'var(--blue2)' },
+        { lbl:'Unattended',    val:cs.unattended||0,         color:'#f97316' },
+        { lbl:'Rec. Captured', val:cs.recording_captured||0, color:'var(--cyan)' },
+        { lbl:'Rec. Missing',  val:cs.recording_missing||0,  color:'var(--muted2)' },
+      ];
+      document.getElementById('ins-call-stats').innerHTML = rows.map(r =>
+        `<div class="ins-row-item" style="cursor:pointer;" onclick="nav('calls',null)">
+          <span style="color:var(--muted2);font-size:11.5px;">${r.lbl}</span>
+          <span style="font-weight:700;color:${r.color};">${r.val}</span>
+        </div>`
+      ).join('');
+    }
+
+    function _renderRecentCalls(rows) {
+      const tbody = document.getElementById('ins-recent-calls-body');
+      if (!rows.length) { tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:var(--muted);padding:14px;">No calls in period</td></tr>'; return; }
+      const typeColor = { Missed:'var(--red2)', In:'var(--green2)', Out:'var(--blue2)' };
+      tbody.innerHTML = rows.map(c => {
+        const rec = c.recording_file && /\.(wav|mp3|ogg|m4a)$/i.test(c.recording_file)
+          ? '<i class="fas fa-circle" style="color:var(--green2);font-size:8px;" title="Captured"></i>'
+          : '<i class="fas fa-circle" style="color:var(--muted);font-size:8px;" title="Missing"></i>';
+        const isNew = !c.duration || c.duration === '00:00:00';
+        return `<tr style="cursor:pointer;" onclick="nav('calls',null)">
+          <td style="white-space:nowrap;font-size:11px;">${c.call_date||''} ${c.call_time?c.call_time.slice(0,5):''}</td>
+          <td>${_esc(c.contact_name||c.caller||'')}</td>
+          <td>${_esc(c.destination||'')}</td>
+          <td style="color:${typeColor[c.call_type]||'var(--muted2)'};">${c.call_type||''}${isNew?' <span style="background:var(--gold);color:#000;font-size:9px;border-radius:3px;padding:0 4px;vertical-align:middle;">NEW</span>':''}</td>
+          <td>${c.duration||'—'}</td>
+          <td style="text-align:center;">${rec}</td>
+        </tr>`;
+      }).join('');
+    }
+
+    const _actMeta = {
+      wa_send:        { lbl:'WA Sent',       color:'#25D366',       icon:'fa-paper-plane' },
+      wa_label_add:   { lbl:'Label Added',   color:'var(--cyan)',   icon:'fa-tag' },
+      wa_label_remove:{ lbl:'Label Removed', color:'#f97316',       icon:'fa-tag' },
+      wa_contact_save:{ lbl:'Contact Saved', color:'var(--blue2)',  icon:'fa-address-card' },
+      login:          { lbl:'Login',         color:'var(--green2)', icon:'fa-sign-in-alt' },
+      logout:         { lbl:'Logout',        color:'var(--muted2)', icon:'fa-sign-out-alt' },
+      create:         { lbl:'Created',       color:'var(--gold)',   icon:'fa-plus' },
+      update:         { lbl:'Updated',       color:'var(--blue2)',  icon:'fa-pen' },
+      delete:         { lbl:'Deleted',       color:'var(--red2)',   icon:'fa-trash' },
+    };
+
+    function _renderActivity(rows) {
+      document.getElementById('ins-activity-count').textContent = rows.length;
+      const tbody = document.getElementById('ins-activity-body');
+      if (!rows.length) { tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;color:var(--muted);padding:14px;">No activity in period</td></tr>'; return; }
+      tbody.innerHTML = rows.map(a => {
+        const m = _actMeta[a.action] || { lbl:a.action, color:'var(--muted2)', icon:'fa-circle' };
+        const ts = a.created_at ? new Date(a.created_at).toLocaleString([], { day:'2-digit', month:'short', hour:'2-digit', minute:'2-digit' }) : '';
+        return `<tr>
+          <td style="white-space:nowrap;font-size:11px;color:var(--muted2);">${ts}</td>
+          <td style="font-weight:600;">${_esc(a.user_name||a.user_email||'System')}</td>
+          <td><span class="ins-act-badge" style="background:${m.color}22;color:${m.color};"><i class="fas ${m.icon}" style="margin-right:4px;"></i>${m.lbl}</span></td>
+          <td style="color:var(--muted2);font-size:11px;max-width:260px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${_esc(a.detail||'')}</td>
+        </tr>`;
+      }).join('');
+    }
+
+    // ── Charts Modal ─────────────────────────────────────────────────────
+    let _currentChartType = 'pie';
+
+    function insightsOpenCharts() {
+      const modal = document.getElementById('ins-charts-modal');
+      modal.style.display = 'flex';
+      insightsRenderChart(_currentChartType);
+    }
+
+    function insightsCloseCharts() {
+      document.getElementById('ins-charts-modal').style.display = 'none';
+    }
+
+    function insightsRenderChart(type) {
+      _currentChartType = type;
+      document.querySelectorAll('#chart-type-tabs .ins-tab').forEach(t => t.classList.toggle('active', t.dataset.ct === type));
+
+      const cs = _insData?.call_stats || {};
+      const wc = _insData?.wa_contacts || {};
+
+      const dark = { color: '#ccc', gridColor: 'rgba(255,255,255,0.07)' };
+      const callLabels = ['Missed', 'Attended In', 'Attended Out', 'Unattended'];
+      const callData   = [cs.missed||0, cs.attended_in||0, cs.attended_out||0, cs.unattended||0];
+      const callColors = ['#ef4444','#22c55e','#3b82f6','#f97316'];
+      const waLabels   = ['Individual','Groups','Channels','Business'];
+      const waData     = [wc.individual||0, wc.groups||0, wc.announcements||0, wc.business||0];
+      const waColors   = ['#22c55e','#3b82f6','#06b6d4','#4FC3F7'];
+
+      ['ins-chart-calls','ins-chart-wa'].forEach(id => {
+        const old = _insCharts[id];
+        if (old) { old.destroy(); delete _insCharts[id]; }
+      });
+
+      const mkCfg = (labels, data, colors, chartType) => {
+        const isPie = chartType === 'pie';
+        return {
+          type: chartType === 'line' ? 'line' : (isPie ? 'pie' : 'bar'),
+          data: {
+            labels,
+            datasets: [{
+              label: 'Count',
+              data,
+              backgroundColor: isPie ? colors : colors.map(c => c + '99'),
+              borderColor: colors,
+              borderWidth: isPie ? 0 : 2,
+              fill: chartType === 'line',
+              tension: 0.4,
+              pointBackgroundColor: colors,
+            }],
+          },
+          options: {
+            responsive: true,
+            plugins: {
+              legend: { labels: { color: dark.color, font: { size: 11 } }, position: isPie ? 'right' : 'top' },
+              tooltip: { bodyColor: '#fff', titleColor: '#fff', backgroundColor: 'rgba(0,0,0,.85)' },
+            },
+            scales: isPie ? {} : {
+              x: { ticks: { color: dark.color }, grid: { color: dark.gridColor } },
+              y: { ticks: { color: dark.color }, grid: { color: dark.gridColor }, beginAtZero: true },
+            },
+          },
+        };
+      };
+
+      _insCharts['ins-chart-calls'] = new Chart(document.getElementById('ins-chart-calls'), mkCfg(callLabels, callData, callColors, type));
+      _insCharts['ins-chart-wa']    = new Chart(document.getElementById('ins-chart-wa'),    mkCfg(waLabels,   waData,   waColors,   type));
+    }
+
+    // ── AI Summary ───────────────────────────────────────────────────────
+    async function insightsAISummary() {
+      const btn  = document.getElementById('ins-ai-btn');
+      const text = document.getElementById('ins-ai-text');
+      if (!_insData) { text.textContent = 'Load insights first.'; return; }
+      btn.disabled = true;
+      btn.innerHTML = '<span class="spin-loader"></span> Thinking…';
+      text.style.fontStyle = 'italic';
+      text.style.color = 'var(--muted)';
+      text.textContent = 'PicoClaw is analysing your stats…';
+
+      const cs = _insData.call_stats || {};
+      const wc = _insData.wa_contacts || {};
+      const cmp = _insData.comparison || {};
+      const prompt = `You are a CRM analytics assistant. Analyse these stats and give a numbered list summary (max 8 points, concise, professional):
+Period: ${_insData.period}
+CALLS: total=${cs.total}, missed=${cs.missed}, attended_in=${cs.attended_in}, attended_out=${cs.attended_out}, unattended=${cs.unattended}, recording_captured=${cs.recording_captured}, recording_missing=${cs.recording_missing}
+WA CONTACTS: total=${wc.total}, individual=${wc.individual}, groups=${wc.groups}, channels=${wc.announcements}, business=${wc.business}
+WA UNREAD CHATS: ${_insData.wa_unread?.length||0}
+WA LABELS: ${_insData.wa_labels?.length||0} labels
+TODAY vs YESTERDAY: calls ${cmp.today?.calls||0} vs ${cmp.yesterday?.calls||0}, missed ${cmp.today?.missed||0} vs ${cmp.yesterday?.missed||0}
+USER ACTIVITY (recent): ${_insData.user_activity?.length||0} events
+Provide insight in a numbered list. Highlight risks and positives.`;
+
+      try {
+        const res = await fetch('/api/system/ai/chat', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
+          body: JSON.stringify({ messages: [{ role:'user', content: prompt }] }),
+        });
+        const data = await res.json();
+        const reply = data.reply || 'No summary available.';
+        text.style.fontStyle = 'normal';
+        text.style.color = 'var(--text)';
+        text.innerHTML = reply.replace(/\n/g, '<br>');
+      } catch (e) {
+        text.textContent = 'AI unavailable: ' + e.message;
+      } finally {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fas fa-magic"></i> Regenerate';
+      }
+    }
+
+    function _esc(s) {
+      return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    }
 
   </script>
 

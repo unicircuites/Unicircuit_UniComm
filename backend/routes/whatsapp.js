@@ -1017,6 +1017,10 @@ router.post('/send', authenticate, async (req, res) => {
   if (!jid || !message) return res.status(400).json({ error: 'jid and message required' });
   try {
     await wa.sendMessage(jid, message, quotedMsgId || null);
+    pool.query(
+      `INSERT INTO audit_log (user_id, action, entity, entity_id, detail) VALUES ($1,'wa_send','whatsapp_chat',$2,$3)`,
+      [req.user?.id, jid, `Sent WA message to ${jid}: "${String(message).slice(0,80)}"`]
+    ).catch(() => {});
     res.json({ success: true });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
@@ -1504,6 +1508,11 @@ router.post('/chats/:jid/labels/:labelId', authenticate, async (req, res) => {
     await wa.addChatLabel(jid, labelId);
     await pool.query(`INSERT INTO wa_label_associations (label_id,account_phone,chat_id) VALUES ($1,$2,$3) ON CONFLICT DO NOTHING`,
       [labelId, accountPhone, jid]);
+    const lbl = await pool.query(`SELECT name FROM wa_labels WHERE id=$1 LIMIT 1`, [labelId]).catch(() => ({ rows: [] }));
+    pool.query(
+      `INSERT INTO audit_log (user_id, action, entity, entity_id, detail) VALUES ($1,'wa_label_add','whatsapp_chat',$2,$3)`,
+      [req.user?.id, jid, `Added label "${lbl.rows[0]?.name || labelId}" to chat ${jid}`]
+    ).catch(() => {});
     wa.emitEvent('wa:labels_updated', { type: 'association', association: { labelId, chatId: jid }, action: 'add' });
     res.json({ ok: true });
   } catch (err) { res.status(500).json({ error: err.message }); }
@@ -1517,6 +1526,11 @@ router.delete('/chats/:jid/labels/:labelId', authenticate, async (req, res) => {
   const { labelId } = req.params;
   try {
     await wa.removeChatLabel(jid, labelId);
+    const lbl2 = await pool.query(`SELECT name FROM wa_labels WHERE id=$1 LIMIT 1`, [labelId]).catch(() => ({ rows: [] }));
+    pool.query(
+      `INSERT INTO audit_log (user_id, action, entity, entity_id, detail) VALUES ($1,'wa_label_remove','whatsapp_chat',$2,$3)`,
+      [req.user?.id, jid, `Removed label "${lbl2.rows[0]?.name || labelId}" from chat ${jid}`]
+    ).catch(() => {});
     await pool.query(`DELETE FROM wa_label_associations WHERE label_id=$1 AND account_phone=$2 AND chat_id=$3`,
       [labelId, accountPhone, jid]);
     wa.emitEvent('wa:labels_updated', { type: 'association', association: { labelId, chatId: jid }, action: 'remove' });
@@ -1547,6 +1561,10 @@ router.put('/contacts/:jid', authenticate, async (req, res) => {
     `, [jid, accountPhone, name]);
     // Also update wa_chats display name
     await pool.query(`UPDATE wa_chats SET name=$1 WHERE id=$2 AND account_phone=$3`, [name, jid, accountPhone]);
+    pool.query(
+      `INSERT INTO audit_log (user_id, action, entity, entity_id, detail) VALUES ($1,'wa_contact_save','whatsapp_contact',$2,$3)`,
+      [req.user?.id, jid, `Saved WA contact name "${name}" for ${jid}`]
+    ).catch(() => {});
     res.json({ ok: true });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
