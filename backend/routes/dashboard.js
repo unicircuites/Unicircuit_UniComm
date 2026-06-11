@@ -293,9 +293,9 @@ router.get('/insights', async (req, res) => {
       waAccountPhone ? safeQuery(`
         SELECT
           COUNT(*)::int AS total,
-          COUNT(*) FILTER (WHERE jid LIKE '%@g.us')::int AS groups,
-          COUNT(*) FILTER (WHERE jid LIKE '%@newsletter')::int AS announcements,
-          COUNT(*) FILTER (WHERE jid NOT LIKE '%@g.us' AND jid NOT LIKE '%@newsletter')::int AS individual,
+          COUNT(*) FILTER (WHERE id LIKE '%@g.us')::int AS groups,
+          COUNT(*) FILTER (WHERE id LIKE '%@newsletter')::int AS announcements,
+          COUNT(*) FILTER (WHERE id NOT LIKE '%@g.us' AND id NOT LIKE '%@newsletter')::int AS individual,
           (SELECT COUNT(*)::int FROM wa_contacts
            WHERE account_phone = $1 AND (is_business = true OR verified_name IS NOT NULL)) AS business
         FROM wa_chats WHERE account_phone = $1
