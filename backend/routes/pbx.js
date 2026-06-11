@@ -644,10 +644,11 @@ router.get(
         });
       }
 
-      await backfillPBXRecordingMetadata(backupFolder, extensionFolder);
+      const isAll = backupFolder === '__ALL__';
+      if (!isAll) await backfillPBXRecordingMetadata(backupFolder, extensionFolder);
 
-      const where = ['backup_folder = $1', 'extension_folder = $2'];
-      const values = [backupFolder, extensionFolder];
+      const where = isAll ? ['extension_folder = $1'] : ['backup_folder = $1', 'extension_folder = $2'];
+      const values = isAll ? [extensionFolder] : [backupFolder, extensionFolder];
 
       if (/^\d{4}-\d{2}-\d{2}$/.test(dateFrom)) {
         values.push(dateFrom);

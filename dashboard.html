@@ -30545,6 +30545,46 @@ ${plainText}`;
         return;
       }
 
+      // --- All Folders virtual node ---
+      const allExtensions = {};
+      backupFolders.forEach(bf => {
+        Object.keys(tree[bf]).forEach(ext => {
+          allExtensions[ext] = true;
+        });
+      });
+
+      const allDiv = document.createElement('div');
+      allDiv.innerHTML = `
+        <div style="
+          padding:10px 12px;
+          color:var(--text);
+          font-weight:600;
+          font-size:14px;
+        ">
+          🗂️ All Folders
+        </div>
+      `;
+      container.appendChild(allDiv);
+
+      Object.keys(allExtensions).sort().forEach(extension => {
+        if (
+          pbxSelectedDbFolder &&
+          pbxSelectedDbFolder.backupFolder === '__ALL__' &&
+          pbxSelectedDbFolder.extension === extension
+        ) {
+          selectedStillExists = true;
+        }
+        const extDiv = document.createElement('div');
+        extDiv.style.marginLeft = '18px';
+        extDiv.style.cursor = 'pointer';
+        extDiv.style.padding = '8px 12px';
+        extDiv.style.color = 'var(--muted2)';
+        extDiv.innerHTML = `📂 ${extension}`;
+        extDiv.onclick = () => loadDBRecordings('__ALL__', extension);
+        container.appendChild(extDiv);
+      });
+      // --- end All Folders ---
+
       let selectedStillExists = false;
 
       backupFolders.forEach(
@@ -30669,7 +30709,7 @@ ${plainText}`;
         document.getElementById(
           'pbx-breadcrumb'
         ).innerText =
-          `${backupFolder} › ${extensionFolder}`;
+          `${backupFolder === '__ALL__' ? 'All' : backupFolder} › ${extensionFolder}`;
 
       } catch (err) {
         console.error(err);
