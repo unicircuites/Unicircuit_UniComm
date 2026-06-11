@@ -402,12 +402,12 @@ function getContactName(jid, pushName) {
   return formatDisplayPhone(local);
 }
 
-const GROUP_METADATA_CONCURRENCY = 1;
-const GROUP_METADATA_DELAY_MS = 1200;
+const GROUP_METADATA_CONCURRENCY = 2;
+const GROUP_METADATA_DELAY_MS = 600;
 const LID_CONTACT_BATCH_SIZE = 200;
 const LID_RESOLUTION_BATCH_SIZE = 100;
-const LID_RESOLUTION_BATCH_DELAY_MS = 5000;
-const MAX_GROUPS_PER_LID_BATCH = 8;
+const LID_RESOLUTION_BATCH_DELAY_MS = 2500;
+const MAX_GROUPS_PER_LID_BATCH = 16;
 let lidResolutionWorkerTimer = null;
 let lidResolutionInFlight = false;
 let lidResolutionGroupCursor = 0;

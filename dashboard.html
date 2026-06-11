@@ -22356,16 +22356,12 @@ ${plainText}`;
       waSocket.on('wa:participants_synced', function (data) {
         console.log('[WA] Group participants synced — reloading LID map (' + (data.resolved || data.total || 0) + ' resolved, ' + (data.pending || '?') + ' pending)');
         waLoadLidMap();
-        waLoadResolutionStats(waAllChats.length).then(function () {
-          waLoadChats({ force: true });
-        });
+        waLoadResolutionStats(waAllChats.length);
       });
       waSocket.on('wa:lid_batch', function (data) {
         console.log('[WA] LID batch complete:', data);
         waLoadLidMap();
-        waLoadResolutionStats(waAllChats.length).then(function () {
-          waLoadChats({ force: true });
-        });
+        waLoadResolutionStats(waAllChats.length);
       });
       waSocket.on('wa:lid_resolution_complete', function () {
         waLoadResolutionStats(waAllChats.length).then(function (stats) {
