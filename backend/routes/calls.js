@@ -190,6 +190,9 @@ async function ensurePbxContactsTable() {
   // Migrate existing table
   await pool.query(`ALTER TABLE pbx_contacts ADD COLUMN IF NOT EXISTS email VARCHAR(254)`);
   await pool.query(`ALTER TABLE pbx_contacts ADD COLUMN IF NOT EXISTS mobile_phone VARCHAR(50)`);
+  // Clean garbage rows — SMDR import pollution: rows with no name and no real phone
+  const cleaned = await pool.query(`DELETE FROM pbx_contacts WHERE name IS NULL`);
+  if (cleaned.rowCount > 0) console.log(`[Calls] Cleaned ${cleaned.rowCount} unnamed garbage rows from pbx_contacts.`);
 }
 ensurePbxContactsTable().catch(err => console.warn('[Calls] pbx_contacts table error:', err.message));
 
@@ -337,6 +340,20 @@ router.post('/contacts/save', async (req, res) => {
     const cleanPhone = phone.trim();
     const cleanEmail = email ? email.trim().toLowerCase() : null;
     const cleanMobile = mobile_phone ? mobile_phone.trim() : null;
+
+    // Duplicate-name check: reject if another contact (different phone) already has this name
+    if (name && name.trim()) {
+      const dupCheck = await pool.query(`
+        SELECT id, phone FROM pbx_contacts
+        WHERE LOWER(TRIM(name)) = LOWER(TRIM($1))
+          AND regexp_replace(phone, '[^0-9]', '', 'g') != regexp_replace($2, '[^0-9]', '', 'g')
+        LIMIT 1
+      `, [name.trim(), cleanPhone]);
+      if (dupCheck.rowCount > 0) {
+        return res.status(409).json({ error: `Name "${name.trim()}" is already used by another contact (${dupCheck.rows[0].phone}). Use a unique name.` });
+      }
+    }
+
     const existing = await pool.query(`
       SELECT id
       FROM pbx_contacts
@@ -420,6 +437,7 @@ router.get('/contact/:phone', async (req, res) => {
         SELECT DISTINCT ON (regexp_replace(phone, '[^0-9]', '', 'g'))
           regexp_replace(phone, '[^0-9]', '', 'g') AS phone_digits, phone, name, company, notes
         FROM pbx_contacts
+        WHERE name IS NOT NULL
         ORDER BY regexp_replace(phone, '[^0-9]', '', 'g'), (name IS NULL), updated_at DESC NULLS LAST, id DESC
       ) pc1 ON (
         pc1.phone = cl.caller
@@ -429,6 +447,7 @@ router.get('/contact/:phone', async (req, res) => {
         SELECT DISTINCT ON (regexp_replace(phone, '[^0-9]', '', 'g'))
           regexp_replace(phone, '[^0-9]', '', 'g') AS phone_digits, phone, name, company, notes
         FROM pbx_contacts
+        WHERE name IS NOT NULL
         ORDER BY regexp_replace(phone, '[^0-9]', '', 'g'), (name IS NULL), updated_at DESC NULLS LAST, id DESC
       ) pc2 ON (
         pc2.phone = cl.destination
@@ -549,12 +568,14 @@ router.get('/', async (req, res) => {
          SELECT DISTINCT ON (regexp_replace(phone, '[^0-9]', '', 'g'))
            regexp_replace(phone, '[^0-9]', '', 'g') AS phone_digits, phone, name, company, notes
          FROM pbx_contacts
+         WHERE name IS NOT NULL
          ORDER BY regexp_replace(phone, '[^0-9]', '', 'g'), (name IS NULL), updated_at DESC NULLS LAST, id DESC
        ) pc1 ON pc1.phone_digits = regexp_replace(cl.caller, '[^0-9]', '', 'g')
        LEFT JOIN (
          SELECT DISTINCT ON (regexp_replace(phone, '[^0-9]', '', 'g'))
            regexp_replace(phone, '[^0-9]', '', 'g') AS phone_digits, phone, name, company, notes
          FROM pbx_contacts
+         WHERE name IS NOT NULL
          ORDER BY regexp_replace(phone, '[^0-9]', '', 'g'), (name IS NULL), updated_at DESC NULLS LAST, id DESC
        ) pc2 ON pc2.phone_digits = regexp_replace(cl.destination, '[^0-9]', '', 'g')
        WHERE ${whereStr}
@@ -1256,11 +1277,13 @@ router.get('/section-summary', async (req, res) => {
       LEFT JOIN (
         SELECT DISTINCT ON (regexp_replace(phone,'[^0-9]','','g'))
           regexp_replace(phone,'[^0-9]','','g') AS pd, name FROM pbx_contacts
+        WHERE name IS NOT NULL
         ORDER BY regexp_replace(phone,'[^0-9]','','g'), id DESC
       ) pc1 ON pc1.pd = regexp_replace(cl.caller,'[^0-9]','','g')
       LEFT JOIN (
         SELECT DISTINCT ON (regexp_replace(phone,'[^0-9]','','g'))
           regexp_replace(phone,'[^0-9]','','g') AS pd, name FROM pbx_contacts
+        WHERE name IS NOT NULL
         ORDER BY regexp_replace(phone,'[^0-9]','','g'), id DESC
       ) pc2 ON pc2.pd = regexp_replace(cl.destination,'[^0-9]','','g')
       WHERE NOT (cl.duration IS NULL OR cl.duration = '' OR cl.duration = '00:00:00')

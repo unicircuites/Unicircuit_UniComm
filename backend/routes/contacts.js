@@ -225,6 +225,15 @@ router.post('/', async (req, res) => {
   const [avatar_color, avatar_bg] = palettes[Math.floor(Math.random() * palettes.length)];
 
   try {
+    // Duplicate-name check
+    const dupCheck = await pool.query(
+      `SELECT id FROM contacts WHERE LOWER(TRIM(fname)) = LOWER($1) AND LOWER(TRIM(lname)) = LOWER($2) LIMIT 1`,
+      [fname.trim(), lname.trim()]
+    );
+    if (dupCheck.rowCount > 0) {
+      return res.status(409).json({ error: `Contact "${fname.trim()} ${lname.trim()}" already exists. Use a unique name.` });
+    }
+
     const result = await pool.query(`
       INSERT INTO contacts
         (fname,lname,company,designation,dept,phone,wa,email,segment,score,
@@ -265,6 +274,16 @@ router.put('/:id', async (req, res) => {
   const { fname, lname, company, designation, dept, phone, wa, email,
           segment, score, products, city, notes } = req.body;
   try {
+    // Duplicate-name check: reject if a different contact already has this name
+    if (fname && lname) {
+      const dupCheck = await pool.query(
+        `SELECT id FROM contacts WHERE LOWER(TRIM(fname)) = LOWER($1) AND LOWER(TRIM(lname)) = LOWER($2) AND id != $3 LIMIT 1`,
+        [fname.trim(), lname.trim(), req.params.id]
+      );
+      if (dupCheck.rowCount > 0) {
+        return res.status(409).json({ error: `Another contact named "${fname.trim()} ${lname.trim()}" already exists. Use a unique name.` });
+      }
+    }
     const result = await pool.query(`
       UPDATE contacts SET
         fname=$1, lname=$2, company=$3, designation=$4, dept=$5,

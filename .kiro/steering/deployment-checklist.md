@@ -10,6 +10,20 @@ Yeh file update karo taaki tower server pe deploy karte waqt kuch miss na ho.
 
 ---
 
+## WA BIZ Tag + LID Phone Fix (Jun 2026)
+
+| Change | File |
+|---|---|
+| `verified_name` column added to `wa_contacts` (auto-migrated on startup) | `backend/services/whatsapp.js` |
+| `saveContact` now stores `verifiedName` from Baileys into `verified_name` | `backend/services/whatsapp.js` |
+| `enriched_contacts` CTE, `chat_rows`, `contact_rows` all expose `verified_name` | `backend/routes/whatsapp.js` |
+| BIZ badge (blue, `#4FC3F7`) shown for individual contacts with `verified_name` — in chat list, contacts directory subtitle, contacts directory detail panel, and chat header | `dashboard.html` |
+| LID contact subtitle in WA Contacts directory now resolves phone from `waLidMap` (fixes Gohil Ravi blank phone) | `dashboard.html` |
+
+**No new npm packages. No .env changes needed.**
+
+---
+
 ## VMS/Voicemail 390 Call Log Fix (Jun 2026)
 
 | Change | File |
