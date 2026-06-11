@@ -655,6 +655,9 @@ async function ensureTables(retries = 3) {
       // Handle migrations for multi-account support on existing databases (e.g. Tower Server)
       await pool.query(`ALTER TABLE wa_contacts ADD COLUMN IF NOT EXISTS account_phone VARCHAR(50) DEFAULT 'unknown'`).catch(() => { });
       await pool.query(`ALTER TABLE wa_contacts ADD COLUMN IF NOT EXISTS is_group_member BOOLEAN DEFAULT FALSE`).catch(() => { });
+      await pool.query(`ALTER TABLE wa_contacts ADD COLUMN IF NOT EXISTS verified_name TEXT`).catch(() => { });
+      await pool.query(`ALTER TABLE wa_contacts ADD COLUMN IF NOT EXISTS is_business BOOLEAN DEFAULT FALSE`).catch(() => { });
+      await pool.query(`UPDATE wa_contacts SET is_business = true WHERE verified_name IS NOT NULL AND is_business = false`).catch(() => { });
       await pool.query(`ALTER TABLE wa_chats ADD COLUMN IF NOT EXISTS account_phone VARCHAR(50) DEFAULT 'unknown'`).catch(() => { });
       await pool.query(`ALTER TABLE wa_chats ADD COLUMN IF NOT EXISTS profile_pic_url TEXT`).catch(() => { });
       await pool.query(`ALTER TABLE wa_messages ADD COLUMN IF NOT EXISTS account_phone VARCHAR(50) DEFAULT 'unknown'`).catch(() => { });
@@ -824,6 +827,7 @@ async function saveContact(contact) {
   let name = contact.name || null;
   let notify = contact.notify || contact.username || null;
   const verifiedName = contact.verifiedName || null;
+  const isBusiness = !!(contact.isBusiness || contact.verifiedName);
   if (name && (isInvalidContactLabel(name) || isPhoneLikeLabel(name, phone) || normalizeWaPhone(name) === phone)) {
     name = null;
   }
@@ -854,17 +858,19 @@ async function saveContact(contact) {
   if (!WA_DYNAMIC_DB_STORE) return;
   try {
     await pool.query(`
-      INSERT INTO wa_contacts (jid, account_phone, name, notify, phone)
-      VALUES ($1,$2,$3,$4,$5)
+      INSERT INTO wa_contacts (jid, account_phone, name, notify, phone, verified_name, is_business)
+      VALUES ($1,$2,$3,$4,$5,$6,$7)
       ON CONFLICT (jid, account_phone) DO UPDATE SET
-        name   = COALESCE(EXCLUDED.name,   wa_contacts.name),
-        notify = COALESCE(EXCLUDED.notify, wa_contacts.notify),
+        name          = COALESCE(EXCLUDED.name,          wa_contacts.name),
+        notify        = COALESCE(EXCLUDED.notify,        wa_contacts.notify),
+        verified_name = COALESCE(EXCLUDED.verified_name, wa_contacts.verified_name),
+        is_business   = EXCLUDED.is_business OR wa_contacts.is_business,
         phone  = CASE
           WHEN EXCLUDED.phone IS NOT NULL AND EXCLUDED.phone != '' THEN EXCLUDED.phone
           ELSE wa_contacts.phone
         END,
         updated_at = NOW()
-    `, [jid, accPhone, name, notify, phone || null]);
+    `, [jid, accPhone, name, notify, phone || null, verifiedName || null, isBusiness]);
   } catch (_) { }
 }
 

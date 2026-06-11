@@ -1644,7 +1644,7 @@
       position: fixed;
       inset: 0;
       background: rgba(0, 0, 0, 0.7);
-      z-index: 1000;
+      z-index: 99999;
       display: none;
       align-items: center;
       justify-content: center;
@@ -5247,7 +5247,7 @@
         <div class="modal-overlay" id="pbx-save-contact-modal">
           <div class="modal" style="max-width:440px;">
             <div class="modal-title">
-              <span><i class="fas fa-user-tag" style="color:var(--gold);margin-right:8px;"></i>Save PBX Contact</span>
+              <span><i class="fas fa-user-tag" style="color:var(--gold);margin-right:8px;"></i><span id="pbx-save-modal-title">Save PBX Contact</span></span>
               <span class="modal-close" onclick="closeModal('pbx-save-contact-modal')"><i
                   class="fas fa-times"></i></span>
             </div>
@@ -5284,7 +5284,7 @@
               <div id="pbx-save-mobile-warn" style="display:none;font-size:11px;color:var(--gold2);margin-top:4px;"><i class="fas fa-exclamation-triangle"></i> Without mobile number, this contact won't merge with WhatsApp in the All tab.</div>
             </div>
             <div style="display:flex;gap:8px;margin-top:4px;">
-              <button class="btn btn-gold" style="flex:1;justify-content:center;" onclick="pbxSaveContactSubmit()"><i
+              <button class="btn btn-gold" id="pbx-save-submit-btn" style="flex:1;justify-content:center;" onclick="pbxSaveContactSubmit()"><i
                   class="fas fa-save"></i> Save Contact</button>
               <button class="btn btn-ghost" onclick="closeModal('pbx-save-contact-modal')">Cancel</button>
             </div>
@@ -9477,7 +9477,13 @@ Always write in a professional yet warm Indian B2B communication style. Use form
         const initials = name.split(' ').map(w => w[0] || '').join('').toUpperCase().slice(0, 2) || '?';
         const time = c.last_time ? new Date(c.last_time).toLocaleString('en-IN', { dateStyle: 'short', timeStyle: 'short' }) : '';
         const unread = c.unread > 0 ? `<span class="badge b-green" style="margin-left:6px;">${c.unread}</span>` : '';
-        const subtitle = isGroup ? '<span style="font-size:10px;background:rgba(37,211,102,0.12);color:#25D366;border-radius:3px;padding:1px 5px;">Group</span>' : escHtml(c.phone || '');
+        let _subPhone = c.phone || '';
+        if (!_subPhone && !isGroup && String(c.id || '').endsWith('@lid')) {
+          const _le = waLidMap[c.id.split('@')[0]];
+          if (_le && _le.phone) _subPhone = _le.phone;
+        }
+        const _bizBadge = (c.is_business || c.verified_name) ? '<span style="font-size:10px;color:#4FC3F7;border:1px solid rgba(79,195,247,0.4);padding:1px 5px;border-radius:999px;font-weight:800;margin-left:4px;">BIZ</span>' : '';
+        const subtitle = isGroup ? '<span style="font-size:10px;background:rgba(37,211,102,0.12);color:#25D366;border-radius:3px;padding:1px 5px;">Group</span>' + _bizBadge : (escHtml(_subPhone) + _bizBadge);
         return `
     <div class="contact-card" onclick='showWaDirectoryDetail(${JSON.stringify(c.id)}, this)'>
       <div style="display:flex;align-items:center;gap:11px;">
@@ -9515,7 +9521,7 @@ Always write in a professional yet warm Indian B2B communication style. Use form
       panel.innerHTML = `
     <div class="card" style="animation:fadeUp 0.2s ease;">
       <div style="padding:18px 20px;border-bottom:1px solid var(--border);">
-        <div class="section-label"><i class="fab fa-whatsapp" style="color:#25D366;"></i> WhatsApp${isGroup ? ' <span style="font-size:10px;background:rgba(37,211,102,0.12);color:#25D366;border-radius:3px;padding:1px 6px;margin-left:4px;">Group</span>' : ''}</div>
+        <div class="section-label"><i class="fab fa-whatsapp" style="color:#25D366;"></i> WhatsApp${isGroup ? ' <span style="font-size:10px;background:rgba(37,211,102,0.12);color:#25D366;border-radius:3px;padding:1px 6px;margin-left:4px;">Group</span>' : ''}${c && (c.is_business || c.verified_name) ? ' <span style="font-size:10px;color:#4FC3F7;border:1px solid rgba(79,195,247,0.4);border-radius:999px;padding:1px 6px;margin-left:4px;font-weight:800;">BIZ</span>' : ''}</div>
         <div style="font-size:17px;font-weight:800;color:var(--text);margin-top:8px;">${escHtml(name)}</div>
       </div>
       ${phone ? `<div style="color:var(--gold);font-family:'JetBrains Mono';font-size:14px;padding:4px 20px 0;">${escHtml(phone)}</div>` : ''}
@@ -22953,7 +22959,9 @@ ${plainText}`;
         if (seq !== _waLoadChatsSeq) return;
         waAllChats = chats;
         _waChatTotal = chats.length;  // real chat count — not contacts
-        waRenderChats(waAllChats);
+        var _waSearchEl = document.getElementById('wa-search');
+        var _waCurrentQ = _waSearchEl ? _waSearchEl.value.trim() : '';
+        if (_waCurrentQ) waFilterChats(_waCurrentQ); else waRenderChats(waAllChats);
         waLoadLidMap().catch(function () {});
         var resolutionStats = statsRes && statsRes.ok ? await statsRes.json().catch(function () { return null; }) : null;
         if (resolutionStats) waApplyResolutionStats(resolutionStats, waAllChats.length);
@@ -23173,11 +23181,12 @@ ${plainText}`;
 
         var name = displayName;
         // Show GRP only for real WhatsApp groups (@g.us), not for contact-only group members.
+        var _biz = (c.verified_name || c.is_business) ? ' <span style="font-size:10px;color:#4FC3F7;border:1px solid rgba(79,195,247,0.4);padding:1px 6px;border-radius:999px;font-weight:800;white-space:nowrap;">BIZ</span>' : '';
         var grpBadge = isRealGroup
-          ? (c.announce || c.is_announce
+          ? ((c.announce || c.is_announce
             ? '<span style="font-size:10px;color:var(--gold2);border:1px solid rgba(255,193,7,0.35);padding:1px 6px;border-radius:999px;font-weight:800;white-space:nowrap;">ANN</span>'
-            : '<span style="font-size:10px;color:var(--gold);border:1px solid rgba(255, 215, 0, 0.35);padding:1px 6px;border-radius:999px;font-weight:800;white-space:nowrap;">GRP</span>')
-          : '';
+            : '<span style="font-size:10px;color:var(--gold);border:1px solid rgba(255, 215, 0, 0.35);padding:1px 6px;border-radius:999px;font-weight:800;white-space:nowrap;">GRP</span>') + _biz)
+          : _biz.trim();
         var initials = name.split(' ').map(function (w) { return w[0] || ''; }).join('').toUpperCase().slice(0, 2) || '?';
         var time = '';
         if (c.last_time) {
@@ -23426,7 +23435,12 @@ ${plainText}`;
             : '<span style="font-size:10px;color:var(--gold);border:1px solid rgba(255,215,0,0.35);padding:1px 6px;border-radius:999px;font-weight:800;margin-left:5px;">GRP</span>';
           titleEl.innerHTML = name + hdrBadge;
         } else {
-          titleEl.textContent = name;
+          var _chatEntry2 = waAllChats.find(function(x) { return x.id === jid; });
+          if (_chatEntry2 && (_chatEntry2.is_business || _chatEntry2.verified_name)) {
+            titleEl.innerHTML = escHtml(name) + '<span style="font-size:10px;color:#4FC3F7;border:1px solid rgba(79,195,247,0.4);padding:1px 6px;border-radius:999px;font-weight:800;margin-left:5px;">BIZ</span>';
+          } else {
+            titleEl.textContent = name;
+          }
         }
       }
 
@@ -24399,15 +24413,24 @@ ${plainText}`;
       var btn = document.getElementById('wcf-save-btn');
       if (btn) { btn.disabled = true; btn.innerHTML = '<span class="spin-loader" style="width:14px;height:14px;"></span>'; }
       try {
-        await fetch(API_BASE + '/wa/contacts/' + encodeURIComponent(jid), {
+        const waRes = await fetch(API_BASE + '/wa/contacts/' + encodeURIComponent(jid), {
           method: 'PUT', headers: getAuthHeaders(), body: JSON.stringify({ name: fullName })
         });
-        await fetch(API_BASE + '/contacts', {
+        if (!waRes.ok) {
+          const waData = await waRes.json().catch(() => ({}));
+          throw new Error(waData.error || 'Failed to save WA contact');
+        }
+        const crmRes = await fetch(API_BASE + '/contacts', {
           method: 'POST', headers: getAuthHeaders(),
           body: JSON.stringify({ fname, lname: lname||'.', company: company||'WhatsApp Contact',
             designation: job||null, city: city||null, phone: phone||null, wa: phone||null,
             email: email||null, notes: notes||null, segment: 'Prospect', score: 50 })
         });
+        if (!crmRes.ok) {
+          const crmData = await crmRes.json().catch(() => ({}));
+          if (crmRes.status !== 409) throw new Error(crmData.error || 'Failed to save CRM contact');
+          // 409 on CRM is non-fatal (WA contact was saved successfully)
+        }
         var chat = waAllChats.find(function(c) { return c.id === jid; });
         if (chat) { chat.name = fullName; waRenderChats(waAllChats); }
         if (waActiveJid === jid) {
@@ -29250,6 +29273,7 @@ ${plainText}`;
             <td>
               <div style="display:flex;gap:4px;">
                 ${!contactName && callerPhone ? `<button class="btn btn-ghost btn-xs" onclick="event.stopPropagation();pbxSaveContactModal(${jsArg(callerPhone)})" title="Save Contact"><i class="fas fa-user-plus"></i></button>` : ''}
+                ${contactName && callerPhone ? `<button class="btn btn-ghost btn-xs" onclick="event.stopPropagation();pbxSaveContactModal(${jsArg(callerPhone)},${jsArg(contactName)},${jsArg(log.saved_company||'')},${jsArg(log.saved_notes||log.contact_notes||'')},${jsArg(log.email||'')},${jsArg(log.mobile_phone||'')})" title="Edit Contact"><i class="fas fa-pen"></i></button>` : ''}
                 <button class="btn btn-ghost btn-xs" onclick="event.stopPropagation();openCallRecordDetails(${log.id})" title="View Details"><i class="fas fa-eye"></i></button>
                 <button class="btn btn-ghost btn-xs" onclick="event.stopPropagation();doSummarizeCall(${log.id})" title="AI Summarize"><i class="fas fa-magic"></i></button>
                 <button class="btn btn-ghost btn-xs" onclick="event.stopPropagation();deleteCallLog(${log.id})" title="Delete Call Log" style="color:var(--red2);"><i class="fas fa-trash"></i></button>
@@ -29346,7 +29370,9 @@ ${plainText}`;
         ${pbxDetailRow('Raw SMDR Line', log.raw_line)}
 
         <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:14px;flex-wrap:wrap;">
-          ${caller ? `<button class="btn btn-ghost btn-sm" onclick="pbxSaveContactModal(${jsArg(caller)});closeModal('pbx-call-details-modal')"><i class="fas fa-user-plus"></i> Save Contact</button>` : ''}
+          ${caller ? (contactName
+            ? `<button class="btn btn-gold btn-sm" onclick="pbxSaveContactModal(${jsArg(caller)},${jsArg(contactName)},${jsArg(savedCompany)},${jsArg(savedNotes)},${jsArg(log.email||'')},${jsArg(log.mobile_phone||'')});closeModal('pbx-call-details-modal')"><i class="fas fa-pen"></i> Edit Contact</button>`
+            : `<button class="btn btn-ghost btn-sm" onclick="pbxSaveContactModal(${jsArg(caller)});closeModal('pbx-call-details-modal')"><i class="fas fa-user-plus"></i> Save Contact</button>`) : ''}
           <button class="btn btn-ghost btn-sm" onclick="pbxCopyRecordingKey(${log.id})"><i class="fas fa-microphone-lines"></i> Copy Recording Key</button>
           <button class="btn btn-gold btn-sm" onclick="doSummarizeCall(${log.id});closeModal('pbx-call-details-modal')"><i class="fas fa-magic"></i> AI Summarize</button>
           <button class="btn btn-red btn-sm" onclick="deleteCallLog(${log.id});closeModal('pbx-call-details-modal')"><i class="fas fa-trash"></i> Delete</button>
@@ -29646,6 +29672,11 @@ ${plainText}`;
     // pbxShowTab('contacts') and associated functions removed from here.
 
     function pbxSaveContactModal(phone, existingName, existingCompany, existingNotes, existingEmail, existingMobile) {
+      const isUpdate = !!(existingName);
+      document.getElementById('pbx-save-modal-title').textContent = isUpdate ? 'Update PBX Contact' : 'Save PBX Contact';
+      document.getElementById('pbx-save-submit-btn').innerHTML = isUpdate
+        ? '<i class="fas fa-save"></i> Update Contact'
+        : '<i class="fas fa-save"></i> Save Contact';
       document.getElementById('pbx-save-phone').value = phone;
       document.getElementById('pbx-save-name').value = existingName || '';
       document.getElementById('pbx-save-company').value = existingCompany || '';
