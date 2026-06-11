@@ -240,7 +240,7 @@ router.get('/overview', async (req, res) => {
 router.get('/insights', async (req, res) => {
   try {
     const { period = 'week', from, to } = req.query;
-    const waAccountPhone = accountPhone || await (async () => {
+    const waAccountPhone = wa.getConnectedPhone() || await (async () => {
       try {
         const r = await pool.query(`SELECT account_phone FROM wa_chats GROUP BY account_phone ORDER BY COUNT(*) DESC LIMIT 1`);
         return r.rows[0]?.account_phone || null;
