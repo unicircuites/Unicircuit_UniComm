@@ -30545,120 +30545,122 @@ ${plainText}`;
         return;
       }
 
-      // --- All Folders virtual node ---
-      const allExtensions = {};
-      backupFolders.forEach(bf => {
-        Object.keys(tree[bf]).forEach(ext => {
-          allExtensions[ext] = true;
-        });
-      });
-
-      const allDiv = document.createElement('div');
-      allDiv.innerHTML = `
-        <div style="
-          padding:10px 12px;
-          color:var(--text);
-          font-weight:600;
-          font-size:14px;
-        ">
-          🗂️ All Folders
-        </div>
-      `;
-      container.appendChild(allDiv);
-
-      Object.keys(allExtensions).sort().forEach(extension => {
-        if (
-          pbxSelectedDbFolder &&
-          pbxSelectedDbFolder.backupFolder === '__ALL__' &&
-          pbxSelectedDbFolder.extension === extension
-        ) {
-          selectedStillExists = true;
-        }
-        const extDiv = document.createElement('div');
-        extDiv.style.marginLeft = '18px';
-        extDiv.style.cursor = 'pointer';
-        extDiv.style.padding = '8px 12px';
-        extDiv.style.color = 'var(--muted2)';
-        extDiv.innerHTML = `📂 ${extension}`;
-        extDiv.onclick = () => loadDBRecordings('__ALL__', extension);
-        container.appendChild(extDiv);
-      });
-      // --- end All Folders ---
-
       let selectedStillExists = false;
 
-      backupFolders.forEach(
-        backupFolder => {
+      // helper: make a collapsible group
+      function makeFolderGroup(label, icon, totalCount, children, collapsed) {
+        const wrap = document.createElement('div');
 
-          const backupDiv =
-            document.createElement('div');
+        const header = document.createElement('div');
+        header.style.cssText = `
+          padding:9px 12px;
+          color:var(--text);
+          font-weight:600;
+          font-size:13px;
+          cursor:pointer;
+          user-select:none;
+          display:flex;
+          align-items:center;
+          gap:6px;
+        `;
+        const arrow = document.createElement('span');
+        arrow.style.cssText = 'font-size:10px;transition:transform .15s;display:inline-block;';
+        arrow.textContent = '▾';
 
-          backupDiv.innerHTML = `
-            <div style="
-              padding:10px 12px;
-              color:var(--text);
-              font-weight:600;
-              font-size:14px;
-            ">
-              📁 ${backupFolder}
-            </div>
-          `;
+        const badge = document.createElement('span');
+        badge.style.cssText = `
+          margin-left:auto;
+          background:var(--accent,#6366f1);
+          color:#fff;
+          font-size:10px;
+          font-weight:700;
+          border-radius:9px;
+          padding:1px 7px;
+          min-width:20px;
+          text-align:center;
+        `;
+        badge.textContent = totalCount;
 
-          container.appendChild(
-            backupDiv
-          );
+        header.appendChild(arrow);
+        header.appendChild(document.createTextNode(`${icon} ${label}`));
+        header.appendChild(badge);
 
-          const extensions =
-            tree[backupFolder];
+        const body = document.createElement('div');
+        body.style.overflow = 'hidden';
 
-          Object.keys(extensions)
-          .forEach(extension => {
-
-            if (
-              pbxSelectedDbFolder &&
-              pbxSelectedDbFolder.backupFolder === backupFolder &&
-              pbxSelectedDbFolder.extension === extension
-            ) {
-              selectedStillExists = true;
-            }
-
-            const extDiv =
-              document.createElement(
-                'div'
-              );
-
-            extDiv.style.marginLeft =
-              '18px';
-
-            extDiv.style.cursor =
-              'pointer';
-
-            extDiv.style.padding =
-              '8px 12px';
-
-            extDiv.style.color =
-              'var(--muted2)';
-
-            extDiv.innerHTML =
-              `📂 ${extension}`;
-
-            extDiv.onclick = () => {
-
-              loadDBRecordings(
-                backupFolder,
-                extension
-              );
-
-            };
-
-            container.appendChild(
-              extDiv
-            );
-
-          });
-
+        if (collapsed) {
+          body.style.display = 'none';
+          arrow.style.transform = 'rotate(-90deg)';
         }
-      );
+
+        header.onclick = () => {
+          const open = body.style.display !== 'none';
+          body.style.display = open ? 'none' : 'block';
+          arrow.style.transform = open ? 'rotate(-90deg)' : 'rotate(0deg)';
+        };
+
+        children.forEach(c => body.appendChild(c));
+        wrap.appendChild(header);
+        wrap.appendChild(body);
+        return wrap;
+      }
+
+      // helper: make an extension sub-item
+      function makeExtItem(bf, ext, count) {
+        const d = document.createElement('div');
+        d.style.cssText = `
+          margin-left:18px;
+          cursor:pointer;
+          padding:7px 12px;
+          color:var(--muted2);
+          font-size:13px;
+          display:flex;
+          align-items:center;
+          gap:6px;
+        `;
+        const badge = document.createElement('span');
+        badge.style.cssText = `
+          margin-left:auto;
+          background:rgba(99,102,241,.18);
+          color:var(--accent,#6366f1);
+          font-size:10px;
+          font-weight:700;
+          border-radius:9px;
+          padding:1px 7px;
+          min-width:20px;
+          text-align:center;
+        `;
+        badge.textContent = count;
+        d.appendChild(document.createTextNode(`📂 ${ext}`));
+        d.appendChild(badge);
+        d.onclick = () => loadDBRecordings(bf, ext);
+        if (pbxSelectedDbFolder && pbxSelectedDbFolder.backupFolder === bf && pbxSelectedDbFolder.extension === ext) {
+          selectedStillExists = true;
+          d.style.color = 'var(--text)';
+          d.style.background = 'rgba(99,102,241,.12)';
+          d.style.borderRadius = '6px';
+        }
+        return d;
+      }
+
+      // --- All Folders virtual node ---
+      const allExtMap = {};
+      backupFolders.forEach(bf => {
+        Object.keys(tree[bf]).forEach(ext => {
+          allExtMap[ext] = (allExtMap[ext] || 0) + tree[bf][ext].length;
+        });
+      });
+      const allTotal = Object.values(allExtMap).reduce((a, b) => a + b, 0);
+      const allItems = Object.keys(allExtMap).sort().map(ext => makeExtItem('__ALL__', ext, allExtMap[ext]));
+      container.appendChild(makeFolderGroup('All Folders', '🗂️', allTotal, allItems, false));
+
+      // --- Per-backup-folder nodes ---
+      backupFolders.forEach(backupFolder => {
+        const extensions = tree[backupFolder];
+        const bfTotal = Object.values(extensions).reduce((a, b) => a + b.length, 0);
+        const extItems = Object.keys(extensions).map(ext => makeExtItem(backupFolder, ext, extensions[ext].length));
+        container.appendChild(makeFolderGroup(backupFolder, '📁', bfTotal, extItems, true));
+      });
 
       if (pbxSelectedDbFolder && selectedStillExists) {
         loadDBRecordings(
