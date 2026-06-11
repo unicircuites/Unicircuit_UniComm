@@ -10,7 +10,7 @@ async function safeQuery(sql, params = []) {
   try {
     return await pool.query(sql, params);
   } catch (err) {
-    console.warn('[Dashboard] Query skipped:', err.message);
+    console.error('[Dashboard] Query failed:', err.message, '| SQL:', sql.slice(0, 120));
     return { rows: [] };
   }
 }
@@ -324,16 +324,18 @@ router.get('/insights', async (req, res) => {
         FROM call_logs WHERE ${callIntervalSql}
       `),
 
-      // New calls in period (with details) — use deduped view which already has saved_name
+      // New calls in period (with details)
       safeQuery(`
         SELECT cl.id, cl.caller, cl.destination, cl.call_type, cl.duration,
                TO_CHAR(cl.call_date,'YYYY-MM-DD') AS call_date, cl.call_time,
                cl.recording_file,
-               cl.saved_name AS contact_name
-        FROM call_logs_deduped cl
+               pc.name AS contact_name
+        FROM call_logs cl
+        LEFT JOIN pbx_contacts pc ON pc.name IS NOT NULL
+          AND regexp_replace(pc.phone,'[^0-9]','','g') = regexp_replace(cl.caller,'[^0-9]','','g')
         WHERE ${callIntervalSql}
         ORDER BY cl.call_date DESC NULLS LAST, cl.call_time DESC NULLS LAST, cl.id DESC
-        LIMIT 50
+        LIMIT 20
       `),
 
       // User activity from audit_log
