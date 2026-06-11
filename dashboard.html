@@ -9555,7 +9555,7 @@ Always write in a professional yet warm Indian B2B communication style. Use form
           if (_le && _le.phone) _subPhone = _le.phone;
         }
         const _bizBadge = (c.is_business || c.verified_name) ? '<span style="font-size:10px;color:#4FC3F7;border:1px solid rgba(79,195,247,0.4);padding:1px 5px;border-radius:999px;font-weight:800;margin-left:4px;">BIZ</span>' : '';
-        const subtitle = isGroup ? '<span style="font-size:10px;background:rgba(37,211,102,0.12);color:#25D366;border-radius:3px;padding:1px 5px;">Group</span>' + _bizBadge : (escHtml(_subPhone) + _bizBadge);
+        const subtitle = isGroup ? '<span style="font-size:10px;background:rgba(37,211,102,0.12);color:#25D366;border-radius:3px;padding:1px 5px;">Group</span>' + _bizBadge : (_subPhone ? (escHtml(_subPhone) + _bizBadge) : (String(c.id||'').endsWith('@lid') ? '<span style="font-size:10px;color:var(--muted2);font-style:italic;">Phone resolving...</span>' + _bizBadge : _bizBadge));
         return `
     <div class="contact-card" onclick='showWaDirectoryDetail(${JSON.stringify(c.id)}, this)'>
       <div style="display:flex;align-items:center;gap:11px;">
@@ -9598,7 +9598,7 @@ Always write in a professional yet warm Indian B2B communication style. Use form
       </div>
       ${phone ? `<div style="color:var(--gold);font-family:'JetBrains Mono';font-size:14px;padding:4px 20px 0;">${escHtml(phone)}</div>` : ''}
       <div style="padding:14px 20px;border-bottom:1px solid var(--border);">
-        ${phone ? `<div class="stat-row"><div class="stat-label">Phone</div><div class="stat-val" style="font-size:12px;font-family:'JetBrains Mono';">${escHtml(phone)}</div></div>` : ''}
+        ${phone ? `<div class="stat-row"><div class="stat-label">Phone</div><div class="stat-val" style="font-size:12px;font-family:'JetBrains Mono';">${escHtml(phone)}</div></div>` : (jid.endsWith('@lid') ? `<div class="stat-row"><div class="stat-label">Phone</div><div class="stat-val" style="font-size:12px;color:var(--muted2);font-style:italic;">Resolving in background…</div></div>` : '')}
         <div class="stat-row"><div class="stat-label">JID</div><div class="stat-val" style="font-size:11px;word-break:break-all;">${escHtml(jid)}</div></div>
         <div class="stat-row"><div class="stat-label">Last message</div><div class="stat-val" style="font-size:12px;">${escHtml(last)}</div></div>
       </div>

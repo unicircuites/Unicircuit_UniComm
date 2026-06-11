@@ -296,7 +296,8 @@ router.get('/insights', async (req, res) => {
           COUNT(*) FILTER (WHERE jid LIKE '%@g.us')::int AS groups,
           COUNT(*) FILTER (WHERE jid LIKE '%@newsletter')::int AS announcements,
           COUNT(*) FILTER (WHERE jid NOT LIKE '%@g.us' AND jid NOT LIKE '%@newsletter')::int AS individual,
-          COUNT(*) FILTER (WHERE is_business = true OR verified_name IS NOT NULL)::int AS business
+          (SELECT COUNT(*)::int FROM wa_contacts
+           WHERE account_phone = $1 AND (is_business = true OR verified_name IS NOT NULL)) AS business
         FROM wa_chats WHERE account_phone = $1
       `, [waAccountPhone]) : Promise.resolve({ rows: [{ total:0, groups:0, announcements:0, individual:0, business:0 }] }),
 
