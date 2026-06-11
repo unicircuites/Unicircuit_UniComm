@@ -282,6 +282,7 @@ async function ensureTable(retries = 3) {
       await pool.query(`CREATE INDEX IF NOT EXISTS idx_call_logs_call_type  ON call_logs (call_type)`).catch(() => { });
       await pool.query(`CREATE INDEX IF NOT EXISTS idx_call_logs_caller     ON call_logs (caller)`).catch(() => { });
       await pool.query(`CREATE INDEX IF NOT EXISTS idx_call_logs_created_at ON call_logs (created_at DESC)`).catch(() => { });
+      await pool.query(`CREATE INDEX IF NOT EXISTS idx_audit_log_created_at ON audit_log (created_at DESC)`).catch(() => { });
 
       // ── Materialized view for fast paginated call log queries ─────────────
       // Precomputes the expensive dedup CTE so page switches are a simple index seek.

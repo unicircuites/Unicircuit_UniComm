@@ -275,6 +275,10 @@ router.get('/insights', async (req, res) => {
       callStats,
       newCalls,
       auditActivity,
+      todayCalls,
+      yesterdayCalls,
+      todayWaUnread,
+      yesterdayActivity,
     ] = await Promise.all([
       // WA unread chats list
       waAccountPhone ? safeQuery(`
@@ -319,15 +323,13 @@ router.get('/insights', async (req, res) => {
         FROM call_logs WHERE ${callIntervalSql}
       `),
 
-      // New calls in period (with details)
+      // New calls in period (with details) — use deduped view which already has saved_name
       safeQuery(`
         SELECT cl.id, cl.caller, cl.destination, cl.call_type, cl.duration,
                TO_CHAR(cl.call_date,'YYYY-MM-DD') AS call_date, cl.call_time,
                cl.recording_file,
-               pc.name AS contact_name
-        FROM call_logs cl
-        LEFT JOIN pbx_contacts pc ON pc.name IS NOT NULL
-          AND regexp_replace(pc.phone,'[^0-9]','','g') = regexp_replace(cl.caller,'[^0-9]','','g')
+               cl.saved_name AS contact_name
+        FROM call_logs_deduped cl
         WHERE ${callIntervalSql}
         ORDER BY cl.call_date DESC NULLS LAST, cl.call_time DESC NULLS LAST, cl.id DESC
         LIMIT 50
@@ -346,10 +348,8 @@ router.get('/insights', async (req, res) => {
         ORDER BY al.created_at DESC
         LIMIT 100
       `),
-    ]);
 
-    // Comparison: today vs yesterday (always, regardless of period filter)
-    const [todayCalls, yesterdayCalls, todayWaUnread, yesterdayActivity] = await Promise.all([
+      // Comparison queries — merged into same Promise.all to avoid serial wait
       safeQuery(`SELECT COUNT(*)::int AS total, COUNT(*) FILTER (WHERE call_type='Missed')::int AS missed FROM call_logs WHERE call_date = CURRENT_DATE`),
       safeQuery(`SELECT COUNT(*)::int AS total, COUNT(*) FILTER (WHERE call_type='Missed')::int AS missed FROM call_logs WHERE call_date = CURRENT_DATE - 1`),
       waAccountPhone ? safeQuery(`SELECT COALESCE(SUM(unread),0)::int AS unread FROM wa_chats WHERE account_phone=$1`, [waAccountPhone]) : Promise.resolve({ rows:[{unread:0}] }),
