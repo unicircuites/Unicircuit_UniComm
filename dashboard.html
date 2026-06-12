@@ -23697,26 +23697,66 @@ ${plainText}`;
           filename = cleanBody;
         }
         var ext = String(filename).split('.').pop().toLowerCase();
-        var docColor = ext === 'pdf' ? '#ef4444' : ['doc','docx','rtf'].includes(ext) ? '#3b82f6' : ['xls','xlsx','csv'].includes(ext) ? '#22c55e' : ['ppt','pptx'].includes(ext) ? '#f97316' : ['zip','rar','7z'].includes(ext) ? '#f59e0b' : ['txt','log','md'].includes(ext) ? '#94a3b8' : ['jpg','jpeg','png','gif','webp','bmp'].includes(ext) ? '#a855f7' : '#60a5fa';
-        var docIcon = ext === 'pdf' ? 'fa-file-pdf' : ['doc','docx','rtf'].includes(ext) ? 'fa-file-word' : ['xls','xlsx','csv'].includes(ext) ? 'fa-file-excel' : ['ppt','pptx'].includes(ext) ? 'fa-file-powerpoint' : ['zip','rar','7z'].includes(ext) ? 'fa-file-archive' : ['txt','log','md'].includes(ext) ? 'fa-file-lines' : ['jpg','jpeg','png','gif','webp','bmp'].includes(ext) ? 'fa-file-image' : 'fa-file-alt';
-        var docLabel = ext === 'pdf' ? 'PDF Document' : ['doc','docx','rtf'].includes(ext) ? 'Word Document' : ['xls','xlsx','csv'].includes(ext) ? 'Spreadsheet' : ['ppt','pptx'].includes(ext) ? 'Presentation' : ['zip','rar','7z'].includes(ext) ? 'Archive' : ['txt','log','md'].includes(ext) ? 'Text File' : ['jpg','jpeg','png','gif','webp','bmp'].includes(ext) ? 'Image' : 'Document';
         var isPdf = ext === 'pdf';
-        var dlLink = dlUrl ? '<a href="' + escAttr(dlUrl) + '" download="' + escAttr(filename) + '" style="display:inline-flex;align-items:center;gap:5px;background:rgba(59,130,246,0.15);border:1px solid rgba(59,130,246,0.3);border-radius:6px;padding:4px 10px;font-size:11px;color:var(--blue2);text-decoration:none;"><i class="fas fa-download"></i> Download</a>' : '';
-        var prevBtn = previewUrl ? '<button onclick="openDocPreview(\'' + escAttr(previewUrl) + '\',\'' + escAttr(filename) + '\')" style="display:inline-flex;align-items:center;gap:5px;background:linear-gradient(135deg,rgba(37,211,102,0.2),rgba(37,211,102,0.08));border:1px solid rgba(37,211,102,0.45);border-radius:6px;padding:4px 10px;font-size:11px;color:#25D366;cursor:pointer;"><i class="fas fa-eye"></i> Preview</button>' : '';
-        var thumbArea = isPdf && previewUrl
-          ? '<div style="height:200px;background:#f5f5f5;border-top:1px solid var(--border);"><iframe src="' + escAttr(previewUrl) + '#toolbar=0&navpanes=0" loading="lazy" style="width:100%;height:100%;border:0;"></iframe></div>'
-          : '<div onclick="' + (previewUrl ? 'openDocPreview(\'' + escAttr(previewUrl) + '\',\'' + escAttr(filename) + '\')' : '') + '" style="height:110px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;background:linear-gradient(135deg,rgba(255,255,255,0.07),rgba(255,255,255,0.02));border-top:1px solid var(--border);' + (previewUrl ? 'cursor:pointer;' : '') + '">'
-            + '<i class="fas ' + docIcon + '" style="font-size:26px;color:' + docColor + ';"></i>'
-            + '<span style="font-size:10px;font-weight:900;color:' + docColor + ';letter-spacing:1px;">' + ext.toUpperCase() + '</span>'
-            + (previewUrl ? '<span style="font-size:9.5px;color:rgba(255,255,255,0.35);"><i class="fas fa-eye" style="margin-right:2px;"></i>Click to preview</span>' : '')
-            + '</div>';
-        return '<div style="background:rgba(255,255,255,0.06);border:1px solid var(--border);border-radius:10px;overflow:hidden;max-width:300px;min-width:220px;margin-bottom:4px;">'
-          + thumbArea
-          + '<div style="padding:8px 10px 4px;display:flex;align-items:center;gap:8px;">'
-          + '<div style="width:30px;height:30px;border-radius:7px;background:' + docColor + '22;border:1px solid ' + docColor + '44;display:flex;align-items:center;justify-content:center;flex-shrink:0;"><i class="fas ' + docIcon + '" style="color:' + docColor + ';font-size:13px;"></i></div>'
-          + '<div style="min-width:0;flex:1;"><div title="' + escAttr(filename) + '" style="font-size:12.5px;font-weight:700;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + escHtml(filename) + '</div>'
-          + '<div style="font-size:10px;color:var(--muted);">' + docLabel + '</div></div></div>'
-          + '<div style="display:flex;gap:5px;padding:6px 10px 10px;">' + prevBtn + dlLink + '</div>'
+        var isWord = ['doc','docx','rtf'].includes(ext);
+        var isSheet = ['xls','xlsx','csv'].includes(ext);
+        var isImage = ['jpg','jpeg','png','gif','webp','bmp'].includes(ext);
+        
+        var docIcon = isPdf ? 'fa-file-pdf' : isWord ? 'fa-file-word' : isSheet ? 'fa-file-excel' : ['ppt','pptx'].includes(ext) ? 'fa-file-powerpoint' : ['zip','rar','7z'].includes(ext) ? 'fa-file-archive' : ['txt','log','md'].includes(ext) ? 'fa-file-lines' : isImage ? 'fa-file-image' : 'fa-file-alt';
+        var docColor = isPdf ? '#ef4444' : isWord ? '#3b82f6' : isSheet ? '#22c55e' : ['ppt','pptx'].includes(ext) ? '#f97316' : '#94a3b8';
+        var docTypeLabel = ext.toUpperCase();
+
+        var containerId = 'doc-thumb-' + msgId;
+        
+        // Generate the thumbnail area content
+        var thumbHtml = '';
+        if (previewUrl) {
+          if (isPdf) {
+            thumbHtml = '<iframe src="' + escAttr(previewUrl) + '#toolbar=0&navpanes=0&scrollbar=0&view=FitH" style="width:200%;height:200%;transform:scale(0.5);transform-origin:top left;border:0;pointer-events:none;" scrolling="no"></iframe>';
+          } else if (isImage) {
+            thumbHtml = '<img src="' + escAttr(previewUrl) + '" style="width:100%;height:100%;object-fit:cover;pointer-events:none;">';
+          } else if (isWord || isSheet || ['txt','md','csv'].includes(ext)) {
+            // We will inject the parsed HTML into this container after the DOM renders
+            thumbHtml = '<div id="' + containerId + '" style="width:250%;height:250%;transform:scale(0.4);transform-origin:top left;background:#fff;padding:20px;font-size:12px;color:#000;overflow:hidden;pointer-events:none;white-space:pre-wrap;line-height:1.4;"></div>';
+            
+            // Script to fetch and render content into the thumbnail
+            setTimeout(function() {
+              var el = document.getElementById(containerId);
+              if (!el) return;
+              if (isWord && typeof mammoth !== 'undefined') {
+                fetch(previewUrl).then(function(r){return r.arrayBuffer()}).then(function(buf){
+                  return mammoth.convertToHtml({arrayBuffer: buf});
+                }).then(function(res){ el.innerHTML = res.value; }).catch(function(){ el.innerHTML = '<div style="color:#999;text-align:center;padding:40px;">Preview not available</div>'; });
+              } else if (isSheet && typeof XLSX !== 'undefined') {
+                fetch(previewUrl).then(function(r){return r.arrayBuffer()}).then(function(buf){
+                  var wb = XLSX.read(buf, {type:'array'});
+                  var html = XLSX.utils.sheet_to_html(wb.Sheets[wb.SheetNames[0]], {editable:false});
+                  el.innerHTML = '<style>#'+containerId+' table{border-collapse:collapse;width:100%;}#'+containerId+' td{border:1px solid #ddd;padding:4px;}</style>' + html;
+                }).catch(function(){ el.innerHTML = '<div style="color:#999;text-align:center;padding:40px;">Preview not available</div>'; });
+              } else {
+                fetch(previewUrl).then(function(r){return r.text()}).then(function(text){
+                  el.textContent = text;
+                }).catch(function(){});
+              }
+            }, 100);
+          } else {
+            thumbHtml = '<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;background:#f5f5f5;"><i class="fas ' + docIcon + '" style="font-size:48px;color:#cbd5e1;"></i></div>';
+          }
+        }
+
+        // WhatsApp Web Chat Bubble style for Document
+        return '<div style="background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.1);border-radius:8px;overflow:hidden;width:280px;margin-bottom:4px;display:flex;flex-direction:column;cursor:pointer;" onclick="window.open(\'' + escAttr(dlUrl) + '\', \'_blank\')">'
+          + '<div style="height:140px;background:#fff;position:relative;overflow:hidden;border-bottom:1px solid rgba(0,0,0,0.05);">'
+          + thumbHtml
+          + '</div>'
+          + '<div style="background:rgba(240,242,245,0.9);padding:10px 12px;display:flex;align-items:center;gap:12px;">'
+          + '<i class="fas ' + docIcon + '" style="font-size:28px;color:' + docColor + ';flex-shrink:0;"></i>'
+          + '<div style="min-width:0;flex:1;">'
+          + '<div title="' + escAttr(filename) + '" style="font-size:14px;font-weight:600;color:#111b21;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-bottom:2px;">' + escHtml(filename) + '</div>'
+          + '<div style="font-size:12px;color:#667781;">' + docTypeLabel + '</div>'
+          + '</div>'
+          + '<div style="width:36px;height:36px;border-radius:50%;border:1.5px solid rgba(17,27,33,0.15);display:flex;align-items:center;justify-content:center;flex-shrink:0;color:#111b21;"><i class="fas fa-arrow-down" style="font-size:14px;"></i></div>'
+          + '</div>'
           + '</div>';
       }
 
@@ -34820,143 +34860,6 @@ Nagpur, Maharashtra, 440017, India<br>
 
 
 
-<!-- ══════════════ DOCUMENT PREVIEW MODAL ══════════════ -->
-<div id="doc-preview-modal" style="display:none;position:fixed;inset:0;z-index:99999;background:rgba(0,0,0,0.82);backdrop-filter:blur(6px);align-items:center;justify-content:center;flex-direction:column;">
-  <div style="width:min(92vw,900px);max-height:88vh;background:var(--card,#1e2330);border-radius:14px;border:1px solid var(--border,rgba(255,255,255,0.1));display:flex;flex-direction:column;overflow:hidden;box-shadow:0 32px 80px rgba(0,0,0,0.6);">
-    <!-- Header -->
-    <div style="display:flex;align-items:center;gap:10px;padding:12px 16px;border-bottom:1px solid var(--border,rgba(255,255,255,0.08));flex-shrink:0;">
-      <i id="doc-prev-icon" class="fas fa-file-alt" style="font-size:18px;color:#60a5fa;"></i>
-      <span id="doc-prev-title" style="flex:1;font-size:13.5px;font-weight:700;color:var(--text,#e2e8f0);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">Document</span>
-      <a id="doc-prev-open-btn" href="#" target="_blank" style="display:none;align-items:center;gap:5px;background:rgba(255,255,255,0.08);border:1px solid var(--border);border-radius:6px;padding:5px 12px;font-size:11.5px;color:var(--text);text-decoration:none;"><i class="fas fa-up-right-from-square"></i> Open</a>
-      <a id="doc-prev-dl-btn" href="#" download style="display:inline-flex;align-items:center;gap:5px;background:rgba(59,130,246,0.15);border:1px solid rgba(59,130,246,0.3);border-radius:6px;padding:5px 12px;font-size:11.5px;color:var(--blue2,#60a5fa);text-decoration:none;"><i class="fas fa-download"></i> Download</a>
-      <button onclick="closeDocPreview()" style="background:rgba(255,255,255,0.06);border:1px solid var(--border);border-radius:6px;padding:5px 10px;color:var(--muted);cursor:pointer;font-size:13px;"><i class="fas fa-times"></i></button>
-    </div>
-    <!-- Body -->
-    <div id="doc-prev-body" style="flex:1;overflow:auto;min-height:200px;position:relative;">
-      <div id="doc-prev-loading" style="display:flex;align-items:center;justify-content:center;padding:60px;color:var(--muted);gap:12px;font-size:13px;"><span class="spin-loader" style="width:22px;height:22px;border-width:2px;"></span> Loading preview…</div>
-    </div>
-  </div>
-</div>
 
-<script>
-function openDocPreview(url, filename) {
-  var modal = document.getElementById('doc-preview-modal');
-  var body  = document.getElementById('doc-prev-body');
-  var title = document.getElementById('doc-prev-title');
-  var icon  = document.getElementById('doc-prev-icon');
-  var dlBtn = document.getElementById('doc-prev-dl-btn');
-  var openBtn = document.getElementById('doc-prev-open-btn');
-
-  if (!modal || !url) return;
-
-  var ext = (filename || '').split('.').pop().toLowerCase();
-  var iconMap = { pdf:'fa-file-pdf', doc:'fa-file-word', docx:'fa-file-word', rtf:'fa-file-word', xls:'fa-file-excel', xlsx:'fa-file-excel', csv:'fa-file-excel', ppt:'fa-file-powerpoint', pptx:'fa-file-powerpoint', zip:'fa-file-archive', rar:'fa-file-archive', txt:'fa-file-lines', md:'fa-file-lines', log:'fa-file-lines', jpg:'fa-file-image', jpeg:'fa-file-image', png:'fa-file-image', gif:'fa-file-image', webp:'fa-file-image' };
-  var colorMap = { pdf:'#ef4444', doc:'#3b82f6', docx:'#3b82f6', rtf:'#3b82f6', xls:'#22c55e', xlsx:'#22c55e', csv:'#22c55e', ppt:'#f97316', pptx:'#f97316', zip:'#f59e0b', rar:'#f59e0b', txt:'#94a3b8', md:'#94a3b8', jpg:'#a855f7', jpeg:'#a855f7', png:'#a855f7', gif:'#a855f7', webp:'#a855f7' };
-
-  title.textContent = filename || 'Document';
-  icon.className = 'fas ' + (iconMap[ext] || 'fa-file-alt');
-  icon.style.color = colorMap[ext] || '#60a5fa';
-  dlBtn.href = url;
-  dlBtn.download = filename || 'document';
-  openBtn.href = url;
-  openBtn.style.display = 'none';
-
-  // Show modal
-  modal.style.display = 'flex';
-  document.body.style.overflow = 'hidden';
-
-  // Loading state
-  body.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;padding:60px;color:var(--muted);gap:12px;font-size:13px;"><span class="spin-loader" style="width:22px;height:22px;border-width:2px;margin-right:8px;"></span> Loading preview…</div>';
-
-  // ── PDF ──────────────────────────────────────────────
-  if (ext === 'pdf') {
-    body.innerHTML = '<iframe src="' + url + '#toolbar=1&navpanes=0" style="width:100%;height:75vh;border:0;background:#fff;"></iframe>';
-    return;
-  }
-
-  // ── Images ───────────────────────────────────────────
-  if (['jpg','jpeg','png','gif','webp','bmp','svg'].includes(ext)) {
-    body.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;padding:16px;min-height:300px;"><img src="' + url + '" style="max-width:100%;max-height:70vh;border-radius:8px;object-fit:contain;" onerror="this.parentElement.innerHTML=\'<div style=&quot;padding:40px;color:var(--muted);text-align:center;&quot;><i class=&quot;fas fa-image&quot; style=&quot;font-size:40px;display:block;margin-bottom:12px;&quot;></i>Could not load image.</div>\'"></div>';
-    return;
-  }
-
-  // ── TXT / MD / LOG ───────────────────────────────────
-  if (['txt','md','log','csv'].includes(ext) && ext !== 'csv') {
-    fetch(url).then(function(r){ return r.text(); }).then(function(text){
-      body.innerHTML = '<pre style="padding:20px;margin:0;font-size:12px;font-family:monospace;color:var(--text);white-space:pre-wrap;word-break:break-word;max-height:70vh;overflow:auto;background:rgba(0,0,0,0.2);">' + text.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;') + '</pre>';
-    }).catch(function(){ body.innerHTML = errMsg(url); });
-    return;
-  }
-
-  // ── DOCX ─────────────────────────────────────────────
-  if (['doc','docx','rtf'].includes(ext)) {
-    if (typeof mammoth !== 'undefined') {
-      fetch(url).then(function(r){ return r.arrayBuffer(); }).then(function(buf){
-        return mammoth.convertToHtml({ arrayBuffer: buf });
-      }).then(function(result){
-        body.innerHTML = '<div style="padding:24px 28px;max-height:70vh;overflow:auto;color:#1a1a2e;background:#fff;font-family:Calibri,sans-serif;font-size:14px;line-height:1.6;">' + result.value + '</div>';
-      }).catch(function(){ body.innerHTML = errMsg(url); openBtn.style.display = 'inline-flex'; });
-    } else { body.innerHTML = errMsg(url); openBtn.style.display = 'inline-flex'; }
-    return;
-  }
-
-  // ── XLSX / CSV ───────────────────────────────────────
-  if (['xls','xlsx','csv'].includes(ext)) {
-    if (typeof XLSX !== 'undefined') {
-      fetch(url).then(function(r){ return r.arrayBuffer(); }).then(function(buf){
-        var wb = XLSX.read(buf, { type: 'array' });
-        var ws = wb.Sheets[wb.SheetNames[0]];
-        var html = XLSX.utils.sheet_to_html(ws, { id:'doc-prev-sheet', editable:false });
-        body.innerHTML = '<div style="overflow:auto;max-height:70vh;padding:12px;"><style>#doc-prev-sheet{border-collapse:collapse;font-size:12px;font-family:Calibri,sans-serif;}#doc-prev-sheet td,#doc-prev-sheet th{border:1px solid #d1d5db;padding:4px 8px;white-space:nowrap;}</style>' + html + '</div>';
-      }).catch(function(){ body.innerHTML = errMsg(url); });
-    } else { body.innerHTML = errMsg(url); openBtn.style.display = 'inline-flex'; }
-    return;
-  }
-
-  // ── PPTX / PPT ───────────────────────────────────────
-  if (['ppt','pptx'].includes(ext)) {
-    body.innerHTML = '<div style="padding:48px 24px;text-align:center;color:var(--muted);">'
-      + '<i class="fas fa-file-powerpoint" style="font-size:52px;color:#f97316;display:block;margin-bottom:16px;"></i>'
-      + '<div style="font-size:14px;font-weight:600;color:var(--text);margin-bottom:8px;">' + (filename || 'Presentation') + '</div>'
-      + '<div style="font-size:12.5px;margin-bottom:20px;">PowerPoint files cannot be previewed in-browser.<br>Use the Download button to open in PowerPoint or LibreOffice.</div>'
-      + '<a href="' + url + '" download="' + (filename||'file.pptx') + '" style="display:inline-flex;align-items:center;gap:6px;background:#f97316;color:#fff;border-radius:8px;padding:8px 18px;text-decoration:none;font-size:13px;"><i class="fas fa-download"></i> Download &amp; Open</a>'
-      + '</div>';
-    return;
-  }
-
-  // ── Archive / Unknown ────────────────────────────────
-  body.innerHTML = '<div style="padding:48px 24px;text-align:center;color:var(--muted);">'
-    + '<i class="fas fa-file-alt" style="font-size:48px;color:#60a5fa;display:block;margin-bottom:16px;"></i>'
-    + '<div style="font-size:13.5px;font-weight:600;color:var(--text);margin-bottom:8px;">' + (filename || 'Document') + '</div>'
-    + '<div style="font-size:12.5px;margin-bottom:20px;">Preview not available for this file type.<br>Download to open it locally.</div>'
-    + '<a href="' + url + '" download="' + (filename||'file') + '" style="display:inline-flex;align-items:center;gap:6px;background:#60a5fa;color:#fff;border-radius:8px;padding:8px 18px;text-decoration:none;font-size:13px;"><i class="fas fa-download"></i> Download</a>'
-    + '</div>';
-}
-
-function errMsg(url) {
-  return '<div style="padding:40px;text-align:center;color:var(--muted);">'
-    + '<i class="fas fa-exclamation-triangle" style="font-size:36px;display:block;margin-bottom:12px;color:#f59e0b;"></i>'
-    + '<div style="font-size:13px;margin-bottom:16px;">Could not render preview.<br>Try downloading the file.</div>'
-    + '<a href="' + url + '" target="_blank" style="color:var(--blue2);">Open in new tab</a>'
-    + '</div>';
-}
-
-function closeDocPreview() {
-  var modal = document.getElementById('doc-preview-modal');
-  if (modal) { modal.style.display = 'none'; }
-  document.body.style.overflow = '';
-  var body = document.getElementById('doc-prev-body');
-  if (body) body.innerHTML = '';
-}
-
-// Close on backdrop click
-document.getElementById('doc-preview-modal').addEventListener('click', function(e) {
-  if (e.target === this) closeDocPreview();
-});
-// Close on Escape key
-document.addEventListener('keydown', function(e) {
-  if (e.key === 'Escape') closeDocPreview();
-});
-</script>
 </body>
 </html>
