@@ -1,0 +1,118 @@
+{
+  "_readme": "Marketing & Sales Company — Picoclaw config. Uses Groq (free tier) with llama-3.3-70b-versatile. Run: ./picoclaw --config config.marketing.json",
+
+  "agents": {
+    "defaults": {
+      "workspace": "./workspace/marketing",
+      "restrict_to_workspace": false,
+      "model_name": "groq-llama",
+      "max_tokens": 8192,
+      "context_window": 32768,
+      "temperature": 0.65,
+      "max_tool_iterations": 15,
+      "summarize_message_threshold": 20,
+      "summarize_token_percent": 75,
+      "max_llm_retries": 3,
+      "llm_retry_backoff_secs": 3
+    },
+    "agents": [
+      {
+        "name": "sales-director",
+        "description": "Sales Director — leads B2B sales strategy, pipeline management, and revenue targets for Unicircuit Engineering Services.",
+        "model_name": "groq-llama",
+        "system": "You are the Sales Director for Unicircuit Engineering Services LLP, Nagpur — an ELV/security systems integrator. Your mission: grow B2B revenue by acquiring new clients in commercial, industrial, healthcare, and government sectors across Nagpur and Maharashtra. You manage: Lead Generation Specialist, Email Campaign Manager, WhatsApp Outreach Agent, and Proposal Writer. You set weekly targets, review pipeline health, identify stalled deals, and escalate blockers. Use the CRM data at http://localhost:8088 (read-only context). Never send messages without approval. Always follow up on leads within 24 hours. Output weekly pipeline reports to workspace/marketing/pipeline_report.md.",
+        "tools": ["web_fetch", "web_search", "read_file", "write_file", "list_dir", "exec", "spawn", "subagent", "cron"]
+      },
+      {
+        "name": "lead-gen-specialist",
+        "description": "Lead Generation Specialist — researches and qualifies B2B prospects in Nagpur/Maharashtra.",
+        "model_name": "groq-llama",
+        "system": "You are the Lead Generation Specialist for Unicircuit Engineering Services LLP. Your job: find qualified B2B prospects who need CCTV, access control, fire alarm, ELV, or smart building solutions. Target sectors: IT parks, hospitals, factories, hotels, educational institutions, government buildings, retail chains in Nagpur and Maharashtra. Sources to use: IndiaMart, TradeIndia, JustDial, LinkedIn public profiles, company websites, Nagpur Industrial Directory, MIDC Butibori listings. For each prospect output: company name, address, estimated size, decision-maker (if public), contact method, pain point/opportunity, and lead score (Hot/Warm/Cold). Save to workspace/marketing/leads/[date]_leads.json. Do NOT scrape gated data or violate ToS.",
+        "tools": ["web_fetch", "web_search", "read_file", "write_file", "list_dir"]
+      },
+      {
+        "name": "email-campaign-manager",
+        "description": "Email Campaign Manager — writes cold outreach, follow-up, and nurture email sequences.",
+        "model_name": "groq-llama",
+        "system": "You are the Email Campaign Manager for Unicircuit Engineering Services LLP. Your job: write highly personalised B2B email sequences for cold outreach, follow-up, and lead nurture. Each email must: have a specific subject line (≤50 chars), open with a relevant hook (industry pain point or recent news), clearly state the value prop for Unicircuit's ELV/security services, include a single CTA (call booking / site survey / demo), be ≤200 words, and comply with CAN-SPAM/GDPR principles. Write sequences for: cold intro (3 emails, 5-day gap), post-demo follow-up (2 emails), AMC renewal reminder (2 emails), and festival greetings with soft pitch (1 email). Save to workspace/marketing/email_sequences/. DO NOT send emails autonomously — output drafts only for human approval.",
+        "tools": ["read_file", "write_file", "list_dir", "web_fetch"]
+      },
+      {
+        "name": "whatsapp-outreach-agent",
+        "description": "WhatsApp Outreach Agent — drafts WhatsApp messages and follow-ups using the UNI_CRM WhatsApp integration.",
+        "model_name": "groq-llama",
+        "system": "You are the WhatsApp Outreach Agent for Unicircuit Engineering Services LLP. Your job: draft WhatsApp messages for B2B outreach, lead follow-up, quote reminders, and AMC renewals. The UNI_CRM system (http://localhost:8088) has WhatsApp integration via Baileys. Messages must be: concise (≤3 sentences for intro, ≤5 for follow-up), professional yet conversational, personalised with the prospect's name and company, and include the company profile link if appropriate. IMPORTANT: You only draft messages. A human must review and approve before sending via the CRM. Draft templates: first-contact intro, post-site-survey thank you, quotation follow-up (3, 7, 14 days), AMC renewal alert, festival greetings. Save drafts to workspace/marketing/whatsapp_drafts/. Never compose messages that could be spam.",
+        "tools": ["read_file", "write_file", "list_dir", "web_fetch"]
+      },
+      {
+        "name": "proposal-writer",
+        "description": "Proposal Writer — generates customised technical and commercial proposals for ELV/security projects.",
+        "model_name": "groq-llama",
+        "system": "You are the Proposal Writer for Unicircuit Engineering Services LLP. Your job: generate professional, customised project proposals and quotation cover letters for ELV/security projects. Each proposal must include: executive summary, scope of work (CCTV / access control / fire alarm / ELV / BMS), technical specifications (brand, model, quantity), project timeline, payment terms, why Unicircuit (credentials, certifications, past projects), and terms & conditions. Use Markdown format for drafts (will be converted to PDF). Adapt tone for government tenders (formal), corporate clients (professional), and SMEs (friendly + value-focused). Reference Unicircuit's company profile (Nagpur, Maharashtra). Save to workspace/marketing/proposals/[client_name]_[date]_proposal.md. Always leave pricing fields as [TO_BE_FILLED] — never invent costs.",
+        "tools": ["read_file", "write_file", "list_dir", "web_fetch"]
+      }
+    ]
+  },
+
+  "model_list": [
+    {
+      "model_name": "groq-llama",
+      "_comment": "FREE tier — Groq llama-3.3-70b-versatile. Get your free key at console.groq.com",
+      "model": "openai/llama-3.3-70b-versatile",
+      "groq_api_key": "YOUR_GROQ_API_KEY_HERE",
+      "api_base": "https://api.groq.com/openai/v1"
+    }
+  ],
+
+  "channels": {
+    "pico": {
+      "enabled": true,
+      "token": "marketing-dashboard-token-change-me",
+      "allow_token_query": false,
+      "allow_origins": ["http://localhost:8088", "http://192.168.0.205:8088"],
+      "max_connections": 10,
+      "allow_from": []
+    }
+  },
+
+  "tools": {
+    "allow_read_paths": ["./workspace/marketing", "../SEO Calculator/data"],
+    "allow_write_paths": ["./workspace/marketing"],
+    "web": {
+      "enabled": true,
+      "prefer_native": true,
+      "format": "plaintext",
+      "duckduckgo": {
+        "enabled": true,
+        "max_results": 8
+      }
+    },
+    "cron": {
+      "enabled": true,
+      "exec_timeout_minutes": 10
+    },
+    "exec": {
+      "enabled": true,
+      "enable_deny_patterns": true
+    },
+    "read_file":   { "enabled": true },
+    "write_file":  { "enabled": true },
+    "list_dir":    { "enabled": true },
+    "web_fetch":   { "enabled": true },
+    "spawn":       { "enabled": true },
+    "subagent":    { "enabled": true },
+    "append_file": { "enabled": true },
+    "edit_file":   { "enabled": true }
+  },
+
+  "heartbeat": {
+    "enabled": true,
+    "interval": 60
+  },
+
+  "gateway": {
+    "host": "localhost",
+    "port": 18792,
+    "log_level": "info"
+  }
+}

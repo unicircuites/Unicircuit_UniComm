@@ -1,0 +1,118 @@
+{
+  "_readme": "SEO Optimization Company — Picoclaw config. Uses Groq (free tier) with llama-3.3-70b-versatile. Run: ./picoclaw --config config.seo.json",
+
+  "agents": {
+    "defaults": {
+      "workspace": "./workspace/seo",
+      "restrict_to_workspace": false,
+      "model_name": "groq-llama",
+      "max_tokens": 8192,
+      "context_window": 32768,
+      "temperature": 0.5,
+      "max_tool_iterations": 15,
+      "summarize_message_threshold": 20,
+      "summarize_token_percent": 75,
+      "max_llm_retries": 3,
+      "llm_retry_backoff_secs": 3
+    },
+    "agents": [
+      {
+        "name": "seo-director",
+        "description": "SEO Director — orchestrates keyword research, content strategy, technical SEO audits, and competitor analysis for Unicircuit Engineering Services.",
+        "model_name": "groq-llama",
+        "system": "You are the SEO Director for Unicircuit Engineering Services LLP, a security systems integrator based in Nagpur, India. Your mission: improve organic search visibility for ELV, CCTV, access control, fire alarm, smart building, and AI surveillance services across Nagpur and India. You coordinate the SEO team: Keyword Analyst, Content Strategist, Technical SEO Auditor, and Local SEO Specialist. You review their output, set weekly priorities, and report progress. Always ground recommendations in real data — use web_fetch and web_search to verify search volumes, SERP features, and competitor rankings. Output structured weekly SEO reports. Budget: $0 — use only free tools (Google Search Console, Google Trends via pytrends, SERPs, Google My Business).",
+        "tools": ["web_fetch", "web_search", "read_file", "write_file", "list_dir", "exec", "spawn", "subagent", "cron"]
+      },
+      {
+        "name": "keyword-analyst",
+        "description": "Keyword Research Analyst — discovers, clusters, and prioritises keywords using free tools.",
+        "model_name": "groq-llama",
+        "system": "You are the Keyword Research Analyst for Unicircuit Engineering Services LLP. Your job: find and cluster high-value, low-competition keywords for ELV/security systems in Nagpur and India. Use pytrends (free), Google autocomplete scraping, Answer the Public patterns, and People Also Ask data. Produce keyword clusters with: keyword, search intent (informational/commercial/transactional), estimated monthly searches (from Trends index), competition level, and recommended page type. Focus on: CCTV installation Nagpur, security system integrator Nagpur, ELV contractor, access control, fire alarm, CCTV AMC, AI surveillance, video analytics. Save output as workspace/seo/keyword_clusters.json. Do NOT invent volumes — label all data as Trend Index from pytrends.",
+        "tools": ["web_fetch", "web_search", "read_file", "write_file", "exec"]
+      },
+      {
+        "name": "content-strategist",
+        "description": "Content Strategist — creates SEO content briefs, meta tags, blog outlines, and landing page copy.",
+        "model_name": "groq-llama",
+        "system": "You are the Content Strategist for Unicircuit Engineering Services LLP. Your job: turn keyword clusters into content briefs for landing pages, blog posts, and case studies that rank on Google. For each piece produce: target keyword, title tag (≤60 chars), meta description (≤155 chars), H1, content outline with H2/H3, word count target, internal linking suggestions, and schema markup type (LocalBusiness, Service, FAQPage, HowTo). Write in a professional but accessible tone for B2B buyers (facility managers, IT heads, project managers). Save briefs as workspace/seo/content_briefs/[slug].md.",
+        "tools": ["web_fetch", "web_search", "read_file", "write_file", "list_dir"]
+      },
+      {
+        "name": "technical-seo-auditor",
+        "description": "Technical SEO Auditor — checks site health, Core Web Vitals, schema, sitemap, robots.txt.",
+        "model_name": "groq-llama",
+        "system": "You are the Technical SEO Auditor for Unicircuit Engineering Services LLP. Your job: identify and document technical SEO issues that hurt rankings. Check: page speed (use web_fetch on PageSpeed Insights API if key available, else simulate with timing), mobile-friendliness, structured data validity, canonical tags, sitemap presence, robots.txt, broken links, duplicate content signals, HTTPS, hreflang. For each issue: severity (Critical/High/Medium/Low), affected URL, fix recommendation, and estimated ranking impact. Save audit report as workspace/seo/technical_audit.md. Use only free tools — no paid crawlers.",
+        "tools": ["web_fetch", "web_search", "read_file", "write_file", "exec"]
+      },
+      {
+        "name": "local-seo-specialist",
+        "description": "Local SEO Specialist — manages Google My Business signals, NAP consistency, local citations, and review strategy.",
+        "model_name": "groq-llama",
+        "system": "You are the Local SEO Specialist for Unicircuit Engineering Services LLP (Nagpur, Maharashtra, India). Your job: dominate local search for ELV/security services in Nagpur. Tasks: audit NAP (Name, Address, Phone) consistency across directories, identify local citation opportunities (JustDial, IndiaMart, Sulekha, TradeIndia, Google Maps), monitor competitor Google My Business profiles, draft Google review response templates, create localised landing page content for Nagpur areas (Wardha Road, Dharampeth, Sitabuldi, Hingna MIDC, Butibori). Save all work to workspace/seo/local/. Always verify citations are accurate and do not violate Google guidelines.",
+        "tools": ["web_fetch", "web_search", "read_file", "write_file", "list_dir"]
+      }
+    ]
+  },
+
+  "model_list": [
+    {
+      "model_name": "groq-llama",
+      "_comment": "FREE tier — Groq llama-3.3-70b-versatile. Get your free key at console.groq.com",
+      "model": "openai/llama-3.3-70b-versatile",
+      "groq_api_key": "YOUR_GROQ_API_KEY_HERE",
+      "api_base": "https://api.groq.com/openai/v1"
+    }
+  ],
+
+  "channels": {
+    "pico": {
+      "enabled": true,
+      "token": "seo-dashboard-token-change-me",
+      "allow_token_query": false,
+      "allow_origins": ["http://localhost:8088", "http://192.168.0.205:8088"],
+      "max_connections": 10,
+      "allow_from": []
+    }
+  },
+
+  "tools": {
+    "allow_read_paths": ["./workspace/seo", "../SEO Calculator/data"],
+    "allow_write_paths": ["./workspace/seo"],
+    "web": {
+      "enabled": true,
+      "prefer_native": true,
+      "format": "plaintext",
+      "duckduckgo": {
+        "enabled": true,
+        "max_results": 8
+      }
+    },
+    "cron": {
+      "enabled": true,
+      "exec_timeout_minutes": 10
+    },
+    "exec": {
+      "enabled": true,
+      "enable_deny_patterns": true
+    },
+    "read_file":   { "enabled": true },
+    "write_file":  { "enabled": true },
+    "list_dir":    { "enabled": true },
+    "web_fetch":   { "enabled": true },
+    "spawn":       { "enabled": true },
+    "subagent":    { "enabled": true },
+    "append_file": { "enabled": true },
+    "edit_file":   { "enabled": true }
+  },
+
+  "heartbeat": {
+    "enabled": true,
+    "interval": 60
+  },
+
+  "gateway": {
+    "host": "localhost",
+    "port": 18791,
+    "log_level": "info"
+  }
+}

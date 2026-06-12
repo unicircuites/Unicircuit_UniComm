@@ -1,0 +1,53 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "AGY: Gemini Fast",
+      "type": "shell",
+      "command": "agy --model gemini-pro",
+      "problemMatcher": []
+    },
+    {
+      "label": "AGY: Gemini 1.5",
+      "type": "shell",
+      "command": "agy --model gemini-1.5",
+      "problemMatcher": []
+    },
+    {
+      "label": "AGY: Gemini 1.5 Pro",
+      "type": "shell",
+      "command": "agy --model gemini-1.5-pro",
+      "problemMatcher": []
+    },
+    {
+      "label": "AGY: Claude 3 Sonnet",
+      "type": "shell",
+      "command": "agy --model claude-3-sonnet",
+      "problemMatcher": []
+    },
+    {
+      "label": "AGY: Claude 3 Opus",
+      "type": "shell",
+      "command": "agy --model claude-3-opus",
+      "problemMatcher": []
+    },
+    {
+      "label": "AGY: Claude 3 Haiku",
+      "type": "shell",
+      "command": "agy --model claude-3-haiku",
+      "problemMatcher": []
+    },
+    {
+      "label": "AGY: Fix Project (Strong)",
+      "type": "shell",
+      "command": "agy --model gemini-1.5 --prompt-interactive \"analyze this entire project, find bugs and fix them step by step\"",
+      "problemMatcher": []
+    },
+    {
+      "label": "AGY: Explain Code",
+      "type": "shell",
+      "command": "agy --model gemini-pro --prompt-interactive \"explain this entire codebase clearly\"",
+      "problemMatcher": []
+    }
+  ]
+}
