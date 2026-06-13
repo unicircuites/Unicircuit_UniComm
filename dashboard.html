@@ -22325,14 +22325,15 @@ ${plainText}`;
       });
       waSocket.on('wa:chats_updated', () => { waLoadChats(); });
       waSocket.on('wa:status', function(data) {
-        // data = { id, status }  status: sent|delivered|read|played
         var el = document.getElementById('msg-' + data.id);
         if (!el) return;
         var tick = el.querySelector('.wa-tick');
-        if (tick) {
-          tick.dataset.status = data.status;
-          tick.innerHTML = waTickSvg(data.status);
-        }
+        if (!tick) return;
+        // Only upgrade: never go backwards
+        var rank = { sent: 1, delivered: 2, read: 3, played: 4 };
+        if ((rank[data.status] || 0) <= (rank[tick.dataset.status] || 0)) return;
+        tick.dataset.status = data.status;
+        tick.innerHTML = waTickSvg(data.status);
       });
       waSocket.on('wa:chat_unread_update', function (data) {
         var jid = waNormalizeJid(data && data.jid);
@@ -23472,8 +23473,7 @@ ${plainText}`;
         quotedBody: m.quoted_body,
         replyToMsgId: m.reply_to_msg_id,
         mediaPath: m.media_path,
-        // Cap at 'delivered' on load — blue tick only via live socket (wa:status)
-        status: (m.status === 'read' || m.status === 'played') ? 'delivered' : (m.status || 'sent')
+        status: m.status || 'sent'
       };
     }
 

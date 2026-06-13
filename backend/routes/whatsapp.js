@@ -991,11 +991,8 @@ router.get('/messages/:jid', authenticate, async (req, res) => {
       });
     }
     res.json(result.rows);
-    // Fire-and-forget: mark messages read after responding — don't block the response
-    Promise.all([
-      pool.query(`UPDATE wa_messages SET is_read=true WHERE chat_id=$1 AND account_phone=$2 AND from_me=false AND is_read=false`, [jid, accountPhone]),
-      wa.markChatRead(jid),
-    ]).catch(() => {});
+    // Update DB unread count only — do NOT send WA read receipt (that would give sender blue tick)
+    pool.query(`UPDATE wa_messages SET is_read=true WHERE chat_id=$1 AND account_phone=$2 AND from_me=false AND is_read=false`, [jid, accountPhone]).catch(() => {});
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 

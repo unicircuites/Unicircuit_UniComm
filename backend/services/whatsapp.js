@@ -1040,11 +1040,15 @@ async function saveMessage(msg) {
     if (!WA_DYNAMIC_DB_STORE) {
       return { id, jid, fromMe, sender: senderJid, senderName, body, type, ts, quotedBody, isReply: replyInfo.isReply, replyToMsgId: replyInfo.replyToMsgId, mediaPath };
     }
+    // Resolve status from Baileys: 1=sent, 2=delivered, 3=read, 4=played
+    const statusMap = { 1: 'sent', 2: 'delivered', 3: 'read', 4: 'played' };
+    const msgStatus = fromMe ? (statusMap[msg.status] || 'sent') : null;
+
     await pool.query(`
-      INSERT INTO wa_messages (id, chat_id, account_phone, from_me, sender, sender_name, body, msg_type, timestamp, is_read, quoted_body, is_reply, reply_to_msg_id, media_path)
-      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)
-      ON CONFLICT (id, chat_id, account_phone) DO NOTHING
-    `, [id, jid, accPhone, fromMe, senderJid, senderName, body, type, ts, fromMe, quotedBody, replyInfo.isReply, replyInfo.replyToMsgId, mediaPath]);
+      INSERT INTO wa_messages (id, chat_id, account_phone, from_me, sender, sender_name, body, msg_type, timestamp, is_read, status, quoted_body, is_reply, reply_to_msg_id, media_path)
+      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)
+      ON CONFLICT (id, chat_id, account_phone) DO UPDATE SET status = EXCLUDED.status WHERE wa_messages.status = 'sent'
+    `, [id, jid, accPhone, fromMe, senderJid, senderName, body, type, ts, fromMe, msgStatus || 'sent', quotedBody, replyInfo.isReply, replyInfo.replyToMsgId, mediaPath]);
 
     // Persist pushName as notify so chat list reflects the sender's current WA profile name
     if (!fromMe && !jid.endsWith('@g.us') && msg.pushName && !isInvalidContactLabel(msg.pushName) && !isPhoneLikeLabel(msg.pushName, '')) {
@@ -1798,11 +1802,37 @@ async function startWA(options = {}) {
       if (update.status && key.fromMe) {
         const statusMap = { 1: 'sent', 2: 'delivered', 3: 'read', 4: 'played' };
         const status = statusMap[update.status] || 'sent';
+        let chatJid = key.remoteJid;
+        // Resolve LID → real phone JID for DB lookup
+        if (chatJid && chatJid.endsWith('@lid')) {
+          const lidLocal = chatJid.split('@')[0];
+          const mapped = contactsStore[chatJid];
+          if (mapped?.phoneJid) {
+            chatJid = mapped.phoneJid;
+          } else {
+            try {
+              const r = await pool.query(
+                `SELECT phone FROM wa_contacts WHERE jid=$1 AND account_phone=$2 AND phone IS NOT NULL LIMIT 1`,
+                [chatJid, phoneNumber]
+              );
+              if (r.rows[0]) chatJid = r.rows[0].phone + '@s.whatsapp.net';
+            } catch (_) {}
+          }
+          // If still LID and it's a self-echo (own LID), skip read/played only
+          if (chatJid.endsWith('@lid') && (status === 'read' || status === 'played')) {
+            console.log(`[WA-STATUS] Skipped ${status} for ${key.id} — unresolved self LID`);
+            continue;
+          }
+        }
+        console.log(`[WA-STATUS] msg=${key.id} status=${update.status}(${status}) chat=${chatJid}`);
         const accPhone = phoneNumber;
         if (!accPhone) continue;
-        await pool.query(
-          `UPDATE wa_messages SET status=$1 WHERE id=$2 AND chat_id=$3 AND account_phone=$4`,
-          [status, key.id, key.remoteJid, accPhone]
+        // Only upgrade: sent(1) < delivered(2) < read(3) < played(4)
+        await pool.query(`
+          UPDATE wa_messages SET status=$1
+          WHERE id=$2 AND chat_id=$3 AND account_phone=$4
+            AND CASE status WHEN 'played' THEN 4 WHEN 'read' THEN 3 WHEN 'delivered' THEN 2 ELSE 1 END < $5`,
+          [status, key.id, chatJid, accPhone, update.status]
         );
         emit('wa:status', { id: key.id, status });
       }
