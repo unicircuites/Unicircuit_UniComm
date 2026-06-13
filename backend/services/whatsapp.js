@@ -2542,6 +2542,13 @@ async function sendMessage(jid, text, quotedMsgId) {
   );
   await saveChat(formattedJid, null, text, ts, 0, formattedJid.endsWith('@g.us'));
 
+  // Ensure the contact appears in WA Contacts directory
+  if (!formattedJid.endsWith('@g.us')) {
+    const digits = formattedJid.split('@')[0];
+    const phone = '+' + digits;
+    saveContact({ jid: formattedJid, id: formattedJid, name: phone, notify: phone, phones: [{ phone }], verifiedName: null, isBusiness: false }).catch(() => {});
+  }
+
   emit('wa:message', savedMsg);
   return result;
 }
