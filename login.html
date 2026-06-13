@@ -441,6 +441,15 @@ async function handleLogin(e) {
       storage.setItem('uc_user',     JSON.stringify(data.user));
       storage.setItem('uc_remember', remember ? '1' : '0');
 
+      // Save credentials for pre-fill on next visit
+      if (remember) {
+        localStorage.setItem('uc_saved_email',    email);
+        localStorage.setItem('uc_saved_password', password);
+      } else {
+        localStorage.removeItem('uc_saved_email');
+        localStorage.removeItem('uc_saved_password');
+      }
+
       // Show success animation then redirect
       document.getElementById('successOverlay').classList.add('show');
       setTimeout(() => { window.location.href = 'dashboard.html'; }, 1200);
@@ -457,42 +466,14 @@ async function handleLogin(e) {
 
 // ── AUTO-FILL IF REMEMBERED ──────────────────────────────────────────────────
 window.addEventListener('DOMContentLoaded', () => {
-  // Helper: read a cookie by name
-  function getCookie(name) {
-    return document.cookie.split(';').map(c => c.trim()).reduce((v, c) => {
-      const [k, ...rest] = c.split('=');
-      return k === name ? decodeURIComponent(rest.join('=')) : v;
-    }, null);
-  }
-
-  // 1. Check persistent cookie first (system-wise remember me)
-  const cookieToken = getCookie('uc_session');
-  if (cookieToken && cookieToken.startsWith('eyJ') && cookieToken.split('.').length === 3) {
-    // Store in localStorage so getAuthHeaders works everywhere, then redirect
-    localStorage.setItem('uc_token', cookieToken);
-    localStorage.setItem('uc_remember', '1');
-    window.location.href = 'dashboard.html';
-    return;
-  }
-
-  // 2. Check localStorage/sessionStorage JWT
-  const token = localStorage.getItem('uc_token') || sessionStorage.getItem('uc_token');
-  const isRealJWT = token && token.startsWith('eyJ') && token.split('.').length === 3;
-  if (isRealJWT) {
-    window.location.href = 'dashboard.html';
-    return;
-  }
-  // Clear any stale/fake tokens
-  if (token && !isRealJWT) {
-    console.warn('[LOGIN] Clearing stale token');
-    localStorage.clear();
-    sessionStorage.clear();
-  }
-  // Pre-fill email if remembered
+  // Pre-fill saved credentials if Remember Me was checked last time
   const remembered = localStorage.getItem('uc_remember');
   if (remembered === '1') {
-    const user = JSON.parse(localStorage.getItem('uc_user') || '{}');
-    if (user.email) document.getElementById('email').value = user.email;
+    const savedEmail    = localStorage.getItem('uc_saved_email') || '';
+    const savedPassword = localStorage.getItem('uc_saved_password') || '';
+    if (savedEmail)    document.getElementById('email').value    = savedEmail;
+    if (savedPassword) document.getElementById('password').value = savedPassword;
+    document.getElementById('rememberMe').checked = true;
   }
   // Apply saved theme
   applyTheme(localStorage.getItem('uc_theme') || 'dark');
