@@ -56,18 +56,32 @@ router.post('/login', async (req, res) => {
       initials: user.avatar_initials,
     };
 
+    const remember = req.body.remember === true || req.body.remember === 'true';
+    const expiry   = remember ? '30d' : (process.env.JWT_EXPIRES || '8h');
+
     const token = jwt.sign(
       payload,
       process.env.JWT_SECRET || 'unicomm_secret',
-      { expiresIn: process.env.JWT_EXPIRES || '8h' }
+      { expiresIn: expiry }
     );
+
+    // If remember=true, set a persistent cookie (30 days, JS-readable for getAuthHeaders)
+    if (remember) {
+      res.cookie('uc_session', token, {
+        httpOnly: false,
+        secure: req.secure || req.headers['x-forwarded-proto'] === 'https',
+        sameSite: 'Strict',
+        maxAge: 30 * 24 * 60 * 60 * 1000,
+        path: '/',
+      });
+    }
 
     // Log user login to activity log
     try {
       activityLog.append({ type: 'user_login', service: 'system', message: `User logged in: ${user.name} (${user.email})`, timestamp: new Date().toISOString() });
     } catch (_) {}
 
-    return res.json({ token, user: payload });
+    return res.json({ token, user: payload, remember });
 
   } catch (err) {
     console.error('[Auth] Login error:', err.message);
@@ -83,6 +97,7 @@ router.post('/logout', authenticate, async (req, res) => {
       [req.user.id, 'LOGOUT', 'users', `${req.user.email} logged out`, req.ip]
     );
   } catch (_) {}
+  res.clearCookie('uc_session', { path: '/' });
   return res.json({ message: 'Logged out.' });
 });
 

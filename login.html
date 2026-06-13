@@ -430,7 +430,7 @@ async function handleLogin(e) {
     const res = await fetch(`${API_BASE}/auth/login`, {
       method:  'POST',
       headers: { 'Content-Type': 'application/json' },
-      body:    JSON.stringify({ email, password }),
+      body:    JSON.stringify({ email, password, remember }),
     });
     const data = await res.json();
 
@@ -457,7 +457,25 @@ async function handleLogin(e) {
 
 // ── AUTO-FILL IF REMEMBERED ──────────────────────────────────────────────────
 window.addEventListener('DOMContentLoaded', () => {
-  // If already logged in with a REAL JWT, redirect
+  // Helper: read a cookie by name
+  function getCookie(name) {
+    return document.cookie.split(';').map(c => c.trim()).reduce((v, c) => {
+      const [k, ...rest] = c.split('=');
+      return k === name ? decodeURIComponent(rest.join('=')) : v;
+    }, null);
+  }
+
+  // 1. Check persistent cookie first (system-wise remember me)
+  const cookieToken = getCookie('uc_session');
+  if (cookieToken && cookieToken.startsWith('eyJ') && cookieToken.split('.').length === 3) {
+    // Store in localStorage so getAuthHeaders works everywhere, then redirect
+    localStorage.setItem('uc_token', cookieToken);
+    localStorage.setItem('uc_remember', '1');
+    window.location.href = 'dashboard.html';
+    return;
+  }
+
+  // 2. Check localStorage/sessionStorage JWT
   const token = localStorage.getItem('uc_token') || sessionStorage.getItem('uc_token');
   const isRealJWT = token && token.startsWith('eyJ') && token.split('.').length === 3;
   if (isRealJWT) {

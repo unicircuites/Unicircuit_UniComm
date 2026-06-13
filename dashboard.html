@@ -13304,6 +13304,20 @@ Keep it concise and professional.`;
       ucSelectRestoreAll();
 
       // ── AUTH GUARD ──────────────────────────────────────────────────────────
+      // Helper: read a cookie by name
+      function getDashCookie(name) {
+        return document.cookie.split(';').map(c => c.trim()).reduce((v, c) => {
+          const [k, ...rest] = c.split('=');
+          return k === name ? decodeURIComponent(rest.join('=')) : v;
+        }, null);
+      }
+      // Promote persistent cookie to localStorage if present
+      const cookieToken = getDashCookie('uc_session');
+      if (cookieToken && cookieToken.startsWith('eyJ') && cookieToken.split('.').length === 3) {
+        localStorage.setItem('uc_token', cookieToken);
+        localStorage.setItem('uc_remember', '1');
+      }
+
       const token = localStorage.getItem('uc_token') || sessionStorage.getItem('uc_token');
       const userRaw = localStorage.getItem('uc_user') || sessionStorage.getItem('uc_user');
 
@@ -13519,6 +13533,8 @@ Keep it concise and professional.`;
       localStorage.removeItem('uc_user');
       sessionStorage.removeItem('uc_token');
       sessionStorage.removeItem('uc_user');
+      // Clear persistent remember-me cookie
+      document.cookie = 'uc_session=; path=/; max-age=0; expires=Thu, 01 Jan 1970 00:00:00 GMT';
       window.location.href = 'login.html';
     }
 
@@ -13532,6 +13548,7 @@ Keep it concise and professional.`;
         console.warn('[AUTH] 401 received — token expired, redirecting to login');
         appendLocalLogEvent('system', 'error', 'Session expired — please log in again');
         localStorage.clear(); sessionStorage.clear();
+        document.cookie = 'uc_session=; path=/; max-age=0; expires=Thu, 01 Jan 1970 00:00:00 GMT';
         window.location.href = 'login.html';
         return res;
       }
