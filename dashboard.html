@@ -23319,14 +23319,34 @@ ${plainText}`;
       if (!q) { waRenderChats(waAllChats); return; }
       var ql = q.toLowerCase().trim();
       var qd = ql.replace(/\D/g, ''); // digits only for phone matching
-      waRenderChats(waAllChats.filter(function (c) {
+      var filtered = waAllChats.filter(function (c) {
         if ((c.name || '').toLowerCase().includes(ql)) return true;
         if (qd.length >= 3) {
           var pd = (c.phone || c.id || '').replace(/\D/g, '');
           if (pd.includes(qd)) return true;
         }
         return false;
-      }));
+      });
+      waRenderChats(filtered);
+
+      // If no results and query looks like a phone number, show "Start chat" button
+      if (!filtered.length && qd.length >= 7) {
+        var digits = qd.length === 10 ? '91' + qd : qd;
+        var jid = digits + '@s.whatsapp.net';
+        var display = '+' + digits;
+        var el = document.getElementById('wa-convo-list');
+        if (el) {
+          el.innerHTML = '<div style="padding:14px 12px;">' +
+            '<div style="color:var(--muted);font-size:12px;margin-bottom:10px;">No existing chat found.</div>' +
+            '<button type="button" onclick="waOpenChat(\'' + jid + '\',\'' + display + '\',\'' + display + '\')" ' +
+            'style="width:100%;display:flex;align-items:center;gap:10px;background:rgba(37,211,102,0.1);border:1px solid rgba(37,211,102,0.3);border-radius:8px;padding:10px 12px;cursor:pointer;color:var(--text,#e2e8f0);">' +
+            '<i class="fab fa-whatsapp" style="color:#25D366;font-size:18px;"></i>' +
+            '<div style="text-align:left;">' +
+            '<div style="font-size:13px;font-weight:600;">' + escHtml(display) + '</div>' +
+            '<div style="font-size:11px;color:var(--muted);">Start new WhatsApp chat</div>' +
+            '</div></button></div>';
+        }
+      }
     }
 
     /**
