@@ -24178,46 +24178,65 @@ ${plainText}`;
       event.stopPropagation();
       var old = document.getElementById('wa-msg-ctx-menu');
       if (old) old.remove();
-      var menu = document.createElement('div');
-      menu.id = 'wa-msg-ctx-menu';
-      menu.style.cssText = 'position:fixed;z-index:9999;background:var(--card2,#1e2433);border:1px solid rgba(255,255,255,0.1);border-radius:8px;padding:4px 0;min-width:160px;box-shadow:0 4px 20px rgba(0,0,0,0.5);';
+
+      var MENU_CSS = 'position:fixed;z-index:9999;background:var(--card2,#1e2433);border:1px solid rgba(255,255,255,0.1);border-radius:8px;padding:4px 0;min-width:170px;box-shadow:0 4px 20px rgba(0,0,0,0.5);';
+      var ITEM_CSS = 'display:flex;align-items:center;gap:9px;width:100%;padding:8px 14px;background:none;border:none;cursor:pointer;font-size:13px;';
+      var DIV_CSS  = 'height:1px;background:rgba(255,255,255,0.08);margin:3px 0;';
+
+      function makeMenu(items) {
+        var m = document.createElement('div');
+        m.id = 'wa-msg-ctx-menu';
+        m.style.cssText = MENU_CSS;
+        items.forEach(function(item) {
+          if (item.divider) { var d = document.createElement('div'); d.style.cssText = DIV_CSS; m.appendChild(d); return; }
+          var btn = document.createElement('button');
+          btn.type = 'button';
+          btn.style.cssText = ITEM_CSS + 'color:' + (item.danger ? '#ef4444' : 'var(--text,#e2e8f0)') + ';';
+          btn.innerHTML = '<i class="fas ' + item.icon + '" style="width:14px;text-align:center;"></i><span>' + item.label + '</span>';
+          btn.onmouseenter = function() { this.style.background = 'rgba(255,255,255,0.07)'; };
+          btn.onmouseleave = function() { this.style.background = 'none'; };
+          btn.onclick = function() { var cur = document.getElementById('wa-msg-ctx-menu'); if (cur) cur.remove(); item.action(); };
+          m.appendChild(btn);
+        });
+        return m;
+      }
+
+      function positionMenu(m, x, y) {
+        document.body.appendChild(m);
+        m.style.left = Math.max(8, Math.min(x, window.innerWidth  - m.offsetWidth  - 10)) + 'px';
+        m.style.top  = Math.max(8, Math.min(y, window.innerHeight - m.offsetHeight - 10)) + 'px';
+        setTimeout(function() { document.addEventListener('click', function h() { var cur = document.getElementById('wa-msg-ctx-menu'); if (cur) cur.remove(); document.removeEventListener('click', h); }); }, 0);
+      }
+
+      function showDeleteSubmenu(x, y) {
+        var subItems = [];
+        if (fromMe) subItems.push({ icon: 'fa-users', label: 'Delete for Everyone', danger: true, action: function() { waDeleteMessage(msgId, 'everyone'); } });
+        subItems.push({ icon: 'fa-user', label: 'Delete for Me', danger: true, action: function() { waDeleteMessage(msgId, 'me'); } });
+        subItems.push({ divider: true });
+        subItems.push({ icon: 'fa-times', label: 'Cancel', action: function() {} });
+        positionMenu(makeMenu(subItems), x, y);
+      }
+
+      var cx = event.clientX, cy = event.clientY;
       var items = [
         { icon: 'fa-reply', label: 'Reply', action: function() { waSetReplyFromMessage(msgId); } },
-        { icon: 'fa-copy', label: 'Copy Text', action: function() {
+        { icon: 'fa-copy',  label: 'Copy Text', action: function() {
           var cached = waRenderedMessages[msgId];
           if (cached && cached.body) navigator.clipboard.writeText(cached.body).catch(function(){});
-        }}
+        }},
+        { divider: true },
+        { icon: 'fa-trash', label: 'Delete Message', danger: true, action: function() { showDeleteSubmenu(cx, cy); } }
       ];
-      if (fromMe) {
-        items.push({ icon: 'fa-trash', label: 'Delete Message', danger: true, action: function() { waDeleteMessage(msgId); } });
-      }
-      items.forEach(function(item) {
-        var btn = document.createElement('button');
-        btn.type = 'button';
-        btn.style.cssText = 'display:flex;align-items:center;gap:9px;width:100%;padding:8px 14px;background:none;border:none;cursor:pointer;font-size:13px;color:' + (item.danger ? '#ef4444' : 'var(--text,#e2e8f0)') + ';';
-        btn.innerHTML = '<i class="fas ' + item.icon + '" style="width:14px;text-align:center;"></i><span>' + item.label + '</span>';
-        btn.onmouseenter = function() { this.style.background = 'rgba(255,255,255,0.07)'; };
-        btn.onmouseleave = function() { this.style.background = 'none'; };
-        btn.onclick = function() { menu.remove(); item.action(); };
-        menu.appendChild(btn);
-      });
-      document.body.appendChild(menu);
-      menu.style.left = Math.max(8, Math.min(event.clientX, window.innerWidth - menu.offsetWidth - 10)) + 'px';
-      menu.style.top = Math.max(8, Math.min(event.clientY, window.innerHeight - menu.offsetHeight - 10)) + 'px';
-      setTimeout(function() { document.addEventListener('click', function h() { menu.remove(); document.removeEventListener('click', h); }); }, 0);
+      positionMenu(makeMenu(items), cx, cy);
     }
 
-    async function waDeleteMessage(msgId) {
+    async function waDeleteMessage(msgId, scope) {
       if (!waActiveJid) return;
-      if (!confirm('Delete this message for everyone?')) return;
       try {
-        var res = await fetch(API_BASE + '/wa/message/' + encodeURIComponent(msgId) + '?chatJid=' + encodeURIComponent(waActiveJid), {
-          method: 'DELETE',
-          headers: getAuthHeaders()
-        });
+        var url = API_BASE + '/wa/message/' + encodeURIComponent(msgId) + '?chatJid=' + encodeURIComponent(waActiveJid) + '&scope=' + (scope || 'me');
+        var res = await fetch(url, { method: 'DELETE', headers: getAuthHeaders() });
         var data = await res.json();
         if (!res.ok) throw new Error(data.error || 'Delete failed');
-        // Remove bubble from DOM
         var el = document.getElementById('msg-' + msgId);
         if (el) el.remove();
       } catch (err) {

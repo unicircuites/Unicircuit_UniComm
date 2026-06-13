@@ -3593,28 +3593,29 @@ async function removeChatLabel(jid, labelId) {
 }
 
 // ── DELETE MESSAGE ─────────────────────────────────────────────────────────────
-async function deleteWaMessage(chatJid, msgId) {
+async function deleteWaMessage(chatJid, msgId, forEveryone = false) {
   if (!sock || !isConnected) throw new Error('WhatsApp not connected');
   const accPhone = phoneNumber;
   if (!accPhone) throw new Error('Connected WhatsApp account is not known yet');
   const formattedJid = formatJid(chatJid);
 
-  // Look up the message to know fromMe (needed to build the key correctly)
-  let fromMe = true;
-  try {
-    const row = await pool.query(
-      `SELECT from_me FROM wa_messages WHERE id=$1 AND chat_id=$2 AND account_phone=$3`,
-      [msgId, formattedJid, accPhone]
-    );
-    if (row.rows[0]) fromMe = !!row.rows[0].from_me;
-  } catch (_) {}
+  if (forEveryone) {
+    // Look up fromMe for the Baileys key
+    let fromMe = true;
+    try {
+      const row = await pool.query(
+        `SELECT from_me FROM wa_messages WHERE id=$1 AND chat_id=$2 AND account_phone=$3`,
+        [msgId, formattedJid, accPhone]
+      );
+      if (row.rows[0]) fromMe = !!row.rows[0].from_me;
+    } catch (_) {}
 
-  // Send delete (revoke) via Baileys
-  await sock.sendMessage(formattedJid, {
-    delete: { id: msgId, remoteJid: formattedJid, fromMe }
-  });
+    await sock.sendMessage(formattedJid, {
+      delete: { id: msgId, remoteJid: formattedJid, fromMe }
+    });
+  }
 
-  // Remove from DB
+  // Always remove from local DB
   await pool.query(
     `DELETE FROM wa_messages WHERE id=$1 AND chat_id=$2 AND account_phone=$3`,
     [msgId, formattedJid, accPhone]

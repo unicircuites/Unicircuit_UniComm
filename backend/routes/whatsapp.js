@@ -1030,10 +1030,10 @@ router.post('/send', authenticate, async (req, res) => {
 // ── Delete WA Message ─────────────────────────────────────────────────────────
 router.delete('/message/:msgId', authenticate, async (req, res) => {
   const { msgId } = req.params;
-  const { chatJid } = req.query;
+  const { chatJid, scope } = req.query;
   if (!chatJid) return res.status(400).json({ error: 'chatJid query param required' });
   try {
-    await wa.deleteWaMessage(chatJid, msgId);
+    await wa.deleteWaMessage(chatJid, msgId, scope === 'everyone');
     res.json({ success: true });
   } catch (err) {
     res.status(500).json({ error: err.message });
