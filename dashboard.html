@@ -24183,6 +24183,17 @@ ${plainText}`;
       var ITEM_CSS = 'display:flex;align-items:center;gap:9px;width:100%;padding:8px 14px;background:none;border:none;cursor:pointer;font-size:13px;';
       var DIV_CSS  = 'height:1px;background:rgba(255,255,255,0.08);margin:3px 0;';
 
+      function closeMenu() { var cur = document.getElementById('wa-msg-ctx-menu'); if (cur) cur.remove(); }
+
+      function attachDismiss() {
+        setTimeout(function() {
+          document.addEventListener('click', function h(e) {
+            var cur = document.getElementById('wa-msg-ctx-menu');
+            if (cur && !cur.contains(e.target)) { cur.remove(); document.removeEventListener('click', h); }
+          });
+        }, 0);
+      }
+
       function makeMenu(items) {
         var m = document.createElement('div');
         m.id = 'wa-msg-ctx-menu';
@@ -24195,7 +24206,7 @@ ${plainText}`;
           btn.innerHTML = '<i class="fas ' + item.icon + '" style="width:14px;text-align:center;"></i><span>' + item.label + '</span>';
           btn.onmouseenter = function() { this.style.background = 'rgba(255,255,255,0.07)'; };
           btn.onmouseleave = function() { this.style.background = 'none'; };
-          btn.onclick = function() { var cur = document.getElementById('wa-msg-ctx-menu'); if (cur) cur.remove(); item.action(); };
+          btn.onclick = function(e) { e.stopPropagation(); closeMenu(); item.action(); };
           m.appendChild(btn);
         });
         return m;
@@ -24205,7 +24216,7 @@ ${plainText}`;
         document.body.appendChild(m);
         m.style.left = Math.max(8, Math.min(x, window.innerWidth  - m.offsetWidth  - 10)) + 'px';
         m.style.top  = Math.max(8, Math.min(y, window.innerHeight - m.offsetHeight - 10)) + 'px';
-        setTimeout(function() { document.addEventListener('click', function h() { var cur = document.getElementById('wa-msg-ctx-menu'); if (cur) cur.remove(); document.removeEventListener('click', h); }); }, 0);
+        attachDismiss();
       }
 
       function showDeleteSubmenu(x, y) {
