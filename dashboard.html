@@ -23188,6 +23188,9 @@ ${plainText}`;
 
       // Recent conversations first, then alphabetical for contacts without activity
       chats.sort(function (a, b) {
+        var hasDraftA = !!localStorage.getItem('wa_draft_' + a.id);
+        var hasDraftB = !!localStorage.getItem('wa_draft_' + b.id);
+        if (hasDraftA !== hasDraftB) return hasDraftA ? -1 : 1;
         var ta = a.last_time ? new Date(a.last_time).getTime() : 0;
         var tb = b.last_time ? new Date(b.last_time).getTime() : 0;
         if (tb !== ta) return tb - ta;
@@ -23469,7 +23472,8 @@ ${plainText}`;
         quotedBody: m.quoted_body,
         replyToMsgId: m.reply_to_msg_id,
         mediaPath: m.media_path,
-        status: m.status || 'sent'
+        // Cap at 'delivered' on load — blue tick only via live socket (wa:status)
+        status: (m.status === 'read' || m.status === 'played') ? 'delivered' : (m.status || 'sent')
       };
     }
 
