@@ -1027,6 +1027,19 @@ router.post('/send', authenticate, async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
+// ── Delete WA Message ─────────────────────────────────────────────────────────
+router.delete('/message/:msgId', authenticate, async (req, res) => {
+  const { msgId } = req.params;
+  const { chatJid } = req.query;
+  if (!chatJid) return res.status(400).json({ error: 'chatJid query param required' });
+  try {
+    await wa.deleteWaMessage(chatJid, msgId);
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // ── WA Broadcast History (DB-backed) ─────────────────────────────────────────
 pool.query(`
   CREATE TABLE IF NOT EXISTS wa_broadcast_history (

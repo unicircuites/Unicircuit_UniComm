@@ -10,6 +10,18 @@ Yeh file update karo taaki tower server pe deploy karte waqt kuch miss na ho.
 
 ---
 
+## WA Delete Message (Jun 2026)
+
+| Change | File |
+|---|---|
+| `deleteWaMessage(chatJid, msgId)` function added — calls Baileys `delete` key then removes from DB | `backend/services/whatsapp.js` |
+| `DELETE /api/wa/message/:msgId?chatJid=` route added | `backend/routes/whatsapp.js` |
+| Right-click context menu on WA bubbles: Reply, Copy Text, Delete Message (Delete only shown for `fromMe` messages) | `dashboard.html` |
+
+**No new npm packages. No .env changes needed.**
+
+---
+
 ## WA BIZ Tag + LID Phone Fix (Jun 2026)
 
 | Change | File |

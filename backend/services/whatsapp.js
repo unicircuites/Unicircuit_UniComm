@@ -3592,6 +3592,35 @@ async function removeChatLabel(jid, labelId) {
   await sock.removeChatLabel(jid, labelId);
 }
 
-module.exports = { startWA, sendMessage, sendMediaMessage, logout, getStatus, getQR, requestQR, requestPhonePairingCode, setIO, getGroupMetadata, getGroupSubjectFromCache, refreshCurrentAccountGroupMetadata, resyncDirectoryFromSocket, processLidResolutionBatch, startLidResolutionWorker, stopLidResolutionWorker, downloadMedia, msgCache, importExportedChat, getConnectedPhone, getLiveChats, getLiveMessages, isLidResolutionExhausted, getLidResolutionCooldownMins, updateGroupName, flushCachedMediaToDisk, getProfilePicUrl, markChatRead, markChatUnread, addChatLabel, removeChatLabel, emitEvent: emit };
+// ── DELETE MESSAGE ─────────────────────────────────────────────────────────────
+async function deleteWaMessage(chatJid, msgId) {
+  if (!sock || !isConnected) throw new Error('WhatsApp not connected');
+  const accPhone = phoneNumber;
+  if (!accPhone) throw new Error('Connected WhatsApp account is not known yet');
+  const formattedJid = formatJid(chatJid);
+
+  // Look up the message to know fromMe (needed to build the key correctly)
+  let fromMe = true;
+  try {
+    const row = await pool.query(
+      `SELECT from_me FROM wa_messages WHERE id=$1 AND chat_id=$2 AND account_phone=$3`,
+      [msgId, formattedJid, accPhone]
+    );
+    if (row.rows[0]) fromMe = !!row.rows[0].from_me;
+  } catch (_) {}
+
+  // Send delete (revoke) via Baileys
+  await sock.sendMessage(formattedJid, {
+    delete: { id: msgId, remoteJid: formattedJid, fromMe }
+  });
+
+  // Remove from DB
+  await pool.query(
+    `DELETE FROM wa_messages WHERE id=$1 AND chat_id=$2 AND account_phone=$3`,
+    [msgId, formattedJid, accPhone]
+  );
+}
+
+module.exports = { startWA, sendMessage, sendMediaMessage, logout, getStatus, getQR, requestQR, requestPhonePairingCode, setIO, getGroupMetadata, getGroupSubjectFromCache, refreshCurrentAccountGroupMetadata, resyncDirectoryFromSocket, processLidResolutionBatch, startLidResolutionWorker, stopLidResolutionWorker, downloadMedia, msgCache, importExportedChat, getConnectedPhone, getLiveChats, getLiveMessages, isLidResolutionExhausted, getLidResolutionCooldownMins, updateGroupName, flushCachedMediaToDisk, getProfilePicUrl, markChatRead, markChatUnread, addChatLabel, removeChatLabel, deleteWaMessage, emitEvent: emit };
 
 

@@ -24044,7 +24044,7 @@ ${plainText}`;
       // Reply button
       var replyBtn = '<button onclick="waSetReplyFromMessage(\'' + escAttr(msgId) + '\')" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:10px;padding:2px 4px;opacity:0;transition:opacity 0.15s;" class="wa-reply-btn" title="Reply"><i class="fas fa-reply"></i></button>';
 
-      div.innerHTML = senderLabel + '<div class="' + (fromMe ? 'wa-bubble wa-out' : 'wa-bubble wa-in') + '" style="max-width:78%;position:relative;" onmouseover="this.querySelector(\'.wa-reply-btn\').style.opacity=1" onmouseout="this.querySelector(\'.wa-reply-btn\').style.opacity=0">' + quotedBlock + bodyText + '<div class="wa-time">' + time + (fromMe ? ' ✓✓' : '') + ' ' + replyBtn + '</div></div>';
+      div.innerHTML = senderLabel + '<div class="' + (fromMe ? 'wa-bubble wa-out' : 'wa-bubble wa-in') + '" style="max-width:78%;position:relative;" oncontextmenu="waShowMsgContextMenu(event,\'' + escAttr(msgId) + '\',' + (fromMe ? 'true' : 'false') + ')" onmouseover="this.querySelector(\'.wa-reply-btn\').style.opacity=1" onmouseout="this.querySelector(\'.wa-reply-btn\').style.opacity=0">' + quotedBlock + bodyText + '<div class="wa-time">' + time + (fromMe ? ' ✓✓' : '') + ' ' + replyBtn + '</div></div>';
       if (prepend && area.firstElementChild) {
         area.insertBefore(div, area.firstElementChild);
       } else {
@@ -24171,6 +24171,58 @@ ${plainText}`;
       waReplyTo = null;
       var bar = document.getElementById('wa-reply-bar');
       if (bar) bar.style.display = 'none';
+    }
+
+    function waShowMsgContextMenu(event, msgId, fromMe) {
+      event.preventDefault();
+      event.stopPropagation();
+      var old = document.getElementById('wa-msg-ctx-menu');
+      if (old) old.remove();
+      var menu = document.createElement('div');
+      menu.id = 'wa-msg-ctx-menu';
+      menu.style.cssText = 'position:fixed;z-index:9999;background:var(--card2,#1e2433);border:1px solid rgba(255,255,255,0.1);border-radius:8px;padding:4px 0;min-width:160px;box-shadow:0 4px 20px rgba(0,0,0,0.5);';
+      var items = [
+        { icon: 'fa-reply', label: 'Reply', action: function() { waSetReplyFromMessage(msgId); } },
+        { icon: 'fa-copy', label: 'Copy Text', action: function() {
+          var cached = waRenderedMessages[msgId];
+          if (cached && cached.body) navigator.clipboard.writeText(cached.body).catch(function(){});
+        }}
+      ];
+      if (fromMe) {
+        items.push({ icon: 'fa-trash', label: 'Delete Message', danger: true, action: function() { waDeleteMessage(msgId); } });
+      }
+      items.forEach(function(item) {
+        var btn = document.createElement('button');
+        btn.type = 'button';
+        btn.style.cssText = 'display:flex;align-items:center;gap:9px;width:100%;padding:8px 14px;background:none;border:none;cursor:pointer;font-size:13px;color:' + (item.danger ? '#ef4444' : 'var(--text,#e2e8f0)') + ';';
+        btn.innerHTML = '<i class="fas ' + item.icon + '" style="width:14px;text-align:center;"></i><span>' + item.label + '</span>';
+        btn.onmouseenter = function() { this.style.background = 'rgba(255,255,255,0.07)'; };
+        btn.onmouseleave = function() { this.style.background = 'none'; };
+        btn.onclick = function() { menu.remove(); item.action(); };
+        menu.appendChild(btn);
+      });
+      document.body.appendChild(menu);
+      menu.style.left = Math.max(8, Math.min(event.clientX, window.innerWidth - menu.offsetWidth - 10)) + 'px';
+      menu.style.top = Math.max(8, Math.min(event.clientY, window.innerHeight - menu.offsetHeight - 10)) + 'px';
+      setTimeout(function() { document.addEventListener('click', function h() { menu.remove(); document.removeEventListener('click', h); }); }, 0);
+    }
+
+    async function waDeleteMessage(msgId) {
+      if (!waActiveJid) return;
+      if (!confirm('Delete this message for everyone?')) return;
+      try {
+        var res = await fetch(API_BASE + '/wa/message/' + encodeURIComponent(msgId) + '?chatJid=' + encodeURIComponent(waActiveJid), {
+          method: 'DELETE',
+          headers: getAuthHeaders()
+        });
+        var data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Delete failed');
+        // Remove bubble from DOM
+        var el = document.getElementById('msg-' + msgId);
+        if (el) el.remove();
+      } catch (err) {
+        alert('Could not delete message: ' + err.message);
+      }
     }
 
     var waComposerSuggestTimer = null;
