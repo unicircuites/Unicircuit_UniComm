@@ -23299,9 +23299,15 @@ ${plainText}`;
         var bg = isActive ? 'background:rgba(37,211,102,0.06);border-left:3px solid #25D366;' : '';
         // Last message preview — WhatsApp style: "~ SenderName: message" for groups
         var lastMsg = waPreviewForChat(c);
-        var lastMsgDisplay = lastMsg;
-        // Truncate
-        if (lastMsgDisplay.length > 45) lastMsgDisplay = lastMsgDisplay.substring(0, 45) + '...';
+        var draftText = localStorage.getItem('wa_draft_' + c.id) || '';
+        var previewHtml;
+        if (draftText) {
+          var draftPreview = draftText.length > 35 ? draftText.substring(0, 35) + '...' : draftText;
+          previewHtml = '<span style="color:#ef4444;font-weight:600;font-size:11px;">Draft: </span><span style="font-size:11.5px;color:var(--muted);">' + escHtml(draftPreview) + '</span>';
+        } else {
+          var lastMsgDisplay = lastMsg.length > 45 ? lastMsg.substring(0, 45) + '...' : lastMsg;
+          previewHtml = escHtml(lastMsgDisplay);
+        }
         return '<div data-wa-jid="' + escAttr(c.id) + '" data-wa-name="' + escAttr(name) + '" data-wa-phone="' + escAttr(c.phone || '') + '" onclick="waOpenChat(this.dataset.waJid,this.dataset.waName,this.dataset.waPhone)" ' +
           'style="padding:10px 14px;border-bottom:1px solid var(--border);cursor:pointer;display:flex;gap:10px;align-items:center;' + bg + '" ' +
           'onmouseover="if(this.style.borderLeft!==\'3px solid rgb(37, 211, 102)\')this.style.background=\'rgba(255,255,255,0.03)\'" ' +
@@ -23316,7 +23322,7 @@ ${plainText}`;
           '<span data-wa-time style="font-size:10.5px;color:var(--muted);flex-shrink:0;">' + time + '</span>' +
           '</div>' +
           '<div style="display:flex;justify-content:space-between;align-items:center;margin-top:2px;">' +
-          '<span data-wa-preview style="font-size:11.5px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:170px;">' + escHtml(lastMsgDisplay) + '</span>' +
+          '<span data-wa-preview style="font-size:11.5px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:170px;">' + previewHtml + '</span>' +
           unread +
           '</div>' +
           labelChips +
@@ -23386,9 +23392,15 @@ ${plainText}`;
       // Update last-message preview
       var previewEl = row.querySelector('[data-wa-preview]');
       if (previewEl) {
-        var preview = waPreviewForChat(chat);
-        if (preview.length > 45) preview = preview.substring(0, 45) + '...';
-        previewEl.textContent = preview;
+        var draftTxt = localStorage.getItem('wa_draft_' + chat.id) || '';
+        if (draftTxt) {
+          var dp = draftTxt.length > 35 ? draftTxt.substring(0, 35) + '...' : draftTxt;
+          previewEl.innerHTML = '<span style="color:#ef4444;font-weight:600;font-size:11px;">Draft: </span>' + escHtml(dp);
+        } else {
+          var preview = waPreviewForChat(chat);
+          if (preview.length > 45) preview = preview.substring(0, 45) + '...';
+          previewEl.textContent = preview;
+        }
       }
 
       // Update timestamp
@@ -24356,6 +24368,9 @@ ${plainText}`;
         var draftVal = input.value;
         if (draftVal) localStorage.setItem('wa_draft_' + waActiveJid, draftVal);
         else localStorage.removeItem('wa_draft_' + waActiveJid);
+        // Re-render just the active chat row to show/hide draft label
+        var chat = waAllChats.find(function(c) { return c.id === waActiveJid; });
+        if (chat) waPatchChatRow(chat);
       }
 
       if ((input.value || '').trim() !== waComposerSuggestionText) {
@@ -24720,7 +24735,7 @@ ${plainText}`;
       var text = input.value.trim();
       var jid = waActiveJid;
       if (!jid) return;
-      if (!text && !waSelectedMedia) return;
+      if (!text && !waSelectedMedia.length) return;
 
       var quotedId = waReplyTo ? waReplyTo.id : null;
       var quotedBody = waReplyTo ? waReplyTo.body : null;

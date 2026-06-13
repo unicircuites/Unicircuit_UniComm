@@ -1795,7 +1795,7 @@ async function startWA(options = {}) {
   // ── MESSAGE STATUS ──────────────────────────────────────────────────────────────────
   sock.ev.on('messages.update', async (updates) => {
     for (const { key, update } of updates) {
-      if (update.status) {
+      if (update.status && key.fromMe) {
         const statusMap = { 1: 'sent', 2: 'delivered', 3: 'read', 4: 'played' };
         const status = statusMap[update.status] || 'sent';
         const accPhone = phoneNumber;
