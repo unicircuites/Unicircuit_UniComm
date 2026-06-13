@@ -5821,7 +5821,7 @@
                 <div id="wa-compose-suggestions"
                   style="display:none;align-items:center;gap:6px;flex-wrap:wrap;padding:0 44px 2px 44px;"></div>
                 <div style="display:flex;gap:8px;align-items:flex-end;position:relative;">
-                  <input type="file" id="wa-media-input" style="display:none;" onchange="waHandleFileSelect(event)" />
+                  <input type="file" id="wa-media-input" style="display:none;" multiple onchange="waHandleFileSelect(event)" />
                   <button class="btn btn-ghost btn-sm" onclick="document.getElementById('wa-media-input').click()"
                     title="Attach Media">
                     <i class="fas fa-paperclip"></i>
@@ -22324,6 +22324,16 @@ ${plainText}`;
         }
       });
       waSocket.on('wa:chats_updated', () => { waLoadChats(); });
+      waSocket.on('wa:status', function(data) {
+        // data = { id, status }  status: sent|delivered|read|played
+        var el = document.getElementById('msg-' + data.id);
+        if (!el) return;
+        var tick = el.querySelector('.wa-tick');
+        if (tick) {
+          tick.dataset.status = data.status;
+          tick.innerHTML = waTickSvg(data.status);
+        }
+      });
       waSocket.on('wa:chat_unread_update', function (data) {
         var jid = waNormalizeJid(data && data.jid);
         if (!jid) return;
@@ -23446,7 +23456,8 @@ ${plainText}`;
         senderPhone: m.sender_phone,
         quotedBody: m.quoted_body,
         replyToMsgId: m.reply_to_msg_id,
-        mediaPath: m.media_path
+        mediaPath: m.media_path,
+        status: m.status || 'sent'
       };
     }
 
@@ -23610,6 +23621,15 @@ ${plainText}`;
         if (area.scrollTop <= 40) waLoadOlderMessages();
       };
       await waLoadActiveMessages({ showLoader: true });
+
+      // Restore draft for this chat
+      var draftInput = document.getElementById('wa-msg-input');
+      if (draftInput) {
+        var saved = localStorage.getItem('wa_draft_' + jid) || '';
+        draftInput.value = saved;
+        draftInput.style.height = 'auto';
+        draftInput.style.height = Math.min(draftInput.scrollHeight, 110) + 'px';
+      }
 
       // Load group info in background
       if (isGroup) {
@@ -24067,7 +24087,7 @@ ${plainText}`;
       // Reply button
       var replyBtn = '<button onclick="waSetReplyFromMessage(\'' + escAttr(msgId) + '\')" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:10px;padding:2px 4px;opacity:0;transition:opacity 0.15s;" class="wa-reply-btn" title="Reply"><i class="fas fa-reply"></i></button>';
 
-      div.innerHTML = senderLabel + '<div class="' + (fromMe ? 'wa-bubble wa-out' : 'wa-bubble wa-in') + '" style="max-width:78%;position:relative;" oncontextmenu="waShowMsgContextMenu(event,\'' + escAttr(msgId) + '\',' + (fromMe ? 'true' : 'false') + ')" onmouseover="this.querySelector(\'.wa-reply-btn\').style.opacity=1" onmouseout="this.querySelector(\'.wa-reply-btn\').style.opacity=0">' + quotedBlock + bodyText + '<div class="wa-time">' + time + (fromMe ? ' ✓✓' : '') + ' ' + replyBtn + '</div></div>';
+      div.innerHTML = senderLabel + '<div class="' + (fromMe ? 'wa-bubble wa-out' : 'wa-bubble wa-in') + '" style="max-width:78%;position:relative;" oncontextmenu="waShowMsgContextMenu(event,\'' + escAttr(msgId) + '\',' + (fromMe ? 'true' : 'false') + ')" onmouseover="this.querySelector(\'.wa-reply-btn\').style.opacity=1" onmouseout="this.querySelector(\'.wa-reply-btn\').style.opacity=0">' + quotedBlock + bodyText + '<div class="wa-time">' + time + (fromMe ? ' ' + waTickHtml(msg.status || 'sent') : '') + ' ' + replyBtn + '</div></div>';
       if (prepend && area.firstElementChild) {
         area.insertBefore(div, area.firstElementChild);
       } else {
@@ -24076,42 +24096,31 @@ ${plainText}`;
       }
     }
 
-    var waSelectedMedia = null;
+    var waSelectedMedia = []; // now an array
 
     function waHandleFileSelect(event) {
-      const file = event.target.files[0];
-      if (!file) return;
-      const isStickerFile = file.type === 'image/webp' || file.type === 'image/gif' || /\.(webp|gif)$/i.test(file.name);
+      const files = Array.from(event.target.files || []);
+      if (!files.length) return;
 
-      const maxSize = 64 * 1024 * 1024;
-      if (file.size > maxSize) {
-        alert('File is too large! Maximum limit is 64MB.');
-        event.target.value = '';
-        return;
+      const MAX = 64 * 1024 * 1024;
+      const valid = [];
+      for (const file of files) {
+        if (file.size > MAX) { alert(file.name + ' is too large (max 64MB). Skipped.'); continue; }
+        valid.push(file);
       }
+      if (!valid.length) { event.target.value = ''; return; }
 
-      if (file.type.startsWith('video/') || file.type.startsWith('audio/')) {
-        const url = URL.createObjectURL(file);
-        const media = document.createElement(file.type.startsWith('video/') ? 'video' : 'audio');
-        media.src = url;
-        media.onloadedmetadata = function () {
-          URL.revokeObjectURL(url);
-          if (media.duration > 300) {
-            alert('Media is too long! Maximum duration is 5 minutes.');
-            waCancelMedia();
-          }
-        };
-      }
-
-      waSelectedMedia = file;
+      waSelectedMedia = valid;
       const bar = document.getElementById('wa-media-bar');
       const txt = document.getElementById('wa-media-text');
       if (bar) bar.style.display = 'flex';
-      if (txt) txt.textContent = (isStickerFile ? 'Sticker: ' : 'Attached: ') + file.name + ' (' + (file.size / (1024 * 1024)).toFixed(2) + ' MB)';
+      if (txt) txt.textContent = valid.length === 1
+        ? 'Attached: ' + valid[0].name + ' (' + (valid[0].size / (1024 * 1024)).toFixed(2) + ' MB)'
+        : valid.length + ' files attached: ' + valid.map(f => f.name).join(', ');
     }
 
     function waCancelMedia() {
-      waSelectedMedia = null;
+      waSelectedMedia = [];
       const input = document.getElementById('wa-media-input');
       if (input) input.value = '';
       const bar = document.getElementById('wa-media-bar');
@@ -24169,6 +24178,24 @@ ${plainText}`;
           document.removeEventListener('click', _close);
         });
       }, 10);
+    }
+
+    function waTickSvg(status) {
+      // Single tick = sent, double grey = delivered, double blue = read
+      var blue = status === 'read' || status === 'played';
+      var double = status === 'delivered' || status === 'read' || status === 'played';
+      var color = blue ? '#53bdeb' : 'rgba(255,255,255,0.55)';
+      if (!double) {
+        return '<svg width="14" height="10" viewBox="0 0 14 10" style="vertical-align:middle;"><path d="M1 5l4 4L13 1" stroke="' + color + '" stroke-width="2" fill="none" stroke-linecap="round"/></svg>';
+      }
+      return '<svg width="18" height="10" viewBox="0 0 18 10" style="vertical-align:middle;">' +
+        '<path d="M1 5l4 4L13 1" stroke="' + color + '" stroke-width="2" fill="none" stroke-linecap="round"/>' +
+        '<path d="M5 5l4 4L17 1" stroke="' + color + '" stroke-width="2" fill="none" stroke-linecap="round"/>' +
+        '</svg>';
+    }
+
+    function waTickHtml(status) {
+      return '<span class="wa-tick" data-status="' + (status || 'sent') + '">' + waTickSvg(status || 'sent') + '</span>';
     }
 
     function waSetReplyFromMessage(msgId) {
@@ -24323,6 +24350,14 @@ ${plainText}`;
       if (!input) return;
       input.style.height = 'auto';
       input.style.height = Math.min(input.scrollHeight, 110) + 'px';
+
+      // Save draft per JID
+      if (waActiveJid) {
+        var draftVal = input.value;
+        if (draftVal) localStorage.setItem('wa_draft_' + waActiveJid, draftVal);
+        else localStorage.removeItem('wa_draft_' + waActiveJid);
+      }
+
       if ((input.value || '').trim() !== waComposerSuggestionText) {
         waComposerAiSuggestion = '';
         waComposerSuggestionText = '';
@@ -24689,42 +24724,27 @@ ${plainText}`;
 
       var quotedId = waReplyTo ? waReplyTo.id : null;
       var quotedBody = waReplyTo ? waReplyTo.body : null;
-      var sendingMedia = !!waSelectedMedia;
-      var selectedMediaName = waSelectedMedia ? waSelectedMedia.name : '';
+      var sendingMedia = waSelectedMedia.length > 0;
+      var selectedMediaName = sendingMedia ? waSelectedMedia.map(f => f.name).join(', ') : '';
 
-      if (waSelectedMedia) {
-        var isStickerMedia = waSelectedMedia.type === 'image/webp' || waSelectedMedia.type === 'image/gif' || /\.(webp|gif)$/i.test(waSelectedMedia.name);
-        var tempMsgId = 'temp-' + Date.now();
-        var tempLocalUrl = (waSelectedMedia.type.startsWith('image/') || isStickerMedia)
-          ? URL.createObjectURL(waSelectedMedia)
-          : '';
-
-        waAppendMessage({
-          id: tempMsgId,
-          fromMe: true,
-          body: text || waSelectedMedia.name,
-
-          // IMPORTANT FIX
-          mediaPath: null,
-
-          // Use browser local preview only
-          localUrl: tempLocalUrl,
-
-          ts: new Date(),
-
-          type: isStickerMedia
-            ? 'stickerMessage'
-            : (waSelectedMedia.type.startsWith('image/')
-            ? 'imageMessage'
-            : (waSelectedMedia.type.startsWith('video/')
-              ? 'videoMessage'
-              : 'documentMessage')),
-
-          quotedBody: quotedBody,
-          replyToMsgId: quotedId,
-          isReply: !!quotedId
+      if (sendingMedia) {
+        // Show a temp bubble for each file
+        waSelectedMedia.forEach(function(file) {
+          var isStickerMedia = file.type === 'image/webp' || file.type === 'image/gif' || /\.(webp|gif)$/i.test(file.name);
+          var tempLocalUrl = (file.type.startsWith('image/') || isStickerMedia) ? URL.createObjectURL(file) : '';
+          waAppendMessage({
+            id: 'temp-' + Date.now() + '-' + Math.random(),
+            fromMe: true,
+            body: (waSelectedMedia.length === 1 ? text : '') || file.name,
+            mediaPath: null,
+            localUrl: tempLocalUrl,
+            ts: new Date(),
+            type: isStickerMedia ? 'stickerMessage' : (file.type.startsWith('image/') ? 'imageMessage' : (file.type.startsWith('video/') ? 'videoMessage' : 'documentMessage')),
+            quotedBody: quotedBody,
+            replyToMsgId: quotedId,
+            isReply: !!quotedId
+          });
         });
-
       } else {
         var textTempId = 'temp-' + Date.now();
         waAppendMessage({
@@ -24739,6 +24759,7 @@ ${plainText}`;
       }
 
       input.value = '';
+      if (waActiveJid) localStorage.removeItem('wa_draft_' + waActiveJid);
       waComposerAiSuggestion = '';
       waComposerSuggestionText = '';
       waComposerLastAiText = '';
@@ -24746,44 +24767,44 @@ ${plainText}`;
       waCancelReply();
 
       try {
-        if (waSelectedMedia) {
-          const reader = new FileReader();
-          const fileToUpload = waSelectedMedia;
-          const mediaCaption = text;
+        if (sendingMedia) {
+          const filesToSend = waSelectedMedia.slice();
+          const captionText = text;
           waCancelMedia();
 
-          reader.onload = async function (e) {
-            const base64 = e.target.result;
-            let mediaType = 'document';
-            if (fileToUpload.type === 'image/webp' || fileToUpload.type === 'image/gif' || /\.(webp|gif)$/i.test(fileToUpload.name)) mediaType = 'sticker';
-            else if (fileToUpload.type.startsWith('image/')) mediaType = 'image';
-            else if (fileToUpload.type.startsWith('video/')) mediaType = 'video';
+          // Send files sequentially
+          async function sendNextFile(idx) {
+            if (idx >= filesToSend.length) return;
+            const fileToUpload = filesToSend[idx];
+            const reader = new FileReader();
+            reader.onload = async function(e) {
+              const base64 = e.target.result;
+              let mediaType = 'document';
+              if (fileToUpload.type === 'image/webp' || fileToUpload.type === 'image/gif' || /\.(webp|gif)$/i.test(fileToUpload.name)) mediaType = 'sticker';
+              else if (fileToUpload.type.startsWith('image/')) mediaType = 'image';
+              else if (fileToUpload.type.startsWith('video/')) mediaType = 'video';
 
-            const payload = {
-              jid: jid,
-              fileName: fileToUpload.name,
-              mimeType: fileToUpload.type,
-              mediaType: mediaType,
-              data: base64,
-              caption: mediaCaption,
-              quotedMsgId: quotedId
+              const payload = {
+                jid: jid,
+                fileName: fileToUpload.name,
+                mimeType: fileToUpload.type,
+                mediaType: mediaType,
+                data: base64,
+                caption: idx === 0 ? captionText : '',  // caption only on first file
+                quotedMsgId: idx === 0 ? quotedId : null
+              };
+              const res = await fetch(API_BASE + '/wa/send-media', { method: 'POST', headers: getAuthHeaders(), body: JSON.stringify(payload) });
+              if (!res.ok) {
+                const d = await res.json();
+                notify('Send failed: ' + fileToUpload.name, d.error || 'Unknown error', 'var(--red)', 'fas fa-exclamation-circle');
+              }
+              await sendNextFile(idx + 1);
             };
-
-            const res = await fetch(API_BASE + '/wa/send-media', { method: 'POST', headers: getAuthHeaders(), body: JSON.stringify(payload) });
-            if (!res.ok) {
-              const data = await res.json();
-              notify('Media send failed', data.error || 'Unknown error', 'var(--red)', 'fas fa-exclamation-circle');
-              return;
-            }
-            const data = await res.json();
-            const tempEl = document.getElementById('msg-' + tempMsgId);
-            if (tempEl) tempEl.remove();
-            if (tempLocalUrl) URL.revokeObjectURL(tempLocalUrl);
-            if (data && data.message) {
-              waAppendMessage(data.message);
-            }
-          };
-          reader.readAsDataURL(fileToUpload);
+            reader.readAsDataURL(fileToUpload);
+          }
+          await sendNextFile(0);
+          // Reload messages to get server-side versions
+          setTimeout(function() { waLoadActiveMessages({ showLoader: false, preserveScroll: true }); }, 1500);
         } else {
           const sendRes = await fetch(API_BASE + '/wa/send', { method: 'POST', headers: getAuthHeaders(), body: JSON.stringify({ jid: jid, message: text, quotedMsgId: quotedId }) });
           const sendData = sendRes.ok ? await sendRes.json() : null;
