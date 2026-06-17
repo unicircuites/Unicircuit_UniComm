@@ -14,6 +14,7 @@ const {
   getContentType,
   downloadMediaMessage,
   ALL_WA_PATCH_NAMES,
+  WAMessageStatus,
 } = require('@whiskeysockets/baileys');
 
 const qrcode = require('qrcode');
@@ -153,10 +154,268 @@ function pushLiveMessage(jid, message) {
   if (!jid || !message) return;
   const key = formatJid(jid);
   const list = liveMessagesStore.get(key) || [];
-  if (!list.find(m => m.id === message.id)) list.push(message);
+  const existing = list.find(m => m.id === message.id);
+  if (existing) {
+    if (message.status && waStatusRank(message.status) > waStatusRank(existing.status)) {
+      existing.status = waStatusLabel(message.status);
+    }
+  } else {
+    list.push(message);
+  }
   list.sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
   if (list.length > 400) list.splice(0, list.length - 400);
   liveMessagesStore.set(key, list);
+}
+
+// WhatsApp read-receipt ranks for our UI/DB labels: sent(1) < delivered(2) < read(3) < played(4)
+const WA_STATUS_RANK = { sent: 1, delivered: 2, read: 3, played: 4, pending: 0, error: 0 };
+
+// Baileys proto.WebMessageInfo.Status — DO NOT use 1..4 blindly; enum starts at PENDING=1, SERVER_ACK=2, etc.
+// PENDING=1, SERVER_ACK=2 (one tick), DELIVERY_ACK=3 (two grey), READ=4 (two blue), PLAYED=5 (two blue)
+const BAILEYS_STATUS_TO_LABEL = {
+  [WAMessageStatus.ERROR]: 'error',
+  [WAMessageStatus.PENDING]: 'pending',
+  [WAMessageStatus.SERVER_ACK]: 'sent',
+  [WAMessageStatus.DELIVERY_ACK]: 'delivered',
+  [WAMessageStatus.READ]: 'read',
+  [WAMessageStatus.PLAYED]: 'played',
+};
+
+const WA_STATUS_DEBUG = process.env.WA_STATUS_DEBUG === '1' || process.env.WA_STATUS_DEBUG === 'true';
+
+function waStatusLabel(value) {
+  if (typeof value === 'number') return BAILEYS_STATUS_TO_LABEL[value] || 'sent';
+  return WA_STATUS_RANK[value] ? value : 'sent';
+}
+
+function waStatusRank(value) {
+  const label = typeof value === 'number' ? waStatusLabel(value) : value;
+  return WA_STATUS_RANK[label] || 0;
+}
+
+function logStatusTrace(stage, payload) {
+  const line = `[WA-TICK-TRACE] ${stage} ${JSON.stringify(payload)}`;
+  console.log(line);
+  if (WA_STATUS_DEBUG) {
+    emit('wa:status_trace', { stage, ts: Date.now(), ...payload });
+  }
+}
+
+async function resolveStatusChatJid(rawJid) {
+  let chatJid = formatJid(rawJid);
+  if (!chatJid.endsWith('@lid')) return chatJid;
+  const mapped = contactsStore[chatJid];
+  if (mapped?.phoneJid) return formatJid(mapped.phoneJid);
+  try {
+    const accPhone = phoneNumber;
+    if (!accPhone) return chatJid;
+    const r = await pool.query(
+      `SELECT phone FROM wa_contacts WHERE jid=$1 AND account_phone=$2 AND phone IS NOT NULL LIMIT 1`,
+      [chatJid, accPhone]
+    );
+    if (r.rows[0]?.phone) return formatJid(`${r.rows[0].phone}@s.whatsapp.net`);
+  } catch (_) { }
+  return chatJid;
+}
+
+async function resolveChatJidAliases(rawJid) {
+  const accPhone = phoneNumber;
+  const candidates = new Set();
+  const primary = formatJid(rawJid);
+  const resolved = await resolveStatusChatJid(rawJid);
+  candidates.add(primary);
+  candidates.add(resolved);
+  if (!accPhone) return [...candidates].filter(Boolean);
+  const phoneDigits = (resolved || primary).endsWith('@s.whatsapp.net')
+    ? (resolved || primary).split('@')[0]
+    : null;
+  if (phoneDigits) {
+    try {
+      const lids = await pool.query(
+        `SELECT jid FROM wa_contacts
+         WHERE account_phone=$1
+           AND regexp_replace(COALESCE(phone, ''), '[^0-9]', '', 'g') = $2
+           AND jid LIKE '%@lid'`,
+        [accPhone, phoneDigits]
+      );
+      lids.rows.forEach((r) => candidates.add(formatJid(r.jid)));
+      const lidChats = await pool.query(
+        `SELECT id FROM wa_chats
+         WHERE account_phone=$1
+           AND regexp_replace(COALESCE(phone, ''), '[^0-9]', '', 'g') = $2
+           AND id LIKE '%@lid'`,
+        [accPhone, phoneDigits]
+      );
+      lidChats.rows.forEach((r) => candidates.add(formatJid(r.id)));
+    } catch (_) { }
+  }
+  return [...candidates].filter(Boolean);
+}
+
+async function markIncomingMessagesReadInDb(chatJid, accPhone) {
+  const aliases = await resolveChatJidAliases(chatJid);
+  for (const jid of aliases) {
+    const phoneDigits = jid.endsWith('@s.whatsapp.net') ? jid.split('@')[0] : null;
+    await pool.query(`
+      UPDATE wa_messages SET is_read=true
+      WHERE account_phone=$1 AND from_me=false AND is_read=false
+        AND (
+          chat_id=$2
+          OR chat_id LIKE split_part($2, '@', 1) || ':%@' || split_part($2, '@', 2)
+          OR ($3::text IS NOT NULL AND chat_id IN (
+            SELECT wc.jid FROM wa_contacts wc
+            WHERE wc.account_phone = $1
+              AND regexp_replace(COALESCE(wc.phone, ''), '[^0-9]', '', 'g') = $3
+              AND wc.jid LIKE '%@lid'
+          ))
+        )
+    `, [accPhone, jid, phoneDigits]).catch(() => {});
+    await pool.query(
+      `UPDATE wa_chats SET unread=0, updated_at=NOW() WHERE id=$1 AND account_phone=$2`,
+      [jid, accPhone]
+    ).catch(() => {});
+    const lc = liveChatsStore.get(jid);
+    if (lc) { lc.unread = 0; liveChatsStore.set(jid, lc); }
+  }
+  emit('wa:chat_unread_update', { jid: formatJid(chatJid), unread: 0 });
+}
+
+async function reconcileChatUnreadFromMessages(chatJid, accPhone) {
+  const aliases = await resolveChatJidAliases(chatJid);
+  for (const jid of aliases) {
+    const phoneDigits = jid.endsWith('@s.whatsapp.net') ? jid.split('@')[0] : null;
+    const res = await pool.query(`
+      SELECT COUNT(*)::int AS n FROM wa_messages
+      WHERE account_phone=$1 AND from_me=false AND is_read=false
+        AND (
+          chat_id=$2
+          OR chat_id LIKE split_part($2, '@', 1) || ':%@' || split_part($2, '@', 2)
+          OR ($3::text IS NOT NULL AND chat_id IN (
+            SELECT wc.jid FROM wa_contacts wc
+            WHERE wc.account_phone = $1
+              AND regexp_replace(COALESCE(wc.phone, ''), '[^0-9]', '', 'g') = $3
+              AND wc.jid LIKE '%@lid'
+          ))
+        )
+    `, [accPhone, jid, phoneDigits]);
+    const n = res.rows[0]?.n || 0;
+    await pool.query(
+      `UPDATE wa_chats SET unread=$1, updated_at=NOW() WHERE id=$2 AND account_phone=$3`,
+      [n, jid, accPhone]
+    ).catch(() => {});
+    const lc = liveChatsStore.get(jid);
+    if (lc) { lc.unread = n; liveChatsStore.set(jid, lc); }
+    if (n > 0) emit('wa:chat_unread_update', { jid, unread: n });
+  }
+}
+
+async function applyMessageStatusUpdate(key, rawStatus, source) {
+  if (!key?.fromMe || !key?.id) return false;
+  const statusLabel = waStatusLabel(rawStatus);
+  const statusRank = waStatusRank(rawStatus);
+  const protoNum = typeof rawStatus === 'number' ? rawStatus : null;
+
+  logStatusTrace('incoming', {
+    source: source || 'unknown',
+    msgId: key.id,
+    rawStatus,
+    protoNum,
+    mappedLabel: statusLabel,
+    mappedRank: statusRank,
+    remoteJid: key.remoteJid,
+    participant: key.participant || null,
+  });
+
+  // Only upgrade outbound message ticks; ignore pending/error
+  if (statusRank < 1) {
+    logStatusTrace('skipped_low_rank', { msgId: key.id, statusLabel, statusRank });
+    return false;
+  }
+
+  const accPhone = phoneNumber;
+  if (!accPhone) return false;
+
+  const candidates = new Set([formatJid(key.remoteJid), await resolveStatusChatJid(key.remoteJid)]);
+  let updated = false;
+  let matchedChatJid = null;
+  let previousStatus = null;
+
+  for (const chatJid of candidates) {
+    if (!chatJid) continue;
+    // Unresolved LID: allow delivered but not read/played (can't match DB row reliably for read)
+    if (chatJid.endsWith('@lid') && (statusLabel === 'read' || statusLabel === 'played')) {
+      logStatusTrace('skipped_lid_read', { msgId: key.id, chatJid, statusLabel });
+      continue;
+    }
+
+    const phoneDigits = chatJid.endsWith('@s.whatsapp.net') ? chatJid.split('@')[0] : null;
+
+    const before = await pool.query(
+      `SELECT status FROM wa_messages WHERE id=$1 AND account_phone=$2 AND from_me=true
+         AND (chat_id=$3 OR chat_id LIKE split_part($3, '@', 1) || ':%@' || split_part($3, '@', 2))
+       LIMIT 1`,
+      [key.id, accPhone, chatJid]
+    );
+    if (before.rows[0]) previousStatus = before.rows[0].status;
+
+    const result = await pool.query(`
+      UPDATE wa_messages SET status = $1
+      WHERE id = $2 AND account_phone = $3 AND from_me = true
+        AND (
+          chat_id = $4
+          OR chat_id LIKE split_part($4, '@', 1) || ':%@' || split_part($4, '@', 2)
+          OR ($5::text IS NOT NULL AND chat_id IN (
+            SELECT wc.jid FROM wa_contacts wc
+            WHERE wc.account_phone = $3
+              AND regexp_replace(COALESCE(wc.phone, ''), '[^0-9]', '', 'g') = $5
+              AND wc.jid LIKE '%@lid'
+          ))
+          OR ($5::text IS NOT NULL AND chat_id IN (
+            SELECT wc.id FROM wa_chats wc
+            WHERE wc.account_phone = $3
+              AND regexp_replace(COALESCE(wc.phone, ''), '[^0-9]', '', 'g') = $5
+              AND wc.id LIKE '%@lid'
+          ))
+        )
+        AND CASE status WHEN 'played' THEN 4 WHEN 'read' THEN 3 WHEN 'delivered' THEN 2 ELSE 1 END < $6
+      RETURNING id, chat_id, status`,
+      [statusLabel, key.id, accPhone, chatJid, phoneDigits, statusRank]
+    );
+
+    if (result.rowCount > 0) {
+      updated = true;
+      matchedChatJid = chatJid;
+      for (const row of result.rows) {
+        const list = liveMessagesStore.get(formatJid(row.chat_id));
+        if (!list) continue;
+        const msg = list.find(m => m.id === row.id);
+        if (msg) msg.status = statusLabel;
+      }
+      break;
+    }
+  }
+
+  if (updated) {
+    logStatusTrace('applied', {
+      msgId: key.id,
+      source: source || 'unknown',
+      previousStatus,
+      newStatus: statusLabel,
+      protoNum,
+      chatJid: matchedChatJid,
+    });
+    emit('wa:status', { id: key.id, status: statusLabel, chatId: matchedChatJid, source: source || 'unknown', proto: protoNum });
+  } else {
+    logStatusTrace('no_db_row', {
+      msgId: key.id,
+      source: source || 'unknown',
+      statusLabel,
+      protoNum,
+      candidates: [...candidates],
+      previousStatus,
+    });
+  }
+  return updated;
 }
 
 let updateLiveChatDebounceTimer = null;
@@ -770,7 +1029,10 @@ async function ensureTables(retries = 3) {
 }
 
 // ── SAVE CHAT ────────────────────────────────────────────────────────────────────────
-async function saveChat(rawJid, name, lastMsg, lastTime, unread, isGroup) {
+// unreadMode:
+//   'increment' — add `unread` to existing count (new incoming message)
+//   'set'       — replace with absolute value from WhatsApp sync (default when unread=0)
+async function saveChat(rawJid, name, lastMsg, lastTime, unread, isGroup, opts = {}) {
   if (isNonChatJid(rawJid)) return;
   let jid = normalizeRawJid(rawJid);
 
@@ -812,6 +1074,8 @@ async function saveChat(rawJid, name, lastMsg, lastTime, unread, isGroup) {
     ? null
     : (cleanName && !isInvalidContactLabel(cleanName) ? cleanName : null);
   const ts = lastTime instanceof Date ? lastTime : toDate(lastTime);
+  const unreadVal = Number(unread) || 0;
+  const unreadMode = opts.unreadMode || (unreadVal === 0 ? 'set' : 'increment');
   updateLiveChatRow({
     id: jid,
     name: safeName || displayPhone,
@@ -819,13 +1083,16 @@ async function saveChat(rawJid, name, lastMsg, lastTime, unread, isGroup) {
     is_group: isGroupChat,
     last_message: lastMsg || '',
     last_time: ts || null,
-    unread: unread || 0,
+    unread: unreadMode === 'set' ? unreadVal : (liveChatsStore.get(formatJid(jid))?.unread || 0) + unreadVal,
   });
   if (!WA_DYNAMIC_DB_STORE) return;
   try {
     const accPhone = phoneNumber;
     if (!accPhone) return;
     if (await isBlockedChat(jid, accPhone)) return;
+    const unreadSql = unreadMode === 'set'
+      ? 'EXCLUDED.unread'
+      : `CASE WHEN EXCLUDED.unread = 0 THEN 0 ELSE wa_chats.unread + EXCLUDED.unread END`;
     await pool.query(`
       INSERT INTO wa_chats (id, account_phone, name, phone, is_group, last_message, last_time, unread)
       VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
@@ -835,9 +1102,9 @@ async function saveChat(rawJid, name, lastMsg, lastTime, unread, isGroup) {
         is_group     = wa_chats.is_group OR EXCLUDED.is_group,
         last_message = CASE WHEN EXCLUDED.last_message != '' THEN EXCLUDED.last_message ELSE wa_chats.last_message END,
         last_time    = GREATEST(COALESCE(EXCLUDED.last_time, wa_chats.last_time), COALESCE(wa_chats.last_time, EXCLUDED.last_time)),
-        unread       = CASE WHEN EXCLUDED.unread = 0 THEN 0 ELSE wa_chats.unread + EXCLUDED.unread END,
+        unread       = ${unreadSql},
         updated_at   = NOW()
-    `, [jid, accPhone, safeName || displayPhone, displayPhone, isGroupChat, lastMsg || '', ts, unread || 0]);
+    `, [jid, accPhone, safeName || displayPhone, displayPhone, isGroupChat, lastMsg || '', ts, unreadVal]);
   } catch (err) {
     console.error(`[WA-DB] saveChat error ${jid}:`, err.message);
   }
@@ -1012,6 +1279,7 @@ async function saveMessage(msg) {
     const accPhone = phoneNumber;
     if (!accPhone) return null;
     if (await isBlockedChat(jid, accPhone)) return null;
+    const msgStatus = fromMe ? waStatusLabel(msg.status) : null;
     const liveRow = {
       id,
       chat_id: jid,
@@ -1023,6 +1291,7 @@ async function saveMessage(msg) {
       msg_type: type,
       timestamp: ts ? ts.toISOString() : new Date().toISOString(),
       is_read: fromMe,
+      status: msgStatus || null,
       quoted_body: quotedBody,
       is_reply: replyInfo.isReply,
       reply_to_msg_id: replyInfo.replyToMsgId,
@@ -1038,16 +1307,17 @@ async function saveMessage(msg) {
     };
     pushLiveMessage(jid, liveRow);
     if (!WA_DYNAMIC_DB_STORE) {
-      return { id, jid, fromMe, sender: senderJid, senderName, body, type, ts, quotedBody, isReply: replyInfo.isReply, replyToMsgId: replyInfo.replyToMsgId, mediaPath };
+      return { id, jid, fromMe, sender: senderJid, senderName, body, type, ts, quotedBody, isReply: replyInfo.isReply, replyToMsgId: replyInfo.replyToMsgId, mediaPath, status: msgStatus || 'sent' };
     }
     // Resolve status from Baileys: 1=sent, 2=delivered, 3=read, 4=played
-    const statusMap = { 1: 'sent', 2: 'delivered', 3: 'read', 4: 'played' };
-    const msgStatus = fromMe ? (statusMap[msg.status] || 'sent') : null;
 
     await pool.query(`
       INSERT INTO wa_messages (id, chat_id, account_phone, from_me, sender, sender_name, body, msg_type, timestamp, is_read, status, quoted_body, is_reply, reply_to_msg_id, media_path)
       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)
-      ON CONFLICT (id, chat_id, account_phone) DO UPDATE SET status = EXCLUDED.status WHERE wa_messages.status = 'sent'
+      ON CONFLICT (id, chat_id, account_phone) DO UPDATE SET
+        status = EXCLUDED.status
+      WHERE CASE wa_messages.status WHEN 'played' THEN 4 WHEN 'read' THEN 3 WHEN 'delivered' THEN 2 ELSE 1 END
+          < CASE EXCLUDED.status WHEN 'played' THEN 4 WHEN 'read' THEN 3 WHEN 'delivered' THEN 2 ELSE 1 END
     `, [id, jid, accPhone, fromMe, senderJid, senderName, body, type, ts, fromMe, msgStatus || 'sent', quotedBody, replyInfo.isReply, replyInfo.replyToMsgId, mediaPath]);
 
     // Persist pushName as notify so chat list reflects the sender's current WA profile name
@@ -1064,7 +1334,7 @@ async function saveMessage(msg) {
       `, [contactJid, accPhone, msg.pushName]).catch(() => {});
     }
 
-    return { id, jid, fromMe, sender: senderJid, senderName, body, type, ts, quotedBody, isReply: replyInfo.isReply, replyToMsgId: replyInfo.replyToMsgId, mediaPath };
+    return { id, jid, fromMe, sender: senderJid, senderName, body, type, ts, quotedBody, isReply: replyInfo.isReply, replyToMsgId: replyInfo.replyToMsgId, mediaPath, status: msgStatus || 'sent' };
   } catch (err) {
     console.error('[WA-DB] saveMessage error:', err.message);
     return null;
@@ -1651,20 +1921,20 @@ async function startWA(options = {}) {
     if (!accPhone) return;
     for (const update of updates) {
       if (!update?.id || isNonChatJid(update.id)) continue;
-      const jid = normalizeRawJid(update.id);
-      // unreadCount is set (0 = read, >0 = unread count, -1 = mark-unread sentinel in some Baileys versions)
-      if (update.unreadCount !== undefined && update.unreadCount !== null) {
-        const rawUnread = Number(update.unreadCount);
-        const newUnread = rawUnread === -1 ? 1 : Math.max(0, rawUnread || 0);
-        pool.query(
-          `UPDATE wa_chats SET unread=$1 WHERE id=$2 AND account_phone=$3`,
-          [newUnread, jid, accPhone]
-        ).catch(() => {});
-        // Update in-memory liveChatsStore if present
-        const lc = liveChatsStore.get(jid);
-        if (lc) { lc.unread = newUnread; liveChatsStore.set(jid, lc); }
-        emit('wa:chat_unread_update', { jid, unread: newUnread });
-      }
+      if (update.unreadCount === undefined || update.unreadCount === null) continue;
+      const rawUnread = Number(update.unreadCount);
+      const newUnread = rawUnread === -1 ? 1 : Math.max(0, rawUnread || 0);
+      resolveChatJidAliases(update.id).then((aliases) => {
+        for (const jid of aliases) {
+          pool.query(
+            `UPDATE wa_chats SET unread=$1, updated_at=NOW() WHERE id=$2 AND account_phone=$3`,
+            [newUnread, jid, accPhone]
+          ).catch(() => {});
+          const lc = liveChatsStore.get(jid);
+          if (lc) { lc.unread = newUnread; liveChatsStore.set(jid, lc); }
+        }
+        emit('wa:chat_unread_update', { jid: formatJid(update.id), unread: newUnread });
+      }).catch(() => {});
     }
   });
 
@@ -1738,7 +2008,7 @@ async function startWA(options = {}) {
         ? getContactName(jid, null)
         : getContactName(jid, msg.key.fromMe ? null : msg.pushName);
 
-      await saveChat(jid, chatName, saved.body, saved.ts, msg.key.fromMe ? 0 : 1, isGroup);
+      await saveChat(jid, chatName, saved.body, saved.ts, msg.key.fromMe ? 0 : 1, isGroup, { unreadMode: 'increment' });
 
       if (type === 'notify' && isRealMessage(msg) && !msg.key.fromMe) {
         console.log(`[WA] Emitting message to UI: ${saved.id}`);
@@ -1785,6 +2055,7 @@ async function startWA(options = {}) {
           type: saved.type,
           ts: saved.ts,
           mediaPath: saved.mediaPath,
+          status: saved.status || (saved.fromMe ? 'sent' : null),
 
           quotedBody: saved.quotedBody,
           isReply: saved.isReply,
@@ -1796,46 +2067,24 @@ async function startWA(options = {}) {
     }
   });
 
-  // ── MESSAGE STATUS ──────────────────────────────────────────────────────────────────
+  // ── MESSAGE STATUS (1:1 chats via messages.update) ─────────────────────────────────
   sock.ev.on('messages.update', async (updates) => {
     for (const { key, update } of updates) {
       if (update.status && key.fromMe) {
-        const statusMap = { 1: 'sent', 2: 'delivered', 3: 'read', 4: 'played' };
-        const status = statusMap[update.status] || 'sent';
-        let chatJid = key.remoteJid;
-        // Resolve LID → real phone JID for DB lookup
-        if (chatJid && chatJid.endsWith('@lid')) {
-          const lidLocal = chatJid.split('@')[0];
-          const mapped = contactsStore[chatJid];
-          if (mapped?.phoneJid) {
-            chatJid = mapped.phoneJid;
-          } else {
-            try {
-              const r = await pool.query(
-                `SELECT phone FROM wa_contacts WHERE jid=$1 AND account_phone=$2 AND phone IS NOT NULL LIMIT 1`,
-                [chatJid, phoneNumber]
-              );
-              if (r.rows[0]) chatJid = r.rows[0].phone + '@s.whatsapp.net';
-            } catch (_) {}
-          }
-          // If still LID and it's a self-echo (own LID), skip read/played only
-          if (chatJid.endsWith('@lid') && (status === 'read' || status === 'played')) {
-            console.log(`[WA-STATUS] Skipped ${status} for ${key.id} — unresolved self LID`);
-            continue;
-          }
-        }
-        console.log(`[WA-STATUS] msg=${key.id} status=${update.status}(${status}) chat=${chatJid}`);
-        const accPhone = phoneNumber;
-        if (!accPhone) continue;
-        // Only upgrade: sent(1) < delivered(2) < read(3) < played(4)
-        await pool.query(`
-          UPDATE wa_messages SET status=$1
-          WHERE id=$2 AND chat_id=$3 AND account_phone=$4
-            AND CASE status WHEN 'played' THEN 4 WHEN 'read' THEN 3 WHEN 'delivered' THEN 2 ELSE 1 END < $5`,
-          [status, key.id, chatJid, accPhone, update.status]
-        );
-        emit('wa:status', { id: key.id, status });
+        await applyMessageStatusUpdate(key, update.status, 'messages.update');
       }
+    }
+  });
+
+  // ── MESSAGE STATUS (group chats via message-receipt.update in Baileys 7) ───────────
+  sock.ev.on('message-receipt.update', async (updates) => {
+    for (const { key, receipt } of updates) {
+      if (!key?.fromMe || !key?.id || !receipt) continue;
+      let statusNum = 0;
+      if (receipt.readTimestamp) statusNum = WAMessageStatus.READ;
+      else if (receipt.receiptTimestamp) statusNum = WAMessageStatus.DELIVERY_ACK;
+      if (!statusNum) continue;
+      await applyMessageStatusUpdate(key, statusNum, 'message-receipt.update');
     }
   });
 
@@ -2102,7 +2351,7 @@ async function _inner_consolidateLidChats() {
           phone = COALESCE(EXCLUDED.phone, wa_chats.phone),
           last_message = CASE WHEN EXCLUDED.last_message != '' THEN EXCLUDED.last_message ELSE wa_chats.last_message END,
           last_time = GREATEST(COALESCE(EXCLUDED.last_time, wa_chats.last_time), COALESCE(wa_chats.last_time, EXCLUDED.last_time)),
-          unread = wa_chats.unread + EXCLUDED.unread,
+          unread = GREATEST(wa_chats.unread, EXCLUDED.unread),
           updated_at = NOW()
         RETURNING 1
       ),
@@ -2570,6 +2819,21 @@ async function sendMessage(jid, text, quotedMsgId) {
      ON CONFLICT (id, chat_id, account_phone) DO NOTHING`,
     [savedMsg.id, formattedJid, accPhone, text, ts, savedMsg.quotedBody, !!quotedMsgId, quotedMsgId || null]
   );
+  pushLiveMessage(formattedJid, {
+    id: savedMsg.id,
+    chat_id: formattedJid,
+    account_phone: accPhone,
+    from_me: true,
+    sender_name: 'You',
+    body: text,
+    msg_type: 'text',
+    timestamp: ts.toISOString(),
+    is_read: true,
+    status: 'sent',
+    quoted_body: savedMsg.quotedBody,
+    is_reply: !!quotedMsgId,
+    reply_to_msg_id: quotedMsgId || null,
+  });
   await saveChat(formattedJid, null, text, ts, 0, formattedJid.endsWith('@g.us'));
 
   // Ensure the contact appears in WA Contacts directory
@@ -2580,7 +2844,7 @@ async function sendMessage(jid, text, quotedMsgId) {
   }
 
   emit('wa:message', savedMsg);
-  return result;
+  return savedMsg;
 }
 
 function safeMediaFilename(filename, fallback) {
@@ -2776,6 +3040,22 @@ async function sendMediaMessage(jid, media, quotedMsgId) {
      ON CONFLICT (id, chat_id, account_phone) DO NOTHING`,
     [id, formattedJid, accPhone, body, finalType, ts, savedMsg.quotedBody, !!quotedMsgId, quotedMsgId || null, savedName]
   );
+  pushLiveMessage(formattedJid, {
+    id,
+    chat_id: formattedJid,
+    account_phone: accPhone,
+    from_me: true,
+    sender_name: 'You',
+    body,
+    msg_type: finalType,
+    timestamp: ts.toISOString(),
+    is_read: true,
+    status: 'sent',
+    quoted_body: savedMsg.quotedBody,
+    is_reply: !!quotedMsgId,
+    reply_to_msg_id: quotedMsgId || null,
+    media_path: savedName,
+  });
   await saveChat(formattedJid, null, body, ts, 0, formattedJid.endsWith('@g.us'));
 
   emit('wa:message', savedMsg);
@@ -2935,7 +3215,7 @@ async function resyncDirectoryFromSocket(options = {}) {
       ? (chat.subject || chat.name || null)
       : getContactName(chat.id, chat.name || chat.notify);
     const ts = toDate(chat.conversationTimestamp);
-    await saveChat(chat.id, name, '', ts, Number(chat.unreadCount || 0), isGroup);
+    await saveChat(chat.id, name, '', ts, Number(chat.unreadCount || 0), isGroup, { unreadMode: 'set' });
     chatsSaved++;
   }
 
@@ -3436,6 +3716,7 @@ function getLiveMessages(jid, opts = {}) {
         msg_type: getContentType(cached.message) || 'text',
         timestamp: ts.toISOString(),
         is_read: !!cached?.key?.fromMe,
+        status: cached?.status ? waStatusLabel(cached.status) : (!!cached?.key?.fromMe ? 'sent' : null),
         quoted_body: getQuotedBody(cached),
         is_reply: false,
         reply_to_msg_id: null,
@@ -3563,31 +3844,55 @@ async function getProfilePicUrl(jid, accPhone) {
 
 // ── MARK CHAT READ / UNREAD ───────────────────────────────────────────────────────────
 async function markChatRead(jid) {
-  if (!sock || !isConnected) throw new Error('WhatsApp not connected');
+  const formattedJid = formatJid(jid);
   const accPhone = phoneNumber;
-  // Get last message key for chatModify
-  let lastMsg = null;
-  if (accPhone) {
+  if (!accPhone) throw new Error('Connected WhatsApp account is not known yet');
+
+  // Always persist read state locally first (survives refresh even if socket fails)
+  await markIncomingMessagesReadInDb(formattedJid, accPhone);
+
+  if (!sock || !isConnected) return;
+
+  const aliases = await resolveChatJidAliases(formattedJid);
+  for (const chatJid of aliases) {
+    let lastMsg = null;
     try {
-      const row = await pool.query(
-        `SELECT id, from_me, sender, timestamp FROM wa_messages
-         WHERE chat_id=$1 AND account_phone=$2
-         ORDER BY timestamp DESC LIMIT 1`,
-        [jid, accPhone]
+      const phoneDigits = chatJid.endsWith('@s.whatsapp.net') ? chatJid.split('@')[0] : null;
+      const row = await pool.query(`
+        SELECT id, from_me, sender, timestamp, chat_id FROM wa_messages
+        WHERE account_phone=$1 AND from_me=false
+          AND (
+            chat_id=$2
+            OR chat_id LIKE split_part($2, '@', 1) || ':%@' || split_part($2, '@', 2)
+            OR ($3::text IS NOT NULL AND chat_id IN (
+              SELECT wc.jid FROM wa_contacts wc
+              WHERE wc.account_phone = $1
+                AND regexp_replace(COALESCE(wc.phone, ''), '[^0-9]', '', 'g') = $3
+                AND wc.jid LIKE '%@lid'
+            ))
+          )
+        ORDER BY timestamp DESC LIMIT 1`,
+        [accPhone, chatJid, phoneDigits]
       );
       if (row.rows[0]) {
         const r = row.rows[0];
-        lastMsg = { key: { remoteJid: jid, fromMe: r.from_me, id: r.id, ...(r.sender ? { participant: r.sender } : {}) }, messageTimestamp: Math.floor(new Date(r.timestamp).getTime() / 1000) };
+        const remote = formatJid(r.chat_id || chatJid);
+        lastMsg = {
+          key: {
+            remoteJid: remote,
+            fromMe: false,
+            id: r.id,
+            ...(r.sender ? { participant: r.sender } : {}),
+          },
+          messageTimestamp: Math.floor(new Date(r.timestamp).getTime() / 1000),
+        };
       }
-    } catch (_) {}
-  }
-  if (lastMsg) {
-    await sock.chatModify({ markRead: true, lastMessages: [lastMsg] }, jid).catch(() => {});
-  }
-  // Update DB
-  if (accPhone) {
-    await pool.query(`UPDATE wa_chats SET unread=0 WHERE id=$1 AND account_phone=$2`, [jid, accPhone]).catch(() => {});
-    emit('wa:chat_unread_update', { jid, unread: 0 });
+    } catch (_) { }
+    if (lastMsg) {
+      await sock.chatModify({ markRead: true, lastMessages: [lastMsg] }, chatJid).catch((err) => {
+        console.warn(`[WA-UNREAD] chatModify markRead failed for ${chatJid}:`, err.message);
+      });
+    }
   }
 }
 
@@ -3659,6 +3964,6 @@ async function deleteWaMessage(chatJid, msgId, forEveryone = false) {
   );
 }
 
-module.exports = { startWA, sendMessage, sendMediaMessage, logout, getStatus, getQR, requestQR, requestPhonePairingCode, setIO, getGroupMetadata, getGroupSubjectFromCache, refreshCurrentAccountGroupMetadata, resyncDirectoryFromSocket, processLidResolutionBatch, startLidResolutionWorker, stopLidResolutionWorker, downloadMedia, msgCache, importExportedChat, getConnectedPhone, getLiveChats, getLiveMessages, isLidResolutionExhausted, getLidResolutionCooldownMins, updateGroupName, flushCachedMediaToDisk, getProfilePicUrl, markChatRead, markChatUnread, addChatLabel, removeChatLabel, deleteWaMessage, emitEvent: emit };
+module.exports = { startWA, sendMessage, sendMediaMessage, logout, getStatus, getQR, requestQR, requestPhonePairingCode, setIO, getGroupMetadata, getGroupSubjectFromCache, refreshCurrentAccountGroupMetadata, resyncDirectoryFromSocket, processLidResolutionBatch, startLidResolutionWorker, stopLidResolutionWorker, downloadMedia, msgCache, importExportedChat, getConnectedPhone, getLiveChats, getLiveMessages, isLidResolutionExhausted, getLidResolutionCooldownMins, updateGroupName, flushCachedMediaToDisk, getProfilePicUrl, markChatRead, markChatUnread, markIncomingMessagesReadInDb, reconcileChatUnreadFromMessages, addChatLabel, removeChatLabel, deleteWaMessage, emitEvent: emit };
 
 

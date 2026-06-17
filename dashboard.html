@@ -6992,8 +6992,11 @@
         <span style="font-size:11px;font-weight:700;color:var(--green2);text-transform:uppercase;letter-spacing:0.5px;">
           <i class="fas fa-brackets-curly"></i> Variable Fields (values sent in email)
         </span>
+        <div style="display:flex;gap:6px;">
         <button type="button" class="btn btn-ghost btn-xs" onclick="bcAddCustomVariable()"><i class="fas fa-plus"></i> Add
           Field</button>
+        <button type="button" class="btn btn-ghost btn-xs" onclick="bcRefreshVariablesPanel()" title="Reload panel"><i class="fas fa-rotate-right"></i> Reload</button>
+        </div>
       </div>
       <div id="bc-variables-hint" style="font-size:11px;color:var(--muted);padding:8px 12px;border-bottom:1px solid var(--border);">
         Apply a template to configure variable values before sending.
@@ -12923,7 +12926,7 @@ Keep it concise and professional.`;
           var subj = document.getElementById('bc-subject');
           var body = document.getElementById('bc-html');
           if (subj && t.subject) subj.value = t.subject;
-          if (body && t.html_body) { body.innerHTML = t.html_body; applyLinkTooltips(body); }
+          if (body && t.html_body) { body.innerHTML = t.html_body; applyLinkTooltips(body); restorePersistentHtmlEmbeds(body); }
           bcVariableFields = emailNormalizeVariableFields(t.variable_fields || []);
           bcRefreshVariablesPanel();
           if (t.banner_config) {
@@ -12976,6 +12979,7 @@ Keep it concise and professional.`;
             }
             document.execCommand('insertHTML', false, html);
             bcSaveSelection();
+            restorePersistentHtmlEmbeds(body);
           }
           if (sel) sel.value = '';
           // Restore banner config if present
@@ -15140,14 +15144,16 @@ Best regards,<br>
 
       try {
         // 1. SAVE TO OUTLOOK
+        const displayName = [fname, lname].filter(Boolean).join(' ').trim() || email;
         const outlookPayload = {
-          displayName: [fname, lname].filter(Boolean).join(' '),
+          displayName,
           givenName: fname || undefined,
           surname: lname || undefined,
           companyName: company || undefined,
           jobTitle: job || undefined,
           mobilePhone: phone || undefined,
-          emailAddresses: [{ address: email, name: [fname, lname].filter(Boolean).join(' ') }]
+          email,
+          emailAddresses: [{ address: email, name: displayName }]
         };
 
         let oRes;
@@ -15339,8 +15345,8 @@ Best regards,<br>
         phone = '+91' + phone;
       }
 
-      if (!email || (!fname && !lname)) {
-        notify('Email and at least one name field required', 'error');
+      if (!email) {
+        notify('Email is required', 'error');
         return;
       }
 
@@ -15354,14 +15360,16 @@ Best regards,<br>
 
       try {
         // 1. SAVE TO OUTLOOK
+        const displayName = [fname, lname].filter(Boolean).join(' ').trim() || email;
         const outlookPayload = {
-          displayName: [fname, lname].filter(Boolean).join(' '),
+          displayName,
           givenName: fname || undefined,
           surname: lname || undefined,
           companyName: company || undefined,
           jobTitle: job || undefined,
           mobilePhone: phone || undefined,
-          emailAddresses: [{ address: email, name: [fname, lname].filter(Boolean).join(' ') }]
+          email,
+          emailAddresses: [{ address: email, name: displayName }]
         };
 
         let oRes;
@@ -20970,6 +20978,7 @@ ${plainText}`;
               if (body.contains(range.commonAncestorContainer)) {
                 // Insert at cursor position using execCommand for undo support
                 document.execCommand('insertHTML', false, t.html_body);
+                restorePersistentHtmlEmbeds(body);
               } else {
                 // Cursor not in editor - append to end
                 const newRange = document.createRange();
@@ -20978,6 +20987,7 @@ ${plainText}`;
                 selection.removeAllRanges();
                 selection.addRange(newRange);
                 document.execCommand('insertHTML', false, '<br><br>' + t.html_body);
+                restorePersistentHtmlEmbeds(body);
               }
             } else {
               // No selection - append to end
@@ -20988,21 +20998,9 @@ ${plainText}`;
               newSelection.removeAllRanges();
               newSelection.addRange(newRange);
               document.execCommand('insertHTML', false, '<br><br>' + t.html_body);
+              restorePersistentHtmlEmbeds(body);
             }
-
-            // Keep focus on editor
-            body.focus();
           }
-
-          notify('Template applied', t.name, 'var(--blue2)', 'fas fa-file-alt');
-
-          // Restore banner config if present
-          if (t.banner_config && typeof msgBannerMountPanel === 'function') {
-            msgBannerMountPanel('bc');
-            msgBannerWriteForm('bc', t.banner_config);
-            setTimeout(function () { msgBannerApplyToEditor('bc'); }, 50);
-          }
-
           // Restore variable fields if present
           if (t.variable_fields && t.variable_fields.length && typeof emailNormalizeVariableFields === 'function') {
             if (typeof bcVariableFields !== 'undefined') {
@@ -21172,6 +21170,47 @@ ${plainText}`;
      */
     var _htmlEmbedStore = new Map();
 
+    function htmlEmbedEncode(html) {
+      try { return btoa(unescape(encodeURIComponent(String(html || '')))); }
+      catch (_) { return ''; }
+    }
+
+    function htmlEmbedDecode(encoded) {
+      try { return decodeURIComponent(escape(atob(String(encoded || '')))); }
+      catch (_) { return ''; }
+    }
+
+    function restorePersistentHtmlEmbeds(root) {
+      if (!root) return;
+      root.querySelectorAll('[data-html-uid]').forEach(function (wrapper) {
+        var uid = wrapper.getAttribute('data-html-uid') || ('html-embed-' + Date.now());
+        var stored = _htmlEmbedStore.get(uid) || htmlEmbedDecode(wrapper.getAttribute('data-html-payload') || '');
+        if (!stored) return;
+        _htmlEmbedStore.set(uid, stored);
+        var iframe = wrapper.querySelector('iframe');
+        if (iframe) {
+          iframe.srcdoc = stored;
+          iframe.onload = function () {
+            try {
+              var h = iframe.contentDocument.documentElement.scrollHeight ||
+                iframe.contentDocument.body.scrollHeight;
+              if (h > 100) iframe.style.minHeight = (h + 20) + 'px';
+            } catch (_) { }
+          };
+        }
+      });
+    }
+
+    function persistHtmlEmbedPayloads(root) {
+      if (!root) return;
+      root.querySelectorAll('[data-html-uid]').forEach(function (wrapper) {
+        if (wrapper.getAttribute('data-html-payload')) return;
+        var uid = wrapper.getAttribute('data-html-uid') || '';
+        var stored = _htmlEmbedStore.get(uid) || '';
+        if (stored) wrapper.setAttribute('data-html-payload', htmlEmbedEncode(stored));
+      });
+    }
+
     /**
      * SIMPLE Outlook CSS Inliner - Just inline CSS and remove unsupported properties
      * NO layout conversion (no grid→table, no flex→table)
@@ -21180,6 +21219,14 @@ ${plainText}`;
     function inlineHtmlForOutlook(rawHtml, callback) {
       console.group('[EMAIL-INLINE] Simple Outlook CSS inliner');
       console.log('[EMAIL-INLINE] Input length:', rawHtml.length);
+      
+      let reportLines = [];
+      reportLines.push("=================================================");
+      reportLines.push("     OUTLOOK HTML CONVERSION LOG");
+      reportLines.push("=================================================");
+      reportLines.push("This log details the specific transformations applied");
+      reportLines.push("to your HTML to ensure compatibility with Outlook.");
+      reportLines.push("");
 
       try {
         // Parse HTML
@@ -21228,7 +21275,8 @@ ${plainText}`;
         }
         document.head.removeChild(tempStyle);
 
-        console.log('[EMAIL-INLINE] Parsed', rules.length, 'CSS rules');
+        reportLines.push("[✓] COMPATIBILITY CHECK: CSS Rules");
+        reportLines.push(`    Parsed ${rules.length} CSS rules and converted them to inline styles (required for Outlook).`);
 
         // Extract CSS variables from :root
         var cssVarMap = {};
@@ -21243,6 +21291,10 @@ ${plainText}`;
             });
           }
         });
+        
+        if (Object.keys(cssVarMap).length > 0) {
+            reportLines.push(`    Found ${Object.keys(cssVarMap).length} CSS Variables (e.g. var(--color)). Resolved them to hardcoded values.`);
+        }
 
         // Apply CSS rules to matching elements
         rules.forEach(function (rule) {
@@ -21287,6 +21339,11 @@ ${plainText}`;
           'order'
         ];
 
+        reportLines.push("");
+        reportLines.push("[!] STRIPPED CSS PROPERTIES");
+        
+        let removedCss = new Set();
+        
         // Clean up inline styles - remove unsupported properties
         var cleanedCount = 0;
         doc.querySelectorAll('[style]').forEach(function (el) {
@@ -21305,16 +21362,16 @@ ${plainText}`;
 
             var propName = prop.split(':')[0].trim().toLowerCase();
 
+            let remove = false;
             // Remove if in unsupported list
-            if (UNSUPPORTED_PROPS.indexOf(propName) !== -1) return false;
-
+            if (UNSUPPORTED_PROPS.indexOf(propName) !== -1) remove = true;
             // Remove if starts with grid- or flex-
-            if (propName.startsWith('grid-') || propName.startsWith('flex-')) return false;
-
+            if (propName.startsWith('grid-') || propName.startsWith('flex-')) remove = true;
             // Remove if contains var()
-            if (prop.indexOf('var(') !== -1) return false;
+            if (prop.indexOf('var(') !== -1) remove = true;
 
-            return true;
+            if (remove) removedCss.add(propName);
+            return !remove;
           });
 
           var cleanStyle = props.join('; ');
@@ -21330,38 +21387,63 @@ ${plainText}`;
           }
         });
 
-        console.log('[EMAIL-INLINE] Cleaned', cleanedCount, 'elements (removed unsupported CSS)');
+        if (removedCss.size > 0) {
+           reportLines.push(`    The following unsupported CSS properties were removed:`);
+           removedCss.forEach(p => reportLines.push(`    - ${p}`));
+        } else {
+           reportLines.push(`    No unsupported CSS properties found. Great job!`);
+        }
 
+        reportLines.push("");
+        reportLines.push("[!] STRIPPED HTML TAGS & ATTRIBUTES");
+        
+        let removedTags = new Set();
         // Remove <style>, <script>, <link> tags
-        doc.querySelectorAll('style, script, link').forEach(function (s) {
+        doc.querySelectorAll('style, script, link, iframe, form, button').forEach(function (s) {
+          removedTags.add(s.tagName.toLowerCase());
           s.remove();
         });
+        
+        if (removedTags.size > 0) {
+            reportLines.push(`    The following unsupported HTML tags were completely removed:`);
+            removedTags.forEach(t => reportLines.push(`    - <${t}>`));
+        }
 
+        let removedAttrs = 0;
         // Remove class attributes (Outlook prefixes with x_)
         doc.querySelectorAll('[class]').forEach(function (el) {
           el.removeAttribute('class');
+          removedAttrs++;
         });
 
         // Remove id attributes (not needed in email)
         doc.querySelectorAll('[id]').forEach(function (el) {
           el.removeAttribute('id');
+          removedAttrs++;
         });
+        
+        reportLines.push(`    Removed ${removedAttrs} 'class' and 'id' attributes (Outlook requires inline styles).`);
+        
+        reportLines.push("");
+        reportLines.push("=================================================");
+        reportLines.push("STATUS: READY FOR OUTLOOK");
 
         var result = doc.body ? doc.body.innerHTML : rawHtml;
         console.log('[EMAIL-INLINE] ✅ Output length:', result.length);
         console.groupEnd();
 
-        callback(result);
+        callback(result, reportLines.join('\r\n'));
 
       } catch (err) {
         console.error('[EMAIL-INLINE] Error:', err);
+        reportLines.push("Error during conversion: " + err.message);
         // Fallback: return body content
         try {
           var p = new DOMParser();
           var d = p.parseFromString(rawHtml, 'text/html');
-          callback(d.body ? d.body.innerHTML : rawHtml);
+          callback(d.body ? d.body.innerHTML : rawHtml, reportLines.join('\r\n'));
         } catch (_) {
-          callback(rawHtml);
+          callback(rawHtml, reportLines.join('\r\n'));
         }
       }
     }
@@ -21380,6 +21462,7 @@ ${plainText}`;
       }
 
       console.log('[EMAIL-SEND] Found', wrappers.length, 'HTML embed(s) - already transformed on insert!');
+      persistHtmlEmbedPayloads(editorEl);
 
       // Clone the editor content
       var clone = editorEl.cloneNode(true);
@@ -21387,7 +21470,7 @@ ${plainText}`;
       // Replace each wrapper with the stored HTML (already transformed)
       clone.querySelectorAll('[data-html-uid]').forEach(function (wrapper) {
         var uid = wrapper.getAttribute('data-html-uid') || '';
-        var transformedHtml = _htmlEmbedStore.get(uid) || '';
+        var transformedHtml = _htmlEmbedStore.get(uid) || htmlEmbedDecode(wrapper.getAttribute('data-html-payload') || '');
         console.log('[EMAIL-SEND] Embed uid:', uid, '| stored HTML length:', transformedHtml.length, '(already Outlook-compatible)');
 
         if (transformedHtml.trim()) {
@@ -22314,6 +22397,15 @@ ${plainText}`;
           waAppendMessage(msg);
           var area = document.getElementById('wa-chat-area');
           if (area) area.scrollTop = area.scrollHeight;
+          // Chat is open — keep unread at 0 in DB (backend increments on saveChat)
+          if (!msg.fromMe && !msg.from_me) {
+            fetch(API_BASE + '/wa/chats/' + encodeURIComponent(cleanJid) + '/read', {
+              method: 'POST',
+              headers: getAuthHeaders()
+            }).then(function () {
+              if (chat) { chat.unread = 0; waPatchChatRow(chat); }
+            }).catch(function () {});
+          }
         } else {
           var senderJid = msg.sender || (!cleanJid.endsWith('@g.us') ? cleanJid : '');
           var sender = waResolveJidDisplay(senderJid, msg.chatName || msg.contactName || msg.senderName || msg.pushName || '');
@@ -22325,15 +22417,38 @@ ${plainText}`;
       });
       waSocket.on('wa:chats_updated', () => { waLoadChats(); });
       waSocket.on('wa:status', function(data) {
+        if (localStorage.getItem('wa_tick_debug') === '1') {
+          console.log('[WA-TICK-UI] status update', data);
+        }
         var el = document.getElementById('msg-' + data.id);
-        if (!el) return;
+        if (!el) {
+          if (localStorage.getItem('wa_tick_debug') === '1') {
+            console.warn('[WA-TICK-UI] no DOM element for msg-' + data.id);
+          }
+          return;
+        }
         var tick = el.querySelector('.wa-tick');
         if (!tick) return;
         // Only upgrade: never go backwards
         var rank = { sent: 1, delivered: 2, read: 3, played: 4 };
-        if ((rank[data.status] || 0) <= (rank[tick.dataset.status] || 0)) return;
+        var prev = tick.dataset.status || 'sent';
+        if ((rank[data.status] || 0) <= (rank[prev] || 0)) {
+          if (localStorage.getItem('wa_tick_debug') === '1') {
+            console.log('[WA-TICK-UI] ignored downgrade/same', { id: data.id, from: prev, to: data.status, source: data.source, proto: data.proto });
+          }
+          return;
+        }
         tick.dataset.status = data.status;
         tick.innerHTML = waTickSvg(data.status);
+        if (waRenderedMessages[data.id]) waRenderedMessages[data.id].status = data.status;
+        if (localStorage.getItem('wa_tick_debug') === '1') {
+          console.log('[WA-TICK-UI] tick upgraded', { id: data.id, from: prev, to: data.status, source: data.source, proto: data.proto });
+        }
+      });
+      waSocket.on('wa:status_trace', function(data) {
+        if (localStorage.getItem('wa_tick_debug') === '1') {
+          console.log('[WA-TICK-TRACE]', data);
+        }
       });
       waSocket.on('wa:chat_unread_update', function (data) {
         var jid = waNormalizeJid(data && data.jid);
@@ -22904,7 +23019,7 @@ ${plainText}`;
         var currentTime = chat.last_time ? new Date(chat.last_time).getTime() : 0;
         var existingTime = existing.last_time ? new Date(existing.last_time).getTime() : 0;
         if (currentTime >= existingTime) {
-          byId[key] = Object.assign({}, existing, chat, { unread: Math.max(existing.unread || 0, chat.unread || 0) });
+          byId[key] = Object.assign({}, existing, chat);
         }
       });
       return Object.keys(byId).map(function (id) { return byId[id]; });
@@ -23515,7 +23630,7 @@ ${plainText}`;
           area.scrollTop = area.scrollHeight;
         }
         var chat = waAllChats.find(function (c) { return c.id === waActiveJid; });
-        if (chat) { chat.unread = 0; waRenderChats(waAllChats); }
+        if (chat) { chat.unread = 0; waPatchChatRow(chat); }
       } catch (err) {
         if (seq === _waLoadMessagesSeq) {
           area.innerHTML = '<div style="color:var(--red2);padding:16px;font-size:12.5px;">' + err.message + '</div>';
@@ -23637,6 +23752,19 @@ ${plainText}`;
         if (area.scrollTop <= 40) waLoadOlderMessages();
       };
       await waLoadActiveMessages({ showLoader: true });
+
+      // Mark chat read: persist unread=0 in DB + sync with linked WhatsApp session
+      fetch(API_BASE + '/wa/chats/' + encodeURIComponent(jid) + '/read', {
+        method: 'POST',
+        headers: getAuthHeaders()
+      }).then(function () {
+        var chat = waAllChats.find(function (c) { return c.id === jid; });
+        if (chat) { chat.unread = 0; waPatchChatRow(chat); }
+      }).catch(function (err) {
+        if (localStorage.getItem('wa_tick_debug') === '1') {
+          console.warn('[WA-UNREAD] mark read failed:', err);
+        }
+      });
 
       // Restore draft for this chat
       var draftInput = document.getElementById('wa-msg-input');
@@ -24010,7 +24138,8 @@ ${plainText}`;
         id: msgId,
         body: body,
         sender: fromMe ? 'You' : (senderDisplay || senderName || 'Contact'),
-        type: type
+        type: type,
+        status: fromMe ? (msg.status || 'sent') : null
       };
       if (quotedMsgId && (!quotedBody || quotedBody === 'Reply' || /^(↩|↪)?\s*Reply$/i.test(quotedBody))) {
         var quotedMsg = waRenderedMessages[quotedMsgId];
@@ -24201,12 +24330,14 @@ ${plainText}`;
       var blue = status === 'read' || status === 'played';
       var double = status === 'delivered' || status === 'read' || status === 'played';
       var color = blue ? '#53bdeb' : 'rgba(255,255,255,0.55)';
+      var lightGrey = 'rgba(0,0,0,0.35)';
+      var tickColor = blue ? color : (document.documentElement.classList.contains('light') ? lightGrey : color);
       if (!double) {
-        return '<svg width="14" height="10" viewBox="0 0 14 10" style="vertical-align:middle;"><path d="M1 5l4 4L13 1" stroke="' + color + '" stroke-width="2" fill="none" stroke-linecap="round"/></svg>';
+        return '<svg width="14" height="10" viewBox="0 0 14 10" style="vertical-align:middle;"><path d="M1 5l4 4L13 1" stroke="' + tickColor + '" stroke-width="2" fill="none" stroke-linecap="round"/></svg>';
       }
       return '<svg width="18" height="10" viewBox="0 0 18 10" style="vertical-align:middle;">' +
-        '<path d="M1 5l4 4L13 1" stroke="' + color + '" stroke-width="2" fill="none" stroke-linecap="round"/>' +
-        '<path d="M5 5l4 4L17 1" stroke="' + color + '" stroke-width="2" fill="none" stroke-linecap="round"/>' +
+        '<path d="M1 5l4 4L13 1" stroke="' + tickColor + '" stroke-width="2" fill="none" stroke-linecap="round"/>' +
+        '<path d="M5 5l4 4L17 1" stroke="' + tickColor + '" stroke-width="2" fill="none" stroke-linecap="round"/>' +
         '</svg>';
     }
 
@@ -24758,6 +24889,7 @@ ${plainText}`;
             mediaPath: null,
             localUrl: tempLocalUrl,
             ts: new Date(),
+            status: 'sent',
             type: isStickerMedia ? 'stickerMessage' : (file.type.startsWith('image/') ? 'imageMessage' : (file.type.startsWith('video/') ? 'videoMessage' : 'documentMessage')),
             quotedBody: quotedBody,
             replyToMsgId: quotedId,
@@ -24771,6 +24903,7 @@ ${plainText}`;
           fromMe: true,
           body: text,
           ts: new Date(),
+          status: 'sent',
           quotedBody: quotedBody,
           replyToMsgId: quotedId,
           isReply: !!quotedId
@@ -25541,6 +25674,15 @@ ${plainText}`;
       company_website: ['www.unicircuites.com', 'unicircuites.com', 'https://www.unicircuites.com']
     };
 
+    // Shared user-added options, persisted across all popups
+    var _emailUserOptsKey = 'unicomm_var_user_opts';
+    function emailGetUserOpts() {
+      try { return JSON.parse(localStorage.getItem(_emailUserOptsKey) || '{}'); } catch(e) { return {}; }
+    }
+    function emailSaveUserOpts(obj) {
+      try { localStorage.setItem(_emailUserOptsKey, JSON.stringify(obj)); } catch(e) {}
+    }
+
     function emailExtractPlaceholders(html, subject) {
       var keys = {};
       var re = /\{\{\s*([a-zA-Z0-9_]+)\s*\}\}/g;
@@ -25570,10 +25712,15 @@ ${plainText}`;
 
     function emailNormalizeVariableFields(fields) {
       if (!Array.isArray(fields)) return [];
+      var userOpts = emailGetUserOpts();
       return fields.map(function (f) {
         if (!f || !f.key) return null;
         var key = String(f.key).toLowerCase().replace(/[^a-z0-9_]/g, '');
-        var presets = (f.options && f.options.length) ? f.options : (EMAIL_VAR_OPTION_PRESETS[key] || []);
+        var presets = EMAIL_VAR_OPTION_PRESETS[key] || [];
+        var stored = (f.options && f.options.length) ? f.options : presets;
+        var user = userOpts[key] || [];
+        var merged = stored.slice();
+        user.forEach(function(o) { if (merged.indexOf(o) === -1) merged.push(o); });
         return {
           key: key,
           label: f.label || key,
@@ -25581,7 +25728,7 @@ ${plainText}`;
           source: f.source === 'recipient' ? 'recipient' : 'static',
           value: f.value != null ? String(f.value) : '',
           example: f.example != null ? String(f.example) : (presets[0] || ''),
-          options: presets
+          options: merged
         };
       }).filter(Boolean);
     }
@@ -25636,13 +25783,99 @@ ${plainText}`;
       return prefix === 'bc' ? bcVariableFields : etVariableFields;
     }
 
+    function emailToggleOptDropdown(ddId) {
+      var dd = document.getElementById(ddId);
+      if (!dd) return;
+      var isOpen = dd.style.display !== 'none';
+      // close all other open dropdowns
+      document.querySelectorAll('[id^="vf-dd-"]').forEach(function (el) { if (!el.id.endsWith('-wrap')) el.style.display = 'none'; });
+      dd.style.display = isOpen ? 'none' : 'block';
+      if (!isOpen) {
+        // close on outside click
+        setTimeout(function () {
+          document.addEventListener('click', function _close(e) {
+            if (!dd.closest('[id$="-wrap"]').contains(e.target)) { dd.style.display = 'none'; }
+            document.removeEventListener('click', _close);
+          });
+        }, 0);
+      }
+    }
+
+    function emailPickFieldOption(prefix, idx, val) {
+      var fields = emailCollectVariableFields(prefix);
+      if (!fields[idx]) return;
+      fields[idx].value = val;
+      if (prefix === 'et') etVariableFields = fields;
+      else bcVariableFields = fields;
+      emailRefreshPanel(prefix);
+    }
+
+    function emailRemoveFieldOption(prefix, idx, removed) {
+      var fields = emailCollectVariableFields(prefix);
+      if (!fields[idx]) return;
+      var key = fields[idx].key;
+      var userOpts = emailGetUserOpts();
+      var userArr = userOpts[key] || [];
+      userOpts[key] = userArr.filter(function(o) { return o !== removed; });
+      emailSaveUserOpts(userOpts);
+      if (fields[idx].value === removed) {
+        var remaining = (fields[idx].options || []).filter(function(o){ return o !== removed; });
+        fields[idx].value = remaining[0] || '';
+      }
+      if (prefix === 'et') etVariableFields = fields;
+      else bcVariableFields = fields;
+      emailRefreshAllPanels();
+    }
+
+    function emailAddFieldOption(prefix, idx) {
+      var inp = document.getElementById('vf-inp-' + prefix + '-' + idx);
+      var val = inp ? String(inp.value || '').trim() : '';
+      if (!val) return;
+      var fields = emailCollectVariableFields(prefix);
+      if (!fields[idx]) return;
+      var key = fields[idx].key;
+      var userOpts = emailGetUserOpts();
+      var arr = userOpts[key] || [];
+      var valLow = val.toLowerCase();
+      // check against presets + user opts for duplicate
+      var allOpts = (EMAIL_VAR_OPTION_PRESETS[key] || []).concat(arr);
+      if (allOpts.some(function(o) { return String(o).toLowerCase() === valLow; })) return;
+      arr.push(val);
+      userOpts[key] = arr;
+      emailSaveUserOpts(userOpts);
+      fields[idx].value = val;
+      if (prefix === 'et') etVariableFields = fields;
+      else bcVariableFields = fields;
+      emailRefreshAllPanels();
+    }
+
+    function emailLivePreviewField(prefix, idx, inputEl) {
+      // Update only the "Renders as" text without re-rendering the whole panel
+      var val = String(inputEl.value || '').trim();
+      var row = inputEl.closest('[data-var-idx]');
+      if (row) {
+        var strong = row.querySelector('.var-renders-as');
+        if (strong) strong.textContent = val || '—';
+      }
+    }
+
+    function emailRefreshPanel(prefix) {
+      if (prefix === 'et') etRefreshVariablesPanel();
+      else bcRefreshVariablesPanel();
+    }
+
+    function emailRefreshAllPanels() {
+      if (document.getElementById('et-variables-list')) etRefreshVariablesPanel();
+      if (document.getElementById('bc-variables-list')) bcRefreshVariablesPanel();
+    }
+
     function emailSetFieldValue(prefix, idx, value) {
       var fields = emailCollectVariableFields(prefix);
       if (!fields[idx]) return;
       fields[idx].value = value;
       if (prefix === 'et') etVariableFields = fields;
       else bcVariableFields = fields;
-      emailRenderVariablesPanel(prefix);
+      emailRefreshPanel(prefix);
     }
 
     function emailSetFieldKey(prefix, idx, key) {
@@ -25652,7 +25885,7 @@ ${plainText}`;
       fields[idx] = Object.assign({}, normalized, { value: fields[idx].value || normalized.value });
       if (prefix === 'et') etVariableFields = fields;
       else bcVariableFields = fields;
-      emailRenderVariablesPanel(prefix);
+      emailRefreshPanel(prefix);
     }
 
     function emailSetFieldSource(prefix, idx, source) {
@@ -25661,7 +25894,7 @@ ${plainText}`;
       fields[idx].source = source === 'recipient' ? 'recipient' : 'static';
       if (prefix === 'et') etVariableFields = fields;
       else bcVariableFields = fields;
-      emailRenderVariablesPanel(prefix);
+      emailRefreshPanel(prefix);
     }
 
     function emailRemoveVariableField(prefix, idx) {
@@ -25669,26 +25902,39 @@ ${plainText}`;
       fields.splice(idx, 1);
       if (prefix === 'et') etVariableFields = fields;
       else bcVariableFields = fields;
-      emailRenderVariablesPanel(prefix);
+      emailRefreshPanel(prefix);
     }
 
     function emailRenderValueControl(prefix, idx, field) {
       if (field.source === 'recipient') {
         return '<span style="font-size:11px;color:var(--muted2);"><i class="fas fa-user"></i> Uses each recipient\'s name when sending</span>';
       }
-      var opts = (field.options && field.options.length) ? field.options.slice() : (EMAIL_VAR_OPTION_PRESETS[field.key] || []).slice();
-      var cur = String(field.value || '').trim() || field.example || '';
+      var opts = (field.options && field.options.length) ? field.options.slice() : [];      var cur = String(field.value || '').trim() || field.example || '';
       if (cur && opts.indexOf(cur) === -1) opts.unshift(cur);
       var html = '';
       if (opts.length) {
-        html += '<select class="inp" style="font-size:11px;padding:4px 6px;width:100%;" onchange="emailSetFieldValue(\'' + prefix + '\',' + idx + ',this.value)">';
-        html += '<option value="">— Select preset —</option>';
-        opts.forEach(function (o) {
-          html += '<option value="' + escAttr(o) + '"' + (o === cur ? ' selected' : '') + '>' + escHtml(o) + '</option>';
+        var ddId = 'vf-dd-' + prefix + '-' + idx;
+        html += '<div style="position:relative;" id="' + ddId + '-wrap">';
+        // trigger button
+        html += '<div class="inp" onclick="emailToggleOptDropdown(\'' + ddId + '\')" style="font-size:11px;padding:4px 28px 4px 6px;width:100%;cursor:pointer;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;position:relative;">' +
+          escHtml(cur || '— Select preset —') +
+          '<span style="position:absolute;right:6px;top:50%;transform:translateY(-50%);pointer-events:none;">▾</span></div>';
+        // dropdown list
+        html += '<div id="' + ddId + '" style="display:none;position:absolute;z-index:9999;left:0;right:0;background:var(--bg2,#1e2235);border:1px solid var(--border);border-radius:4px;max-height:160px;overflow-y:auto;box-shadow:0 4px 12px rgba(0,0,0,0.4);">';
+        html += '<div onclick="emailSetFieldValue(\'' + prefix + '\',' + idx + ',\'\')" style="font-size:11px;padding:5px 8px;cursor:pointer;color:var(--muted);border-bottom:1px solid var(--border);">— Select preset —</div>';
+        opts.forEach(function (o, oi) {
+          var isCur = o === cur;
+          html += '<div style="display:flex;align-items:center;gap:4px;padding:4px 6px;' + (isCur ? 'background:rgba(108,99,255,0.18);' : '') + '">' +
+            '<span onclick="emailPickFieldOption(\'' + prefix + '\',' + idx + ',\'' + escAttr(o) + '\')" style="flex:1;font-size:11px;cursor:pointer;padding:1px 0;">' + escHtml(o) + '</span>' +
+            '<button type="button" onclick="emailRemoveFieldOption(\'' + prefix + '\',' + idx + ',\'' + escAttr(o) + '\')" style="flex-shrink:0;background:none;border:none;color:var(--red2,#f87171);cursor:pointer;font-size:12px;padding:0 2px;line-height:1;" title="Delete option">✕</button>' +
+            '</div>';
         });
-        html += '</select>';
+        html += '</div></div>';
       }
-      html += '<input class="inp" style="font-size:11px;padding:4px 6px;width:100%;margin-top:' + (opts.length ? '4' : '0') + 'px;" placeholder="Value to render" value="' + escAttr(cur) + '" oninput="emailSetFieldValue(\'' + prefix + '\',' + idx + ',this.value)" />';
+      html += '<div style="display:flex;gap:4px;margin-top:' + (opts.length ? '4' : '0') + 'px;">' +
+        '<input id="vf-inp-' + prefix + '-' + idx + '" class="inp" style="font-size:11px;padding:4px 6px;flex:1;min-width:0;" placeholder="Value to render" value="' + escAttr(cur) + '" oninput="emailLivePreviewField(\'' + prefix + '\',' + idx + ',this)" onchange="emailSetFieldValue(\'' + prefix + '\',' + idx + ',this.value)" />' +
+        '<button type="button" title="Add as option" onclick="emailAddFieldOption(\'' + prefix + '\',' + idx + ')" style="flex-shrink:0;padding:4px 8px;background:var(--accent,#6c63ff);border:none;border-radius:4px;color:#fff;cursor:pointer;font-size:13px;line-height:1;">+</button>' +
+        '</div>';
       return html;
     }
 
@@ -25716,11 +25962,11 @@ ${plainText}`;
         var inTemplate = placeholders.indexOf(field.key) !== -1;
         var status = emailFieldMappingStatus(field, inTemplate);
         if (status.code === 'unmapped') unmapped++;
-        return '<div style="display:grid;grid-template-columns:minmax(120px,1fr) minmax(160px,1.4fr) 110px 28px;gap:8px;align-items:start;padding:8px 12px;border-bottom:1px solid var(--border);font-size:11.5px;">' +
+        return '<div data-var-idx="' + idx + '" style="display:grid;grid-template-columns:minmax(120px,1fr) minmax(160px,1.4fr) 110px 28px;gap:8px;align-items:start;padding:8px 12px;border-bottom:1px solid var(--border);font-size:11.5px;">' +
           '<div><div style="font-family:monospace;color:var(--gold2);font-weight:600;">{{' + escHtml(field.key) + '}}</div>' +
           '<div style="font-size:10px;color:var(--muted);margin-top:2px;">' + escHtml(field.label || field.key) + '</div></div>' +
           '<div>' + emailRenderValueControl(prefix, idx, field) +
-          '<div style="font-size:10px;color:var(--muted);margin-top:4px;">Renders as: <strong style="color:var(--text);">' + escHtml(emailResolvedPreview(field)) + '</strong></div></div>' +
+          '<div style="font-size:10px;color:var(--muted);margin-top:4px;">Renders as: <strong class="var-renders-as" style="color:var(--text);">' + escHtml(emailResolvedPreview(field)) + '</strong></div></div>' +
           '<div><span style="font-size:10px;font-weight:700;color:' + status.color + ';">' + escHtml(status.label) + '</span>' +
           '<select class="inp" style="font-size:10px;padding:2px 4px;margin-top:4px;width:100%;" onchange="emailSetFieldSource(\'' + prefix + '\',' + idx + ',this.value)">' +
           '<option value="static"' + (field.source !== 'recipient' ? ' selected' : '') + '>Fixed value</option>' +
@@ -25766,7 +26012,7 @@ ${plainText}`;
 
     // ── MESSAGE BANNER (hero image + overlay, header bar, CTA — like MediCare-style emails) ──
     var MSG_BANNER_STORAGE_PREFIX = 'unicomm_banner_v2_';
-    var MSG_BANNER_PANEL_VERSION = '5';
+    var MSG_BANNER_PANEL_VERSION = '6';
     var EMAIL_FRAME_WIDTH = 600;
     var _msgBannerImageDataCache = {};
     var MSG_BANNER_EDITORS = { bc: 'bc-html', et: 'et-html-editor', cl: 'cl-body-editor' };
@@ -26099,7 +26345,7 @@ ${plainText}`;
       var ctaHtml = '';
       if (cfg.showCta && cfg.ctaText) {
         ctaHtml = '<table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin-top:14px;"><tr><td style="background:' + escAttr(cfg.ctaColor || '#fff') + ';border-radius:6px;padding:11px 22px;">'
-          + '<a href="' + escAttr(cfg.ctaUrl || '#') + '" style="color:' + escAttr(cfg.ctaTextColor || '#1d4ed8') + ';font-weight:700;font-size:13px;text-decoration:none;">'
+          + '<a href="' + escAttr(cfg.ctaUrl || '#') + '" target="_blank" rel="noopener" style="color:' + escAttr(cfg.ctaTextColor || '#1d4ed8') + ';font-weight:700;font-size:13px;text-decoration:none;">'
           + escHtml(cfg.ctaText) + ' &rsaquo;</a></td></tr></table>';
       }
       var bgAttr = img ? ' background="' + escAttr(img) + '"' : '';
@@ -26292,9 +26538,9 @@ ${plainText}`;
         + '<button type="button" class="btn btn-ghost btn-xs" onclick="msgBannerInsertFooterAtCursor(\'' + s + '\')"><i class="fas fa-level-down-alt"></i> Insert at cursor</button>'
         + '<button type="button" class="btn btn-ghost btn-xs" onclick="msgBannerRefreshFrameFooter(\'' + s + '\')"><i class="fas fa-sync-alt"></i> Update footer row</button></div>'
         + '<div style="border-top:1px solid var(--border);padding-top:8px;margin-bottom:8px;">'
-        + '<label style="display:flex;align-items:center;gap:8px;font-size:11.5px;margin-bottom:6px;cursor:pointer;"><input type="checkbox" id="' + s + '-banner-cta" onchange="msgBannerOnFieldChange(\'' + s + '\')" /> CTA button</label>'
+        + '<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;"><label style="display:flex;align-items:center;gap:8px;font-size:11.5px;cursor:pointer;white-space:nowrap;margin:0;"><input type="checkbox" id="' + s + '-banner-cta" onchange="msgBannerOnFieldChange(\'' + s + '\')" /> CTA button</label>'
+        + '<input type="url" class="inp" id="' + s + '-banner-cta-url" placeholder="CTA click URL (opens in new tab)" style="font-size:12px;flex:1;min-width:180px;height:32px;" oninput="msgBannerOnFieldChange(\'' + s + '\')" /></div>'
         + '<div id="' + s + '-banner-cta-fields" class="form-row" style="gap:6px;display:none;"><input class="inp" id="' + s + '-banner-cta-text" placeholder="Book Now" style="font-size:12px;flex:1;" oninput="msgBannerOnFieldChange(\'' + s + '\')" />'
-        + '<input class="inp" id="' + s + '-banner-cta-url" placeholder="https://…" style="font-size:12px;flex:1.2;" oninput="msgBannerOnFieldChange(\'' + s + '\')" />'
         + '<input type="color" class="inp" id="' + s + '-banner-cta-bg" title="Button bg" style="width:44px;height:36px;padding:2px;" onchange="msgBannerOnFieldChange(\'' + s + '\')" />'
         + '<input type="color" class="inp" id="' + s + '-banner-cta-fg" title="Button text" style="width:44px;height:36px;padding:2px;" onchange="msgBannerOnFieldChange(\'' + s + '\')" /></div></div>'
         + '<div style="border-top:1px solid var(--border);padding-top:8px;margin-bottom:8px;">'
@@ -26691,7 +26937,7 @@ ${plainText}`;
 
     function etSetHTML(html) {
       var ed = etGetEditor();
-      if (ed) { ed.innerHTML = html || ''; applyLinkTooltips(ed); }
+      if (ed) { ed.innerHTML = html || ''; applyLinkTooltips(ed); restorePersistentHtmlEmbeds(ed); }
     }
 
     function etMarkDirty() { /* hook for future autosave */ }
@@ -26956,6 +27202,7 @@ ${plainText}`;
       }
 
       var editorEl = document.getElementById(editorId);
+      if (editorEl && typeof persistHtmlEmbedPayloads === 'function') persistHtmlEmbedPayloads(editorEl);
       var html = editorEl ? (editorEl.innerHTML || '') : '';
 
       // Capture banner_config from the matching scope
@@ -26993,6 +27240,8 @@ ${plainText}`;
       var name = document.getElementById('et-name').value.trim();
       var subject = document.getElementById('et-subject').value.trim();
       var category = document.getElementById('et-category').value;
+      var etEditorEl = etGetEditor();
+      if (etEditorEl && typeof persistHtmlEmbedPayloads === 'function') persistHtmlEmbedPayloads(etEditorEl);
       var html_body = etGetHTML();
       var statusEl = document.getElementById('et-save-status');
       if (!name) { if (statusEl) statusEl.innerHTML = '<span style="color:var(--red2);">Template name required</span>'; return; }
@@ -29157,15 +29406,17 @@ ${plainText}`;
         notify('Transforming HTML...', 'Converting to Outlook-compatible format', 'var(--gold)', 'fas fa-magic');
 
         // Transform the HTML using our Outlook compatibility function
-        inlineHtmlForOutlook(raw, function (transformedHtml) {
+        // Transform the HTML using our Outlook compatibility function
+        inlineHtmlForOutlook(raw, function (transformedHtml, reportLog) {
           console.log('[HTML-INSERT] Transformation complete! Original:', raw.length, 'bytes → Transformed:', transformedHtml.length, 'bytes');
 
           // Store the TRANSFORMED HTML (not the raw HTML)
           _htmlEmbedStore.set(uid, transformedHtml);
 
           // Create wrapper with transformed HTML
+          const payload = htmlEmbedEncode(transformedHtml);
           htmlToInsert =
-            `<div contenteditable="false" data-html-uid="${uid}" style="width:100%;margin:8px 0;border:1px solid #ddd;border-radius:6px;overflow:hidden;display:block;position:relative;">` +
+            `<div contenteditable="false" data-html-uid="${uid}" data-html-payload="${payload}" style="width:100%;margin:8px 0;border:1px solid #ddd;border-radius:6px;overflow:hidden;display:block;position:relative;">` +
             `<div style="position:absolute;top:5px;right:5px;background:rgba(39,150,196,0.9);color:#fff;padding:3px 8px;font-size:10px;font-weight:600;border-radius:4px;z-index:10;">✓ Outlook Compatible</div>` +
             `<iframe id="${uid}" sandbox="allow-scripts allow-popups" srcdoc="" style="width:100%;min-height:500px;border:none;display:block;" scrolling="yes"></iframe>` +
             `</div><br>`;
@@ -29173,7 +29424,20 @@ ${plainText}`;
           // Insert the transformed HTML
           insertTransformedHtml(ed, savedRange, htmlToInsert, uid, transformedHtml);
 
-          notify('HTML Transformed!', 'Now Outlook-compatible (grid→table, CSS vars resolved)', 'var(--green)', 'fas fa-check-circle');
+          // Trigger log download
+          if (reportLog) {
+             const blob = new Blob([reportLog], { type: 'text/plain' });
+             const url = URL.createObjectURL(blob);
+             const a = document.createElement('a');
+             a.href = url;
+             a.download = 'outlook_conversion_log.txt';
+             a.style.display = 'none';
+             document.body.appendChild(a);
+             a.click();
+             setTimeout(() => { document.body.removeChild(a); URL.revokeObjectURL(url); }, 100);
+          }
+
+          notify('HTML Transformed!', 'Outlook log file downloaded automatically.', 'var(--green)', 'fas fa-check-circle');
         });
 
         // Return early - the callback will handle insertion
@@ -33363,8 +33627,11 @@ Preview shows final Outlook-compatible version"><i class="fas fa-code"></i> HTML
               <span style="font-size:11px;font-weight:700;color:var(--gold);text-transform:uppercase;letter-spacing:0.5px;">
                 <i class="fas fa-brackets-curly"></i> Variable Fields &amp; Render Preview
               </span>
+              <div style="display:flex;gap:6px;">
               <button type="button" class="btn btn-ghost btn-xs" onclick="etAddCustomVariable()"><i class="fas fa-plus"></i> Add
                 Field</button>
+              <button type="button" class="btn btn-ghost btn-xs" onclick="etRefreshVariablesPanel()" title="Reload panel"><i class="fas fa-rotate-right"></i> Reload</button>
+              </div>
             </div>
             <div id="et-variables-hint"
               style="font-size:11px;color:var(--muted);padding:8px 12px;border-bottom:1px solid var(--border);">

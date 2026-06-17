@@ -3061,7 +3061,12 @@ router.get('/contacts', async (req, res) => {
 
 // ── POST /api/outlook/contacts ────────────────────────────────────────────
 router.post('/contacts', async (req, res) => {
-  const { displayName, email, givenName, surname, mobilePhone, companyName } = req.body;
+  const { givenName, surname, mobilePhone, companyName, jobTitle } = req.body;
+  const firstEmail = Array.isArray(req.body.emailAddresses)
+    ? req.body.emailAddresses.map(e => e && (e.address || e.email)).find(Boolean)
+    : '';
+  const email = String(req.body.email || firstEmail || '').trim();
+  const displayName = String(req.body.displayName || [givenName, surname].filter(Boolean).join(' ') || email).trim();
 
   if (!displayName || !email) {
     return res.status(400).json({ error: 'displayName and email are required' });
@@ -3074,6 +3079,7 @@ router.post('/contacts', async (req, res) => {
     ...(surname     ? { surname }     : {}),
     ...(mobilePhone ? { mobilePhone } : {}),
     ...(companyName ? { companyName } : {}),
+    ...(jobTitle    ? { jobTitle }    : {}),
   };
 
   try {
@@ -3097,7 +3103,12 @@ router.post('/contacts', async (req, res) => {
 // ── PATCH /api/outlook/contacts/:id ──────────────────────────────────────
 router.patch('/contacts/:id', async (req, res) => {
   const { id } = req.params;
-  const { displayName, givenName, surname, mobilePhone, companyName } = req.body;
+  const { givenName, surname, mobilePhone, companyName, jobTitle } = req.body;
+  const firstEmail = Array.isArray(req.body.emailAddresses)
+    ? req.body.emailAddresses.map(e => e && (e.address || e.email)).find(Boolean)
+    : '';
+  const email = String(req.body.email || firstEmail || '').trim();
+  const displayName = String(req.body.displayName || [givenName, surname].filter(Boolean).join(' ') || email).trim();
 
   if (!displayName) {
     return res.status(400).json({ error: 'displayName is required' });
@@ -3112,6 +3123,8 @@ router.patch('/contacts/:id', async (req, res) => {
     ...(surname     ? { surname }     : {}),
     ...(mobilePhone ? { mobilePhone } : {}),
     ...(companyName ? { companyName } : {}),
+    ...(jobTitle    ? { jobTitle }    : {}),
+    ...(email       ? { emailAddresses: [{ address: email, name: displayName }] } : {}),
   };
 
   try {

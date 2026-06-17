@@ -531,7 +531,7 @@ function buildHeroBannerHtml(cfg) {
   if (cfg.showCta && cfg.ctaText) {
     ctaHtml = '<table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin-top:14px;"><tr><td style="background:'
       + escapeHtml(cfg.ctaColor || '#ffffff') + ';border-radius:6px;padding:11px 22px;">'
-      + '<a href="' + escapeHtml(cfg.ctaUrl || '#') + '" style="color:'
+      + '<a href="' + escapeHtml(cfg.ctaUrl || '#') + '" target="_blank" rel="noopener" style="color:'
       + escapeHtml(cfg.ctaTextColor || '#1d4ed8') + ';font-weight:700;font-size:13px;text-decoration:none;display:inline-block;">'
       + escapeHtml(cfg.ctaText) + ' &rsaquo;</a></td></tr></table>';
   }
@@ -652,7 +652,7 @@ function buildWhatsAppBannerText(cfg) {
   if (c.headline) lines.push('*' + String(c.headline).trim() + '*');
   if (c.subheadline) lines.push(String(c.subheadline).trim());
   if (c.footerLine) lines.push('_' + String(c.footerLine).trim() + '_');
-  if (c.showCta && c.ctaText) lines.push('👉 ' + String(c.ctaText).trim());
+  if (c.showCta && c.ctaText) lines.push('👉 ' + String(c.ctaText).trim() + (c.ctaUrl && c.ctaUrl !== '#' ? '\n' + String(c.ctaUrl).trim() : ''));
   if (!lines.length) return '';
   return lines.join('\n') + '\n────────────────\n\n';
 }

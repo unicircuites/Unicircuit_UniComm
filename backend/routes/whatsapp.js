@@ -202,11 +202,10 @@ function canonicalizeChats(rows) {
       continue;
     }
 
-    // Keep newest row and preserve highest unread count.
+    // Keep newest row — use that row's unread (do not inflate with Math.max)
     const winner = normalizedRow._lastTs >= existing._lastTs
       ? { ...existing, ...normalizedRow }
       : { ...normalizedRow, ...existing };
-    winner._unread = Math.max(existing._unread, normalizedRow._unread);
     winner.unread = winner._unread;
     map.set(key, winner);
   }
@@ -228,13 +227,12 @@ function canonicalizeChats(rows) {
       const tb = existing._lastTs ?? (existing.last_time ? new Date(existing.last_time).getTime() : 0);
       if (ta >= tb) {
         const merged = { ...row };
-        merged._unread = Math.max(row._unread || 0, existing._unread || 0);
-        merged.unread  = merged._unread;
+        merged.unread = row._unread;
+        merged._unread = row._unread;
         dupLog.push(`  DROPPED  [${existing.id}]  kept  [${row.id}]  name="${row.name}"`);
         nameMap.set(nameKey, merged);
       } else {
-        existing._unread = Math.max(existing._unread || 0, row._unread || 0);
-        existing.unread  = existing._unread;
+        existing.unread = existing._unread;
         dupLog.push(`  DROPPED  [${row.id}]  kept  [${existing.id}]  name="${existing.name}"`);
       }
     }
@@ -991,8 +989,8 @@ router.get('/messages/:jid', authenticate, async (req, res) => {
       });
     }
     res.json(result.rows);
-    // Update DB unread count only — do NOT send WA read receipt (that would give sender blue tick)
-    pool.query(`UPDATE wa_messages SET is_read=true WHERE chat_id=$1 AND account_phone=$2 AND from_me=false AND is_read=false`, [jid, accountPhone]).catch(() => {});
+    // Persist read state in DB (badge stays cleared after refresh)
+    wa.markIncomingMessagesReadInDb(jid, accountPhone).catch(() => {});
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
@@ -1015,12 +1013,31 @@ router.post('/send', authenticate, async (req, res) => {
   const { jid, message, quotedMsgId } = req.body;
   if (!jid || !message) return res.status(400).json({ error: 'jid and message required' });
   try {
-    await wa.sendMessage(jid, message, quotedMsgId || null);
+    const saved = await wa.sendMessage(jid, message, quotedMsgId || null);
     pool.query(
       `INSERT INTO audit_log (user_id, action, entity, entity_id, detail) VALUES ($1,'wa_send','whatsapp_chat',$2,$3)`,
       [req.user?.id, jid, `Sent WA message to ${jid}: "${String(message).slice(0,80)}"`]
     ).catch(() => {});
-    res.json({ success: true });
+    res.json({
+      success: true,
+      message: {
+        id: saved.id,
+        from_me: true,
+        fromMe: true,
+        body: saved.body,
+        msg_type: saved.msgType,
+        type: saved.msgType,
+        timestamp: saved.timestamp,
+        ts: saved.timestamp,
+        status: saved.status || 'sent',
+        quoted_body: saved.quotedBody,
+        quotedBody: saved.quotedBody,
+        reply_to_msg_id: saved.replyToMsgId,
+        replyToMsgId: saved.replyToMsgId,
+        is_reply: !!saved.replyToMsgId,
+        isReply: !!saved.replyToMsgId,
+      }
+    });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 

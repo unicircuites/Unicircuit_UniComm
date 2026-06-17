@@ -1,0 +1,854 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>UNICIRCUIT — Technical Solutions Portfolio</title>
+    <base target="_blank" />
+    <style>
+      :root {
+        --primary: #0f172a;
+        --accent: #2563eb;
+        --accent-light: #3b82f6;
+        --surface: #f8fafc;
+        --card: #ffffff;
+        --text: #1e293b;
+        --text-light: #64748b;
+        --border: #e2e8f0;
+        --gradient-start: #0f172a;
+        --gradient-end: #1e3a5f;
+      }
+
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+
+      body {
+        font-family: Arial, Helvetica, sans-serif;
+        background: var(--surface);
+        color: var(--text);
+        line-height: 1.6;
+      }
+
+      .hero {
+        background: linear-gradient(
+          135deg,
+          var(--gradient-start) 0%,
+          var(--gradient-end) 100%
+        );
+        color: white;
+        padding: 80px 20px 60px;
+        text-align: center;
+        position: relative;
+        overflow: hidden;
+      }
+
+      .hero::before {
+        content: "";
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23ffffff' fill-opacity='0.03'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
+        opacity: 0.4;
+      }
+
+      .hero-content {
+        position: relative;
+        z-index: 1;
+        max-width: 800px;
+        margin: 0 auto;
+      }
+
+      .logo-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 12px;
+        background: rgba(255, 255, 255, 0.1);
+        padding: 12px 24px;
+        border-radius: 50px;
+        margin-bottom: 32px;
+        border: 1px solid rgba(255, 255, 255, 0.15);
+      }
+
+      .logo-icon {
+        width: 36px;
+        height: 36px;
+        background: var(--accent);
+        border-radius: 8px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: 800;
+        font-size: 18px;
+      }
+
+      .logo-text {
+        font-weight: 700;
+        font-size: 18px;
+        letter-spacing: 0.5px;
+      }
+
+      .hero h1 {
+        font-size: 40px;
+        font-weight: 800;
+        margin-bottom: 16px;
+        line-height: 1.2;
+      }
+
+      .hero p {
+        font-size: 18px;
+        opacity: 0.9;
+        max-width: 600px;
+        margin: 0 auto;
+      }
+
+      .tagline {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 12px;
+        margin-top: 24px;
+        font-size: 12px;
+        opacity: 0.8;
+        font-weight: 700;
+        letter-spacing: 1px;
+        text-transform: uppercase;
+        flex-wrap: wrap;
+      }
+
+      .tagline span::after {
+        content: "•";
+        opacity: 0.7;
+        padding-left: 12px;
+      }
+
+      .tagline span:last-child::after {
+        display: none;
+      }
+
+      .container {
+        max-width: 1200px;
+        margin: 0 auto;
+        padding: 0 20px;
+      }
+
+      .section {
+        padding: 60px 0;
+      }
+
+      .section-header {
+        text-align: center;
+        margin-bottom: 48px;
+      }
+
+      .section-label {
+        display: inline-block;
+        background: var(--accent);
+        color: white;
+        padding: 6px 16px;
+        border-radius: 20px;
+        font-size: 12px;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        margin-bottom: 16px;
+      }
+
+      .section-title {
+        font-size: 28px;
+        font-weight: 700;
+        color: var(--primary);
+        margin-bottom: 12px;
+      }
+
+      .section-subtitle {
+        color: var(--text-light);
+        max-width: 600px;
+        margin: 0 auto;
+      }
+
+      .services-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+        gap: 24px;
+      }
+
+      .service-card {
+        background: var(--card);
+        border-radius: 16px;
+        padding: 32px;
+        border: 1px solid var(--border);
+      }
+
+      .service-icon {
+        width: 48px;
+        height: 48px;
+        border-radius: 12px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 22px;
+        margin-bottom: 20px;
+      }
+
+      .icon-building {
+        background: #dbeafe;
+      }
+      .icon-industrial {
+        background: #dcfce7;
+      }
+      .icon-security {
+        background: #fee2e2;
+      }
+      .icon-digital {
+        background: #e0e7ff;
+      }
+      .icon-engineering {
+        background: #fef3c7;
+      }
+
+      .service-card h3 {
+        font-size: 18px;
+        font-weight: 700;
+        margin-bottom: 16px;
+        color: var(--primary);
+      }
+
+      .service-links {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+      }
+
+      .service-link {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 8px 14px;
+        background: var(--surface);
+        border-radius: 8px;
+        text-decoration: none;
+        color: var(--text);
+        font-size: 13px;
+        font-weight: 700;
+        border: 1px solid var(--border);
+      }
+
+      .service-link svg {
+        width: 14px;
+        height: 14px;
+        opacity: 0.75;
+      }
+
+      .case-studies {
+        background: linear-gradient(180deg, var(--surface) 0%, #ffffff 100%);
+      }
+
+      .case-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+        gap: 24px;
+      }
+
+      .case-card {
+        background: var(--card);
+        border-radius: 16px;
+        overflow: hidden;
+        border: 1px solid var(--border);
+      }
+
+      .case-header {
+        padding: 24px 24px 0;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+      }
+
+      .case-badge {
+        width: 40px;
+        height: 40px;
+        border-radius: 10px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 18px;
+        flex-shrink: 0;
+      }
+
+      .badge-logistics {
+        background: #dbeafe;
+      }
+      .badge-warehouse {
+        background: #dcfce7;
+      }
+      .badge-traffic {
+        background: #fee2e2;
+      }
+      .badge-safety {
+        background: #fef3c7;
+      }
+
+      .case-meta h4 {
+        font-size: 14px;
+        font-weight: 800;
+        color: var(--primary);
+        margin-bottom: 2px;
+      }
+
+      .case-meta span {
+        font-size: 12px;
+        color: var(--text-light);
+      }
+
+      .case-body {
+        padding: 16px 24px 24px;
+      }
+
+      .case-body p {
+        font-size: 14px;
+        color: var(--text);
+        margin-bottom: 16px;
+        line-height: 1.6;
+      }
+
+      .case-cta {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        color: var(--accent);
+        text-decoration: none;
+        font-weight: 800;
+        font-size: 14px;
+      }
+
+      .case-cta svg {
+        width: 16px;
+        height: 16px;
+      }
+
+      .cta-section {
+        background: var(--primary);
+        color: white;
+        padding: 60px 20px;
+        text-align: center;
+        border-radius: 24px;
+        margin: 40px 20px;
+      }
+
+      .cta-section h2 {
+        font-size: 28px;
+        font-weight: 800;
+        margin-bottom: 12px;
+      }
+
+      .cta-section p {
+        opacity: 0.9;
+        max-width: 500px;
+        margin: 0 auto 24px;
+      }
+
+      .cta-button {
+        display: inline-flex;
+        align-items: center;
+        gap: 10px;
+        background: var(--accent);
+        color: white;
+        padding: 14px 32px;
+        border-radius: 12px;
+        text-decoration: none;
+        font-weight: 800;
+        font-size: 16px;
+      }
+
+      .footer {
+        text-align: center;
+        padding: 40px 20px;
+        border-top: 1px solid var(--border);
+      }
+
+      .footer-brand {
+        font-weight: 800;
+        font-size: 20px;
+        color: var(--primary);
+        margin-bottom: 8px;
+      }
+
+      .footer-tagline {
+        color: var(--text-light);
+        font-size: 14px;
+        font-style: italic;
+      }
+
+      .footer-divider {
+        width: 40px;
+        height: 3px;
+        background: var(--accent);
+        border-radius: 2px;
+        margin: 16px auto;
+      }
+
+      .footer-copyright {
+        font-size: 13px;
+        color: var(--text-light);
+        margin-top: 8px;
+      }
+    </style>
+  </head>
+  <body>
+    <section class="hero">
+      <div class="hero-content">
+        <div class="logo-badge">
+          <div class="logo-icon">U</div>
+          <div class="logo-text">UNICIRCUIT</div>
+        </div>
+        <h1>Technical Solutions Portfolio</h1>
+        <p>
+          Thank you for reaching out. Explore our capabilities across Smart
+          Buildings, Industrial Asset Management, Physical Security, Digital
+          Infrastructure, and Specialized Engineering.
+        </p>
+        <div class="tagline">
+          <span>Design</span><span>Engineer</span><span>Construct</span
+          ><span>Operate</span><span>Maintain</span>
+        </div>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="container">
+        <div class="section-header">
+          <span class="section-label">Services</span>
+          <h2 class="section-title">Technical Solutions Portfolio</h2>
+          <p class="section-subtitle">
+            Comprehensive technology solutions tailored for modern
+            infrastructure and industrial operations.
+          </p>
+        </div>
+
+        <div class="services-grid">
+          <div class="service-card">
+            <div class="service-icon icon-building">🏢</div>
+            <h3>Smart Building Ecosystem</h3>
+            <div class="service-links">
+              <a
+                href="https://unicircuites.com/services/smart-building-ecosystem/ai-power-people-counting/"
+                class="service-link"
+              >
+                <svg
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                >
+                  <path d="M7 17L17 7M17 7H7M17 7V17" />
+                </svg>
+                People Counting
+              </a>
+              <a
+                href="https://unicircuites.com/services/smart-building-ecosystem/smart-building-security/"
+                class="service-link"
+              >
+                <svg
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                >
+                  <path d="M7 17L17 7M17 7H7M17 7V17" />
+                </svg>
+                Building Security
+              </a>
+              <a
+                href="https://unicircuites.com/services/smart-building-ecosystem/smart-building-automation/"
+                class="service-link"
+              >
+                <svg
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                >
+                  <path d="M7 17L17 7M17 7H7M17 7V17" />
+                </svg>
+                Building Automation
+              </a>
+            </div>
+          </div>
+
+          <div class="service-card">
+            <div class="service-icon icon-industrial">🏭</div>
+            <h3>Industrial Asset Management</h3>
+            <div class="service-links">
+              <a href="#" class="service-link">
+                <svg
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                >
+                  <path d="M7 17L17 7M17 7H7M17 7V17" />
+                </svg>
+                Asset &amp; Inventory
+              </a>
+              <a href="#" class="service-link">
+                <svg
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                >
+                  <path d="M7 17L17 7M17 7H7M17 7V17" />
+                </svg>
+                Hands-free Inventory
+              </a>
+              <a
+                href="https://unicircuites.com/services/industrial-asset-management/vehicle-inspection-management/"
+                class="service-link"
+              >
+                <svg
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                >
+                  <path d="M7 17L17 7M17 7H7M17 7V17" />
+                </svg>
+                Vehicle Inspection
+              </a>
+              <a
+                href="https://unicircuites.com/services/industrial-asset-management/industrial-traffic-vehicle-management/"
+                class="service-link"
+              >
+                <svg
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                >
+                  <path d="M7 17L17 7M17 7H7M17 7V17" />
+                </svg>
+                Traffic &amp; Vehicle Mgmt
+              </a>
+              <a
+                href="https://unicircuites.com/services/smart-building-ecosystem/industrial-temperature-monitoring/"
+                class="service-link"
+              >
+                <svg
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                >
+                  <path d="M7 17L17 7M17 7H7M17 7V17" />
+                </svg>
+                Temperature Monitoring
+              </a>
+            </div>
+          </div>
+
+          <div class="service-card">
+            <div class="service-icon icon-security">🛡️</div>
+            <h3>Physical Security Surveillance</h3>
+            <div class="service-links">
+              <a
+                href="https://unicircuites.com/services/physical-security-surveillance/video-surveillance-solution/"
+                class="service-link"
+              >
+                <svg
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                >
+                  <path d="M7 17L17 7M17 7H7M17 7V17" />
+                </svg>
+                AI Power Surveillance
+              </a>
+              <a
+                href="https://unicircuites.com/services/physical-security-surveillance/smart-site-safety-system/"
+                class="service-link"
+              >
+                <svg
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                >
+                  <path d="M7 17L17 7M17 7H7M17 7V17" />
+                </svg>
+                Smart Site Safety
+              </a>
+              <a
+                href="https://unicircuites.com/services/physical-security-surveillance/entrance-automation/"
+                class="service-link"
+              >
+                <svg
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                >
+                  <path d="M7 17L17 7M17 7H7M17 7V17" />
+                </svg>
+                Entrance Automation
+              </a>
+              <a
+                href="https://unicircuites.com/services/physical-security-surveillance/entrance-automation/"
+                class="service-link"
+              >
+                <svg
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                >
+                  <path d="M7 17L17 7M17 7H7M17 7V17" />
+                </svg>
+                Perimeter Intrusion (PIDS)
+              </a>
+            </div>
+          </div>
+
+          <div class="service-card">
+            <div class="service-icon icon-digital">🌐</div>
+            <h3>Digital Infrastructure Connectivity</h3>
+            <div class="service-links">
+              <a
+                href="https://unicircuites.com/services/digital-infrastructure-connectivity/networking-solution/"
+                class="service-link"
+              >
+                <svg
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                >
+                  <path d="M7 17L17 7M17 7H7M17 7V17" />
+                </svg>
+                Network Infrastructure
+              </a>
+              <a
+                href="https://unicircuites.com/services/digital-infrastructure-connectivity/advance-communication-solution/"
+                class="service-link"
+              >
+                <svg
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                >
+                  <path d="M7 17L17 7M17 7H7M17 7V17" />
+                </svg>
+                Communication Solution
+              </a>
+            </div>
+          </div>
+
+          <div class="service-card">
+            <div class="service-icon icon-engineering">⚙️</div>
+            <h3>Specialized Engineering</h3>
+            <div class="service-links">
+              <a
+                href="https://unicircuites.com/services/turnkey-electrical-services/"
+                class="service-link"
+              >
+                <svg
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                >
+                  <path d="M7 17L17 7M17 7H7M17 7V17" />
+                </svg>
+                ELV Turnkey Projects
+              </a>
+              <a
+                href="https://unicircuites.com/services/professional-services/"
+                class="service-link"
+              >
+                <svg
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                >
+                  <path d="M7 17L17 7M17 7H7M17 7V17" />
+                </svg>
+                Professional Manpower
+              </a>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section case-studies">
+      <div class="container">
+        <div class="section-header">
+          <span class="section-label">Case Studies</span>
+          <h2 class="section-title">Featured Projects</h2>
+          <p class="section-subtitle">
+            Real-world implementations delivering measurable results for
+            industry leaders.
+          </p>
+        </div>
+
+        <div class="case-grid">
+          <div class="case-card">
+            <div class="case-header">
+              <div class="case-badge badge-logistics">🚛</div>
+              <div class="case-meta">
+                <h4>Logistics Automation</h4>
+                <span>Ambuja Cement, Dadri</span>
+              </div>
+            </div>
+            <div class="case-body">
+              <p>
+                Streamlined vehicle entry and inspection workflows, reducing
+                gate congestion and improving throughput efficiency.
+              </p>
+              <a
+                href="https://unicircuites.com/project/smart-vehicle-safety-inspection/"
+                class="case-cta"
+              >
+                View Study
+                <svg
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                >
+                  <path d="M5 12h14M12 5l7 7-7 7" />
+                </svg>
+              </a>
+            </div>
+          </div>
+
+          <div class="case-card">
+            <div class="case-header">
+              <div class="case-badge badge-warehouse">📦</div>
+              <div class="case-meta">
+                <h4>Next-Gen Warehousing</h4>
+                <span>Adani Power</span>
+              </div>
+            </div>
+            <div class="case-body">
+              <p>
+                Smart Glass deployment enabling hands-free inventory tracking
+                and real-time visibility across warehouse operations.
+              </p>
+              <a
+                href="https://unicircuites.com/project/revolutionizing-inventory-management-2/"
+                class="case-cta"
+              >
+                View Study
+                <svg
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                >
+                  <path d="M5 12h14M12 5l7 7-7 7" />
+                </svg>
+              </a>
+            </div>
+          </div>
+
+          <div class="case-card">
+            <div class="case-header">
+              <div class="case-badge badge-traffic">🚦</div>
+              <div class="case-meta">
+                <h4>Traffic Compliance</h4>
+                <span>Adani — Bhatapara, Korba</span>
+              </div>
+            </div>
+            <div class="case-body">
+              <p>
+                Integrated <strong>ANPR</strong> and Speed Monitoring system
+                ensuring regulatory compliance and site safety.
+              </p>
+              <a
+                href="https://unicircuites.com/project/smart-speed-monitoring/"
+                class="case-cta"
+              >
+                View Study
+                <svg
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                >
+                  <path d="M5 12h14M12 5l7 7-7 7" />
+                </svg>
+              </a>
+            </div>
+          </div>
+
+          <div class="case-card">
+            <div class="case-header">
+              <div class="case-badge badge-safety">👷</div>
+              <div class="case-meta">
+                <h4>Early Smoke &amp; PPE Detection</h4>
+                <span>Adani Power</span>
+              </div>
+            </div>
+            <div class="case-body">
+              <p>
+                AI-powered workman safety compliance with real-time PPE
+                detection and early smoke identification.
+              </p>
+              <a
+                href="https://unicircuites.com/project/ppe-detection-workplace-safety/"
+                class="case-cta"
+              >
+                View Study
+                <svg
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                >
+                  <path d="M5 12h14M12 5l7 7-7 7" />
+                </svg>
+              </a>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="cta-section">
+      <div class="cta-content">
+        <h2>Ready to Explore Synergies?</h2>
+        <p>
+          Our team is reviewing your inquiry and will be in touch shortly. In
+          the meantime, browse our full portfolio or reach out directly.
+        </p>
+        <a href="https://unicircuites.com" class="cta-button">
+          Visit Full Portfolio
+          <svg
+            width="20"
+            height="20"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+          >
+            <path d="M5 12h14M12 5l7 7-7 7" />
+          </svg>
+        </a>
+      </div>
+    </section>
+
+    <footer class="footer">
+      <div class="footer-brand">UNICIRCUIT</div>
+      <div class="footer-tagline">Design • Engineer • Construct • Operate • Maintain</div>
+      <div class="footer-divider"></div>
+      <div class="footer-copyright">© 2026 UNICIRCUIT. All rights reserved.</div>
+    </footer>
+  </body>
+</html>
