@@ -7806,6 +7806,13 @@ Always write in a professional yet warm Indian B2B communication style. Use form
       if (id === 'email-templates-modal') msgBannerMountPanel('et');
       if (id === 'campaign-modal') msgBannerMountPanel('nc');
 
+      if (typeof restorePersistentHtmlEmbeds === 'function') {
+        el.querySelectorAll('[contenteditable][id], .oa-html-editor[id]').forEach(function (editor) {
+          restorePersistentHtmlEmbeds(editor);
+        });
+      }
+      document.dispatchEvent(new CustomEvent('uc:modal:open', { detail: { id: id } }));
+
       // Note: outside-click-to-close is intentionally disabled for all modals.
     }
     function closeModal(id) {
@@ -12926,7 +12933,11 @@ Keep it concise and professional.`;
           var subj = document.getElementById('bc-subject');
           var body = document.getElementById('bc-html');
           if (subj && t.subject) subj.value = t.subject;
-          if (body && t.html_body) { body.innerHTML = t.html_body; applyLinkTooltips(body); restorePersistentHtmlEmbeds(body); }
+          if (body && t.html_body) {
+            body.innerHTML = normalizeTemplateHtmlForEditor(t.html_body);
+            applyLinkTooltips(body);
+            restorePersistentHtmlEmbeds(body);
+          }
           bcVariableFields = emailNormalizeVariableFields(t.variable_fields || []);
           bcRefreshVariablesPanel();
           if (t.banner_config) {
@@ -12968,7 +12979,8 @@ Keep it concise and professional.`;
           if (body && t.html_body) {
             bcSetActiveEditor('cl-body-editor');
             body.focus();
-            var html = (body.innerHTML || '').trim() ? '<br><br>' + t.html_body : t.html_body;
+            var tpl = normalizeTemplateHtmlForEditor(t.html_body);
+            var html = (body.innerHTML || '').trim() ? '<br><br>' + tpl : tpl;
             var selObj = window.getSelection();
             if (!selObj.rangeCount || !body.contains(selObj.getRangeAt(0).commonAncestorContainer)) {
               var r = document.createRange();
@@ -13292,16 +13304,20 @@ Keep it concise and professional.`;
           });
         });
       });
-      ['bc-html', 'compose-body', 'et-html-editor'].forEach(function(id) {
-        var el = document.getElementById(id);
-        if (el) { applyLinkTooltips(el); _linkObserver.observe(el, { childList: true, subtree: true }); }
-      });
-      // Also patch on modal open since editors may not exist yet at DOMContentLoaded
-      document.addEventListener('uc:modal:open', function() {
-        ['bc-html', 'compose-body', 'et-html-editor'].forEach(function(id) {
-          var el = document.getElementById(id);
-          if (el) { applyLinkTooltips(el); _linkObserver.observe(el, { childList: true, subtree: true }); }
+      window.ucInitEditorObservers = function(root) {
+        collectEditableHtmlEditors(root).forEach(function(el) {
+          if (!el || el.dataset.ucObserved === '1') return;
+          applyLinkTooltips(el);
+          _linkObserver.observe(el, { childList: true, subtree: true });
+          el.dataset.ucObserved = '1';
         });
+      };
+      ucInitEditorObservers(document);
+      // Also patch on modal open since editors may not exist yet at DOMContentLoaded
+      document.addEventListener('uc:modal:open', function(e) {
+        var modalId = e && e.detail && e.detail.id;
+        var modalRoot = modalId ? document.getElementById(modalId) : document;
+        ucInitEditorObservers(modalRoot || document);
       });
 
       // Restore custom dropdown options added by user
@@ -20811,6 +20827,7 @@ ${plainText}`;
     let composeRecipientSuggestions = [];
     let composeRecipientPanel = null;
     let composeRecipientLoading = false;
+    let composeRecipientActiveInput = null;
 
     function normalizeRecipientSuggestion(email, name, source) {
       email = String(email || '').trim();
@@ -20851,28 +20868,50 @@ ${plainText}`;
       composeRecipientSuggestions = Array.from(byEmail.values()).sort((a, b) => (a.name || a.email).localeCompare(b.name || b.email));
     }
 
-    function setupComposeRecipientAutocomplete() {
-      ['compose-to', 'compose-cc'].forEach(id => {
-        const input = document.getElementById(id);
-        if (!input || input.dataset.autocompleteBound === '1') return;
+    function isEmailSuggestionEligibleField(input) {
+      if (!input || input.disabled || input.readOnly) return false;
+      if (input.id === 'bc-recipients') return false; // has dedicated broadcast typeahead
+      const tag = String(input.tagName || '').toUpperCase();
+      if (tag !== 'INPUT' && tag !== 'TEXTAREA') return false;
+      const type = String(input.type || '').toLowerCase();
+      const id = String(input.id || '');
+      const name = String(input.name || '');
+      const ph = String(input.placeholder || '');
+      const hay = (id + ' ' + name + ' ' + ph).toLowerCase();
+      if (type === 'email') return true;
+      return /(email|recipient|recipients|\bto\b|\bcc\b)/.test(hay);
+    }
+
+    function setupComposeRecipientAutocomplete(root) {
+      const scope = root || document;
+      scope.querySelectorAll('input, textarea').forEach(input => {
+        if (!isEmailSuggestionEligibleField(input)) return;
+        if (input.dataset.autocompleteBound === '1') return;
         input.dataset.autocompleteBound = '1';
-        input.addEventListener('focus', () => { loadComposeRecipientSuggestions().then(() => showComposeRecipientSuggestions(input)); });
-        input.addEventListener('input', () => showComposeRecipientSuggestions(input));
+        input.addEventListener('focus', () => {
+          composeRecipientActiveInput = input;
+          loadComposeRecipientSuggestions().then(() => showComposeRecipientSuggestions(input));
+        });
+        input.addEventListener('input', () => {
+          composeRecipientActiveInput = input;
+          showComposeRecipientSuggestions(input);
+        });
         input.addEventListener('keydown', e => { if (e.key === 'Escape') hideComposeRecipientSuggestions(); });
       });
     }
 
     function currentRecipientToken(value) {
-      const parts = String(value || '').split(/[,;]/);
+      const parts = String(value || '').split(/[,;\n]/);
       return (parts[parts.length - 1] || '').trim().toLowerCase();
     }
 
     function applyRecipientSuggestion(input, item) {
-      const pieces = String(input.value || '').split(/([,;])/);
+      const pieces = String(input.value || '').split(/([,;\n])/);
       let idx = pieces.length - 1;
-      while (idx >= 0 && /^[,;]$/.test(pieces[idx])) idx--;
+      while (idx >= 0 && /^[,;\n]$/.test(pieces[idx])) idx--;
       pieces[idx] = item.name ? `${item.name} <${item.email}>` : item.email;
-      input.value = pieces.join('').replace(/\s*$/, '') + ', ';
+      const expectsMulti = input.tagName === 'TEXTAREA' || /(to|cc|recipient|recipients)/i.test(String(input.id || '') + ' ' + String(input.name || ''));
+      input.value = pieces.join('').replace(/\s*$/, '') + (expectsMulti ? ', ' : '');
       hideComposeRecipientSuggestions();
       input.focus();
     }
@@ -20913,14 +20952,21 @@ ${plainText}`;
 
     function hideComposeRecipientSuggestions() {
       if (composeRecipientPanel) composeRecipientPanel.style.display = 'none';
+      composeRecipientActiveInput = null;
     }
 
     document.addEventListener('click', function (event) {
       if (!composeRecipientPanel) return;
-      if (event.target.closest('#compose-recipient-suggestions') || event.target.closest('#compose-to') || event.target.closest('#compose-cc')) return;
+      if (event.target.closest('#compose-recipient-suggestions')) return;
+      if (composeRecipientActiveInput && composeRecipientActiveInput.contains && composeRecipientActiveInput.contains(event.target)) return;
       hideComposeRecipientSuggestions();
     });
-    document.addEventListener('DOMContentLoaded', setupComposeRecipientAutocomplete);
+    document.addEventListener('DOMContentLoaded', function() { setupComposeRecipientAutocomplete(document); });
+    document.addEventListener('uc:modal:open', function(e) {
+      const modalId = e && e.detail && e.detail.id;
+      const root = modalId ? document.getElementById(modalId) : document;
+      setupComposeRecipientAutocomplete(root || document);
+    });
 
     async function loadComposeTemplates() {
       const sel = document.getElementById('compose-template-select');
@@ -20939,6 +20985,24 @@ ${plainText}`;
           sel.appendChild(opt);
         });
       } catch (_) { }
+    }
+
+    function normalizeTemplateHtmlForEditor(rawHtml) {
+      const html = String(rawHtml || '').trim();
+      if (!html) return '';
+      try {
+        const parser = new DOMParser();
+        const doc = parser.parseFromString(html, 'text/html');
+        const bodyHtml = (doc && doc.body) ? String(doc.body.innerHTML || '').trim() : '';
+        // If the input is a full HTML document, browsers may refuse `execCommand('insertHTML')`
+        // or yield inconsistent results. Using body.innerHTML makes it a safe fragment.
+        if (bodyHtml) return bodyHtml;
+      } catch (_) { }
+      // Fallback: remove obvious document wrappers and return the remainder.
+      return html
+        .replace(/^\s*<!doctype[\s\S]*?>/i, '')
+        .replace(/<\/?(html|head|body)[^>]*>/gi, '')
+        .trim();
     }
 
     function applyComposeTemplate() {
@@ -20965,7 +21029,8 @@ ${plainText}`;
           if (subj && t.subject) subj.value = t.subject;
 
           // Insert template at cursor position
-          if (body && t.html_body) {
+          const htmlToInsert = normalizeTemplateHtmlForEditor(t.html_body);
+          if (body && htmlToInsert) {
             body.focus();
 
             const selection = window.getSelection();
@@ -20977,7 +21042,7 @@ ${plainText}`;
               // Verify the cursor is actually inside the compose body
               if (body.contains(range.commonAncestorContainer)) {
                 // Insert at cursor position using execCommand for undo support
-                document.execCommand('insertHTML', false, t.html_body);
+                document.execCommand('insertHTML', false, htmlToInsert);
                 restorePersistentHtmlEmbeds(body);
               } else {
                 // Cursor not in editor - append to end
@@ -20986,7 +21051,7 @@ ${plainText}`;
                 newRange.collapse(false);
                 selection.removeAllRanges();
                 selection.addRange(newRange);
-                document.execCommand('insertHTML', false, '<br><br>' + t.html_body);
+                document.execCommand('insertHTML', false, '<br><br>' + htmlToInsert);
                 restorePersistentHtmlEmbeds(body);
               }
             } else {
@@ -20997,7 +21062,7 @@ ${plainText}`;
               newRange.collapse(false);
               newSelection.removeAllRanges();
               newSelection.addRange(newRange);
-              document.execCommand('insertHTML', false, '<br><br>' + t.html_body);
+              document.execCommand('insertHTML', false, '<br><br>' + htmlToInsert);
               restorePersistentHtmlEmbeds(body);
             }
           }
@@ -21198,6 +21263,15 @@ ${plainText}`;
             } catch (_) { }
           };
         }
+      });
+    }
+
+    function collectEditableHtmlEditors(root) {
+      var scope = root || document;
+      return Array.from(scope.querySelectorAll('[contenteditable][id], .oa-html-editor[id]')).filter(function (el) {
+        var editable = (el.getAttribute('contenteditable') || '').toLowerCase();
+        if (editable === 'false') return false;
+        return !!el.id;
       });
     }
 
@@ -21454,6 +21528,9 @@ ${plainText}`;
      * Returns a Promise that resolves with the processed HTML string.
      */
     function getEmailBodyForSend(editorEl) {
+      if (!editorEl) return Promise.resolve('');
+      restorePersistentHtmlEmbeds(editorEl);
+      persistHtmlEmbedPayloads(editorEl);
       var wrappers = editorEl.querySelectorAll('[data-html-uid]');
 
       if (wrappers.length === 0) {
@@ -21462,7 +21539,6 @@ ${plainText}`;
       }
 
       console.log('[EMAIL-SEND] Found', wrappers.length, 'HTML embed(s) - already transformed on insert!');
-      persistHtmlEmbedPayloads(editorEl);
 
       // Clone the editor content
       var clone = editorEl.cloneNode(true);
