@@ -1,0 +1,68 @@
+{
+  "version": "1.0.0",
+  "description": "Canonical agent schema to internal UniComm CRM field mapping.",
+  "entities": {
+    "lead": {
+      "table": "contacts",
+      "canonicalToInternal": {
+        "id": "id",
+        "first_name": "fname",
+        "last_name": "lname",
+        "company": "company",
+        "title": "designation",
+        "department": "dept",
+        "phone": "phone",
+        "whatsapp": "wa",
+        "email": "email",
+        "city": "city",
+        "segment": "segment",
+        "score": "score",
+        "products": "products",
+        "notes": "notes",
+        "enrichment_status": "enrichment_status",
+        "tier": "tier",
+        "scored": "scored",
+        "outreach_status": "outreach_status",
+        "source": "lead_source",
+        "raw": "raw_lead_json",
+        "created_at": "created_at"
+      },
+      "requiredForCreate": ["company"],
+      "idempotencyKey": "email"
+    },
+    "deal": {
+      "table": "pipeline_deals",
+      "canonicalToInternal": {
+        "id": "id",
+        "name": "name",
+        "company": "company",
+        "value": "value",
+        "stage": "stage",
+        "probability": "probability",
+        "score": "score",
+        "owner": "owner",
+        "due_date": "due_date",
+        "created_at": "created_at"
+      }
+    },
+    "activity": {
+      "table": "crm_agent_activities",
+      "canonicalToInternal": {
+        "id": "id",
+        "lead_id": "lead_id",
+        "deal_id": "deal_id",
+        "agent_id": "agent_id",
+        "type": "activity_type",
+        "summary": "summary",
+        "payload": "payload",
+        "created_at": "created_at"
+      }
+    }
+  },
+  "webhookEvents": [
+    "lead_created",
+    "lead_tier_changed",
+    "deal_stage_changed",
+    "customer_created"
+  ]
+}

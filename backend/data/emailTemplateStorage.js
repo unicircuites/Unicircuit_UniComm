@@ -40,6 +40,7 @@ const industrialAssocBannerConfig         = getBannerPreset('industrialAssoc');
 const stateGovtBannerConfig               = getBannerPreset('stateGovt');
 const correctionalBannerConfig            = getBannerPreset('correctional');
 const coldChainStorageBannerConfig        = getBannerPreset('coldChainStorage');
+const generalPortfolioBannerConfig        = getBannerPreset('generalPortfolio');
 
 const agricultureBodyHtml = `
       <p>Dear {{recipient_name}},</p>
@@ -1051,7 +1052,281 @@ const seedEmailTemplates = [
       <p>Could we connect for a brief introductory meeting {{meeting_window}} to share relevant work?</p>
       <p>Warm regards,<br>{{sender_name}}<br>{{sender_designation}} | Unicircuit Engineering Services LLP<br>{{sender_phone}} | {{sender_email}} | {{company_website}}</p>
     `.trim())
-  )}
+  )},
+  {
+    slug: 'html-render-test',
+    name: 'HTML render Test',
+    category: 'General',
+    subject: 'Your Trusted Digital Transformation Partner',
+    variable_fields: [],
+    banner_config: null,
+    html_body: `<html><head></head><body><center style="width: 100%; background-color: #f4f4f4;">
+<!-- Preview Text -->
+<div style="display: none; font-size: 1px; line-height: 1px; max-height: 0px; max-width: 0px; opacity: 0; overflow: hidden; font-family: Arial, sans-serif;">
+21+ AI-powered solutions across 6 service domains. ISO certified. Cisco &amp; PRAMA authorized partner. Explore our complete portfolio.
+</div>
+<!-- Email Container -->
+<table align="center" role="presentation" cellspacing="0" cellpadding="0" border="0" width="600" style="margin: auto; border-spacing: 0; border-collapse: collapse;">
+<!-- Logo & Header -->
+<tbody>
+<tr>
+<td style="padding: 30px 0; text-align: center; background-color: #1a1a2e;">
+<div style="font-size: 32px; font-weight: 800; color: #00a8e8; letter-spacing: 1px; font-family: Arial, sans-serif;">
+UNICIRCUIT
+</div>
+<div style="font-size: 14px; color: #ffffff; margin-top: 8px; letter-spacing: 0.5px; font-family: Arial, sans-serif;">
+Engineering Services LLP
+</div> </td>
+</tr>
+<!-- Hero Section -->
+<tr>
+<td style="background: linear-gradient(135deg, #00a8e8 0%, #006b9e 100%); background-color: #00a8e8; padding: 50px 40px; text-align: center;"> <h1 style="margin: 0 0 20px; font-size: 28px; line-height: 36px; color: #ffffff; font-weight: bold; font-family: Arial, sans-serif;"> Your Trusted Digital Transformation Partner </h1> <p style="margin: 0; font-size: 18px; line-height: 28px; color: #ffffff; font-family: Arial, sans-serif;"> 21+ AI-Powered Solutions | 6 Service Domains | ISO 9001:2015 Certified </p> </td>
+</tr>
+<!-- Introduction -->
+<tr>
+<td style="background-color: #ffffff; padding: 40px 40px 30px;">
+<table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="border-spacing: 0; border-collapse: collapse;">
+<tbody>
+<tr>
+<td style="font-family: Arial, sans-serif; font-size: 16px; line-height: 26px; color: #333333;"> <p style="margin: 0 0 20px; font-family: Arial, sans-serif;">Dear Sir,</p> <p style="margin: 0 0 20px; font-family: Arial, sans-serif;"> At <strong style="color: #00a8e8;">Unicircuit Engineering Services</strong>, we're transforming how industries operate through cutting-edge AI, IoT, and automation solutions. </p> <p style="margin: 0 0 20px; font-family: Arial, sans-serif;"> As a technology-focused System Integration company, we provide <strong>comprehensive end-to-end solutions</strong> — from design and engineering to construction, operation, and maintenance. </p> <p style="margin: 0; font-family: Arial, sans-serif;"> With <strong style="color: #00a8e8;">21+ proven technology solutions</strong> across 6 service domains, we're helping organizations across India embrace digital transformation with confidence. </p> </td>
+</tr>
+</tbody>
+</table> </td>
+</tr>
+<!-- Service Domains Overview -->
+<tr>
+<td style="background-color: #f8f9fa; padding: 40px 40px 20px;">
+<table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="border-spacing: 0; border-collapse: collapse;">
+<tbody>
+<tr>
+<td style="text-align: center; font-family: Arial, sans-serif;"> <h2 style="margin: 0 0 30px; font-size: 24px; line-height: 32px; color: #333333; font-weight: bold; font-family: Arial, sans-serif;"> Our Service Portfolio </h2> </td>
+</tr>
+</tbody>
+</table>
+<!-- Service Grid Row 1 -->
+<table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="border-spacing: 0; border-collapse: collapse; margin-bottom: 15px;">
+<tbody>
+<tr>
+<!-- Service Card 1 -->
+<td width="48%" style="padding: 20px; background: #ffffff; vertical-align: top;">
+<div style="text-align: center; margin-bottom: 15px; font-size: 40px;">
+🏢
+</div> <h3 style="margin: 0 0 10px; font-size: 18px; color: #333333; font-weight: bold; text-align: center; font-family: Arial, sans-serif;"> Smart Building Ecosystem </h3> <p style="margin: 0; font-size: 14px; line-height: 22px; color: #666666; text-align: center; font-family: Arial, sans-serif;"> 3 Solutions </p> <p style="margin: 10px 0 0; font-size: 13px; line-height: 20px; color: #999999; text-align: center; font-family: Arial, sans-serif;"> AI People Counting • Building Automation • Building Security </p> </td>
+<td width="4%">&nbsp;</td>
+<!-- Service Card 2 -->
+<td width="48%" style="padding: 20px; background: #ffffff; vertical-align: top;">
+<div style="text-align: center; margin-bottom: 15px; font-size: 40px;">
+🛡️
+</div> <h3 style="margin: 0 0 10px; font-size: 18px; color: #333333; font-weight: bold; text-align: center; font-family: Arial, sans-serif;"> Physical Security &amp; Surveillance </h3> <p style="margin: 0; font-size: 14px; line-height: 22px; color: #666666; text-align: center; font-family: Arial, sans-serif;"> 9 Solutions </p> <p style="margin: 10px 0 0; font-size: 13px; line-height: 20px; color: #999999; text-align: center; font-family: Arial, sans-serif;"> AI Surveillance • CCTV • PPE Detection • Video Analytics • PIDS </p> </td>
+</tr>
+</tbody>
+</table>
+<!-- Service Grid Row 2 -->
+<table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="border-spacing: 0; border-collapse: collapse; margin-bottom: 15px;">
+<tbody>
+<tr>
+<!-- Service Card 3 -->
+<td width="48%" style="padding: 20px; background: #ffffff; vertical-align: top;">
+<div style="text-align: center; margin-bottom: 15px; font-size: 40px;">
+⚙️
+</div> <h3 style="margin: 0 0 10px; font-size: 18px; color: #333333; font-weight: bold; text-align: center; font-family: Arial, sans-serif;"> Industrial Asset Management </h3> <p style="margin: 0; font-size: 14px; line-height: 22px; color: #666666; text-align: center; font-family: Arial, sans-serif;"> 5 Solutions </p> <p style="margin: 10px 0 0; font-size: 13px; line-height: 20px; color: #999999; text-align: center; font-family: Arial, sans-serif;"> Inventory Management • Speed Monitoring • Vehicle Inspection </p> </td>
+<td width="4%">&nbsp;</td>
+<!-- Service Card 4 -->
+<td width="48%" style="padding: 20px; background: #ffffff; vertical-align: top;">
+<div style="text-align: center; margin-bottom: 15px; font-size: 40px;">
+🌐
+</div> <h3 style="margin: 0 0 10px; font-size: 18px; color: #333333; font-weight: bold; text-align: center; font-family: Arial, sans-serif;"> Digital Infrastructure </h3> <p style="margin: 0; font-size: 14px; line-height: 22px; color: #666666; text-align: center; font-family: Arial, sans-serif;"> 2 Solutions </p> <p style="margin: 10px 0 0; font-size: 13px; line-height: 20px; color: #999999; text-align: center; font-family: Arial, sans-serif;"> Network Infrastructure • Communication Systems </p> </td>
+</tr>
+</tbody>
+</table>
+<!-- Service Grid Row 3 -->
+<table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="border-spacing: 0; border-collapse: collapse;">
+<tbody>
+<tr>
+<!-- Service Card 5 -->
+<td width="48%" style="padding: 20px; background: #ffffff; vertical-align: top;">
+<div style="text-align: center; margin-bottom: 15px; font-size: 40px;">
+👷
+</div> <h3 style="margin: 0 0 10px; font-size: 18px; color: #333333; font-weight: bold; text-align: center; font-family: Arial, sans-serif;"> Professional Services </h3> <p style="margin: 0; font-size: 14px; line-height: 22px; color: #666666; text-align: center; font-family: Arial, sans-serif;"> 2 Solutions </p> <p style="margin: 10px 0 0; font-size: 13px; line-height: 20px; color: #999999; text-align: center; font-family: Arial, sans-serif;"> Technical Manpower • ELV Turnkey Projects </p> </td>
+<td width="4%">&nbsp;</td>
+<!-- Service Card 6 - Featured -->
+<td width="48%" style="padding: 20px; background: linear-gradient(135deg, #00a8e8, #006b9e); background-color: #00a8e8; vertical-align: top; color: #ffffff;">
+<div style="text-align: center; margin-bottom: 15px; font-size: 40px; opacity: 0.9;">
+💡
+</div> <h3 style="margin: 0 0 10px; font-size: 18px; color: #ffffff; font-weight: bold; text-align: center; font-family: Arial, sans-serif;"> 21+ Total Solutions </h3> <p style="margin: 0; font-size: 14px; line-height: 22px; color: #ffffff; text-align: center; font-family: Arial, sans-serif; opacity: 0.9;"> Complete Portfolio </p> <p style="margin: 10px 0 0; font-size: 13px; line-height: 20px; color: #ffffff; text-align: center; font-family: Arial, sans-serif; opacity: 0.8;"> AI • IoT • Automation • Integration </p> </td>
+</tr>
+</tbody>
+</table> </td>
+</tr>
+<!-- Featured Projects -->
+<tr>
+<td style="background-color: #ffffff; padding: 40px 40px;">
+<table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="border-spacing: 0; border-collapse: collapse;">
+<tbody>
+<tr>
+<td style="font-family: Arial, sans-serif;"> <h2 style="margin: 0 0 10px; font-size: 24px; line-height: 32px; color: #333333; font-weight: bold; font-family: Arial, sans-serif;"> Featured Projects </h2> <p style="margin: 0 0 25px; font-size: 16px; line-height: 24px; color: #666666; font-family: Arial, sans-serif;"> Proven track record across diverse industries </p>
+<!-- Project 1 -->
+<table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="border-spacing: 0; border-collapse: collapse; margin-bottom: 12px;">
+<tbody>
+<tr>
+<td width="40" valign="top" style="padding-right: 10px;"> <span style="color: #00a8e8; font-size: 24px;">📹</span> </td>
+<td style="font-size: 15px; line-height: 24px; color: #333333; font-family: Arial, sans-serif;"> <strong style="font-family: Arial, sans-serif;">Intelligent Campus Surveillance</strong><br> <span style="color: #666666; font-size: 14px; font-family: Arial, sans-serif;">AI-driven campus security with real-time threat detection</span> </td>
+</tr>
+</tbody>
+</table>
+<!-- Project 2 -->
+<table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="border-spacing: 0; border-collapse: collapse; margin-bottom: 12px;">
+<tbody>
+<tr>
+<td width="40" valign="top" style="padding-right: 10px;"> <span style="color: #00a8e8; font-size: 24px;">🦺</span> </td>
+<td style="font-size: 15px; line-height: 24px; color: #333333; font-family: Arial, sans-serif;"> <strong style="font-family: Arial, sans-serif;">PPE Detection &amp; Workplace Safety</strong><br> <span style="color: #666666; font-size: 14px; font-family: Arial, sans-serif;">Real-time PPE compliance monitoring across industrial sites</span> </td>
+</tr>
+</tbody>
+</table>
+<!-- Project 3 -->
+<table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="border-spacing: 0; border-collapse: collapse; margin-bottom: 12px;">
+<tbody>
+<tr>
+<td width="40" valign="top" style="padding-right: 10px;"> <span style="color: #00a8e8; font-size: 24px;">📦</span> </td>
+<td style="font-size: 15px; line-height: 24px; color: #333333; font-family: Arial, sans-serif;"> <strong style="font-family: Arial, sans-serif;">Revolutionizing Inventory Management</strong><br> <span style="color: #666666; font-size: 14px; font-family: Arial, sans-serif;">Hands-free AI-powered warehouse inspection</span> </td>
+</tr>
+</tbody>
+</table>
+<!-- Project 4 -->
+<table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="border-spacing: 0; border-collapse: collapse; margin-bottom: 12px;">
+<tbody>
+<tr>
+<td width="40" valign="top" style="padding-right: 10px;"> <span style="color: #00a8e8; font-size: 24px;">🚗</span> </td>
+<td style="font-size: 15px; line-height: 24px; color: #333333; font-family: Arial, sans-serif;"> <strong style="font-family: Arial, sans-serif;">Vehicle Inspection &amp; Traffic Management</strong><br> <span style="color: #666666; font-size: 14px; font-family: Arial, sans-serif;">Automated compliance checks and industrial traffic control</span> </td>
+</tr>
+</tbody>
+</table>
+<!-- Project 5 -->
+<table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="border-spacing: 0; border-collapse: collapse;">
+<tbody>
+<tr>
+<td width="40" valign="top" style="padding-right: 10px;"> <span style="color: #00a8e8; font-size: 24px;">📊</span> </td>
+<td style="font-size: 15px; line-height: 24px; color: #333333; font-family: Arial, sans-serif;"> <strong style="font-family: Arial, sans-serif;">Smart Speed Monitoring</strong><br> <span style="color: #666666; font-size: 14px; font-family: Arial, sans-serif;">Intelligent speed enforcement for industrial zones</span> </td>
+</tr>
+</tbody>
+</table> </td>
+</tr>
+</tbody>
+</table> </td>
+</tr>
+<!-- Why Unicircuit -->
+<tr>
+<td style="background-color: #f8f9fa; padding: 40px 40px;">
+<table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="border-spacing: 0; border-collapse: collapse;">
+<tbody>
+<tr>
+<td style="font-family: Arial, sans-serif;"> <h2 style="margin: 0 0 25px; font-size: 24px; line-height: 32px; color: #333333; font-weight: bold; font-family: Arial, sans-serif;"> Why Choose Unicircuit? </h2>
+<!-- Reason 1 -->
+<table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="border-spacing: 0; border-collapse: collapse; margin-bottom: 10px;">
+<tbody>
+<tr>
+<td width="30" valign="top"> <span style="color: #00a8e8; font-size: 20px; font-weight: bold;">✓</span> </td>
+<td style="font-size: 15px; line-height: 24px; color: #666666; font-family: Arial, sans-serif;"> <strong style="color: #333333; font-family: Arial, sans-serif;">ISO 9001:2015 Certified</strong> quality management across all operations </td>
+</tr>
+</tbody>
+</table>
+<!-- Reason 2 -->
+<table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="border-spacing: 0; border-collapse: collapse; margin-bottom: 10px;">
+<tbody>
+<tr>
+<td width="30" valign="top"> <span style="color: #00a8e8; font-size: 20px; font-weight: bold;">✓</span> </td>
+<td style="font-size: 15px; line-height: 24px; color: #666666; font-family: Arial, sans-serif;"> <strong style="color: #333333; font-family: Arial, sans-serif;">Authorized Partnerships</strong> with Cisco, PRAMA, Securus, Visionify </td>
+</tr>
+</tbody>
+</table>
+<!-- Reason 3 -->
+<table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="border-spacing: 0; border-collapse: collapse; margin-bottom: 10px;">
+<tbody>
+<tr>
+<td width="30" valign="top"> <span style="color: #00a8e8; font-size: 20px; font-weight: bold;">✓</span> </td>
+<td style="font-size: 15px; line-height: 24px; color: #666666; font-family: Arial, sans-serif;"> <strong style="color: #333333; font-family: Arial, sans-serif;">End-to-End Integration</strong> from design through operation &amp; maintenance </td>
+</tr>
+</tbody>
+</table>
+<!-- Reason 4 -->
+<table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="border-spacing: 0; border-collapse: collapse; margin-bottom: 10px;">
+<tbody>
+<tr>
+<td width="30" valign="top"> <span style="color: #00a8e8; font-size: 20px; font-weight: bold;">✓</span> </td>
+<td style="font-size: 15px; line-height: 24px; color: #666666; font-family: Arial, sans-serif;"> <strong style="color: #333333; font-family: Arial, sans-serif;">Global Engineering Team</strong> delivering world-class turnkey solutions </td>
+</tr>
+</tbody>
+</table>
+<!-- Reason 5 -->
+<table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="border-spacing: 0; border-collapse: collapse;">
+<tbody>
+<tr>
+<td width="30" valign="top"> <span style="color: #00a8e8; font-size: 20px; font-weight: bold;">✓</span> </td>
+<td style="font-size: 15px; line-height: 24px; color: #666666; font-family: Arial, sans-serif;"> <strong style="color: #333333; font-family: Arial, sans-serif;">24/7 Support &amp; Maintenance</strong> with proven track record </td>
+</tr>
+</tbody>
+</table> </td>
+</tr>
+</tbody>
+</table> </td>
+</tr>
+<!-- CTA Section -->
+<tr>
+<td style="background: linear-gradient(135deg, #00a8e8 0%, #006b9e 100%); background-color: #00a8e8; padding: 50px 40px; text-align: center;"> <h2 style="margin: 0 0 15px; font-size: 26px; line-height: 34px; color: #ffffff; font-weight: bold; font-family: Arial, sans-serif;"> Explore Our Complete Portfolio </h2> <p style="margin: 0 0 30px; font-size: 16px; line-height: 26px; color: #ffffff; font-family: Arial, sans-serif;"> Discover how we can transform your operations </p>
+<!-- Button -->
+<table role="presentation" cellspacing="0" cellpadding="0" border="0" align="center" style="margin: auto; border-spacing: 0; border-collapse: collapse;">
+<tbody>
+<tr>
+<td style=" background: #ffffff;"> <a href="https://www.unicircuites.com" target="_blank" style="background: #ffffff; border: 15px solid #ffffff; font-family: Arial, sans-serif; font-size: 16px; line-height: 20px; text-align: center; text-decoration: none; display: block; font-weight: bold; color: #00a8e8;"> View Full Portfolio </a> </td>
+</tr>
+</tbody>
+</table> <p style="margin: 25px 0 0; font-size: 14px; color: #ffffff; font-family: Arial, sans-serif;"> Or call us: <strong><a href="tel:+919359475770" style="color: #ffffff; text-decoration: underline;">+91-93594-75770</a></strong> </p> </td>
+</tr>
+<!-- Resources Section -->
+<tr>
+<td style="background-color: #ffffff; padding: 40px 40px;">
+<table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="border-spacing: 0; border-collapse: collapse;">
+<tbody>
+<tr>
+<td style="padding: 30px; background-color: #f0f8ff; border-left: 4px solid #00a8e8; font-family: Arial, sans-serif;"> <h3 style="margin: 0 0 15px; font-size: 20px; line-height: 28px; color: #00a8e8; font-weight: bold; font-family: Arial, sans-serif;"> 📄 Download Our Company Profile </h3> <p style="margin: 0 0 15px; font-size: 15px; line-height: 24px; color: #333333; font-family: Arial, sans-serif;"> Get detailed information about all our solutions, certifications, and featured projects. </p> <a href="https://unicircuites.com/wp-content/uploads/2026/03/UNICIRCUIT-Company-Profile-2026.pdf" target="_blank" style="color: #00a8e8; text-decoration: underline; font-weight: bold; font-size: 15px; font-family: Arial, sans-serif;"> Download PDF (2 MB) → </a> </td>
+</tr>
+</tbody>
+</table> </td>
+</tr>
+<!-- Closing -->
+<tr>
+<td style="background-color: #ffffff; padding: 0 40px 40px;">
+<table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="border-spacing: 0; border-collapse: collapse;">
+<tbody>
+<tr>
+<td style="font-family: Arial, sans-serif; font-size: 16px; line-height: 26px; color: #333333;"> <p style="margin: 0 0 20px; font-family: Arial, sans-serif;"> We'd love to discuss how our solutions can address your specific challenges and help you achieve your digital transformation goals. </p> <p style="margin: 0 0 20px; font-family: Arial, sans-serif;"> <strong>Let's connect:</strong> Reply to this email or visit our website to schedule a consultation. </p> <p style="margin: 0 0 10px; font-family: Arial, sans-serif;">Best regards,</p> <p style="margin: 0; font-weight: bold; font-family: Arial, sans-serif;">Unicircuit Engineering Services Team</p> <p style="margin: 0; color: #666666; font-style: italic; font-family: Arial, sans-serif;">Design • Engineer • Construct • Operate • Maintain</p> </td>
+</tr>
+</tbody>
+</table> </td>
+</tr>
+<!-- Footer -->
+<tr>
+<td style="background-color: #1a1a2e; padding: 40px 40px;">
+<table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="border-spacing: 0; border-collapse: collapse;">
+<tbody>
+<tr>
+<td style="padding: 0 0 20px; font-family: Arial, sans-serif; font-size: 14px; line-height: 22px; color: #ffffff; text-align: center;"> <strong style="font-size: 18px; color: #00a8e8; font-family: Arial, sans-serif;">UNICIRCUIT</strong><br> <span style="font-size: 12px; color: #cccccc; font-family: Arial, sans-serif;">Engineering Services LLP</span><br><br> <span style="font-family: Arial, sans-serif;">Your Trusted Digital Transformation Partner</span> </td>
+</tr>
+<tr>
+<td style="padding: 20px 0 0; border-top: 1px solid #333333; font-family: Arial, sans-serif; font-size: 14px; line-height: 22px; color: #cccccc; text-align: center;"> <strong style="font-family: Arial, sans-serif;">Website:</strong> <a href="https://www.unicircuites.com" target="_blank" style="color: #00a8e8; text-decoration: none; font-family: Arial, sans-serif;">www.unicircuites.com</a><br> <strong style="font-family: Arial, sans-serif;">Email:</strong> <a href="mailto:sales@unicircuites.com" style="color: #00a8e8; text-decoration: none; font-family: Arial, sans-serif;">sales@unicircuites.com</a><br> <strong style="font-family: Arial, sans-serif;">Phone:</strong> <a href="tel:+919359475770" style="color: #00a8e8; text-decoration: none; font-family: Arial, sans-serif;">+91-93594-75770</a> </td>
+</tr>
+<tr>
+<td style="padding: 20px 0 0; font-family: Arial, sans-serif; font-size: 12px; line-height: 18px; color: #999999; text-align: center;"> ISO 9001:2015 Certified | Cisco Authorized Partner | PRAMA System Integrator<br><br> You're receiving this email because you expressed interest in Unicircuit's solutions.<br> <a href="[unsubscribe]" style="color: #999999; text-decoration: underline; font-family: Arial, sans-serif;">Unsubscribe</a> | <a href="https://www.unicircuites.com/privacy" target="_blank" style="color: #999999; text-decoration: underline; font-family: Arial, sans-serif;">Privacy Policy</a> </td>
+</tr>
+</tbody>
+</table> </td>
+</tr>
+</tbody>
+</table>
+</center>
+
+</body></html>`
+  }
 ];
 
 module.exports = {

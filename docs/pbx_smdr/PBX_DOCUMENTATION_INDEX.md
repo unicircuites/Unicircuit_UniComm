@@ -22,7 +22,7 @@ Complete documentation for the Matrix Eternity PBX SMDR connection issue and sol
 ## Comprehensive Guides
 
 ### 1. Solution Summary
-📄 **File**: [`SOLUTION_SUMMARY.md`](SOLUTION_SUMMARY.md)
+📄 **File**: [`SOLUTION_SUMMARY.md`](../crm_reports/SOLUTION_SUMMARY.md)
 - Problem statement
 - Root cause analysis
 - Solution overview
@@ -80,7 +80,7 @@ Complete documentation for the Matrix Eternity PBX SMDR connection issue and sol
 ---
 
 ### 5. Implementation Checklist
-✅ **File**: [`IMPLEMENTATION_CHECKLIST.md`](IMPLEMENTATION_CHECKLIST.md)
+✅ **File**: [`IMPLEMENTATION_CHECKLIST.md`](../checklists/IMPLEMENTATION_CHECKLIST.md)
 - Pre-fix verification
 - Fix implementation steps
 - Post-fix verification
@@ -98,19 +98,23 @@ Complete documentation for the Matrix Eternity PBX SMDR connection issue and sol
 
 ```
 UNI_CRM/
-├── QUICK_FIX.md                          ← START HERE (5 min)
-├── SOLUTION_SUMMARY.md                   ← Overview (10 min)
-├── PBX_CONNECTION_TROUBLESHOOTING.md     ← Full guide (20 min)
-├── VISUAL_GUIDE.md                       ← Diagrams (15 min)
-├── SMDR_PROTOCOL_DETAILS.md              ← Technical (30 min)
-├── IMPLEMENTATION_CHECKLIST.md           ← Tracking (ongoing)
-├── PBX_DOCUMENTATION_INDEX.md            ← This file
+├── docs/
+│   ├── pbx_smdr/
+│   │   ├── QUICK_FIX.md                      ← START HERE (5 min)
+│   │   ├── PBX_CONNECTION_TROUBLESHOOTING.md ← Full guide (20 min)
+│   │   ├── VISUAL_GUIDE.md                   ← Diagrams (15 min)
+│   │   ├── SMDR_PROTOCOL_DETAILS.md          ← Technical (30 min)
+│   │   └── PBX_DOCUMENTATION_INDEX.md        ← This file
+│   ├── checklists/
+│   │   └── IMPLEMENTATION_CHECKLIST.md       ← Tracking (ongoing)
+│   └── crm_reports/
+│       └── SOLUTION_SUMMARY.md               ← Overview (10 min)
 │
 ├── backend/
 │   ├── services/
-│   │   └── matrixSmdr.js                 ← Enhanced logging
-│   ├── server.js                         ← No changes
-│   └── .env                              ← Configuration
+│   │   └── matrixSmdr.js                     ← Enhanced logging
+│   ├── server.js                             ← No changes
+│   └── .env                                  ← Configuration
 │
 └── [Other project files...]
 ```
@@ -125,7 +129,7 @@ UNI_CRM/
 3. Verify dashboard shows 🟢 green
 
 ### Path 2: "I Want to Understand" (30 minutes)
-1. [`SOLUTION_SUMMARY.md`](SOLUTION_SUMMARY.md) — Overview
+1. [`SOLUTION_SUMMARY.md`](../crm_reports/SOLUTION_SUMMARY.md) — Overview
 2. [`VISUAL_GUIDE.md`](VISUAL_GUIDE.md) — Diagrams
 3. [`PBX_CONNECTION_TROUBLESHOOTING.md`](PBX_CONNECTION_TROUBLESHOOTING.md) — Details
 
@@ -135,8 +139,8 @@ UNI_CRM/
 3. [`SMDR_PROTOCOL_DETAILS.md`](SMDR_PROTOCOL_DETAILS.md) — Technical deep-dive
 
 ### Path 4: "I'm Implementing This" (60+ minutes)
-1. [`SOLUTION_SUMMARY.md`](SOLUTION_SUMMARY.md) — Understand the issue
-2. [`IMPLEMENTATION_CHECKLIST.md`](IMPLEMENTATION_CHECKLIST.md) — Track progress
+1. [`SOLUTION_SUMMARY.md`](../crm_reports/SOLUTION_SUMMARY.md) — Understand the issue
+2. [`IMPLEMENTATION_CHECKLIST.md`](../checklists/IMPLEMENTATION_CHECKLIST.md) — Track progress
 3. [`PBX_CONNECTION_TROUBLESHOOTING.md`](PBX_CONNECTION_TROUBLESHOOTING.md) — Troubleshoot as needed
 4. [`SMDR_PROTOCOL_DETAILS.md`](SMDR_PROTOCOL_DETAILS.md) — Reference for details
 
@@ -215,11 +219,11 @@ Added detailed console.log messages to help users understand:
 
 ### Internal Documentation
 - [`QUICK_FIX.md`](QUICK_FIX.md) — Quick reference
-- [`SOLUTION_SUMMARY.md`](SOLUTION_SUMMARY.md) — Full overview
+- [`SOLUTION_SUMMARY.md`](../crm_reports/SOLUTION_SUMMARY.md) — Full overview
 - [`PBX_CONNECTION_TROUBLESHOOTING.md`](PBX_CONNECTION_TROUBLESHOOTING.md) — Troubleshooting
 - [`SMDR_PROTOCOL_DETAILS.md`](SMDR_PROTOCOL_DETAILS.md) — Technical details
 - [`VISUAL_GUIDE.md`](VISUAL_GUIDE.md) — Diagrams
-- [`IMPLEMENTATION_CHECKLIST.md`](IMPLEMENTATION_CHECKLIST.md) — Tracking
+- [`IMPLEMENTATION_CHECKLIST.md`](../checklists/IMPLEMENTATION_CHECKLIST.md) — Tracking
 
 ### External Resources
 - **PBX Web Interface**: `http://192.168.0.81:8080`
@@ -286,11 +290,11 @@ A: Yes, with: `git checkout backend/services/matrixSmdr.js`. But the enhanced lo
 | Document | Purpose | Time |
 |----------|---------|------|
 | [`QUICK_FIX.md`](QUICK_FIX.md) | Quick reference | 5 min |
-| [`SOLUTION_SUMMARY.md`](SOLUTION_SUMMARY.md) | Overview | 10 min |
+| [`SOLUTION_SUMMARY.md`](../crm_reports/SOLUTION_SUMMARY.md) | Overview | 10 min |
 | [`PBX_CONNECTION_TROUBLESHOOTING.md`](PBX_CONNECTION_TROUBLESHOOTING.md) | Full guide | 20 min |
 | [`VISUAL_GUIDE.md`](VISUAL_GUIDE.md) | Diagrams | 15 min |
 | [`SMDR_PROTOCOL_DETAILS.md`](SMDR_PROTOCOL_DETAILS.md) | Technical | 30 min |
-| [`IMPLEMENTATION_CHECKLIST.md`](IMPLEMENTATION_CHECKLIST.md) | Tracking | Ongoing |
+| [`IMPLEMENTATION_CHECKLIST.md`](../checklists/IMPLEMENTATION_CHECKLIST.md) | Tracking | Ongoing |
 
 ---
 

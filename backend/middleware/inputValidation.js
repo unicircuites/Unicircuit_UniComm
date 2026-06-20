@@ -159,6 +159,8 @@ function validateInput(req, res, next) {
       '/ai/chat',
       '/api/system/ai/chat',
       '/auth/callback',
+      '/crm/scraper',
+      '/api/crm/scraper',
     ];
 
     if (skipRoutes.some(route => req.path.startsWith(route))) {

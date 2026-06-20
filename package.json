@@ -1,4 +1,7 @@
 {
+  "scripts": {
+    "start": "node start-services.js"
+  },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.102.0",
     "acorn": "^8.16.0",

@@ -1,4 +1,4 @@
-﻿/**
+/**
  * Outlook-compatible email frames: banner + body + footer in one 600px bordered table.
  */
 
@@ -6,6 +6,26 @@ const EMAIL_FRAME_WIDTH = 600;
 
 const BANNER_PRESETS = {
   none: { id: 'none', label: 'No banner', enabled: false, layout: 'simple' },
+  generalPortfolio: {
+    id: 'generalPortfolio',
+    label: 'General Portfolio Hero',
+    enabled: true,
+    layout: 'hero',
+    eyebrow: 'DIGITAL TRANSFORMATION  ELV  TURNKEY PROJECTS',
+    headline: 'Your Trusted Digital Transformation Partner.',
+    subheadline: 'End-to-end integration across AI, IoT, Automation, and Physical Security for enterprises and PSUs.',
+    footerLine: 'Unicircuit Engineering Services LLP  Digital Transformation & System Integration',
+    accentColor: '#00a8e8',
+    overlayColor: '#1a1a2e',
+    imageUrl: 'https://images.unsplash.com/photo-1451187580459-43490279c0fa?w=1200&q=80',
+    heroHeight: 280,
+    textAlign: 'left',
+    showCta: false,
+    showHeader: true,
+    logoText: 'Unicircuit',
+    logoSubtext: 'ENGINEERING SERVICES LLP',
+    headerBg: '#1a1a2e',
+  },
   healthcare: {
     id: 'healthcare',
     label: 'Healthcare Hero',

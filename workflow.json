@@ -1,0 +1,148 @@
+{
+  "name": "UniCRM Event Router Workflow",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "crm-events",
+        "responseMode": "onReceived",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [0, 0],
+      "id": "webhook-trigger-crm",
+      "name": "CRM Webhook Trigger"
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {},
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.body && $json.body.event ? $json.body.event : ($json.event ? $json.event : '') }}",
+                    "rightValue": "lead_created",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Lead Created"
+            },
+            {
+              "conditions": {
+                "options": {},
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.body && $json.body.event ? $json.body.event : ($json.event ? $json.event : '') }}",
+                    "rightValue": "lead_tier_changed",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Tier Changed"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3,
+      "position": [240, 0],
+      "id": "event-switch-node",
+      "name": "Switch by Event Name"
+    },
+    {
+      "parameters": {
+        "method": "PATCH",
+        "url": "=http://127.0.0.1:8088/api/crm/leads/{{ $json.body && $json.body.data && $json.body.data.id ? $json.body.data.id : ($json.data && $json.data.id ? $json.data.id : '') }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "Bearer enrich_789012"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "{\n  \"enrichment_status\": \"complete\",\n  \"tier\": \"A\"\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [500, -100],
+      "id": "enrich-lead-request",
+      "name": "Enrich & Score Lead"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://127.0.0.1:8088/api/crm/alerts",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "Bearer lm_123456"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"lead_id\": {{ $json.body && $json.body.data && $json.body.data.id ? $json.body.data.id : ($json.data && $json.data.id ? $json.data.id : '') }},\n  \"agent_id\": \"n8n_workflow\",\n  \"alert_type\": \"tier_outreach_needed\",\n  \"severity\": \"medium\",\n  \"message\": \"Lead has been upgraded to Tier A. Manual outreach draft review is required.\"\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [500, 100],
+      "id": "create-alert-request",
+      "name": "Create Human Review Alert"
+    }
+  ],
+  "connections": {
+    "CRM Webhook Trigger": {
+      "main": [
+        [
+          {
+            "node": "Switch by Event Name",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Switch by Event Name": {
+      "main": [
+        [
+          {
+            "node": "Enrich & Score Lead",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Create Human Review Alert",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1"
+  }
+}

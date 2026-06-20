@@ -4466,6 +4466,8 @@
         <div class="nav-item" id="nav-marketing" onclick="nav('marketing',this)"><i class="fas fa-bullhorn"></i> Marketing Suite</div>
         <div class="nav-item" onclick="nav('ai',this)"><i class="fas fa-robot"></i> AI Assistant</div>
         <div class="nav-item" id="nav-analytics" onclick="nav('analytics',this)"><i class="fas fa-chart-bar"></i> Analytics</div>
+        <div class="nav-item" id="nav-n8n" onclick="nav('n8n',this)" style="display:none;"><i class="fas fa-network-wired"></i> Automation (n8n)</div>
+        <div class="nav-item" id="nav-webscraper" onclick="nav('webscraper',this)" style="display:none;"><i class="fas fa-spider"></i> Lead Web Scraper</div>
         <div class="nav-item" id="nav-usermgmt" onclick="nav('usermgmt',this)" style="display:none;"><i class="fas fa-users-cog"></i> User Management</div>
       </nav>
 
@@ -6902,6 +6904,381 @@
           </div>
         </div>
 
+        <!-- ─── AUTOMATION (n8n) SECTION ─────────────────────────────────────────── -->
+        <div class="section-view fu" id="sec-n8n">
+          <div style="display: grid; grid-template-columns: 1fr 400px; gap: 16px; height: calc(100vh - 120px);">
+            <!-- Left: n8n Editor Iframe -->
+            <div class="card" style="padding: 0; overflow: hidden; border: 1px solid var(--border); border-radius: 12px; height: 100%;">
+              <iframe src="http://localhost:5678" style="width: 100%; height: 100%; border: none;"></iframe>
+            </div>
+            
+            <!-- Right: Workflow Tester Console -->
+            <div style="display: flex; flex-direction: column; gap: 16px; height: 100%; overflow-y: auto;">
+              
+              <!-- Trigger 1: Lead Creation -->
+              <div class="card" style="background: var(--bg3); border: 1px solid var(--border2); border-radius: 12px; padding: 20px;">
+                <div style="font-size: 14px; font-weight: 600; color: var(--text); margin-bottom: 14px;">
+                  <i class="fas fa-user-plus" style="color: var(--gold); margin-right: 6px;"></i>Trigger Lead Created Workflow
+                </div>
+                <div class="form-group" style="margin-bottom: 10px;">
+                  <label class="form-label" style="font-size: 11px; color: var(--muted);">First Name</label>
+                  <input class="inp" id="test-lead-fname" placeholder="Rahul" style="font-size: 12px; padding: 6px 10px;" />
+                </div>
+                <div class="form-group" style="margin-bottom: 10px;">
+                  <label class="form-label" style="font-size: 11px; color: var(--muted);">Last Name</label>
+                  <input class="inp" id="test-lead-lname" placeholder="Kumar" style="font-size: 12px; padding: 6px 10px;" />
+                </div>
+                <div class="form-group" style="margin-bottom: 10px;">
+                  <label class="form-label" style="font-size: 11px; color: var(--muted);">Company *</label>
+                  <input class="inp" id="test-lead-company" placeholder="n8n Integration Corp" style="font-size: 12px; padding: 6px 10px;" />
+                </div>
+                <div class="form-group" style="margin-bottom: 10px;">
+                  <label class="form-label" style="font-size: 11px; color: var(--muted);">Email</label>
+                  <input class="inp" id="test-lead-email" placeholder="rahul.kumar.new12@example.com" style="font-size: 12px; padding: 6px 10px;" />
+                </div>
+                <div class="form-group" style="margin-bottom: 12px;">
+                  <label class="form-label" style="font-size: 11px; color: var(--muted);">Tier</label>
+                  <select class="inp" id="test-lead-tier" style="font-size: 12px; padding: 6px 10px; height: 32px;">
+                    <option value="A">Tier A</option>
+                    <option value="B">Tier B</option>
+                    <option value="C">Tier C</option>
+                  </select>
+                </div>
+                <button class="btn btn-primary btn-sm" onclick="triggerLeadCreatedTest()" style="width: 100%;">
+                  <i class="fas fa-play"></i> Trigger Lead Creation
+                </button>
+              </div>
+
+              <!-- Trigger 2: Tier Change -->
+              <div class="card" style="background: var(--bg3); border: 1px solid var(--border2); border-radius: 12px; padding: 20px;">
+                <div style="font-size: 14px; font-weight: 600; color: var(--text); margin-bottom: 14px;">
+                  <i class="fas fa-exchange-alt" style="color: var(--gold); margin-right: 6px;"></i>Trigger Tier Changed Workflow
+                </div>
+                <div class="form-group" style="margin-bottom: 10px;">
+                  <label class="form-label" style="font-size: 11px; color: var(--muted);">Select Lead</label>
+                  <select class="inp" id="test-change-lead-id" style="font-size: 12px; padding: 6px 10px; height: 32px;">
+                    <option value="">-- Loading Leads... --</option>
+                  </select>
+                </div>
+                <div class="form-group" style="margin-bottom: 12px;">
+                  <label class="form-label" style="font-size: 11px; color: var(--muted);">New Tier</label>
+                  <select class="inp" id="test-change-lead-tier" style="font-size: 12px; padding: 6px 10px; height: 32px;">
+                    <option value="A">Tier A</option>
+                    <option value="B">Tier B</option>
+                    <option value="C">Tier C</option>
+                  </select>
+                </div>
+                <button class="btn btn-ghost btn-sm" onclick="triggerTierChangedTest()" style="width: 100%; border: 1px solid var(--border);">
+                  <i class="fas fa-play"></i> Trigger Tier Change
+                </button>
+              </div>
+
+              <!-- Test Log Console -->
+              <div class="card" style="background: var(--bg2); border: 1px solid var(--border2); border-radius: 12px; padding: 12px; flex: 1; min-height: 120px; display: flex; flex-direction: column;">
+                <div style="font-size: 11px; font-weight: 600; color: var(--muted); margin-bottom: 6px; display: flex; justify-content: space-between; align-items: center;">
+                  <span>TEST CONSOLE LOG</span>
+                  <a href="#" onclick="clearTestLogs(); return false;" style="color: var(--gold); text-decoration: none;">Clear</a>
+                </div>
+                <pre id="test-console-logs" style="margin: 0; font-family: monospace; font-size: 11px; color: var(--text2); overflow-y: auto; flex: 1; white-space: pre-wrap; word-break: break-all; background: #000; padding: 8px; border-radius: 6px; border: 1px solid var(--border);"></pre>
+              </div>
+              
+            </div>
+          </div>
+        </div>
+
+        <!-- ─── WEB SCRAPER SECTION ──────────────────────────────────────────────── -->
+        <div class="section-view fu" id="sec-webscraper">
+          <div style="display: grid; grid-template-columns: 380px 1fr; gap: 20px; height: calc(100vh - 140px); overflow: hidden;">
+            
+            <!-- Left Panel: Scraper Controls & Inputs -->
+            <div style="display: flex; flex-direction: column; gap: 16px; height: 100%; min-height: 0; overflow-y: auto; padding-right: 4px;">
+              
+              <div class="card" style="background: var(--bg3); border: 1px solid var(--border2); border-radius: 12px; padding: 20px; display: flex; flex-direction: column; max-height: 480px;">
+                <div style="font-size: 14px; font-weight: 600; color: var(--text); margin-bottom: 16px; display: flex; align-items: center; gap: 8px; flex-shrink: 0;">
+                  <i class="fas fa-spider" style="color: var(--gold);"></i> Web Scraper Config
+                </div>
+                
+                <!-- Scrollable fields wrapper -->
+                <div style="flex: 1; overflow-y: auto; padding-right: 6px; margin-bottom: 12px; min-height: 0;">
+                
+                <div class="form-group" style="margin-bottom: 12px;">
+                  <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
+                    <label class="form-label" style="font-size: 11px; color: var(--muted); font-weight: 600; text-transform: uppercase; margin: 0;">Target URL *</label>
+                    <button id="btn-analyze-url" class="btn btn-ghost" onclick="analyzeTargetURL()" style="color: var(--gold); border: 1px solid rgba(212,175,55,0.3); padding: 2px 6px; font-size: 9px; border-radius: 4px; display: inline-flex; align-items: center; gap: 4px; height: auto; cursor: pointer; background: transparent;">
+                      <i class="fas fa-magic"></i> Auto-Detect Selector
+                    </button>
+                  </div>
+                  <input class="inp" id="scrape-url" placeholder="https://example.com/leads" style="font-size: 12px; padding: 8px 12px;" value="https://example.com/leads" />
+                </div>
+
+                <!-- Start & End Points -->
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px;">
+                  <div class="form-group">
+                    <label class="form-label" style="font-size: 11px; color: var(--muted); font-weight: 600; text-transform: uppercase;">Start Page</label>
+                    <input class="inp" type="number" id="scrape-start" value="1" min="1" style="font-size: 12px; padding: 8px 12px;" />
+                  </div>
+                  <div class="form-group">
+                    <label class="form-label" style="font-size: 11px; color: var(--muted); font-weight: 600; text-transform: uppercase;">End Page</label>
+                    <input class="inp" type="number" id="scrape-end" value="3" min="1" style="font-size: 12px; padding: 8px 12px;" />
+                  </div>
+                </div>
+
+                <!-- Pagination Parameter -->
+                <div style="display: flex; gap: 12px; align-items: center; margin-bottom: 12px; background: rgba(255,255,255,0.02); padding: 8px; border-radius: 6px;">
+                  <div style="display: flex; align-items: center; gap: 6px;">
+                    <input type="checkbox" id="scrape-page-enabled" checked style="cursor: pointer; width: 15px; height: 15px;" />
+                    <label for="scrape-page-enabled" style="font-size: 11px; color: var(--text2); font-weight: 600; cursor: pointer; text-transform: uppercase;">Pagination</label>
+                  </div>
+                  <input class="inp" id="scrape-page-param" value="page" placeholder="page" style="font-size: 12px; padding: 4px 8px; flex: 1;" />
+                </div>
+
+                <!-- DOM SELECTORS (Item, Start, End, Pagination Bar Selector) -->
+                <div style="background: rgba(39, 150, 196, 0.04); border: 1px solid var(--border2); padding: 12px; border-radius: 8px; margin-bottom: 12px; display: flex; flex-direction: column; gap: 10px;">
+                  <div style="font-size: 11px; font-weight: 700; color: var(--gold2); letter-spacing: 0.4px; text-transform: uppercase;">
+                    <i class="fas fa-code"></i> DOM Selector Boundaries
+                  </div>
+                  
+                  <div class="form-group">
+                    <label class="form-label" style="font-size: 10px; color: var(--muted); font-weight: 600; text-transform: uppercase;">Item Container Selector</label>
+                    <input class="inp" id="scrape-item-selector" placeholder="e.g. .lead-row, tr, div.card" style="font-size: 11px; padding: 6px 10px;" />
+                  </div>
+                  
+                  <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
+                    <div class="form-group">
+                      <label class="form-label" style="font-size: 10px; color: var(--muted); font-weight: 600; text-transform: uppercase;">Start Selector</label>
+                      <input class="inp" id="scrape-start-selector" placeholder="e.g. #start-lead" style="font-size: 11px; padding: 6px 10px;" />
+                    </div>
+                    <div class="form-group">
+                      <label class="form-label" style="font-size: 10px; color: var(--muted); font-weight: 600; text-transform: uppercase;">End Selector</label>
+                      <input class="inp" id="scrape-end-selector" placeholder="e.g. #end-lead" style="font-size: 11px; padding: 6px 10px;" />
+                    </div>
+                  </div>
+
+                  <div class="form-group">
+                    <label class="form-label" style="font-size: 10px; color: var(--muted); font-weight: 600; text-transform: uppercase;">Pagination Bar Selector</label>
+                    <input class="inp" id="scrape-pagination-selector" placeholder="e.g. .pagination, nav.pages" style="font-size: 11px; padding: 6px 10px;" />
+                  </div>
+                </div>
+
+                <!-- Fields List -->
+                <div class="form-group" style="margin-bottom: 12px;">
+                  <label class="form-label" style="font-size: 11px; color: var(--muted); font-weight: 600; text-transform: uppercase;">Fields to Scrape (comma-separated)</label>
+                  <input class="inp" id="scrape-fields" value="name, company, email, phone, address" placeholder="name, company, email, phone" style="font-size: 12px; padding: 8px 12px;" />
+                </div>
+
+                <!-- Buffer and Scroll -->
+                <div class="form-group" style="margin-bottom: 12px;">
+                  <label class="form-label" style="font-size: 11px; color: var(--muted); font-weight: 600; text-transform: uppercase;">Buffer Reload Delay (ms)</label>
+                  <input class="inp" type="number" id="scrape-buffer" value="1500" placeholder="e.g. 1500" style="font-size: 12px; padding: 8px 12px;" />
+                </div>
+
+                <!-- Session Cookies (JSON) -->
+                <div class="form-group" style="margin-bottom: 12px;">
+                  <label class="form-label" style="font-size: 11px; color: var(--muted); font-weight: 600; text-transform: uppercase; margin-bottom: 4px;">Session Cookies (JSON Array)</label>
+                  <textarea class="inp" id="scrape-cookies" placeholder='[{"name": "session", "value": "xyz", "domain": "example.com"}]' style="font-size: 11px; padding: 8px 12px; height: 60px; font-family: monospace; resize: vertical;"></textarea>
+                </div>
+
+                <!-- Checkboxes for optional settings -->
+                <div style="display: flex; flex-direction: column; gap: 8px; margin-bottom: 16px; background: rgba(0,0,0,0.15); padding: 12px; border-radius: 8px; border: 1px solid var(--border);">
+                  <div style="display: flex; align-items: center; gap: 8px;">
+                    <input type="checkbox" id="scrape-expand" checked style="cursor: pointer;" />
+                    <label for="scrape-expand" style="font-size: 12px; color: var(--text2); cursor: pointer;">Expand hidden "Read More" text</label>
+                  </div>
+                  <div style="display: flex; align-items: center; gap: 8px;">
+                    <input type="checkbox" id="scrape-translate" checked style="cursor: pointer;" />
+                    <label for="scrape-translate" style="font-size: 12px; color: var(--text2); cursor: pointer;">Translate to English (Auto)</label>
+                  </div>
+                  
+                  <div style="font-size: 10px; color: var(--muted); font-weight: 600; margin-top: 4px; border-top: 1px solid var(--border); padding-top: 4px;">FORMATTERS</div>
+                  
+                  <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
+                    <div style="display: flex; align-items: center; gap: 6px;">
+                      <input type="checkbox" id="format-text" checked style="cursor: pointer;" />
+                      <label for="format-text" style="font-size: 11px; color: var(--text2); cursor: pointer;">Text</label>
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 6px;">
+                      <input type="checkbox" id="format-date" checked style="cursor: pointer;" />
+                      <label for="format-date" style="font-size: 11px; color: var(--text2); cursor: pointer;">Date</label>
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 6px;">
+                      <input type="checkbox" id="format-number" checked style="cursor: pointer;" />
+                      <label for="format-number" style="font-size: 11px; color: var(--text2); cursor: pointer;">Number</label>
+                    </div>
+                  </div>
+                </div>
+                </div> <!-- End of scrollable fields wrapper -->
+
+                <!-- Buttons -->
+                <div style="display: flex; gap: 10px; flex-shrink: 0;">
+                  <button class="btn btn-primary" id="btn-start-scrape" onclick="startWebScrape()" style="flex: 1; justify-content: center; height: 38px;">
+                    <i class="fas fa-play" style="margin-right: 6px;"></i> Webscrape
+                  </button>
+                  <button class="btn" id="btn-stop-scrape" onclick="stopWebScrape()" style="background: var(--red); color: white; flex: 1; justify-content: center; height: 38px;" disabled>
+                    <i class="fas fa-stop" style="margin-right: 6px;"></i> Stop
+                  </button>
+                </div>
+              </div>
+
+              <!-- Card 2: Upload/Paste HTML Document -->
+              <div class="card" style="background: var(--bg3); border: 1px solid var(--border2); border-radius: 12px; padding: 20px; max-height: 300px; overflow-y: auto; display: flex; flex-direction: column;">
+                <div style="font-size: 14px; font-weight: 600; color: var(--text); margin-bottom: 12px; display: flex; align-items: center; justify-content: space-between;">
+                  <span><i class="fas fa-file-code" style="color: var(--gold); margin-right: 6px;"></i>HTML Document Scraper</span>
+                  <span style="font-size: 10px; color: var(--muted); border: 1px solid var(--border); padding: 2px 6px; border-radius: 4px;">OPTIONAL</span>
+                </div>
+                <p style="font-size: 11px; color: var(--muted2); margin-top: 0; margin-bottom: 12px; line-height: 1.4;">
+                  If the URL cannot be scraped due to CORS/auth barriers, upload or paste the raw HTML content to extract data fields instantly.
+                </p>
+
+                <!-- Drop area / Upload button -->
+                <div style="display: flex; flex-direction: column; gap: 10px;">
+                  <div style="border: 2px dashed var(--border2); border-radius: 8px; padding: 12px; text-align: center; background: rgba(0,0,0,0.2); cursor: pointer; position: relative;" onclick="document.getElementById('html-file-input').click()">
+                    <i class="fas fa-cloud-upload-alt" style="font-size: 20px; color: var(--muted); margin-bottom: 4px;"></i>
+                    <div style="font-size: 11px; color: var(--text2); font-weight: 500;">Click to upload HTML File</div>
+                    <input type="file" id="html-file-input" accept=".html,.txt" style="display: none;" onchange="handleHtmlFileUpload(event)" />
+                  </div>
+
+                  <div style="font-size: 10px; color: var(--muted); text-align: center; font-weight: 600;">— OR PASTE HTML —</div>
+
+                  <textarea class="inp" id="html-paste-area" placeholder="Paste <html> source code here..." style="font-family: monospace; font-size: 11px; height: 80px; resize: vertical; padding: 8px; background: rgba(0,0,0,0.3); border: 1px solid var(--border);"></textarea>
+
+                  <button class="btn btn-secondary btn-sm" onclick="parsePastedHTML()" style="justify-content: center; height: 32px; border: 1px solid var(--border2);">
+                    <i class="fas fa-file-invoice" style="margin-right: 6px;"></i> Parse HTML Content
+                  </button>
+                </div>
+              </div>
+
+            </div>
+
+            <!-- Right Panel: Status, Metrics, Summary, Logs, Data Table -->
+            <div style="display: flex; flex-direction: column; gap: 16px; height: 100%; min-height: 0; overflow: hidden;">
+              
+              <!-- Metrics Dashboard -->
+              <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px;">
+                <div class="card" style="padding: 14px; background: var(--bg3); border: 1px solid var(--border2); display: flex; align-items: center; gap: 12px;">
+                  <div style="width: 36px; height: 36px; border-radius: 8px; display: flex; align-items: center; justify-content: center; background: rgba(39, 150, 196, 0.15); color: var(--gold); font-size: 16px;">
+                    <i class="fas fa-info-circle"></i>
+                  </div>
+                  <div>
+                    <div style="font-size: 10px; color: var(--muted); font-weight: 600; text-transform: uppercase;">Scraper Status</div>
+                    <div id="scrape-metric-status" style="font-size: 14px; font-weight: 700; color: var(--text);">Idle</div>
+                  </div>
+                </div>
+
+                <div class="card" style="padding: 14px; background: var(--bg3); border: 1px solid var(--border2); display: flex; align-items: center; gap: 12px;">
+                  <div style="width: 36px; height: 36px; border-radius: 8px; display: flex; align-items: center; justify-content: center; background: rgba(16, 185, 129, 0.15); color: var(--green); font-size: 16px;">
+                    <i class="fas fa-database"></i>
+                  </div>
+                  <div>
+                    <div style="font-size: 10px; color: var(--muted); font-weight: 600; text-transform: uppercase;">Collected So Far</div>
+                    <div id="scrape-metric-collected" style="font-size: 14px; font-weight: 700; color: var(--green);">0 records</div>
+                  </div>
+                </div>
+
+                <div class="card" style="padding: 14px; background: var(--bg3); border: 1px solid var(--border2); display: flex; align-items: center; gap: 12px;">
+                  <div style="width: 36px; height: 36px; border-radius: 8px; display: flex; align-items: center; justify-content: center; background: rgba(59, 130, 246, 0.15); color: var(--blue); font-size: 16px;">
+                    <i class="fas fa-copy"></i>
+                  </div>
+                  <div>
+                    <div style="font-size: 10px; color: var(--muted); font-weight: 600; text-transform: uppercase;">Current Page</div>
+                    <div id="scrape-metric-page" style="font-size: 14px; font-weight: 700; color: var(--blue);">Page -</div>
+                  </div>
+                </div>
+
+                <div class="card" style="padding: 14px; background: var(--bg3); border: 1px solid var(--border2); display: flex; align-items: center; gap: 12px;">
+                  <div style="width: 36px; height: 36px; border-radius: 8px; display: flex; align-items: center; justify-content: center; background: rgba(139, 92, 246, 0.15); color: var(--purple); font-size: 16px;">
+                    <i class="fas fa-file-excel"></i>
+                  </div>
+                  <div>
+                    <div style="font-size: 10px; color: var(--muted); font-weight: 600; text-transform: uppercase;">Excel Export</div>
+                    <div>
+                      <button class="btn btn-ghost btn-sm" onclick="exportCollectedToExcel()" id="btn-export-excel" style="padding: 2px 6px; font-size: 11px; border: 1px solid var(--border); height: 20px; display: none;">
+                        <i class="fas fa-download"></i> Save .XLSX
+                      </button>
+                      <span id="export-excel-disabled" style="font-size: 11px; color: var(--muted);">No Data</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Report Summary & Logs -->
+              <div style="display: grid; grid-template-columns: 1fr 340px; gap: 16px; min-height: 150px; max-height: 220px; overflow: hidden;">
+                
+                <!-- Live Scraper Console Logs -->
+                <div class="card" style="background: #070913; border: 1px solid var(--border2); padding: 12px; display: flex; flex-direction: column; height: 100%;">
+                  <div style="font-size: 11px; font-weight: 600; color: var(--muted); margin-bottom: 6px; display: flex; justify-content: space-between; align-items: center;">
+                    <span><i class="fas fa-terminal"></i> SCRAPE ENGINE LOGS</span>
+                    <a href="#" onclick="clearScraperLogs(); return false;" style="color: var(--gold); text-decoration: none; font-size: 10px;">Clear</a>
+                  </div>
+                  <pre id="scraper-console-logs" style="margin: 0; font-family: 'Consolas', 'Monaco', monospace; font-size: 11px; color: #a6b2c9; overflow-y: auto; flex: 1; white-space: pre-wrap; word-break: break-all; padding: 6px; background: rgba(0,0,0,0.4); border-radius: 4px; border: 1px solid var(--border);"></pre>
+                </div>
+
+                <!-- Field Collection Report Card -->
+                <div class="card" style="background: var(--bg3); border: 1px solid var(--border2); padding: 14px; display: flex; flex-direction: column; justify-content: space-between; height: 100%;">
+                  <div>
+                    <div style="font-size: 12px; font-weight: 600; color: var(--text); margin-bottom: 10px;">
+                      <i class="fas fa-file-contract" style="color: var(--gold); margin-right: 6px;"></i>Scraper Report Summary
+                    </div>
+                    
+                    <div style="display: flex; flex-direction: column; gap: 10px; overflow-y: auto; max-height: 110px; padding-right: 4px;">
+                      <div>
+                        <div style="font-size: 10px; color: var(--green2); font-weight: 600; margin-bottom: 4px; text-transform: uppercase;">
+                          <i class="fas fa-check-circle"></i> Collected Fields:
+                        </div>
+                        <div id="report-collected-fields" style="display: flex; flex-wrap: wrap; gap: 4px; font-size: 10px; color: var(--muted2);">
+                          <span style="font-style: italic; color: var(--muted);">None yet</span>
+                        </div>
+                      </div>
+
+                      <div>
+                        <div style="font-size: 10px; color: var(--red2); font-weight: 600; margin-bottom: 4px; text-transform: uppercase;">
+                          <i class="fas fa-exclamation-triangle"></i> Not Collected:
+                        </div>
+                        <div id="report-missing-fields" style="display: flex; flex-wrap: wrap; gap: 4px; font-size: 10px; color: var(--muted2);">
+                          <span style="font-style: italic; color: var(--muted);">None yet</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div id="report-summary-stats" style="font-size: 10px; color: var(--muted); border-top: 1px solid var(--border); padding-top: 6px; margin-top: 4px; display: flex; justify-content: space-between;">
+                    <span>Success Rate: <b style="color: var(--text);" id="report-success-rate">0%</b></span>
+                    <span>Est. Errors: <b style="color: var(--text);" id="report-error-count">0</b></span>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Real-time Preview Table Container -->
+              <div class="card" style="flex: 1; background: var(--bg3); border: 1px solid var(--border2); border-radius: 12px; padding: 16px; display: flex; flex-direction: column; overflow: hidden;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                  <div style="font-size: 13px; font-weight: 600; color: var(--text);">
+                    <i class="fas fa-table" style="color: var(--gold); margin-right: 6px;"></i> Live Scraped Data Preview
+                  </div>
+                  <div id="preview-row-count" style="font-size: 11px; color: var(--muted);">Showing 0 rows</div>
+                </div>
+
+                <div style="flex: 1; overflow: auto; border: 1px solid var(--border); border-radius: 6px; background: rgba(0,0,0,0.15);">
+                  <table style="width: 100%; border-collapse: collapse; font-size: 12px; text-align: left;" id="scraper-preview-table">
+                    <thead>
+                      <tr id="scraper-table-header" style="background: var(--bg2); border-bottom: 1px solid var(--border); color: var(--text2);">
+                        <th style="padding: 10px; font-weight: 600;">No Data Available</th>
+                      </tr>
+                    </thead>
+                    <tbody id="scraper-table-body" style="color: var(--text);">
+                      <tr>
+                        <td style="padding: 20px; text-align: center; color: var(--muted); font-style: italic;">
+                          No scrape data loaded. Enter a URL above and click "Webscrape" or upload an HTML file.
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+            </div>
+
+          </div>
+        </div>
+
       </div><!-- /content-area -->
     </div><!-- /main-area -->
   </div><!-- /app-shell -->
@@ -7697,7 +8074,6 @@ Always write in a professional yet warm Indian B2B communication style. Use form
       return data.reply || 'Unable to generate response from PicoClaw.';
     }
 
-    // ── NAVIGATION ──
     const pageMeta = {
       dashboard: ['Dashboard', 'AI-augmented omnichannel comms · Unicircuit Engineering Services LLP'],
       calls: ['PBX Call Logs', 'Matrix Eternity SMDR realtime integration · AI summaries'],
@@ -7709,12 +8085,14 @@ Always write in a professional yet warm Indian B2B communication style. Use form
       'wa-broadcast': ['WA Broadcast', 'WhatsApp broadcasts · Send & track campaigns'],
       ai: ['AI Assistant', 'PicoClaw-powered · Unicircuit Engineering context'],
       analytics: ['Analytics', 'Communication intelligence · Client insights'],
+      n8n: ['Workflow Automation', 'Manage your backend n8n workflows and webhooks'],
+      webscraper: ['Lead Web Scraper', 'Test website scraping & generate structured Excel files'],
       usermgmt: ['User Management', 'Manage users, roles and access'],
     };
 
     function nav(id, el) {
       // Role guard — user role cannot navigate to restricted sections
-      const _restricted = ['calls','email','pipeline','marketing','analytics','usermgmt'];
+      const _restricted = ['calls','email','pipeline','marketing','analytics','usermgmt','n8n','webscraper'];
       if (window._userRoleIsUser && _restricted.includes(id)) return;
 
       document.querySelectorAll('.section-view').forEach(s => s.classList.remove('active'));
@@ -7732,6 +8110,7 @@ Always write in a professional yet warm Indian B2B communication style. Use form
       document.getElementById('page-h').textContent = m[0];
       document.getElementById('page-sub').textContent = m[1];
       if (id === 'usermgmt') { umCancelEdit(); umLoadUsers(); }
+      if (id === 'n8n') { loadTesterLeads(); }
       const topCompose = document.getElementById('topbar-compose-email');
       if (topCompose) topCompose.style.display = id === 'email' ? '' : 'none';
       if (id === 'contacts') { refreshContactsSection(); }
@@ -13348,13 +13727,17 @@ Keep it concise and professional.`;
         if (user.role === 'admin') {
           var nm = document.getElementById('nav-usermgmt');
           if (nm) nm.style.display = '';
+          var nn = document.getElementById('nav-n8n');
+          if (nn) nn.style.display = '';
+          var nw = document.getElementById('nav-webscraper');
+          if (nw) nw.style.display = '';
         } else {
           // Non-admin: hide everything except Dashboard, WhatsApp, Contacts, AI Assistant
           ['nav-label-overview','nav-calls','nav-email','nav-label-comms',
            'nav-pipeline','nav-label-crm','nav-marketing','nav-analytics','nav-label-intel',
            'topbar-activity-log','topbar-add-contact','mkt-quick-wrap','dashboard-kpi-refresh',
            'svc-pbx','svc-outlook',
-           'contacts-toolbar-actions'].forEach(function(id) {
+           'contacts-toolbar-actions', 'nav-webscraper'].forEach(function(id) {
             var el = document.getElementById(id); if (el) el.style.display = 'none';
           });
           // Show WA Broadcast nav for user role
@@ -13395,6 +13778,679 @@ Keep it concise and professional.`;
         try { msgBannerInitAllPanels(); } catch (_) { }
       }, 200);
     });
+
+    // ── WEB SCRAPER TEST CONTROLLER ──────────────────────────────────────────────
+    let scraperPollInterval = null;
+    let currentScraperSessionId = null;
+    let cachedScrapedData = [];
+    let cachedFields = [];
+    let loggedErrorsCount = 0;
+
+    function addScraperLog(msg, type = 'info') {
+      const consoleEl = document.getElementById('scraper-console-logs');
+      if (!consoleEl) return;
+      const time = new Date().toLocaleTimeString();
+      let color = '#a6b2c9';
+      if (type === 'error') color = 'var(--red2)';
+      if (type === 'success') color = 'var(--green2)';
+      if (type === 'warn') color = 'var(--gold2)';
+      
+      consoleEl.innerHTML += `<span style="color:${color};">[${time}] ${msg}</span>\n`;
+      consoleEl.scrollTop = consoleEl.scrollHeight;
+    }
+
+    function clearScraperLogs() {
+      const consoleEl = document.getElementById('scraper-console-logs');
+      if (consoleEl) consoleEl.innerHTML = '';
+    }
+
+    async function analyzeTargetURL() {
+      const url = document.getElementById('scrape-url').value.trim();
+      if (!url) {
+        alert("Please enter a target URL first.");
+        return;
+      }
+      
+      const cookiesInput = document.getElementById('scrape-cookies').value.trim();
+      const btn = document.getElementById('btn-analyze-url');
+      const originalText = btn.innerHTML;
+      
+      try {
+        btn.disabled = true;
+        btn.innerHTML = `<i class="fas fa-spinner fa-spin"></i> Analyzing...`;
+        
+        addScraperLog(`Analyzing website structure for: ${url}...`, 'info');
+        
+        const response = await fetch('/api/crm/scraper/analyze', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer lm_123456'
+          },
+          body: JSON.stringify({ url, cookies: cookiesInput })
+        });
+        
+        const data = await response.json();
+        if (!response.ok || !data.success) {
+          addScraperLog(`Analysis failed: ${data.error || 'Server error'}`, 'error');
+          alert(`Could not automatically analyze website: ${data.error || 'Check server logs'}`);
+          return;
+        }
+        
+        addScraperLog(`Website analyzed successfully!`, 'success');
+        if (data.cookies) {
+          document.getElementById('scrape-cookies').value = data.cookies;
+          addScraperLog(`- Captured active session cookies automatically!`, 'success');
+        }
+        addScraperLog(`- Discovered Container: "${data.itemSelector}"`, 'success');
+        addScraperLog(`- Suggested Fields: ${data.suggestedFields.join(', ')}`, 'success');
+        if (data.pagination.enabled) {
+          addScraperLog(`- Detected Pagination Param: "${data.pagination.paramName}"` + (data.pagination.selector ? `, Selector: "${data.pagination.selector}"` : ''), 'success');
+        } else {
+          addScraperLog(`- No standard pagination bar detected (likely infinite scroll/single page).`, 'info');
+        }
+        
+        // Ask user if they want to populate these selectors
+        const apply = confirm(`Auto-Detection completed successfully!\n\n` +
+          `Discovered Container: ${data.itemSelector}\n` +
+          `Suggested Fields: ${data.suggestedFields.join(', ')}\n` +
+          `Pagination Detected: ${data.pagination.enabled ? 'Yes (' + data.pagination.paramName + ')' : 'No'}\n\n` +
+          `Do you want to automatically apply these selectors to the configuration form?`);
+          
+        if (apply) {
+          if (data.itemSelector) {
+            document.getElementById('scrape-item-selector').value = data.itemSelector;
+          }
+          
+          if (data.pagination.enabled) {
+            document.getElementById('scrape-page-enabled').checked = true;
+            document.getElementById('scrape-page-param').value = data.pagination.paramName;
+            if (data.pagination.selector) {
+              document.getElementById('scrape-pagination-selector').value = data.pagination.selector;
+            }
+          } else {
+            document.getElementById('scrape-page-enabled').checked = false;
+          }
+          
+          // Map fields using their advanced mappings to handle nested levels
+          const mappedFields = data.suggestedFields.map(f => data.fieldMappingHelp[f] || f);
+          document.getElementById('scrape-fields').value = mappedFields.join(', ');
+          
+          addScraperLog(`Configuration updated with auto-detected selectors!`, 'success');
+        }
+        
+      } catch (err) {
+        addScraperLog(`Analysis error: ${err.message}`, 'error');
+        alert(`Analysis error: ${err.message}`);
+      } finally {
+        btn.disabled = false;
+        btn.innerHTML = originalText;
+      }
+    }
+
+    async function startWebScrape() {
+      const url = document.getElementById('scrape-url').value.trim();
+      const startPoint = parseInt(document.getElementById('scrape-start').value) || 1;
+      const endPoint = parseInt(document.getElementById('scrape-end').value) || 5;
+      const fieldsInput = document.getElementById('scrape-fields').value;
+      const fields = fieldsInput.split(',').map(f => f.trim()).filter(Boolean);
+      const bufferTime = parseInt(document.getElementById('scrape-buffer').value) || 1000;
+      const expandReadMore = document.getElementById('scrape-expand').checked;
+      const translate = document.getElementById('scrape-translate').checked;
+      const pageEnabled = document.getElementById('scrape-page-enabled').checked;
+      const pageParam = document.getElementById('scrape-page-param').value.trim() || 'page';
+      
+      const itemSelector = document.getElementById('scrape-item-selector').value.trim();
+      const startSelector = document.getElementById('scrape-start-selector').value.trim();
+      const endSelector = document.getElementById('scrape-end-selector').value.trim();
+      const pagSelector = document.getElementById('scrape-pagination-selector').value.trim();
+      const cookiesInput = document.getElementById('scrape-cookies').value.trim();
+
+      const textFormatter = document.getElementById('format-text').checked;
+      const dateFormatter = document.getElementById('format-date').checked;
+      const numberFormatter = document.getElementById('format-number').checked;
+
+      if (!url) {
+        alert("Please enter a target URL.");
+        return;
+      }
+      if (!fields.length) {
+        alert("Please list at least one data field to collect.");
+        return;
+      }
+
+      document.getElementById('btn-start-scrape').disabled = true;
+      document.getElementById('btn-stop-scrape').disabled = false;
+      document.getElementById('scrape-metric-status').textContent = 'Starting...';
+      document.getElementById('scrape-metric-status').style.color = 'var(--gold)';
+      
+      clearScraperLogs();
+      addScraperLog(`Initializing scraper session for URL: ${url}`, 'info');
+      addScraperLog(`Fields configured: ${fields.join(', ')}`, 'info');
+
+      currentScraperSessionId = 'session_' + Date.now() + '_' + Math.floor(Math.random() * 1000);
+      cachedScrapedData = [];
+      cachedFields = fields;
+      loggedErrorsCount = 0;
+      updatePreviewTable(fields, []);
+
+      const body = {
+        sessionId: currentScraperSessionId,
+        url: url,
+        fields: fields,
+        startPoint: startPoint,
+        endPoint: endPoint,
+        bufferTime: bufferTime,
+        expandReadMore: expandReadMore,
+        translate: translate,
+        itemSelector: itemSelector,
+        startSelector: startSelector,
+        endSelector: endSelector,
+        cookies: cookiesInput,
+        formatters: {
+          text: textFormatter,
+          date: dateFormatter,
+          number: numberFormatter
+        },
+        pagination: {
+          enabled: pageEnabled,
+          paramName: pageParam,
+          selector: pagSelector
+        }
+      };
+
+      try {
+        const res = await fetch(`${API_BASE}/crm/scraper/start`, {
+          method: 'POST',
+          headers: {
+            'Authorization': 'Bearer lm_123456',
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify(body)
+        });
+        
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Server rejected scraper start');
+        
+        addScraperLog(`Backend scrape engine started successfully. Session: ${currentScraperSessionId}`, 'success');
+        startScraperStatusPolling(currentScraperSessionId);
+      } catch (err) {
+        addScraperLog(`Error starting scraper: ${err.message}`, 'error');
+        document.getElementById('btn-start-scrape').disabled = false;
+        document.getElementById('btn-stop-scrape').disabled = true;
+        document.getElementById('scrape-metric-status').textContent = 'Error';
+        document.getElementById('scrape-metric-status').style.color = 'var(--red)';
+      }
+    }
+
+    async function stopWebScrape() {
+      if (!currentScraperSessionId) return;
+      addScraperLog(`Halting scraper session. Requesting partial data...`, 'warn');
+      
+      try {
+        const res = await fetch(`${API_BASE}/crm/scraper/stop`, {
+          method: 'POST',
+          headers: {
+            'Authorization': 'Bearer lm_123456',
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({ sessionId: currentScraperSessionId })
+        });
+        
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Failed to stop session');
+        
+        addScraperLog(`Scrape session stopped by user. Received ${data.scrapedData?.length || 0} partial records.`, 'success');
+        
+        if (scraperPollInterval) {
+          clearInterval(scraperPollInterval);
+          scraperPollInterval = null;
+        }
+        
+        handleScraperSessionCompletion(data);
+      } catch (err) {
+        addScraperLog(`Error stopping scraper: ${err.message}`, 'error');
+      }
+    }
+
+    function startScraperStatusPolling(sessionId) {
+      if (scraperPollInterval) clearInterval(scraperPollInterval);
+      
+      scraperPollInterval = setInterval(async () => {
+        try {
+          const res = await fetch(`${API_BASE}/crm/scraper/status?sessionId=${sessionId}`, {
+            headers: {
+              'Authorization': 'Bearer lm_123456'
+            }
+          });
+          const data = await res.json();
+          if (!res.ok) {
+            throw new Error(data.error || 'Failed to poll status');
+          }
+
+          document.getElementById('scrape-metric-status').textContent = data.status.toUpperCase();
+          if (data.status === 'running') {
+            document.getElementById('scrape-metric-status').style.color = 'var(--gold)';
+          } else if (data.status === 'completed') {
+            document.getElementById('scrape-metric-status').style.color = 'var(--green)';
+          } else {
+            document.getElementById('scrape-metric-status').style.color = 'var(--red)';
+          }
+          
+          document.getElementById('scrape-metric-collected').textContent = `${data.scrapedData?.length || 0} records`;
+          document.getElementById('scrape-metric-page').textContent = `Page ${data.progress?.currentPage || 1}`;
+
+          if (data.scrapedData && data.scrapedData.length > 0) {
+            cachedScrapedData = data.scrapedData;
+            updatePreviewTable(cachedFields, data.scrapedData);
+            updateReportSummary(data.report, cachedFields, data.scrapedData.length);
+            
+            document.getElementById('btn-export-excel').style.display = '';
+            document.getElementById('export-excel-disabled').style.display = 'none';
+          }
+
+          if (data.errors && data.errors.length > loggedErrorsCount) {
+            for (let i = loggedErrorsCount; i < data.errors.length; i++) {
+              addScraperLog(`[WARNING] ${data.errors[i]}`, 'warn');
+            }
+            loggedErrorsCount = data.errors.length;
+          }
+
+          addScraperLog(`Polling status: ${data.status}. Traversed page ${data.progress?.currentPage || 1}. Collected ${data.scrapedData?.length || 0} records.`, 'info');
+
+          if (data.status !== 'running') {
+            clearInterval(scraperPollInterval);
+            scraperPollInterval = null;
+            addScraperLog(`Scraper finished with status: ${data.status}.`, data.status === 'completed' ? 'success' : 'warn');
+            handleScraperSessionCompletion(data);
+          }
+        } catch (err) {
+          addScraperLog(`Polling error: ${err.message}`, 'error');
+          clearInterval(scraperPollInterval);
+          scraperPollInterval = null;
+          document.getElementById('btn-start-scrape').disabled = false;
+          document.getElementById('btn-stop-scrape').disabled = true;
+        }
+      }, 2000);
+    }
+
+    function handleScraperSessionCompletion(data) {
+      document.getElementById('btn-start-scrape').disabled = false;
+      document.getElementById('btn-stop-scrape').disabled = true;
+      
+      document.getElementById('scrape-metric-status').textContent = data.status.toUpperCase();
+      document.getElementById('scrape-metric-status').style.color = data.status === 'completed' ? 'var(--green)' : 'var(--red)';
+      
+      if (data.error) {
+        addScraperLog(`Scraper Run Failed: ${data.error}`, 'error');
+      }
+
+      if (data.scrapedData && data.scrapedData.length > 0) {
+        cachedScrapedData = data.scrapedData;
+        updatePreviewTable(cachedFields, data.scrapedData);
+        updateReportSummary(data.report, cachedFields, data.scrapedData.length);
+        addScraperLog(`Automatically generating Excel workbook for download...`, 'success');
+        exportCollectedToExcel();
+      } else {
+        addScraperLog(`No records collected. Skipping excel compilation.`, 'warn');
+      }
+    }
+
+    function updateReportSummary(report, fields, totalCount) {
+      const collectedContainer = document.getElementById('report-collected-fields');
+      const missingContainer = document.getElementById('report-missing-fields');
+      
+      if (!collectedContainer || !missingContainer) return;
+      
+      collectedContainer.innerHTML = '';
+      missingContainer.innerHTML = '';
+      
+      const col = report?.collected || [];
+      const mis = report?.notCollected || [];
+      
+      if (col.length === 0) {
+        collectedContainer.innerHTML = `<span style="font-style: italic; color: var(--muted);">None</span>`;
+      } else {
+        col.forEach(f => {
+          collectedContainer.innerHTML += `<span style="background: rgba(16, 185, 129, 0.2); border: 1px solid var(--green); color: var(--green2); padding: 2px 6px; border-radius: 4px; font-weight: 500; font-size: 10px;">${f}</span>`;
+        });
+      }
+      
+      if (mis.length === 0) {
+        missingContainer.innerHTML = `<span style="font-style: italic; color: var(--muted);">None</span>`;
+      } else {
+        mis.forEach(f => {
+          missingContainer.innerHTML += `<span style="background: rgba(239, 68, 68, 0.2); border: 1px solid var(--red); color: var(--red2); padding: 2px 6px; border-radius: 4px; font-weight: 500; font-size: 10px;">${f}</span>`;
+        });
+      }
+      
+      const totalFields = fields.length;
+      const colFields = col.length;
+      const rate = totalFields ? Math.round((colFields / totalFields) * 100) : 0;
+      
+      document.getElementById('report-success-rate').textContent = `${rate}%`;
+      document.getElementById('report-success-rate').style.color = rate > 75 ? 'var(--green2)' : (rate > 40 ? 'var(--gold2)' : 'var(--red2)');
+      
+      const errorCount = totalCount === 0 && colFields === 0 ? 1 : 0;
+      document.getElementById('report-error-count').textContent = errorCount;
+      document.getElementById('report-error-count').style.color = errorCount > 0 ? 'var(--red2)' : 'var(--muted)';
+    }
+
+    function updatePreviewTable(fields, data) {
+      const headerRow = document.getElementById('scraper-table-header');
+      const tableBody = document.getElementById('scraper-table-body');
+      const countEl = document.getElementById('preview-row-count');
+      
+      if (!headerRow || !tableBody) return;
+      
+      headerRow.innerHTML = `<th style="padding: 10px; font-weight: 600; width: 50px;">#</th>`;
+      fields.forEach(f => {
+        headerRow.innerHTML += `<th style="padding: 10px; font-weight: 600; text-transform: capitalize;">${f}</th>`;
+      });
+      
+      tableBody.innerHTML = '';
+      if (data.length === 0) {
+        countEl.textContent = `Showing 0 rows`;
+        tableBody.innerHTML = `
+          <tr>
+            <td colspan="${fields.length + 1}" style="padding: 20px; text-align: center; color: var(--muted); font-style: italic;">
+              No scrape data loaded yet.
+            </td>
+          </tr>
+        `;
+        return;
+      }
+      
+      countEl.textContent = `Showing ${data.length} rows`;
+      
+      data.forEach((row, idx) => {
+        let cells = `<td style="padding: 8px 10px; border-bottom: 1px solid var(--border); color: var(--muted);">${idx + 1}</td>`;
+        fields.forEach(f => {
+          const val = row[f] || 'N/A';
+          let cellStyle = '';
+          if (val === 'N/A') cellStyle = 'color: var(--muted); font-style: italic;';
+          cells += `<td style="padding: 8px 10px; border-bottom: 1px solid var(--border); ${cellStyle}">${val}</td>`;
+        });
+        tableBody.innerHTML += `<tr>${cells}</tr>`;
+      });
+    }
+
+    function exportCollectedToExcel() {
+      if (cachedScrapedData.length === 0) {
+        alert("No data available to export.");
+        return;
+      }
+      
+      try {
+        addScraperLog(`Compiling Excel workbook...`, 'info');
+        
+        const wsData = XLSX.utils.json_to_sheet(cachedScrapedData);
+        
+        const collectedSet = new Set();
+        cachedScrapedData.forEach(row => {
+          cachedFields.forEach(f => {
+            if (row[f] && row[f] !== 'N/A' && row[f] !== '') {
+              collectedSet.add(f);
+            }
+          });
+        });
+        
+        const summaryRows = cachedFields.map(field => {
+          const isCollected = collectedSet.has(field);
+          return {
+            "Data Field": field,
+            "Status": isCollected ? "Collected" : "Missing / Not Found",
+            "Fill Rate": isCollected ? "100%" : "0%"
+          };
+        });
+        
+        summaryRows.push({});
+        summaryRows.push({ "Data Field": "Scraper Execution Metadata" });
+        summaryRows.push({ "Data Field": "Export Time", "Status": new Date().toLocaleString() });
+        summaryRows.push({ "Data Field": "Total Records Scraped", "Status": cachedScrapedData.length });
+        summaryRows.push({ "Data Field": "Total Confirmed Fields", "Status": `${collectedSet.size} of ${cachedFields.length}` });
+        
+        const wsSummary = XLSX.utils.json_to_sheet(summaryRows);
+        
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, wsData, "Scraped Data");
+        XLSX.utils.book_append_sheet(wb, wsSummary, "Scraper Report Summary");
+        
+        const filename = `webscrape_data_${Date.now()}.xlsx`;
+        XLSX.writeFile(wb, filename);
+        
+        addScraperLog(`Excel workbook exported successfully: ${filename}`, 'success');
+      } catch (err) {
+        addScraperLog(`Failed to compile Excel file: ${err.message}`, 'error');
+      }
+    }
+
+    function handleHtmlFileUpload(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+      
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        document.getElementById('html-paste-area').value = e.target.result;
+        addScraperLog(`Loaded file: ${file.name} (${file.size} bytes). Click 'Parse HTML Content' to extract data fields.`, 'info');
+      };
+      reader.readAsText(file);
+    }
+
+    async function parsePastedHTML() {
+      const html = document.getElementById('html-paste-area').value.trim();
+      const fieldsInput = document.getElementById('scrape-fields').value;
+      const fields = fieldsInput.split(',').map(f => f.trim()).filter(Boolean);
+      
+      const itemSelector = document.getElementById('scrape-item-selector').value.trim();
+      const startSelector = document.getElementById('scrape-start-selector').value.trim();
+      const endSelector = document.getElementById('scrape-end-selector').value.trim();
+
+      const textFormatter = document.getElementById('format-text').checked;
+      const dateFormatter = document.getElementById('format-date').checked;
+      const numberFormatter = document.getElementById('format-number').checked;
+      const translate = document.getElementById('scrape-translate').checked;
+      const expandReadMore = document.getElementById('scrape-expand').checked;
+
+      if (!html) {
+        alert("Please upload an HTML file or paste raw HTML content.");
+        return;
+      }
+      if (!fields.length) {
+        alert("Please list at least one data field to collect.");
+        return;
+      }
+
+      addScraperLog(`Parsing local HTML document...`, 'info');
+      document.getElementById('scrape-metric-status').textContent = 'Parsing...';
+      document.getElementById('scrape-metric-status').style.color = 'var(--gold)';
+
+      const body = {
+        html: html,
+        fields: fields,
+        options: {
+          translate: translate,
+          expandReadMore: expandReadMore,
+          itemSelector: itemSelector,
+          startSelector: startSelector,
+          endSelector: endSelector,
+          formatters: {
+            text: textFormatter,
+            date: dateFormatter,
+            number: numberFormatter
+          }
+        }
+      };
+
+      try {
+        const res = await fetch(`${API_BASE}/crm/scraper/upload-html`, {
+          method: 'POST',
+          headers: {
+            'Authorization': 'Bearer lm_123456',
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify(body)
+        });
+        
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Failed to parse local HTML');
+        
+        addScraperLog(`HTML parsed successfully. Extracted ${data.results?.length || 0} records.`, 'success');
+        
+        document.getElementById('scrape-metric-status').textContent = 'COMPLETED';
+        document.getElementById('scrape-metric-status').style.color = 'var(--green)';
+        document.getElementById('scrape-metric-collected').textContent = `${data.results?.length || 0} records`;
+        document.getElementById('scrape-metric-page').textContent = 'Local File';
+
+        if (data.results && data.results.length > 0) {
+          cachedScrapedData = data.results;
+          cachedFields = fields;
+          updatePreviewTable(fields, data.results);
+          updateReportSummary(data.report, fields, data.results.length);
+          
+          document.getElementById('btn-export-excel').style.display = '';
+          document.getElementById('export-excel-disabled').style.display = 'none';
+
+          addScraperLog(`Automatically generating Excel workbook for download...`, 'success');
+          exportCollectedToExcel();
+        } else {
+          addScraperLog(`No records could be extracted from this HTML content. Try adjusting fields or inspect the HTML source.`, 'warn');
+        }
+      } catch (err) {
+        addScraperLog(`Error parsing HTML: ${err.message}`, 'error');
+        document.getElementById('scrape-metric-status').textContent = 'Error';
+        document.getElementById('scrape-metric-status').style.color = 'var(--red)';
+      }
+    }
+
+    // ── n8n WORKFLOW TESTER ──────────────────────────────────────────────────────
+    function addTestLog(msg, type = 'info') {
+      const consoleEl = document.getElementById('test-console-logs');
+      if (!consoleEl) return;
+      const timestamp = new Date().toLocaleTimeString();
+      let color = 'var(--text2)';
+      if (type === 'error') color = '#ff6b6b';
+      if (type === 'success') color = '#51cf66';
+      consoleEl.innerHTML += `<span style="color: ${color}">[${timestamp}] ${msg}</span>\n`;
+      consoleEl.scrollTop = consoleEl.scrollHeight;
+    }
+
+    function clearTestLogs() {
+      const consoleEl = document.getElementById('test-console-logs');
+      if (consoleEl) consoleEl.innerHTML = '';
+    }
+
+    async function loadTesterLeads() {
+      const selectEl = document.getElementById('test-change-lead-id');
+      if (!selectEl) return;
+      selectEl.innerHTML = '<option value="">-- Loading Leads... --</option>';
+      try {
+        const res = await fetch(`${API_BASE}/crm/leads?limit=50`, {
+          headers: {
+            'Authorization': 'Bearer lm_123456'
+          }
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Failed to fetch leads');
+        
+        selectEl.innerHTML = '<option value="">-- Select a Lead --</option>';
+        if (data.data && data.data.length > 0) {
+          data.data.forEach(lead => {
+            const name = `${lead.first_name || ''} ${lead.last_name || ''}`.trim() || lead.email || `Lead #${lead.id}`;
+            const info = `${name} (${lead.company || 'No Company'}) [Tier: ${lead.tier || 'None'}]`;
+            selectEl.innerHTML += `<option value="${lead.id}">${info}</option>`;
+          });
+          addTestLog(`Successfully loaded ${data.data.length} leads for tier change dropdown.`, 'success');
+        } else {
+          selectEl.innerHTML = '<option value="">No leads found</option>';
+          addTestLog('No leads found in database. Create a lead first.', 'info');
+        }
+      } catch (err) {
+        selectEl.innerHTML = '<option value="">Error loading leads</option>';
+        addTestLog(`Failed to load leads: ${err.message}`, 'error');
+      }
+    }
+
+    async function triggerLeadCreatedTest() {
+      const fname = document.getElementById('test-lead-fname').value.trim();
+      const lname = document.getElementById('test-lead-lname').value.trim();
+      const company = document.getElementById('test-lead-company').value.trim();
+      const email = document.getElementById('test-lead-email').value.trim();
+      const tier = document.getElementById('test-lead-tier').value;
+
+      if (!company) {
+        addTestLog('Error: Company is required to create a lead.', 'error');
+        return;
+      }
+
+      addTestLog(`Triggering lead creation for "${fname} ${lname}"...`, 'info');
+      try {
+        const body = {
+          leads: [{
+            first_name: fname || undefined,
+            last_name: lname || undefined,
+            company: company,
+            email: email || undefined,
+            tier: tier
+          }]
+        };
+
+        const res = await fetch(`${API_BASE}/crm/leads/batch`, {
+          method: 'POST',
+          headers: {
+            'Authorization': 'Bearer lm_123456',
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify(body)
+        });
+        
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+        
+        addTestLog(`POST /leads/batch Succeeded! Response: ${JSON.stringify(data)}`, 'success');
+        addTestLog(`Webhook "lead_created" triggered for n8n. Watch n8n execution!`, 'info');
+        
+        // Refresh leads list
+        await loadTesterLeads();
+      } catch (err) {
+        addTestLog(`Trigger failed: ${err.message}`, 'error');
+      }
+    }
+
+    async function triggerTierChangedTest() {
+      const leadId = document.getElementById('test-change-lead-id').value;
+      const tier = document.getElementById('test-change-lead-tier').value;
+
+      if (!leadId) {
+        addTestLog('Error: Please select a lead to change its tier.', 'error');
+        return;
+      }
+
+      addTestLog(`Triggering tier change to "${tier}" for Lead ID ${leadId}...`, 'info');
+      try {
+        const body = { tier: tier };
+
+        const res = await fetch(`${API_BASE}/crm/leads/${leadId}`, {
+          method: 'PATCH',
+          headers: {
+            'Authorization': 'Bearer enrich_789012',
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify(body)
+        });
+        
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+        
+        addTestLog(`PATCH /leads/${leadId} Succeeded! Response: ${JSON.stringify(data)}`, 'success');
+        addTestLog(`Webhook "lead_tier_changed" triggered for n8n. Watch n8n execution!`, 'info');
+        
+        // Refresh leads list to reflect updated tier in dropdown
+        await loadTesterLeads();
+      } catch (err) {
+        addTestLog(`Trigger failed: ${err.message}`, 'error');
+      }
+    }
 
     // ── USER MANAGEMENT ─────────────────────────────────────────────────────────
     let umEditingId = null;
@@ -20926,7 +21982,7 @@ ${plainText}`;
       if (!composeRecipientPanel) {
         composeRecipientPanel = document.createElement('div');
         composeRecipientPanel.id = 'compose-recipient-suggestions';
-        composeRecipientPanel.style.cssText = 'position:fixed;z-index:10050;background:var(--card);border:1px solid var(--border2);border-radius:8px;box-shadow:0 12px 28px rgba(0,0,0,.35);overflow:hidden;max-height:260px;overflow-y:auto;';
+        composeRecipientPanel.style.cssText = 'position:fixed;z-index:999999;background:var(--card);border:1px solid var(--border2);border-radius:8px;box-shadow:0 12px 28px rgba(0,0,0,.35);overflow:hidden;max-height:260px;overflow-y:auto;';
         document.body.appendChild(composeRecipientPanel);
       }
       const rect = input.getBoundingClientRect();
@@ -20990,6 +22046,21 @@ ${plainText}`;
     function normalizeTemplateHtmlForEditor(rawHtml) {
       const html = String(rawHtml || '').trim();
       if (!html) return '';
+
+      const isFullDoc = /<!doctype\s+html/i.test(html) || /<html[\s>]/i.test(html);
+      const hasWrapper = /data-html-uid=/i.test(html);
+
+      if (isFullDoc && !hasWrapper) {
+        // Wrap full HTML documents in a persistent embed automatically to preserve structure and <head>
+        const uid = 'html-embed-tpl-' + Date.now() + Math.floor(Math.random() * 1000);
+        if (typeof _htmlEmbedStore !== 'undefined') {
+          _htmlEmbedStore.set(uid, html);
+        }
+        const payload = typeof htmlEmbedEncode === 'function' ? htmlEmbedEncode(html) : btoa(unescape(encodeURIComponent(html)));
+        const escaped = html.replace(/&/g, '&amp;').replace(/"/g, '&quot;');
+        return `<div class="html-embed-container" data-html-uid="${uid}" data-html-payload="${payload}" contenteditable="false" style="border:1px solid var(--border);border-radius:8px;padding:4px;background:var(--card);margin:10px 0;user-select:none;position:relative;"><div style="position:absolute;top:0;right:0;background:var(--card);padding:4px 8px;font-size:10px;color:var(--gold);border-bottom-left-radius:8px;border-left:1px solid var(--border);border-bottom:1px solid var(--border);z-index:10;"><i class="fas fa-lock"></i> Protected HTML Embed</div><iframe style="width:100%;border:none;pointer-events:none;min-height:200px;" srcdoc="${escaped}"></iframe></div>`;
+      }
+
       try {
         const parser = new DOMParser();
         const doc = parser.parseFromString(html, 'text/html');
@@ -27033,6 +28104,18 @@ ${plainText}`;
       ed.focus();
       try { document.execCommand('styleWithCSS', false, true); } catch (_) { }
       document.execCommand(cmd, false, val || null);
+    }
+
+    function etInsertLink() {
+      etRestoreSelection();
+      var url = prompt('Enter URL (e.g. https://example.com)');
+      if (!url) return;
+      if (!/^https?:\/\//i.test(url)) url = 'https://' + url;
+      document.execCommand('createLink', false, url);
+      var ed = etGetEditor();
+      if (ed) ed.querySelectorAll('a:not([data-lk])').forEach(function(a) {
+        a.style.color = '#1a73e8'; a.setAttribute('title', a.href || url); a.setAttribute('data-lk','1');
+      });
     }
 
     // Font name — wraps selection or sets for next typing
@@ -33635,6 +34718,11 @@ Provide insight in a numbered list. Highlight risks and positives.`;
               onclick="etFmt('insertOrderedList')" title="Numbered list"><i class="fas fa-list-ol"></i></button>
             <button class="btn btn-ghost btn-xs" onmousedown="event.preventDefault()"
               onclick="etFmt('insertUnorderedList')" title="Bullet list"><i class="fas fa-list-ul"></i></button>
+            <div style="width:1px;height:18px;background:var(--border);margin:0 2px;"></div>
+            <button class="btn btn-ghost btn-xs" onmousedown="event.preventDefault()" onclick="etInsertLink()"
+              title="Insert link"><i class="fas fa-link"></i></button>
+            <button class="btn btn-ghost btn-xs" onmousedown="event.preventDefault()" onclick="etFmt('unlink')"
+              title="Remove link"><i class="fas fa-unlink"></i></button>
             <div style="width:1px;height:18px;background:var(--border);margin:0 2px;"></div>
             <span
               style="font-size:10px;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:0.5px;">Insert:</span>
