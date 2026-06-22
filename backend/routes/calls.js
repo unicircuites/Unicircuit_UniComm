@@ -25,6 +25,7 @@ const backupJobs = {};
 const { authenticate } = require('../middleware/auth');
 const smdr = require('../services/matrixSmdr');
 const recordingLinker = require('../services/recordingLinker');
+const oneDriveSync = require('../services/oneDriveSync');
 
 
 // Fire-and-forget refresh of the deduped materialized view (non-blocking)
@@ -1399,14 +1400,17 @@ router.post('/link-recordings', async (req, res) => {
   }
 });
 
-router.get('/recordings/play', (req, res) => {
+router.get('/recordings/play', async (req, res) => {
   try {
     const file = req.query.file;
     if (!file) return res.status(400).json({ error: 'No file specified' });
 
-    const fullPath = recordingLinker.resolveRecordingFullPath(file, REC_DIR);
+    let fullPath = recordingLinker.resolveRecordingFullPath(file, REC_DIR);
     if (!fullPath) {
-      return res.status(404).json({ error: 'Recording file not found' });
+      fullPath = await oneDriveSync.ensureLocalRecording(path.basename(file));
+      if (!fullPath) {
+        return res.status(404).json({ error: 'Recording file not found' });
+      }
     }
 
     const allowedRoots = [
@@ -1654,14 +1658,14 @@ router.get('/recordings/folder', (req, res) => {
 
 
 /** GET /api/calls/recordings/:filename — Stream audio file */
-router.get('/recordings/*', (req, res) => {
+router.get('/recordings/*', async (req, res) => {
 
   try {
 
     const relativePath =
       decodeURIComponent(req.params[0]);
 
-    const filepath =
+    let filepath =
       findRecordingFile(REC_DIR, relativePath);
 
     console.log('[RECORDING REQUEST]', filepath);
@@ -1669,6 +1673,11 @@ router.get('/recordings/*', (req, res) => {
     if (!filepath || !fs.existsSync(filepath)) {
 
       console.log('[RECORDING NOT FOUND]', filepath);
+
+      filepath = await oneDriveSync.ensureLocalRecording(path.basename(relativePath));
+    }
+
+    if (!filepath || !fs.existsSync(filepath)) {
 
       return res.status(404)
         .send('Recording not found');

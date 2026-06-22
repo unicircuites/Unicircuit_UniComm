@@ -7,6 +7,7 @@ const path = require('path');
 const pool = require('../db/pool');
 
 const fsp = fs.promises;
+const oneDriveSync = require('../services/oneDriveSync');
 
 const router = express.Router();
 
@@ -583,6 +584,27 @@ router.get(
   }
 );
 
+router.get('/onedrive/status', async (_req, res) => {
+  try {
+    const status = await oneDriveSync.getSyncStatus();
+    res.json({ success: true, ...status });
+  } catch (err) {
+    console.error('[PBX ONEDRIVE STATUS ERROR]', err);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+router.post('/onedrive/upload', async (_req, res) => {
+  try {
+    await oneDriveSync.cleanLocalCache();
+    const result = await oneDriveSync.runUploadJob();
+    res.json({ success: !result.error, ...result });
+  } catch (err) {
+    console.error('[PBX ONEDRIVE UPLOAD ERROR]', err);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 router.get('/db-folders',
   async (req, res) => {
     try {
@@ -730,7 +752,7 @@ router.get(
         const result =
             await pool.query(
             `
-            SELECT local_path
+            SELECT original_filename, local_path
             FROM pbx_recordings
             WHERE id = $1
             LIMIT 1
@@ -748,8 +770,21 @@ router.get(
 
         }
 
-        const filePath =
+        let filePath =
             result.rows[0].local_path;
+
+        if (
+            !fs.existsSync(filePath)
+        ) {
+            const cachedPath = await oneDriveSync.ensureLocalRecording(result.rows[0].original_filename || path.basename(filePath));
+            if (cachedPath) {
+                filePath = cachedPath;
+                await pool.query(
+                    `UPDATE pbx_recordings SET local_path = $1 WHERE id = $2`,
+                    [cachedPath, req.params.id]
+                ).catch(err => console.warn('[PBX PLAY] Could not update cached local_path:', err.message));
+            }
+        }
 
         if (
             !fs.existsSync(filePath)

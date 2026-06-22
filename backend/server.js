@@ -49,6 +49,7 @@ const wa = require('./services/whatsapp');
 const waInventory = require('./services/whatsappInventory');
 const smdr = require('./services/matrixSmdr');
 const mktCron = require('./services/marketingCron');
+const oneDriveSync = require('./services/oneDriveSync');
 const taskNotifier = require('./services/taskNotifier');
 const automatedAI = require('./services/automatedAI');
 const aiTaskQueue = require('./services/aiTaskQueue');
@@ -694,30 +695,30 @@ app.use('/api/matrix-backup', require('./routes/matrixBackup'));
 app.use('/api/pbx', require('./routes/pbx'));
 app.use('/api/crm', require('./routes/crmIntegration'));
 
-// OAuth2 callback — must be at root level to match redirect URI
+// OAuth2 callback - must be at root level to match redirect URI
 app.use('/auth', require('./routes/outlook'));
 
-// ── HEALTH CHECK ───────────────────────────────────────────────────────────
+// -- HEALTH CHECK -----------------------------------------------------------
 app.get('/api/health', (_req, res) => {
   res.json({ status: 'ok', service: 'UniComm Pro API', version: '3.0.0', timestamp: new Date().toISOString() });
 });
 
-// ── 404 ────────────────────────────────────────────────────────────────────
+// -- 404 --------------------------------------------------------------------
 app.use((req, res) => {
   res.status(404).json({ error: `${req.method} ${req.path} not found.` });
 });
 
-// ── GLOBAL ERROR HANDLER ───────────────────────────────────────────────────
+// -- GLOBAL ERROR HANDLER ---------------------------------------------------
 // eslint-disable-next-line no-unused-vars
 app.use((err, _req, res, _next) => {
   console.error('[Server] Unhandled error:', err.message);
   res.status(500).json({ error: 'Internal server error.' });
 });
 
-// ── START ──────────────────────────────────────────────────────────────────
+// -- START ------------------------------------------------------------------
 server.listen(PORT, HOST, async () => {
-  console.log(`\n🚀  UniComm Pro API  →  ${urlScheme}://localhost:${PORT}  (bind ${HOST})`);
-  console.log(`🏥  Health check    →  ${urlScheme}://localhost:${PORT}/api/health`);
+  console.log(`\nUniComm Pro API  ->  ${urlScheme}://localhost:${PORT}  (bind ${HOST})`);
+  console.log(`Health check     ->  ${urlScheme}://localhost:${PORT}/api/health`);
   console.log(`📱  WhatsApp        →  starting...\n`);
 
   // Sequential Service Initialization for stability
@@ -740,6 +741,7 @@ server.listen(PORT, HOST, async () => {
 
     // 4. Maintenance & Schedulers
     mktCron.start(io);
+    oneDriveSync.start();
     waInventory.startDailyBackup(() => wa.getConnectedPhone());
     taskNotifier.start(pool);
 
