@@ -49,7 +49,6 @@ const wa = require('./services/whatsapp');
 const waInventory = require('./services/whatsappInventory');
 const smdr = require('./services/matrixSmdr');
 const mktCron = require('./services/marketingCron');
-const oneDriveSync = require('./services/oneDriveSync');
 const taskNotifier = require('./services/taskNotifier');
 const automatedAI = require('./services/automatedAI');
 const aiTaskQueue = require('./services/aiTaskQueue');
@@ -741,7 +740,6 @@ server.listen(PORT, HOST, async () => {
 
     // 4. Maintenance & Schedulers
     mktCron.start(io);
-    oneDriveSync.start();
     waInventory.startDailyBackup(() => wa.getConnectedPhone());
     taskNotifier.start(pool);
 

@@ -25,7 +25,6 @@ const backupJobs = {};
 const { authenticate } = require('../middleware/auth');
 const smdr = require('../services/matrixSmdr');
 const recordingLinker = require('../services/recordingLinker');
-const oneDriveSync = require('../services/oneDriveSync');
 
 
 // Fire-and-forget refresh of the deduped materialized view (non-blocking)
@@ -1407,10 +1406,7 @@ router.get('/recordings/play', async (req, res) => {
 
     let fullPath = recordingLinker.resolveRecordingFullPath(file, REC_DIR);
     if (!fullPath) {
-      fullPath = await oneDriveSync.ensureLocalRecording(path.basename(file));
-      if (!fullPath) {
-        return res.status(404).json({ error: 'Recording file not found' });
-      }
+      return res.status(404).json({ error: 'Recording file not found' });
     }
 
     const allowedRoots = [
@@ -1673,11 +1669,6 @@ router.get('/recordings/*', async (req, res) => {
     if (!filepath || !fs.existsSync(filepath)) {
 
       console.log('[RECORDING NOT FOUND]', filepath);
-
-      filepath = await oneDriveSync.ensureLocalRecording(path.basename(relativePath));
-    }
-
-    if (!filepath || !fs.existsSync(filepath)) {
 
       return res.status(404)
         .send('Recording not found');

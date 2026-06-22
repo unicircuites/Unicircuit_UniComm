@@ -71,7 +71,6 @@ const SCOPES = [
   'https://graph.microsoft.com/Mail.ReadWrite',
   'https://graph.microsoft.com/Contacts.ReadWrite',
   'https://graph.microsoft.com/MailboxSettings.ReadWrite',
-  'https://graph.microsoft.com/Files.ReadWrite.All',
   'offline_access',
 ];
 const AUTH_SCOPES = [
