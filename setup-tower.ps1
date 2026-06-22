@@ -20,8 +20,9 @@ Write-Host "Working Directory: $scriptRoot" -ForegroundColor Gray
 
 # ── STEP 2: Configure OneDrive Storage Path ──
 Write-Host "`n[1/7] Configuring custom storage directories..." -ForegroundColor Yellow
-$defaultOneDrive = Join-Path [System.Environment]::GetFolderPath("UserProfile") "OneDrive\UniComm_Storage"
-Write-Host "This app stores high-volume media (photos, videos, voice recordings) in OneDrive to save C: drive space." -ForegroundColor LightGray
+$userProfile = [System.Environment]::GetFolderPath("UserProfile")
+$defaultOneDrive = Join-Path $userProfile "OneDrive\UniComm_Storage"
+Write-Host "This app stores high-volume media (photos, videos, voice recordings) in OneDrive to save C: drive space." -ForegroundColor Gray
 $oneDriveInput = Read-Host "Enter target OneDrive path [Default: $defaultOneDrive]"
 $oneDrivePath = if ([string]::IsNullOrWhiteSpace($oneDriveInput)) { $defaultOneDrive } else { $oneDriveInput }
 
@@ -211,7 +212,7 @@ Write-Host "PM2 Windows Startup Task registered successfully." -ForegroundColor 
 Write-Host "`n=========================================================" -ForegroundColor Green
 Write-Host "             SETUP COMPLETED SUCCESSFULLY!                " -ForegroundColor Green
 Write-Host "=========================================================" -ForegroundColor Green
-Write-Host "You can access the CRM locally at: https://localhost:8088" -ForegroundColor LightGray
-Write-Host "Or on the LAN network at: https://192.168.0.205:8088" -ForegroundColor LightGray
+Write-Host "You can access the CRM locally at: https://localhost:8088" -ForegroundColor Gray
+Write-Host "Or on the LAN network at: https://192.168.0.205:8088" -ForegroundColor Gray
 Write-Host "All media files and backups are redirected to your OneDrive folder." -ForegroundColor Gray
 Write-Host "=========================================================" -ForegroundColor Green
