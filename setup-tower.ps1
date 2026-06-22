@@ -188,19 +188,12 @@ if (-not $pm2Path) {
     npm install -g pm2
 }
 
-# Install n8n globally if missing
-$n8nPath = Get-Command n8n -ErrorAction SilentlyContinue
-if (-not $n8nPath) {
-    Write-Host "n8n workflow manager not found. Installing globally via npm (this may take a few minutes)..." -ForegroundColor Gray
-    npm install -g n8n --legacy-peer-deps
-}
-
 # Clean any existing instances
 Write-Host "Stopping any existing PM2 processes..." -ForegroundColor Gray
 pm2 delete all 2>$null | Out-Null
 
 # Start services using the ecosystem.config.js file
-Write-Host "Starting UniComm CRM & n8n via PM2 ecosystem..." -ForegroundColor Gray
+Write-Host "Starting UniComm CRM via PM2 ecosystem..." -ForegroundColor Gray
 pm2 start ecosystem.config.js
 pm2 save
 
