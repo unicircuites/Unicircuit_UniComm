@@ -41,7 +41,22 @@ const msalConfig = {
   }
 };
 
-const cca = new msal.ConfidentialClientApplication(msalConfig);
+let cca = null;
+try {
+  if (process.env.MS_CLIENT_ID && process.env.MS_CLIENT_SECRET) {
+    cca = new msal.ConfidentialClientApplication(msalConfig);
+  } else {
+    console.warn('[MSAL] Microsoft Graph credentials are not set in environment variables. Outlook integration is disabled.');
+  }
+} catch (err) {
+  console.warn('[MSAL] Failed to initialize ConfidentialClientApplication:', err.message);
+}
+
+function checkCCA() {
+  if (!cca) {
+    throw new Error('Microsoft Graph client is not configured. Please define MS_CLIENT_ID and MS_CLIENT_SECRET in .env.');
+  }
+}
 
 const SCOPES = [
   'https://graph.microsoft.com/Mail.Read',
@@ -103,6 +118,7 @@ async function getClientCredentialsToken(forceRefresh = false) {
     return _ccToken;
   }
   try {
+    checkCCA();
     const result = await cca.acquireTokenByClientCredential({
       scopes: ['https://graph.microsoft.com/.default'],
     });
@@ -136,6 +152,7 @@ async function getAccessToken(email) {
   // Try refresh token
   if (stored && stored.refresh_token) {
     try {
+      checkCCA();
       const result = await cca.acquireTokenByRefreshToken({
         refreshToken: stored.refresh_token,
         scopes: SCOPES,
@@ -162,6 +179,7 @@ async function getAccessTokenForScopes(email, scopes) {
   const stored = await getStoredTokens(email);
   if (!stored || !stored.refresh_token) return null;
   try {
+    checkCCA();
     const result = await cca.acquireTokenByRefreshToken({
       refreshToken: stored.refresh_token,
       scopes: scopes && scopes.length ? scopes : SCOPES,
@@ -187,6 +205,7 @@ async function getAuthUrl(state) {
   console.log('  scopes                      =', AUTH_SCOPES.join(', '));
 
   try {
+    checkCCA();
     const url = await cca.getAuthCodeUrl({
       scopes:      AUTH_SCOPES,
       redirectUri: process.env.MS_REDIRECT_URI,
@@ -237,6 +256,7 @@ function logOutlookOAuthConfigAtStartup() {
 async function exchangeCode(code) {
   console.log('[MSAL] Exchanging auth code for token...');
   try {
+    checkCCA();
     const result = await cca.acquireTokenByCode({
       code,
       scopes:      AUTH_SCOPES,
@@ -359,6 +379,7 @@ async function isAuthenticated(email) {
     } else if (stored.refresh_token) {
       // Try refresh
       try {
+        checkCCA();
         const result = await cca.acquireTokenByRefreshToken({
           refreshToken: stored.refresh_token,
           scopes: SCOPES,
