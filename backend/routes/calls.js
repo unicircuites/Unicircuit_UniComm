@@ -56,7 +56,8 @@ console.log('[REC_DIR]', REC_DIR);
 // ── Backup directory ──────────────────────────────────────────────────────
 const BACKUP_DIR = process.env.CALL_BACKUP_DIR
   || 'C:\\MatrixVMS\\Voicemail_Backup\\_BACKUPS';
-const REPO_BACKUP_DIR = path.join(__dirname, '../../call_backups');
+const REPO_BACKUP_DIR = process.env.CALL_REPO_BACKUP_DIR
+  || path.join(__dirname, '../../call_backups');
 const BACKUP_DIRS = [...new Set([BACKUP_DIR, REPO_BACKUP_DIR])];
 
 // Ensure directories exist

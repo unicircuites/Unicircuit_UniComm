@@ -1309,7 +1309,7 @@ router.post('/purge-all', authenticate, async (req, res) => {
     } finally { client.release(); }
 
     // 3. Wipe media files
-    const mediaDir = path.join(__dirname, '../wa_media');
+    const mediaDir = process.env.WA_MEDIA_DIR || path.join(__dirname, '../wa_media');
     let mediaDeleted = 0;
     if (fs.existsSync(mediaDir)) {
       for (const f of fs.readdirSync(mediaDir)) {

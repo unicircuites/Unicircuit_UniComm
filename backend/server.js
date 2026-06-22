@@ -411,21 +411,19 @@ app.use(express.static(path.join(__dirname, '..'), {
   },
 }));
 
+const pbxLocalRecordingsDir = process.env.PBX_LOCAL_RECORDINGS_DIR || path.join(__dirname, 'pbx_recordings');
 app.use(
   '/pbx-local-recordings',
-
-  express.static(
-    path.join(
-      __dirname,
-      'pbx_recordings'
-    )
-  )
+  express.static(pbxLocalRecordingsDir)
 );
 
 // Redirect root → login page
 app.get('/', (_req, res) => {
   res.redirect('/login.html');
 });
+
+// Serve blank favicon to avoid console 404 errors
+app.get('/favicon.ico', (req, res) => res.status(204).end());
 
 // ── CORS ───────────────────────────────────────────────────────────────────
 app.use(cors({

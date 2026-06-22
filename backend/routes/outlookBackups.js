@@ -4,7 +4,7 @@ const router = express.Router();
 const fs = require('fs');
 const path = require('path');
 
-const BACKUP_DIR = path.join(__dirname, '../outlook_backups');
+const BACKUP_DIR = process.env.OUTLOOK_BACKUPS_DIR || path.join(__dirname, '../outlook_backups');
 
 if (!fs.existsSync(BACKUP_DIR)) {
     fs.mkdirSync(BACKUP_DIR, { recursive: true });

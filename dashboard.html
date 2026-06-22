@@ -7088,6 +7088,10 @@
                     <input type="checkbox" id="scrape-translate" checked style="cursor: pointer;" />
                     <label for="scrape-translate" style="font-size: 12px; color: var(--text2); cursor: pointer;">Translate to English (Auto)</label>
                   </div>
+                  <div style="display: flex; align-items: center; gap: 8px;">
+                    <input type="checkbox" id="scrape-show-browser" style="cursor: pointer;" />
+                    <label for="scrape-show-browser" style="font-size: 12px; color: var(--gold2); font-weight: 600; cursor: pointer;">Show browser window (Test visibility)</label>
+                  </div>
                   
                   <div style="font-size: 10px; color: var(--muted); font-weight: 600; margin-top: 4px; border-top: 1px solid var(--border); padding-top: 4px;">FORMATTERS</div>
                   
@@ -13812,6 +13816,7 @@ Keep it concise and professional.`;
       }
       
       const cookiesInput = document.getElementById('scrape-cookies').value.trim();
+      const showBrowser = document.getElementById('scrape-show-browser')?.checked || false;
       const btn = document.getElementById('btn-analyze-url');
       const originalText = btn.innerHTML;
       
@@ -13827,7 +13832,7 @@ Keep it concise and professional.`;
             'Content-Type': 'application/json',
             'Authorization': 'Bearer lm_123456'
           },
-          body: JSON.stringify({ url, cookies: cookiesInput })
+          body: JSON.stringify({ url, cookies: cookiesInput, showBrowser })
         });
         
         const data = await response.json();
@@ -13934,9 +13939,11 @@ Keep it concise and professional.`;
       loggedErrorsCount = 0;
       updatePreviewTable(fields, []);
 
+      const showBrowser = document.getElementById('scrape-show-browser')?.checked || false;
       const body = {
         sessionId: currentScraperSessionId,
         url: url,
+        showBrowser: showBrowser,
         fields: fields,
         startPoint: startPoint,
         endPoint: endPoint,

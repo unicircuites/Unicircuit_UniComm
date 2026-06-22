@@ -5,8 +5,8 @@ const pool    = require('../db/pool');
 const archiver = require('archiver');
 const unzipper = require('unzipper');
 
-const BACKUP_DIR = path.join(__dirname, '../wa_backups');
-const MEDIA_DIR  = path.join(__dirname, '../wa_media');
+const BACKUP_DIR = process.env.WA_BACKUPS_DIR || path.join(__dirname, '../wa_backups');
+const MEDIA_DIR  = process.env.WA_MEDIA_DIR || path.join(__dirname, '../wa_media');
 const TABLES     = ['wa_contacts', 'wa_chats', 'wa_messages'];
 
 function ensureDir(dir) {

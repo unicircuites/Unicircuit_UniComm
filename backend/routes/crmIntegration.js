@@ -591,9 +591,9 @@ router.post('/scraper/upload-html', async (req, res, next) => {
 
 router.post('/scraper/analyze', async (req, res, next) => {
   try {
-    const { url, cookies } = req.body;
+    const { url, cookies, showBrowser } = req.body;
     if (!url) return res.status(400).json({ error: 'url is required.' });
-    const analysis = await scraperService.analyzeURL(url, cookies);
+    const analysis = await scraperService.analyzeURL(url, cookies, showBrowser);
     return res.json(analysis);
   } catch (err) {
     next(err);

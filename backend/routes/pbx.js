@@ -40,9 +40,11 @@ let scanProgress = {
 };
 
 const PBX_ROOT =
+  process.env.PBX_RECORDINGS_DIR ||
   'C:\\MatrixVMS\\Voicemail_Backup';
 
-  const LOCAL_RECORDINGS =
+const LOCAL_RECORDINGS =
+  process.env.PBX_LOCAL_RECORDINGS_DIR ||
   path.join(
     __dirname,
     '..',

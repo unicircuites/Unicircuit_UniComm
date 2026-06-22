@@ -4,6 +4,43 @@ const { chromium } = require('playwright');
 
 const activeSessions = new Map();
 
+// Helper to detect 2-step verification, CAPTCHAs, or robot challenge pages
+async function isVerificationOrRobotPage(page) {
+  try {
+    const url = page.url().toLowerCase();
+    
+    // Check URL patterns
+    const verificationUrls = ['verify', 'verification', 'challenge', 'captcha', 'mfa', '2fa', 'otp', 'robot', 'security-check', 'cloudflare', 'turnstile', 'recaptcha'];
+    if (verificationUrls.some(pattern => url.includes(pattern))) {
+      return true;
+    }
+    
+    // Check page text content for verification cues
+    const bodyText = (await page.textContent('body') || '').toLowerCase();
+    const verificationTexts = [
+      'verification code', 'verify your identity', 'two-step verification', 
+      'enter the code', 'sent a code', 'one-time password', 'security code',
+      'i am not a robot', 'check your phone', 'confirm your phone', 'authenticator',
+      'prove you are human', 'cloudflare', 'hcaptcha', 'recaptcha', 'robot',
+      'verify you are human'
+    ];
+    if (verificationTexts.some(text => bodyText.includes(text))) {
+      return true;
+    }
+    
+    // Check for common verification inputs or iframe selectors
+    const hasOtpInput = await page.$('input[name*="code" i], input[id*="code" i], input[name*="otp" i], input[id*="otp" i], input[name*="token" i], input[id*="token" i], input[placeholder*="code" i]');
+    const hasCaptchaElements = await page.$('iframe[src*="recaptcha" i], iframe[src*="hcaptcha" i], div.cf-turnstile, div.g-recaptcha, iframe[src*="cloudflare" i]');
+    if (hasOtpInput || hasCaptchaElements) {
+      return true;
+    }
+    
+    return false;
+  } catch (_) {
+    return false;
+  }
+}
+
 // Helper to simulate buffer/reload delays
 const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
@@ -419,7 +456,8 @@ async function startScrape(sessionId, params) {
     itemSelector = '',
     startSelector = '',
     endSelector = '',
-    cookies = null
+    cookies = null,
+    showBrowser = false
   } = params;
 
   const session = {
@@ -443,13 +481,13 @@ async function startScrape(sessionId, params) {
       const maxPages = parseInt(endPoint) || 5;
 
       const parsedCookies = parseCookies(cookies);
-      const useBrowser = parsedCookies.length > 0;
+      const useBrowser = (parsedCookies.length > 0) || showBrowser;
       let browserPage = null;
 
       if (useBrowser) {
-        console.log(`[SCRAPER] Session ${sessionId}: Cookies provided. Starting browser context to bypass login walls.`);
+        console.log(`[SCRAPER] Session ${sessionId}: Browser use required. Starting browser context (visible: ${showBrowser}).`);
         try {
-          browserInstance = await chromium.launch({ headless: true });
+          browserInstance = await chromium.launch({ headless: !showBrowser });
           const context = await browserInstance.newContext({
             userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
           });
@@ -547,6 +585,18 @@ async function startScrape(sessionId, params) {
           
           if (typeof html !== 'string') {
             throw new Error('Response is not HTML text');
+          }
+
+          // Verify if we hit a verification page, captcha, Turnstile, or Cloudflare challenge
+          const htmlLower = html.toLowerCase();
+          const verificationKeywords = [
+            'i am not a robot', 'cloudflare turnstile', 'hcaptcha', 'g-recaptcha',
+            'verification code', 'verify your identity', 'two-step verification',
+            'verify you are human', 'prove you are human', 'one-time password',
+            'enter the code', 'security check'
+          ];
+          if (verificationKeywords.some(kw => htmlLower.includes(kw))) {
+            throw new Error('A 2-step verification, CAPTCHA, or "I am not a robot" security check blocked the automated scraper.');
           }
         } catch (fetchErr) {
           let msg = fetchErr.message;
@@ -679,7 +729,7 @@ function parseLocalHTML(htmlContent, fields, options) {
 }
 
 // Automatically analyze a target URL's DOM structure to detect items, selectors, pagination, and fields
-async function analyzeURL(url, cookies = null) {
+async function analyzeURL(url, cookies = null, showBrowser = false) {
   try {
     // 1. URL syntax validation
     let parsed;
@@ -700,8 +750,8 @@ async function analyzeURL(url, cookies = null) {
 
     // 2. Try utilizing Playwright for dynamic JS rendering and credential / placeholder checks
     try {
-      console.log(`[SCRAPER] Analyzing URL with Playwright browser: ${url}`);
-      playwrightBrowser = await chromium.launch({ headless: true });
+      console.log(`[SCRAPER] Analyzing URL with Playwright browser (visible: ${showBrowser}): ${url}`);
+      playwrightBrowser = await chromium.launch({ headless: !showBrowser });
       const context = await playwrightBrowser.newContext({
         userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
       });
@@ -757,17 +807,30 @@ async function analyzeURL(url, cookies = null) {
         // Poll and wait for login completion (up to 60 seconds)
         let loggedIn = false;
         const startTime = Date.now();
-        const timeoutMs = 60000;
+        let timeoutMs = 60000;
+        let verificationDetected = false;
         
         while (Date.now() - startTime < timeoutMs) {
           await sleep(1000);
           try {
             const currentHeadedUrl = headedPage.url();
             const hasHeadedPassword = await headedPage.$('input[type="password"]');
+            const isVerification = await isVerificationOrRobotPage(headedPage);
             
-            // Check if login wall has been bypassed
-            if (!hasHeadedPassword && !currentHeadedUrl.includes('login') && !currentHeadedUrl.includes('signin') && !currentHeadedUrl.includes('auth')) {
-              console.log(`[SCRAPER] Login wall bypassed successfully! Current URL: ${currentHeadedUrl}`);
+            if (isVerification && !verificationDetected) {
+              console.log(`[SCRAPER] 2-step verification, CAPTCHA, or robot challenge detected on: ${currentHeadedUrl}`);
+              console.log(`[SCRAPER] Extending manual bypass window to 3 minutes...`);
+              timeoutMs = 180000; // Extend to 3 minutes
+              verificationDetected = true;
+            }
+            
+            // Check if login wall has been bypassed and not stuck on verification screen
+            if (!hasHeadedPassword && 
+                !currentHeadedUrl.includes('login') && 
+                !currentHeadedUrl.includes('signin') && 
+                !currentHeadedUrl.includes('auth') &&
+                !isVerification) {
+              console.log(`[SCRAPER] Login wall and verification bypassed successfully! Current URL: ${currentHeadedUrl}`);
               loggedIn = true;
               break;
             }

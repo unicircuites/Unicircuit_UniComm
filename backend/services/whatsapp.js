@@ -23,6 +23,8 @@ const os = require('os');
 const fs = require('fs');
 const pool = require('../db/pool');
 
+const MEDIA_DIR = process.env.WA_MEDIA_DIR || path.join(__dirname, '../wa_media');
+
 let sharp = null;
 function getSharp() {
   if (!sharp) sharp = require('sharp');
@@ -1980,7 +1982,7 @@ async function startWA(options = {}) {
         if (['imageMessage', 'videoMessage', 'audioMessage', 'documentMessage', 'stickerMessage'].includes(mtype)) {
           try {
             const buf = await downloadMediaMessage(msg, 'buffer', {});
-            const mediaDir = path.join(__dirname, '../wa_media');
+            const mediaDir = MEDIA_DIR;
             if (!fs.existsSync(mediaDir)) fs.mkdirSync(mediaDir, { recursive: true });
             const ext = mtype === 'imageMessage' ? 'jpg' : mtype === 'videoMessage' ? 'mp4' : mtype === 'audioMessage' ? 'ogg' : mtype === 'stickerMessage' ? 'webp' : 'bin';
             const docMsg = msg.message.documentMessage;
@@ -2991,7 +2993,7 @@ async function sendMediaMessage(jid, media, quotedMsgId) {
 
   const id = result.key.id;
   const ts = new Date();
-  const mediaDir = path.join(__dirname, '../wa_media');
+  const mediaDir = MEDIA_DIR;
   if (!fs.existsSync(mediaDir)) fs.mkdirSync(mediaDir, { recursive: true });
   const savedName = id + '_' + filename;
   fs.writeFileSync(path.join(mediaDir, savedName), finalBuffer);
@@ -3355,7 +3357,7 @@ const msgCache = new Map();
 const MAX_CACHE = 500;
 
 async function downloadMedia(msgId) {
-  const mediaDir = path.join(__dirname, '../wa_media');
+  const mediaDir = MEDIA_DIR;
   if (fs.existsSync(mediaDir)) {
     const files = fs.readdirSync(mediaDir).filter(f => f.startsWith(msgId + '_'));
     if (files.length > 0) {
@@ -3557,7 +3559,7 @@ async function importExportedChat(chatText, chatJid, mediaFiles, clearOld) {
 
   if (clearOld) await pool.query(`DELETE FROM wa_messages WHERE chat_id=$1 AND account_phone=$2`, [chatJid, accPhone]);
 
-  const mediaDir = path.join(__dirname, '../wa_media');
+  const mediaDir = MEDIA_DIR;
   if (!fs.existsSync(mediaDir)) fs.mkdirSync(mediaDir, { recursive: true });
 
   const mediaSavedMap = {};
@@ -3771,7 +3773,7 @@ async function updateGroupName(jid, subject, accPhone) {
 
 // Download all cached media messages to disk so backup can include them
 async function flushCachedMediaToDisk() {
-  const mediaDir = path.join(__dirname, '../wa_media');
+  const mediaDir = MEDIA_DIR;
   if (!fs.existsSync(mediaDir)) fs.mkdirSync(mediaDir, { recursive: true });
   const mediaTypes = ['imageMessage', 'videoMessage', 'audioMessage', 'documentMessage', 'stickerMessage'];
   const extMap = { imageMessage: 'jpg', videoMessage: 'mp4', audioMessage: 'ogg', stickerMessage: 'webp', documentMessage: 'bin' };
