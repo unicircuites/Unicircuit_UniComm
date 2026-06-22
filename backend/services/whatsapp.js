@@ -6,16 +6,20 @@
  * - Real messages only (no protocol/system messages)
  * - Full history sync via messaging-history.set
  */
-const {
-  default: makeWASocket,
-  useMultiFileAuthState,
-  DisconnectReason,
-  fetchLatestBaileysVersion,
-  getContentType,
-  downloadMediaMessage,
-  ALL_WA_PATCH_NAMES,
-  WAMessageStatus,
-} = require('@whiskeysockets/baileys');
+let makeWASocket, useMultiFileAuthState, DisconnectReason, fetchLatestBaileysVersion, getContentType, downloadMediaMessage, ALL_WA_PATCH_NAMES, WAMessageStatus;
+
+async function loadBaileys() {
+  if (makeWASocket) return;
+  const baileys = await import('@whiskeysockets/baileys');
+  makeWASocket = baileys.default || baileys.makeWASocket;
+  useMultiFileAuthState = baileys.useMultiFileAuthState;
+  DisconnectReason = baileys.DisconnectReason;
+  fetchLatestBaileysVersion = baileys.fetchLatestBaileysVersion;
+  getContentType = baileys.getContentType;
+  downloadMediaMessage = baileys.downloadMediaMessage;
+  ALL_WA_PATCH_NAMES = baileys.ALL_WA_PATCH_NAMES;
+  WAMessageStatus = baileys.WAMessageStatus;
+}
 
 const qrcode = require('qrcode');
 const path = require('path');
@@ -1404,6 +1408,7 @@ async function loadLidPhoneMapFromDB() {
 
 // ── START WHATSAPP ────────────────────────────────────────────────────────────────────
 async function startWA(options = {}) {
+  await loadBaileys();
   startWatchdog();
   const allowQR = !!options.allowQR;
   if (allowQR) allowQrGeneration = true;

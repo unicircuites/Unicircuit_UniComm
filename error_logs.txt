@@ -1,0 +1,834 @@
+PS C:\setup0\Unicircuit_UniComm> pm2 logs --lines 100
+[TAILING] Tailing last 100 lines for [all] processes (change the value with --lines option)
+C:\Users\pbaro\.pm2\pm2.log last 100 lines:
+PM2        | 2026-06-22T12:36:52: PM2 log: App [unicomm-backend:0] starting in -fork mode-
+PM2        | 2026-06-22T12:36:52: PM2 log: App [unicomm-backend:0] online
+PM2        | 2026-06-22T12:36:55: PM2 log: App [unicomm-backend:0] exited with code [0] via signal [SIGINT]
+PM2        | 2026-06-22T12:36:55: PM2 log: App [unicomm-backend:0] starting in -fork mode-
+PM2        | 2026-06-22T12:36:55: PM2 log: App [unicomm-backend:0] online
+PM2        | 2026-06-22T12:36:58: PM2 log: App [unicomm-backend:0] exited with code [0] via signal [SIGINT]
+PM2        | 2026-06-22T12:36:58: PM2 log: App [unicomm-backend:0] starting in -fork mode-
+PM2        | 2026-06-22T12:36:58: PM2 log: App [unicomm-backend:0] online
+PM2        | 2026-06-22T12:37:01: PM2 log: App [unicomm-backend:0] exited with code [0] via signal [SIGINT]
+PM2        | 2026-06-22T12:37:01: PM2 log: App [unicomm-backend:0] starting in -fork mode-
+PM2        | 2026-06-22T12:37:01: PM2 log: App [unicomm-backend:0] online
+PM2        | 2026-06-22T12:37:04: PM2 log: App [unicomm-backend:0] exited with code [0] via signal [SIGINT]
+PM2        | 2026-06-22T12:37:04: PM2 log: App [unicomm-backend:0] starting in -fork mode-
+PM2        | 2026-06-22T12:37:04: PM2 log: App [unicomm-backend:0] online
+PM2        | 2026-06-22T12:37:07: PM2 log: App [unicomm-backend:0] exited with code [0] via signal [SIGINT]
+PM2        | 2026-06-22T12:37:07: PM2 log: App [unicomm-backend:0] starting in -fork mode-
+PM2        | 2026-06-22T12:37:07: PM2 log: App [unicomm-backend:0] online
+PM2        | 2026-06-22T12:37:11: PM2 log: App [unicomm-backend:0] exited with code [0] via signal [SIGINT]
+PM2        | 2026-06-22T12:37:11: PM2 log: App [unicomm-backend:0] starting in -fork mode-
+PM2        | 2026-06-22T12:37:11: PM2 log: App [unicomm-backend:0] online
+PM2        | 2026-06-22T12:37:14: PM2 log: App [unicomm-backend:0] exited with code [0] via signal [SIGINT]
+PM2        | 2026-06-22T12:37:14: PM2 log: App [unicomm-backend:0] starting in -fork mode-
+PM2        | 2026-06-22T12:37:14: PM2 log: App [unicomm-backend:0] online
+PM2        | 2026-06-22T12:37:17: PM2 log: App [unicomm-backend:0] exited with code [0] via signal [SIGINT]
+PM2        | 2026-06-22T12:37:17: PM2 log: App [unicomm-backend:0] starting in -fork mode-
+PM2        | 2026-06-22T12:37:17: PM2 log: App [unicomm-backend:0] online
+PM2        | 2026-06-22T12:37:20: PM2 log: App [unicomm-backend:0] exited with code [0] via signal [SIGINT]
+PM2        | 2026-06-22T12:37:20: PM2 log: App [unicomm-backend:0] starting in -fork mode-
+PM2        | 2026-06-22T12:37:20: PM2 log: App [unicomm-backend:0] online
+PM2        | 2026-06-22T12:37:23: PM2 log: App [unicomm-backend:0] exited with code [0] via signal [SIGINT]
+PM2        | 2026-06-22T12:37:23: PM2 log: App [unicomm-backend:0] starting in -fork mode-
+PM2        | 2026-06-22T12:37:23: PM2 log: App [unicomm-backend:0] online
+PM2        | 2026-06-22T12:37:26: PM2 log: App [unicomm-backend:0] exited with code [0] via signal [SIGINT]
+PM2        | 2026-06-22T12:37:26: PM2 log: App [unicomm-backend:0] starting in -fork mode-
+PM2        | 2026-06-22T12:37:26: PM2 log: App [unicomm-backend:0] online
+PM2        | 2026-06-22T12:37:29: PM2 log: App [unicomm-backend:0] exited with code [0] via signal [SIGINT]
+PM2        | 2026-06-22T12:37:29: PM2 log: App [unicomm-backend:0] starting in -fork mode-
+PM2        | 2026-06-22T12:37:29: PM2 log: App [unicomm-backend:0] online
+PM2        | 2026-06-22T12:37:32: PM2 log: App [unicomm-backend:0] exited with code [0] via signal [SIGINT]
+PM2        | 2026-06-22T12:37:32: PM2 log: App [unicomm-backend:0] starting in -fork mode-
+PM2        | 2026-06-22T12:37:32: PM2 log: App [unicomm-backend:0] online
+PM2        | 2026-06-22T12:37:35: PM2 log: App [unicomm-backend:0] exited with code [0] via signal [SIGINT]
+PM2        | 2026-06-22T12:37:35: PM2 log: App [unicomm-backend:0] starting in -fork mode-
+PM2        | 2026-06-22T12:37:35: PM2 log: App [unicomm-backend:0] online
+PM2        | 2026-06-22T12:37:38: PM2 log: App [unicomm-backend:0] exited with code [0] via signal [SIGINT]
+PM2        | 2026-06-22T12:37:38: PM2 log: App [unicomm-backend:0] starting in -fork mode-
+PM2        | 2026-06-22T12:37:38: PM2 log: App [unicomm-backend:0] online
+PM2        | 2026-06-22T12:37:42: PM2 log: App [unicomm-backend:0] exited with code [0] via signal [SIGINT]
+PM2        | 2026-06-22T12:37:42: PM2 log: App [unicomm-backend:0] starting in -fork mode-
+PM2        | 2026-06-22T12:37:42: PM2 log: App [unicomm-backend:0] online
+PM2        | 2026-06-22T12:37:45: PM2 log: App [unicomm-backend:0] exited with code [0] via signal [SIGINT]
+PM2        | 2026-06-22T12:37:45: PM2 log: App [unicomm-backend:0] starting in -fork mode-
+PM2        | 2026-06-22T12:37:45: PM2 log: App [unicomm-backend:0] online
+PM2        | 2026-06-22T12:37:48: PM2 log: App [unicomm-backend:0] exited with code [0] via signal [SIGINT]
+PM2        | 2026-06-22T12:37:48: PM2 log: App [unicomm-backend:0] starting in -fork mode-
+PM2        | 2026-06-22T12:37:48: PM2 log: App [unicomm-backend:0] online
+PM2        | 2026-06-22T12:37:48: PM2 error: Error caught while calling pidusage
+PM2        | 2026-06-22T12:37:48: PM2 error: Error: No matching pid found
+PM2        | 2026-06-22T12:37:51: PM2 log: App [unicomm-backend:0] exited with code [0] via signal [SIGINT]
+PM2        | 2026-06-22T12:37:51: PM2 log: App [unicomm-backend:0] starting in -fork mode-
+PM2        | 2026-06-22T12:37:51: PM2 log: App [unicomm-backend:0] online
+PM2        | 2026-06-22T12:37:54: PM2 log: App [unicomm-backend:0] exited with code [0] via signal [SIGINT]
+PM2        | 2026-06-22T12:37:54: PM2 log: App [unicomm-backend:0] starting in -fork mode-
+PM2        | 2026-06-22T12:37:54: PM2 log: App [unicomm-backend:0] online
+PM2        | 2026-06-22T12:37:57: PM2 log: App [unicomm-backend:0] exited with code [0] via signal [SIGINT]
+PM2        | 2026-06-22T12:37:57: PM2 log: App [unicomm-backend:0] starting in -fork mode-
+PM2        | 2026-06-22T12:37:57: PM2 log: App [unicomm-backend:0] online
+PM2        | 2026-06-22T12:38:00: PM2 log: App [unicomm-backend:0] exited with code [0] via signal [SIGINT]
+PM2        | 2026-06-22T12:38:00: PM2 log: App [unicomm-backend:0] starting in -fork mode-
+PM2        | 2026-06-22T12:38:00: PM2 log: App [unicomm-backend:0] online
+PM2        | 2026-06-22T12:38:03: PM2 log: App [unicomm-backend:0] exited with code [0] via signal [SIGINT]
+PM2        | 2026-06-22T12:38:03: PM2 log: App [unicomm-backend:0] starting in -fork mode-
+PM2        | 2026-06-22T12:38:03: PM2 log: App [unicomm-backend:0] online
+PM2        | 2026-06-22T12:38:06: PM2 log: App [unicomm-backend:0] exited with code [0] via signal [SIGINT]
+PM2        | 2026-06-22T12:38:06: PM2 log: App [unicomm-backend:0] starting in -fork mode-
+PM2        | 2026-06-22T12:38:06: PM2 log: App [unicomm-backend:0] online
+PM2        | 2026-06-22T12:38:09: PM2 log: App [unicomm-backend:0] exited with code [0] via signal [SIGINT]
+PM2        | 2026-06-22T12:38:09: PM2 log: App [unicomm-backend:0] starting in -fork mode-
+PM2        | 2026-06-22T12:38:10: PM2 log: App [unicomm-backend:0] online
+PM2        | 2026-06-22T12:38:13: PM2 log: App [unicomm-backend:0] exited with code [0] via signal [SIGINT]
+PM2        | 2026-06-22T12:38:13: PM2 log: App [unicomm-backend:0] starting in -fork mode-
+PM2        | 2026-06-22T12:38:13: PM2 log: App [unicomm-backend:0] online
+PM2        | 2026-06-22T12:38:16: PM2 log: App [unicomm-backend:0] exited with code [0] via signal [SIGINT]
+PM2        | 2026-06-22T12:38:16: PM2 log: App [unicomm-backend:0] starting in -fork mode-
+PM2        | 2026-06-22T12:38:16: PM2 log: App [unicomm-backend:0] online
+PM2        | 2026-06-22T12:38:19: PM2 log: App [unicomm-backend:0] exited with code [0] via signal [SIGINT]
+PM2        | 2026-06-22T12:38:19: PM2 log: App [unicomm-backend:0] starting in -fork mode-
+PM2        | 2026-06-22T12:38:19: PM2 log: App [unicomm-backend:0] online
+PM2        | 2026-06-22T12:38:22: PM2 log: App [unicomm-backend:0] exited with code [0] via signal [SIGINT]
+PM2        | 2026-06-22T12:38:22: PM2 log: App [unicomm-backend:0] starting in -fork mode-
+PM2        | 2026-06-22T12:38:22: PM2 log: App [unicomm-backend:0] online
+PM2        | 2026-06-22T12:38:25: PM2 log: App [unicomm-backend:0] exited with code [0] via signal [SIGINT]
+PM2        | 2026-06-22T12:38:25: PM2 log: App [unicomm-backend:0] starting in -fork mode-
+PM2        | 2026-06-22T12:38:25: PM2 log: App [unicomm-backend:0] online
+PM2        | 2026-06-22T12:38:28: PM2 log: App [unicomm-backend:0] exited with code [0] via signal [SIGINT]
+PM2        | 2026-06-22T12:38:28: PM2 log: App [unicomm-backend:0] starting in -fork mode-
+PM2        | 2026-06-22T12:38:28: PM2 log: App [unicomm-backend:0] online
+PM2        | 2026-06-22T12:38:31: PM2 log: App [unicomm-backend:0] exited with code [0] via signal [SIGINT]
+PM2        | 2026-06-22T12:38:31: PM2 log: App [unicomm-backend:0] starting in -fork mode-
+PM2        | 2026-06-22T12:38:31: PM2 log: App [unicomm-backend:0] online
+
+C:\Users\pbaro\.pm2\logs\n8n-out.log last 100 lines:
+C:\Users\pbaro\.pm2\logs\n8n-error.log last 100 lines:
+1|n8n      |     at internalCompileFunction (node:internal/vm:77:18)
+1|n8n      |     at wrapSafe (node:internal/modules/cjs/loader:1288:20)
+1|n8n      |     at Module._compile (node:internal/modules/cjs/loader:1340:27)
+1|n8n      |     at Module._extensions..js (node:internal/modules/cjs/loader:1435:10)
+1|n8n      |     at Module.load (node:internal/modules/cjs/loader:1207:32)
+1|n8n      |     at Module._load (node:internal/modules/cjs/loader:1023:12)
+1|n8n      |     at Function.executeUserEntryPoint [as runMain] (node:internal/modules/run_main:135:12)
+1|n8n      |     at node:internal/main/run_main_module:28:49
+1|n8n      |
+1|n8n      | Node.js v20.11.1
+1|n8n      | C:\PROGRAM FILES\NODEJS\NPX.CMD:1
+1|n8n      | :: Created by npm, please don't edit manually.
+1|n8n      | ^
+1|n8n      |
+1|n8n      | SyntaxError: Unexpected token ':'
+1|n8n      |     at internalCompileFunction (node:internal/vm:77:18)
+1|n8n      |     at wrapSafe (node:internal/modules/cjs/loader:1288:20)
+1|n8n      |     at Module._compile (node:internal/modules/cjs/loader:1340:27)
+1|n8n      |     at Module._extensions..js (node:internal/modules/cjs/loader:1435:10)
+1|n8n      |     at Module.load (node:internal/modules/cjs/loader:1207:32)
+1|n8n      |     at Module._load (node:internal/modules/cjs/loader:1023:12)
+1|n8n      |     at Function.executeUserEntryPoint [as runMain] (node:internal/modules/run_main:135:12)
+1|n8n      |     at node:internal/main/run_main_module:28:49
+1|n8n      |
+1|n8n      | Node.js v20.11.1
+1|n8n      | C:\PROGRAM FILES\NODEJS\NPX.CMD:1
+1|n8n      | :: Created by npm, please don't edit manually.
+1|n8n      | ^
+1|n8n      |
+1|n8n      | SyntaxError: Unexpected token ':'
+1|n8n      |     at internalCompileFunction (node:internal/vm:77:18)
+1|n8n      |     at wrapSafe (node:internal/modules/cjs/loader:1288:20)
+1|n8n      |     at Module._compile (node:internal/modules/cjs/loader:1340:27)
+1|n8n      |     at Module._extensions..js (node:internal/modules/cjs/loader:1435:10)
+1|n8n      |     at Module.load (node:internal/modules/cjs/loader:1207:32)
+1|n8n      |     at Module._load (node:internal/modules/cjs/loader:1023:12)
+1|n8n      |     at Function.executeUserEntryPoint [as runMain] (node:internal/modules/run_main:135:12)
+1|n8n      |     at node:internal/main/run_main_module:28:49
+1|n8n      |
+1|n8n      | Node.js v20.11.1
+1|n8n      | C:\PROGRAM FILES\NODEJS\NPX.CMD:1
+1|n8n      | :: Created by npm, please don't edit manually.
+1|n8n      | ^
+1|n8n      |
+1|n8n      | SyntaxError: Unexpected token ':'
+1|n8n      |     at internalCompileFunction (node:internal/vm:77:18)
+1|n8n      |     at wrapSafe (node:internal/modules/cjs/loader:1288:20)
+1|n8n      |     at Module._compile (node:internal/modules/cjs/loader:1340:27)
+1|n8n      |     at Module._extensions..js (node:internal/modules/cjs/loader:1435:10)
+1|n8n      |     at Module.load (node:internal/modules/cjs/loader:1207:32)
+1|n8n      |     at Module._load (node:internal/modules/cjs/loader:1023:12)
+1|n8n      |     at Function.executeUserEntryPoint [as runMain] (node:internal/modules/run_main:135:12)
+1|n8n      |     at node:internal/main/run_main_module:28:49
+1|n8n      |
+1|n8n      | Node.js v20.11.1
+1|n8n      | C:\PROGRAM FILES\NODEJS\NPX.CMD:1
+1|n8n      | :: Created by npm, please don't edit manually.
+1|n8n      | ^
+1|n8n      |
+1|n8n      | SyntaxError: Unexpected token ':'
+1|n8n      |     at internalCompileFunction (node:internal/vm:77:18)
+1|n8n      |     at wrapSafe (node:internal/modules/cjs/loader:1288:20)
+1|n8n      |     at Module._compile (node:internal/modules/cjs/loader:1340:27)
+1|n8n      |     at Module._extensions..js (node:internal/modules/cjs/loader:1435:10)
+1|n8n      |     at Module.load (node:internal/modules/cjs/loader:1207:32)
+1|n8n      |     at Module._load (node:internal/modules/cjs/loader:1023:12)
+1|n8n      |     at Function.executeUserEntryPoint [as runMain] (node:internal/modules/run_main:135:12)
+1|n8n      |     at node:internal/main/run_main_module:28:49
+1|n8n      |
+1|n8n      | Node.js v20.11.1
+1|n8n      | C:\PROGRAM FILES\NODEJS\NPX.CMD:1
+1|n8n      | :: Created by npm, please don't edit manually.
+1|n8n      | ^
+1|n8n      |
+1|n8n      | SyntaxError: Unexpected token ':'
+1|n8n      |     at internalCompileFunction (node:internal/vm:77:18)
+1|n8n      |     at wrapSafe (node:internal/modules/cjs/loader:1288:20)
+1|n8n      |     at Module._compile (node:internal/modules/cjs/loader:1340:27)
+1|n8n      |     at Module._extensions..js (node:internal/modules/cjs/loader:1435:10)
+1|n8n      |     at Module.load (node:internal/modules/cjs/loader:1207:32)
+1|n8n      |     at Module._load (node:internal/modules/cjs/loader:1023:12)
+1|n8n      |     at Function.executeUserEntryPoint [as runMain] (node:internal/modules/run_main:135:12)
+1|n8n      |     at node:internal/main/run_main_module:28:49
+1|n8n      |
+1|n8n      | Node.js v20.11.1
+1|n8n      | C:\PROGRAM FILES\NODEJS\NPX.CMD:1
+1|n8n      | :: Created by npm, please don't edit manually.
+1|n8n      | ^
+1|n8n      |
+1|n8n      | SyntaxError: Unexpected token ':'
+1|n8n      |     at internalCompileFunction (node:internal/vm:77:18)
+1|n8n      |     at wrapSafe (node:internal/modules/cjs/loader:1288:20)
+1|n8n      |     at Module._compile (node:internal/modules/cjs/loader:1340:27)
+1|n8n      |     at Module._extensions..js (node:internal/modules/cjs/loader:1435:10)
+1|n8n      |     at Module.load (node:internal/modules/cjs/loader:1207:32)
+1|n8n      |     at Module._load (node:internal/modules/cjs/loader:1023:12)
+1|n8n      |     at Function.executeUserEntryPoint [as runMain] (node:internal/modules/run_main:135:12)
+1|n8n      |     at node:internal/main/run_main_module:28:49
+1|n8n      |
+1|n8n      | Node.js v20.11.1
+
+C:\Users\pbaro\.pm2\logs\unicomm-backend-out.log last 100 lines:
+0|unicomm- |
+0|unicomm- | [SERVER] .env loaded. SMDR_PORT from env: 5001
+0|unicomm- | [SERVER] .env file path: C:\setup0\Unicircuit_UniComm\backend\.env
+0|unicomm- |
+0|unicomm- | [Security] Running startup security checks...
+0|unicomm- |
+0|unicomm- | [Security] ℹ️  .env file found (Windows - permission check skipped)
+0|unicomm- | [Security] 💡 Ensure .env file is not accessible to unauthorized users
+0|unicomm- | [Security] ✅ SSL/TLS configured
+0|unicomm- |
+0|unicomm- | [Security] Security checks: 2/3 passed
+0|unicomm- |
+0|unicomm- | [SERVER] .env loaded. SMDR_PORT from env: 5001
+0|unicomm- | [SERVER] .env file path: C:\setup0\Unicircuit_UniComm\backend\.env
+0|unicomm- |
+0|unicomm- | [Security] Running startup security checks...
+0|unicomm- |
+0|unicomm- | [Security] ℹ️  .env file found (Windows - permission check skipped)
+0|unicomm- | [Security] 💡 Ensure .env file is not accessible to unauthorized users
+0|unicomm- | [Security] ✅ SSL/TLS configured
+0|unicomm- |
+0|unicomm- | [Security] Security checks: 2/3 passed
+0|unicomm- |
+0|unicomm- | [SERVER] .env loaded. SMDR_PORT from env: 5001
+0|unicomm- | [SERVER] .env file path: C:\setup0\Unicircuit_UniComm\backend\.env
+0|unicomm- |
+0|unicomm- | [Security] Running startup security checks...
+0|unicomm- |
+0|unicomm- | [Security] ℹ️  .env file found (Windows - permission check skipped)
+0|unicomm- | [Security] 💡 Ensure .env file is not accessible to unauthorized users
+0|unicomm- | [Security] ✅ SSL/TLS configured
+0|unicomm- |
+0|unicomm- | [Security] Security checks: 2/3 passed
+0|unicomm- |
+0|unicomm- | [SERVER] .env loaded. SMDR_PORT from env: 5001
+0|unicomm- | [SERVER] .env file path: C:\setup0\Unicircuit_UniComm\backend\.env
+0|unicomm- |
+0|unicomm- | [Security] Running startup security checks...
+0|unicomm- |
+0|unicomm- | [Security] ℹ️  .env file found (Windows - permission check skipped)
+0|unicomm- | [Security] 💡 Ensure .env file is not accessible to unauthorized users
+0|unicomm- | [Security] ✅ SSL/TLS configured
+0|unicomm- |
+0|unicomm- | [Security] Security checks: 2/3 passed
+0|unicomm- |
+0|unicomm- | [SERVER] .env loaded. SMDR_PORT from env: 5001
+0|unicomm- | [SERVER] .env file path: C:\setup0\Unicircuit_UniComm\backend\.env
+0|unicomm- |
+0|unicomm- | [Security] Running startup security checks...
+0|unicomm- |
+0|unicomm- | [Security] ℹ️  .env file found (Windows - permission check skipped)
+0|unicomm- | [Security] 💡 Ensure .env file is not accessible to unauthorized users
+0|unicomm- | [Security] ✅ SSL/TLS configured
+0|unicomm- |
+0|unicomm- | [Security] Security checks: 2/3 passed
+0|unicomm- |
+0|unicomm- | [SERVER] .env loaded. SMDR_PORT from env: 5001
+0|unicomm- | [SERVER] .env file path: C:\setup0\Unicircuit_UniComm\backend\.env
+0|unicomm- |
+0|unicomm- | [Security] Running startup security checks...
+0|unicomm- |
+0|unicomm- | [Security] ℹ️  .env file found (Windows - permission check skipped)
+0|unicomm- | [Security] 💡 Ensure .env file is not accessible to unauthorized users
+0|unicomm- | [Security] ✅ SSL/TLS configured
+0|unicomm- |
+0|unicomm- | [Security] Security checks: 2/3 passed
+0|unicomm- |
+0|unicomm- | [SERVER] .env loaded. SMDR_PORT from env: 5001
+0|unicomm- | [SERVER] .env file path: C:\setup0\Unicircuit_UniComm\backend\.env
+0|unicomm- |
+0|unicomm- | [Security] Running startup security checks...
+0|unicomm- |
+0|unicomm- | [Security] ℹ️  .env file found (Windows - permission check skipped)
+0|unicomm- | [Security] 💡 Ensure .env file is not accessible to unauthorized users
+0|unicomm- | [Security] ✅ SSL/TLS configured
+0|unicomm- |
+0|unicomm- | [Security] Security checks: 2/3 passed
+0|unicomm- |
+0|unicomm- | [SERVER] .env loaded. SMDR_PORT from env: 5001
+0|unicomm- | [SERVER] .env file path: C:\setup0\Unicircuit_UniComm\backend\.env
+0|unicomm- |
+0|unicomm- | [Security] Running startup security checks...
+0|unicomm- |
+0|unicomm- | [Security] ℹ️  .env file found (Windows - permission check skipped)
+0|unicomm- | [Security] 💡 Ensure .env file is not accessible to unauthorized users
+0|unicomm- | [Security] ✅ SSL/TLS configured
+0|unicomm- |
+0|unicomm- | [Security] Security checks: 2/3 passed
+0|unicomm- |
+0|unicomm- | [SERVER] .env loaded. SMDR_PORT from env: 5001
+0|unicomm- | [SERVER] .env file path: C:\setup0\Unicircuit_UniComm\backend\.env
+0|unicomm- |
+0|unicomm- | [Security] Running startup security checks...
+0|unicomm- |
+0|unicomm- | [Security] ℹ️  .env file found (Windows - permission check skipped)
+0|unicomm- | [Security] 💡 Ensure .env file is not accessible to unauthorized users
+0|unicomm- | [Security] ✅ SSL/TLS configured
+0|unicomm- |
+0|unicomm- | [Security] Security checks: 2/3 passed
+0|unicomm- |
+
+C:\Users\pbaro\.pm2\logs\unicomm-backend-error.log last 100 lines:
+0|unicomm- | [Security] ⚠️  Environment variable warnings:
+0|unicomm- |   - MS_CLIENT_SECRET is not set
+0|unicomm- |   - AI_API_KEY is not set
+0|unicomm- | [Security] ⚠️  Some security checks failed - review warnings above
+0|unicomm- | [Outlook] Could not log OAuth env: invalid_client_credential: See https://aka.ms/msal.js.errors#invalid_client_credential for details
+0|unicomm- | Error [ERR_REQUIRE_ESM]: require() of ES Module C:\setup0\Unicircuit_UniComm\backend\node_modules\@whiskeysockets\baileys\lib\index.js from C:\setup0\Unicircuit_UniComm\backend\services\whatsapp.js not supported.
+0|unicomm- | Instead change the require of index.js in C:\setup0\Unicircuit_UniComm\backend\services\whatsapp.js to a dynamic import() which is available in all CommonJS modules.
+0|unicomm- |     at Object.<anonymous> (C:\setup0\Unicircuit_UniComm\backend\services\whatsapp.js:18:5) {
+0|unicomm- |   code: 'ERR_REQUIRE_ESM'
+0|unicomm- | }
+0|unicomm- | ===================================================
+0|unicomm- | [GLOBAL] Uncaught Exception: Error [ERR_REQUIRE_ESM]: require() of ES Module C:\setup0\Unicircuit_UniComm\backend\node_modules\@whiskeysockets\baileys\lib\index.js from C:\setup0\Unicircuit_UniComm\backend\services\whatsapp.js not supported.
+0|unicomm- | Instead change the require of index.js in C:\setup0\Unicircuit_UniComm\backend\services\whatsapp.js to a dynamic import() which is available in all CommonJS modules.
+0|unicomm- |     at Object.<anonymous> (C:\setup0\Unicircuit_UniComm\backend\services\whatsapp.js:18:5) {
+0|unicomm- |   code: 'ERR_REQUIRE_ESM'
+0|unicomm- | }
+0|unicomm- | Stack: Error [ERR_REQUIRE_ESM]: require() of ES Module C:\setup0\Unicircuit_UniComm\backend\node_modules\@whiskeysockets\baileys\lib\index.js from C:\setup0\Unicircuit_UniComm\backend\services\whatsapp.js not supported.
+0|unicomm- | Instead change the require of index.js in C:\setup0\Unicircuit_UniComm\backend\services\whatsapp.js to a dynamic import() which is available in all CommonJS modules.
+0|unicomm- |     at Object.<anonymous> (C:\setup0\Unicircuit_UniComm\backend\services\whatsapp.js:18:5)
+0|unicomm- | ===================================================
+0|unicomm- | [Security] ⚠️  Environment variable warnings:
+0|unicomm- |   - MS_CLIENT_SECRET is not set
+0|unicomm- |   - AI_API_KEY is not set
+0|unicomm- | [Security] ⚠️  Some security checks failed - review warnings above
+0|unicomm- | [Outlook] Could not log OAuth env: invalid_client_credential: See https://aka.ms/msal.js.errors#invalid_client_credential for details
+0|unicomm- | Error [ERR_REQUIRE_ESM]: require() of ES Module C:\setup0\Unicircuit_UniComm\backend\node_modules\@whiskeysockets\baileys\lib\index.js from C:\setup0\Unicircuit_UniComm\backend\services\whatsapp.js not supported.
+0|unicomm- | Instead change the require of index.js in C:\setup0\Unicircuit_UniComm\backend\services\whatsapp.js to a dynamic import() which is available in all CommonJS modules.
+0|unicomm- |     at Object.<anonymous> (C:\setup0\Unicircuit_UniComm\backend\services\whatsapp.js:18:5) {
+0|unicomm- |   code: 'ERR_REQUIRE_ESM'
+0|unicomm- | }
+0|unicomm- | ===================================================
+0|unicomm- | [GLOBAL] Uncaught Exception: Error [ERR_REQUIRE_ESM]: require() of ES Module C:\setup0\Unicircuit_UniComm\backend\node_modules\@whiskeysockets\baileys\lib\index.js from C:\setup0\Unicircuit_UniComm\backend\services\whatsapp.js not supported.
+0|unicomm- | Instead change the require of index.js in C:\setup0\Unicircuit_UniComm\backend\services\whatsapp.js to a dynamic import() which is available in all CommonJS modules.
+0|unicomm- |     at Object.<anonymous> (C:\setup0\Unicircuit_UniComm\backend\services\whatsapp.js:18:5) {
+0|unicomm- |   code: 'ERR_REQUIRE_ESM'
+0|unicomm- | }
+0|unicomm- | Stack: Error [ERR_REQUIRE_ESM]: require() of ES Module C:\setup0\Unicircuit_UniComm\backend\node_modules\@whiskeysockets\baileys\lib\index.js from C:\setup0\Unicircuit_UniComm\backend\services\whatsapp.js not supported.
+0|unicomm- | Instead change the require of index.js in C:\setup0\Unicircuit_UniComm\backend\services\whatsapp.js to a dynamic import() which is available in all CommonJS modules.
+0|unicomm- |     at Object.<anonymous> (C:\setup0\Unicircuit_UniComm\backend\services\whatsapp.js:18:5)
+0|unicomm- | ===================================================
+0|unicomm- | [Security] ⚠️  Environment variable warnings:
+0|unicomm- |   - MS_CLIENT_SECRET is not set
+0|unicomm- |   - AI_API_KEY is not set
+0|unicomm- | [Security] ⚠️  Some security checks failed - review warnings above
+0|unicomm- | [Outlook] Could not log OAuth env: invalid_client_credential: See https://aka.ms/msal.js.errors#invalid_client_credential for details
+0|unicomm- | Error [ERR_REQUIRE_ESM]: require() of ES Module C:\setup0\Unicircuit_UniComm\backend\node_modules\@whiskeysockets\baileys\lib\index.js from C:\setup0\Unicircuit_UniComm\backend\services\whatsapp.js not supported.
+0|unicomm- | Instead change the require of index.js in C:\setup0\Unicircuit_UniComm\backend\services\whatsapp.js to a dynamic import() which is available in all CommonJS modules.
+0|unicomm- |     at Object.<anonymous> (C:\setup0\Unicircuit_UniComm\backend\services\whatsapp.js:18:5) {
+0|unicomm- |   code: 'ERR_REQUIRE_ESM'
+0|unicomm- | }
+0|unicomm- | ===================================================
+0|unicomm- | [GLOBAL] Uncaught Exception: Error [ERR_REQUIRE_ESM]: require() of ES Module C:\setup0\Unicircuit_UniComm\backend\node_modules\@whiskeysockets\baileys\lib\index.js from C:\setup0\Unicircuit_UniComm\backend\services\whatsapp.js not supported.
+0|unicomm- | Instead change the require of index.js in C:\setup0\Unicircuit_UniComm\backend\services\whatsapp.js to a dynamic import() which is available in all CommonJS modules.
+0|unicomm- |     at Object.<anonymous> (C:\setup0\Unicircuit_UniComm\backend\services\whatsapp.js:18:5) {
+0|unicomm- |   code: 'ERR_REQUIRE_ESM'
+0|unicomm- | }
+0|unicomm- | Stack: Error [ERR_REQUIRE_ESM]: require() of ES Module C:\setup0\Unicircuit_UniComm\backend\node_modules\@whiskeysockets\baileys\lib\index.js from C:\setup0\Unicircuit_UniComm\backend\services\whatsapp.js not supported.
+0|unicomm- | Instead change the require of index.js in C:\setup0\Unicircuit_UniComm\backend\services\whatsapp.js to a dynamic import() which is available in all CommonJS modules.
+0|unicomm- |     at Object.<anonymous> (C:\setup0\Unicircuit_UniComm\backend\services\whatsapp.js:18:5)
+0|unicomm- | ===================================================
+0|unicomm- | [Security] ⚠️  Environment variable warnings:
+0|unicomm- |   - MS_CLIENT_SECRET is not set
+0|unicomm- |   - AI_API_KEY is not set
+0|unicomm- | [Security] ⚠️  Some security checks failed - review warnings above
+0|unicomm- | [Outlook] Could not log OAuth env: invalid_client_credential: See https://aka.ms/msal.js.errors#invalid_client_credential for details
+0|unicomm- | Error [ERR_REQUIRE_ESM]: require() of ES Module C:\setup0\Unicircuit_UniComm\backend\node_modules\@whiskeysockets\baileys\lib\index.js from C:\setup0\Unicircuit_UniComm\backend\services\whatsapp.js not supported.
+0|unicomm- | Instead change the require of index.js in C:\setup0\Unicircuit_UniComm\backend\services\whatsapp.js to a dynamic import() which is available in all CommonJS modules.
+0|unicomm- |     at Object.<anonymous> (C:\setup0\Unicircuit_UniComm\backend\services\whatsapp.js:18:5) {
+0|unicomm- |   code: 'ERR_REQUIRE_ESM'
+0|unicomm- | }
+0|unicomm- | ===================================================
+0|unicomm- | [GLOBAL] Uncaught Exception: Error [ERR_REQUIRE_ESM]: require() of ES Module C:\setup0\Unicircuit_UniComm\backend\node_modules\@whiskeysockets\baileys\lib\index.js from C:\setup0\Unicircuit_UniComm\backend\services\whatsapp.js not supported.
+0|unicomm- | Instead change the require of index.js in C:\setup0\Unicircuit_UniComm\backend\services\whatsapp.js to a dynamic import() which is available in all CommonJS modules.
+0|unicomm- |     at Object.<anonymous> (C:\setup0\Unicircuit_UniComm\backend\services\whatsapp.js:18:5) {
+0|unicomm- |   code: 'ERR_REQUIRE_ESM'
+0|unicomm- | }
+0|unicomm- | Stack: Error [ERR_REQUIRE_ESM]: require() of ES Module C:\setup0\Unicircuit_UniComm\backend\node_modules\@whiskeysockets\baileys\lib\index.js from C:\setup0\Unicircuit_UniComm\backend\services\whatsapp.js not supported.
+0|unicomm- | Instead change the require of index.js in C:\setup0\Unicircuit_UniComm\backend\services\whatsapp.js to a dynamic import() which is available in all CommonJS modules.
+0|unicomm- |     at Object.<anonymous> (C:\setup0\Unicircuit_UniComm\backend\services\whatsapp.js:18:5)
+0|unicomm- | ===================================================
+0|unicomm- | [Security] ⚠️  Environment variable warnings:
+0|unicomm- |   - MS_CLIENT_SECRET is not set
+0|unicomm- |   - AI_API_KEY is not set
+0|unicomm- | [Security] ⚠️  Some security checks failed - review warnings above
+0|unicomm- | [Outlook] Could not log OAuth env: invalid_client_credential: See https://aka.ms/msal.js.errors#invalid_client_credential for details
+0|unicomm- | Error [ERR_REQUIRE_ESM]: require() of ES Module C:\setup0\Unicircuit_UniComm\backend\node_modules\@whiskeysockets\baileys\lib\index.js from C:\setup0\Unicircuit_UniComm\backend\services\whatsapp.js not supported.
+0|unicomm- | Instead change the require of index.js in C:\setup0\Unicircuit_UniComm\backend\services\whatsapp.js to a dynamic import() which is available in all CommonJS modules.
+0|unicomm- |     at Object.<anonymous> (C:\setup0\Unicircuit_UniComm\backend\services\whatsapp.js:18:5) {
+0|unicomm- |   code: 'ERR_REQUIRE_ESM'
+0|unicomm- | }
+0|unicomm- | ===================================================
+0|unicomm- | [GLOBAL] Uncaught Exception: Error [ERR_REQUIRE_ESM]: require() of ES Module C:\setup0\Unicircuit_UniComm\backend\node_modules\@whiskeysockets\baileys\lib\index.js from C:\setup0\Unicircuit_UniComm\backend\services\whatsapp.js not supported.
+0|unicomm- | Instead change the require of index.js in C:\setup0\Unicircuit_UniComm\backend\services\whatsapp.js to a dynamic import() which is available in all CommonJS modules.
+0|unicomm- |     at Object.<anonymous> (C:\setup0\Unicircuit_UniComm\backend\services\whatsapp.js:18:5) {
+0|unicomm- |   code: 'ERR_REQUIRE_ESM'
+0|unicomm- | }
+0|unicomm- | Stack: Error [ERR_REQUIRE_ESM]: require() of ES Module C:\setup0\Unicircuit_UniComm\backend\node_modules\@whiskeysockets\baileys\lib\index.js from C:\setup0\Unicircuit_UniComm\backend\services\whatsapp.js not supported.
+0|unicomm- | Instead change the require of index.js in C:\setup0\Unicircuit_UniComm\backend\services\whatsapp.js to a dynamic import() which is available in all CommonJS modules.
+0|unicomm- |     at Object.<anonymous> (C:\setup0\Unicircuit_UniComm\backend\services\whatsapp.js:18:5)
+0|unicomm- | ===================================================
+
+PM2      | App [unicomm-backend:0] exited with code [0] via signal [SIGINT]
+PM2      | App [unicomm-backend:0] starting in -fork mode-
+PM2      | App [unicomm-backend:0] online
+0|unicomm-backend  | [SERVER] .env loaded. SMDR_PORT from env: 5001
+0|unicomm-backend  | [SERVER] .env file path: C:\setup0\Unicircuit_UniComm\backend\.env
+0|unicomm-backend  | [Security] Running startup security checks...
+0|unicomm-backend  | [Security] ℹ️  .env file found (Windows - permission check skipped)
+0|unicomm-backend  | [Security] 💡 Ensure .env file is not accessible to unauthorized users
+0|unicomm-backend  | [Security] ⚠️  Environment variable warnings:
+0|unicomm-backend  |   - MS_CLIENT_SECRET is not set
+0|unicomm-backend  |   - AI_API_KEY is not set
+0|unicomm-backend  | [Security] ✅ SSL/TLS configured
+0|unicomm-backend  | [Security] Security checks: 2/3 passed
+0|unicomm-backend  | [Security] ⚠️  Some security checks failed - review warnings above
+0|unicomm-backend  | [Outlook] Could not log OAuth env: invalid_client_credential: See https://aka.ms/msal.js.errors#invalid_client_credential for details
+0|unicomm-backend  | Error [ERR_REQUIRE_ESM]: require() of ES Module C:\setup0\Unicircuit_UniComm\backend\node_modules\@whiskeysockets\baileys\lib\index.js from C:\setup0\Unicircuit_UniComm\backend\services\whatsapp.js not supported.
+0|unicomm-backend  | Instead change the require of index.js in C:\setup0\Unicircuit_UniComm\backend\services\whatsapp.js to a dynamic import() which is available in all CommonJS modules.
+0|unicomm-backend  |     at Object.<anonymous> (C:\setup0\Unicircuit_UniComm\backend\services\whatsapp.js:18:5) {
+0|unicomm-backend  |   code: 'ERR_REQUIRE_ESM'
+0|unicomm-backend  | }
+0|unicomm-backend  | ===================================================
+0|unicomm-backend  | [GLOBAL] Uncaught Exception: Error [ERR_REQUIRE_ESM]: require() of ES Module C:\setup0\Unicircuit_UniComm\backend\node_modules\@whiskeysockets\baileys\lib\index.js from C:\setup0\Unicircuit_UniComm\backend\services\whatsapp.js not supported.
+0|unicomm-backend  | Instead change the require of index.js in C:\setup0\Unicircuit_UniComm\backend\services\whatsapp.js to a dynamic import() which is available in all CommonJS modules.
+0|unicomm-backend  |     at Object.<anonymous> (C:\setup0\Unicircuit_UniComm\backend\services\whatsapp.js:18:5) {
+0|unicomm-backend  |   code: 'ERR_REQUIRE_ESM'
+0|unicomm-backend  | }
+0|unicomm-backend  | Stack: Error [ERR_REQUIRE_ESM]: require() of ES Module C:\setup0\Unicircuit_UniComm\backend\node_modules\@whiskeysockets\baileys\lib\index.js from C:\setup0\Unicircuit_UniComm\backend\services\whatsapp.js not supported.
+0|unicomm-backend  | Instead change the require of index.js in C:\setup0\Unicircuit_UniComm\backend\services\whatsapp.js to a dynamic import() which is available in all CommonJS modules.
+0|unicomm-backend  |     at Object.<anonymous> (C:\setup0\Unicircuit_UniComm\backend\services\whatsapp.js:18:5)
+0|unicomm-backend  | ===================================================
+PM2                | App [unicomm-backend:0] exited with code [0] via signal [SIGINT]
+PM2                | App [unicomm-backend:0] starting in -fork mode-
+PM2                | App [unicomm-backend:0] online
+0|unicomm-backend  | [SERVER] .env loaded. SMDR_PORT from env: 5001
+0|unicomm-backend  | [SERVER] .env file path: C:\setup0\Unicircuit_UniComm\backend\.env
+0|unicomm-backend  | [Security] Running startup security checks...
+0|unicomm-backend  | [Security] ℹ️  .env file found (Windows - permission check skipped)
+0|unicomm-backend  | [Security] 💡 Ensure .env file is not accessible to unauthorized users
+0|unicomm-backend  | [Security] ⚠️  Environment variable warnings:
+0|unicomm-backend  |   - MS_CLIENT_SECRET is not set
+0|unicomm-backend  |   - AI_API_KEY is not set
+0|unicomm-backend  | [Security] ✅ SSL/TLS configured
+0|unicomm-backend  | [Security] Security checks: 2/3 passed
+0|unicomm-backend  | [Security] ⚠️  Some security checks failed - review warnings above
+0|unicomm-backend  | [Outlook] Could not log OAuth env: invalid_client_credential: See https://aka.ms/msal.js.errors#invalid_client_credential for details
+0|unicomm-backend  | Error [ERR_REQUIRE_ESM]: require() of ES Module C:\setup0\Unicircuit_UniComm\backend\node_modules\@whiskeysockets\baileys\lib\index.js from C:\setup0\Unicircuit_UniComm\backend\services\whatsapp.js not supported.
+0|unicomm-backend  | Instead change the require of index.js in C:\setup0\Unicircuit_UniComm\backend\services\whatsapp.js to a dynamic import() which is available in all CommonJS modules.
+0|unicomm-backend  |     at Object.<anonymous> (C:\setup0\Unicircuit_UniComm\backend\services\whatsapp.js:18:5) {
+0|unicomm-backend  |   code: 'ERR_REQUIRE_ESM'
+0|unicomm-backend  | }
+0|unicomm-backend  | ===================================================
+0|unicomm-backend  | [GLOBAL] Uncaught Exception: Error [ERR_REQUIRE_ESM]: require() of ES Module C:\setup0\Unicircuit_UniComm\backend\node_modules\@whiskeysockets\baileys\lib\index.js from C:\setup0\Unicircuit_UniComm\backend\services\whatsapp.js not supported.
+0|unicomm-backend  | Instead change the require of index.js in C:\setup0\Unicircuit_UniComm\backend\services\whatsapp.js to a dynamic import() which is available in all CommonJS modules.
+0|unicomm-backend  |     at Object.<anonymous> (C:\setup0\Unicircuit_UniComm\backend\services\whatsapp.js:18:5) {
+0|unicomm-backend  |   code: 'ERR_REQUIRE_ESM'
+0|unicomm-backend  | }
+0|unicomm-backend  | Stack: Error [ERR_REQUIRE_ESM]: require() of ES Module C:\setup0\Unicircuit_UniComm\backend\node_modules\@whiskeysockets\baileys\lib\index.js from C:\setup0\Unicircuit_UniComm\backend\services\whatsapp.js not supported.
+0|unicomm-backend  | Instead change the require of index.js in C:\setup0\Unicircuit_UniComm\backend\services\whatsapp.js to a dynamic import() which is available in all CommonJS modules.
+0|unicomm-backend  |     at Object.<anonymous> (C:\setup0\Unicircuit_UniComm\backend\services\whatsapp.js:18:5)
+0|unicomm-backend  | ===================================================
+PM2                | App [unicomm-backend:0] exited with code [0] via signal [SIGINT]
+PM2                | App [unicomm-backend:0] starting in -fork mode-
+PM2                | App [unicomm-backend:0] online
+0|unicomm-backend  | [SERVER] .env loaded. SMDR_PORT from env: 5001
+0|unicomm-backend  | [SERVER] .env file path: C:\setup0\Unicircuit_UniComm\backend\.env
+0|unicomm-backend  | [Security] Running startup security checks...
+0|unicomm-backend  | [Security] ℹ️  .env file found (Windows - permission check skipped)
+0|unicomm-backend  | [Security] 💡 Ensure .env file is not accessible to unauthorized users
+0|unicomm-backend  | [Security] ⚠️  Environment variable warnings:
+0|unicomm-backend  |   - MS_CLIENT_SECRET is not set
+0|unicomm-backend  |   - AI_API_KEY is not set
+0|unicomm-backend  | [Security] ✅ SSL/TLS configured
+0|unicomm-backend  | [Security] ⚠️  Some security checks failed - review warnings above
+0|unicomm-backend  | [Security] Security checks: 2/3 passed
+0|unicomm-backend  | [Outlook] Could not log OAuth env: invalid_client_credential: See https://aka.ms/msal.js.errors#invalid_client_credential for details
+0|unicomm-backend  | Error [ERR_REQUIRE_ESM]: require() of ES Module C:\setup0\Unicircuit_UniComm\backend\node_modules\@whiskeysockets\baileys\lib\index.js from C:\setup0\Unicircuit_UniComm\backend\services\whatsapp.js not supported.
+0|unicomm-backend  | Instead change the require of index.js in C:\setup0\Unicircuit_UniComm\backend\services\whatsapp.js to a dynamic import() which is available in all CommonJS modules.
+0|unicomm-backend  |     at Object.<anonymous> (C:\setup0\Unicircuit_UniComm\backend\services\whatsapp.js:18:5) {
+0|unicomm-backend  |   code: 'ERR_REQUIRE_ESM'
+0|unicomm-backend  | }
+0|unicomm-backend  | ===================================================
+0|unicomm-backend  | [GLOBAL] Uncaught Exception: Error [ERR_REQUIRE_ESM]: require() of ES Module C:\setup0\Unicircuit_UniComm\backend\node_modules\@whiskeysockets\baileys\lib\index.js from C:\setup0\Unicircuit_UniComm\backend\services\whatsapp.js not supported.
+0|unicomm-backend  | Instead change the require of index.js in C:\setup0\Unicircuit_UniComm\backend\services\whatsapp.js to a dynamic import() which is available in all CommonJS modules.
+0|unicomm-backend  |     at Object.<anonymous> (C:\setup0\Unicircuit_UniComm\backend\services\whatsapp.js:18:5) {
+0|unicomm-backend  |   code: 'ERR_REQUIRE_ESM'
+0|unicomm-backend  | }
+0|unicomm-backend  | Stack: Error [ERR_REQUIRE_ESM]: require() of ES Module C:\setup0\Unicircuit_UniComm\backend\node_modules\@whiskeysockets\baileys\lib\index.js from C:\setup0\Unicircuit_UniComm\backend\services\whatsapp.js not supported.
+0|unicomm-backend  | Instead change the require of index.js in C:\setup0\Unicircuit_UniComm\backend\services\whatsapp.js to a dynamic import() which is available in all CommonJS modules.
+0|unicomm-backend  |     at Object.<anonymous> (C:\setup0\Unicircuit_UniComm\backend\services\whatsapp.js:18:5)
+0|unicomm-backend  | ===================================================
+PM2                | App [unicomm-backend:0] exited with code [0] via signal [SIGINT]
+PM2                | App [unicomm-backend:0] starting in -fork mode-
+PM2                | App [unicomm-backend:0] online
+0|unicomm-backend  | [SERVER] .env loaded. SMDR_PORT from env: 5001
+0|unicomm-backend  | [SERVER] .env file path: C:\setup0\Unicircuit_UniComm\backend\.env
+0|unicomm-backend  | [Security] Running startup security checks...
+0|unicomm-backend  | [Security] ℹ️  .env file found (Windows - permission check skipped)
+0|unicomm-backend  | [Security] 💡 Ensure .env file is not accessible to unauthorized users
+0|unicomm-backend  | [Security] ⚠️  Environment variable warnings:
+0|unicomm-backend  |   - MS_CLIENT_SECRET is not set
+0|unicomm-backend  |   - AI_API_KEY is not set
+0|unicomm-backend  | [Security] ✅ SSL/TLS configured
+0|unicomm-backend  | [Security] ⚠️  Some security checks failed - review warnings above
+0|unicomm-backend  | [Security] Security checks: 2/3 passed
+0|unicomm-backend  | [Outlook] Could not log OAuth env: invalid_client_credential: See https://aka.ms/msal.js.errors#invalid_client_credential for details
+0|unicomm-backend  | Error [ERR_REQUIRE_ESM]: require() of ES Module C:\setup0\Unicircuit_UniComm\backend\node_modules\@whiskeysockets\baileys\lib\index.js from C:\setup0\Unicircuit_UniComm\backend\services\whatsapp.js not supported.
+0|unicomm-backend  | Instead change the require of index.js in C:\setup0\Unicircuit_UniComm\backend\services\whatsapp.js to a dynamic import() which is available in all CommonJS modules.
+0|unicomm-backend  |     at Object.<anonymous> (C:\setup0\Unicircuit_UniComm\backend\services\whatsapp.js:18:5) {
+0|unicomm-backend  |   code: 'ERR_REQUIRE_ESM'
+0|unicomm-backend  | }
+0|unicomm-backend  | ===================================================
+0|unicomm-backend  | [GLOBAL] Uncaught Exception: Error [ERR_REQUIRE_ESM]: require() of ES Module C:\setup0\Unicircuit_UniComm\backend\node_modules\@whiskeysockets\baileys\lib\index.js from C:\setup0\Unicircuit_UniComm\backend\services\whatsapp.js not supported.
+0|unicomm-backend  | Instead change the require of index.js in C:\setup0\Unicircuit_UniComm\backend\services\whatsapp.js to a dynamic import() which is available in all CommonJS modules.
+0|unicomm-backend  |     at Object.<anonymous> (C:\setup0\Unicircuit_UniComm\backend\services\whatsapp.js:18:5) {
+0|unicomm-backend  |   code: 'ERR_REQUIRE_ESM'
+0|unicomm-backend  | }
+0|unicomm-backend  | Stack: Error [ERR_REQUIRE_ESM]: require() of ES Module C:\setup0\Unicircuit_UniComm\backend\node_modules\@whiskeysockets\baileys\lib\index.js from C:\setup0\Unicircuit_UniComm\backend\services\whatsapp.js not supported.
+0|unicomm-backend  | Instead change the require of index.js in C:\setup0\Unicircuit_UniComm\backend\services\whatsapp.js to a dynamic import() which is available in all CommonJS modules.
+0|unicomm-backend  |     at Object.<anonymous> (C:\setup0\Unicircuit_UniComm\backend\services\whatsapp.js:18:5)
+0|unicomm-backend  | ===================================================
+PM2                | App [unicomm-backend:0] exited with code [0] via signal [SIGINT]
+PM2                | App [unicomm-backend:0] starting in -fork mode-
+PM2                | App [unicomm-backend:0] online
+0|unicomm-backend  | [SERVER] .env loaded. SMDR_PORT from env: 5001
+0|unicomm-backend  | [SERVER] .env file path: C:\setup0\Unicircuit_UniComm\backend\.env
+0|unicomm-backend  | [Security] Running startup security checks...
+0|unicomm-backend  | [Security] ℹ️  .env file found (Windows - permission check skipped)
+0|unicomm-backend  | [Security] 💡 Ensure .env file is not accessible to unauthorized users
+0|unicomm-backend  | [Security] ⚠️  Environment variable warnings:
+0|unicomm-backend  |   - MS_CLIENT_SECRET is not set
+0|unicomm-backend  |   - AI_API_KEY is not set
+0|unicomm-backend  | [Security] ✅ SSL/TLS configured
+0|unicomm-backend  | [Security] ⚠️  Some security checks failed - review warnings above
+0|unicomm-backend  | [Security] Security checks: 2/3 passed
+0|unicomm-backend  | [Outlook] Could not log OAuth env: invalid_client_credential: See https://aka.ms/msal.js.errors#invalid_client_credential for details
+0|unicomm-backend  | Error [ERR_REQUIRE_ESM]: require() of ES Module C:\setup0\Unicircuit_UniComm\backend\node_modules\@whiskeysockets\baileys\lib\index.js from C:\setup0\Unicircuit_UniComm\backend\services\whatsapp.js not supported.
+0|unicomm-backend  | Instead change the require of index.js in C:\setup0\Unicircuit_UniComm\backend\services\whatsapp.js to a dynamic import() which is available in all CommonJS modules.
+0|unicomm-backend  |     at Object.<anonymous> (C:\setup0\Unicircuit_UniComm\backend\services\whatsapp.js:18:5) {
+0|unicomm-backend  |   code: 'ERR_REQUIRE_ESM'
+0|unicomm-backend  | }
+0|unicomm-backend  | ===================================================
+0|unicomm-backend  | [GLOBAL] Uncaught Exception: Error [ERR_REQUIRE_ESM]: require() of ES Module C:\setup0\Unicircuit_UniComm\backend\node_modules\@whiskeysockets\baileys\lib\index.js from C:\setup0\Unicircuit_UniComm\backend\services\whatsapp.js not supported.
+0|unicomm-backend  | Instead change the require of index.js in C:\setup0\Unicircuit_UniComm\backend\services\whatsapp.js to a dynamic import() which is available in all CommonJS modules.
+0|unicomm-backend  |     at Object.<anonymous> (C:\setup0\Unicircuit_UniComm\backend\services\whatsapp.js:18:5) {
+0|unicomm-backend  |   code: 'ERR_REQUIRE_ESM'
+0|unicomm-backend  | }
+0|unicomm-backend  | Stack: Error [ERR_REQUIRE_ESM]: require() of ES Module C:\setup0\Unicircuit_UniComm\backend\node_modules\@whiskeysockets\baileys\lib\index.js from C:\setup0\Unicircuit_UniComm\backend\services\whatsapp.js not supported.
+0|unicomm-backend  | Instead change the require of index.js in C:\setup0\Unicircuit_UniComm\backend\services\whatsapp.js to a dynamic import() which is available in all CommonJS modules.
+0|unicomm-backend  |     at Object.<anonymous> (C:\setup0\Unicircuit_UniComm\backend\services\whatsapp.js:18:5)
+0|unicomm-backend  | ===================================================
+PM2                | App [unicomm-backend:0] exited with code [0] via signal [SIGINT]
+PM2                | App [unicomm-backend:0] starting in -fork mode-
+PM2                | App [unicomm-backend:0] online
+0|unicomm-backend  | [SERVER] .env loaded. SMDR_PORT from env: 5001
+0|unicomm-backend  | [SERVER] .env file path: C:\setup0\Unicircuit_UniComm\backend\.env
+0|unicomm-backend  | [Security] Running startup security checks...
+0|unicomm-backend  | [Security] ℹ️  .env file found (Windows - permission check skipped)
+0|unicomm-backend  | [Security] 💡 Ensure .env file is not accessible to unauthorized users
+0|unicomm-backend  | [Security] ⚠️  Environment variable warnings:
+0|unicomm-backend  |   - MS_CLIENT_SECRET is not set
+0|unicomm-backend  |   - AI_API_KEY is not set
+0|unicomm-backend  | [Security] ✅ SSL/TLS configured
+0|unicomm-backend  | [Security] ⚠️  Some security checks failed - review warnings above
+0|unicomm-backend  | [Security] Security checks: 2/3 passed
+0|unicomm-backend  | [Outlook] Could not log OAuth env: invalid_client_credential: See https://aka.ms/msal.js.errors#invalid_client_credential for details
+0|unicomm-backend  | Error [ERR_REQUIRE_ESM]: require() of ES Module C:\setup0\Unicircuit_UniComm\backend\node_modules\@whiskeysockets\baileys\lib\index.js from C:\setup0\Unicircuit_UniComm\backend\services\whatsapp.js not supported.
+0|unicomm-backend  | Instead change the require of index.js in C:\setup0\Unicircuit_UniComm\backend\services\whatsapp.js to a dynamic import() which is available in all CommonJS modules.
+0|unicomm-backend  |     at Object.<anonymous> (C:\setup0\Unicircuit_UniComm\backend\services\whatsapp.js:18:5) {
+0|unicomm-backend  |   code: 'ERR_REQUIRE_ESM'
+0|unicomm-backend  | }
+0|unicomm-backend  | ===================================================
+0|unicomm-backend  | [GLOBAL] Uncaught Exception: Error [ERR_REQUIRE_ESM]: require() of ES Module C:\setup0\Unicircuit_UniComm\backend\node_modules\@whiskeysockets\baileys\lib\index.js from C:\setup0\Unicircuit_UniComm\backend\services\whatsapp.js not supported.
+0|unicomm-backend  | Instead change the require of index.js in C:\setup0\Unicircuit_UniComm\backend\services\whatsapp.js to a dynamic import() which is available in all CommonJS modules.
+0|unicomm-backend  |     at Object.<anonymous> (C:\setup0\Unicircuit_UniComm\backend\services\whatsapp.js:18:5) {
+0|unicomm-backend  |   code: 'ERR_REQUIRE_ESM'
+0|unicomm-backend  | }
+0|unicomm-backend  | Stack: Error [ERR_REQUIRE_ESM]: require() of ES Module C:\setup0\Unicircuit_UniComm\backend\node_modules\@whiskeysockets\baileys\lib\index.js from C:\setup0\Unicircuit_UniComm\backend\services\whatsapp.js not supported.
+0|unicomm-backend  | Instead change the require of index.js in C:\setup0\Unicircuit_UniComm\backend\services\whatsapp.js to a dynamic import() which is available in all CommonJS modules.
+0|unicomm-backend  |     at Object.<anonymous> (C:\setup0\Unicircuit_UniComm\backend\services\whatsapp.js:18:5)
+0|unicomm-backend  | ===================================================
+PM2                | App [unicomm-backend:0] exited with code [0] via signal [SIGINT]
+PM2                | App [unicomm-backend:0] starting in -fork mode-
+PM2                | App [unicomm-backend:0] online
+0|unicomm-backend  | [SERVER] .env loaded. SMDR_PORT from env: 5001
+0|unicomm-backend  | [SERVER] .env file path: C:\setup0\Unicircuit_UniComm\backend\.env
+0|unicomm-backend  | [Security] Running startup security checks...
+0|unicomm-backend  | [Security] ℹ️  .env file found (Windows - permission check skipped)
+0|unicomm-backend  | [Security] 💡 Ensure .env file is not accessible to unauthorized users
+0|unicomm-backend  | [Security] ⚠️  Environment variable warnings:
+0|unicomm-backend  |   - MS_CLIENT_SECRET is not set
+0|unicomm-backend  |   - AI_API_KEY is not set
+0|unicomm-backend  | [Security] ✅ SSL/TLS configured
+0|unicomm-backend  | [Security] ⚠️  Some security checks failed - review warnings above
+0|unicomm-backend  | [Security] Security checks: 2/3 passed
+0|unicomm-backend  | [Outlook] Could not log OAuth env: invalid_client_credential: See https://aka.ms/msal.js.errors#invalid_client_credential for details
+0|unicomm-backend  | Error [ERR_REQUIRE_ESM]: require() of ES Module C:\setup0\Unicircuit_UniComm\backend\node_modules\@whiskeysockets\baileys\lib\index.js from C:\setup0\Unicircuit_UniComm\backend\services\whatsapp.js not supported.
+0|unicomm-backend  | Instead change the require of index.js in C:\setup0\Unicircuit_UniComm\backend\services\whatsapp.js to a dynamic import() which is available in all CommonJS modules.
+0|unicomm-backend  |     at Object.<anonymous> (C:\setup0\Unicircuit_UniComm\backend\services\whatsapp.js:18:5) {
+0|unicomm-backend  |   code: 'ERR_REQUIRE_ESM'
+0|unicomm-backend  | }
+0|unicomm-backend  | ===================================================
+0|unicomm-backend  | [GLOBAL] Uncaught Exception: Error [ERR_REQUIRE_ESM]: require() of ES Module C:\setup0\Unicircuit_UniComm\backend\node_modules\@whiskeysockets\baileys\lib\index.js from C:\setup0\Unicircuit_UniComm\backend\services\whatsapp.js not supported.
+0|unicomm-backend  | Instead change the require of index.js in C:\setup0\Unicircuit_UniComm\backend\services\whatsapp.js to a dynamic import() which is available in all CommonJS modules.
+0|unicomm-backend  |     at Object.<anonymous> (C:\setup0\Unicircuit_UniComm\backend\services\whatsapp.js:18:5) {
+0|unicomm-backend  |   code: 'ERR_REQUIRE_ESM'
+0|unicomm-backend  | }
+0|unicomm-backend  | Stack: Error [ERR_REQUIRE_ESM]: require() of ES Module C:\setup0\Unicircuit_UniComm\backend\node_modules\@whiskeysockets\baileys\lib\index.js from C:\setup0\Unicircuit_UniComm\backend\services\whatsapp.js not supported.
+0|unicomm-backend  | Instead change the require of index.js in C:\setup0\Unicircuit_UniComm\backend\services\whatsapp.js to a dynamic import() which is available in all CommonJS modules.
+0|unicomm-backend  |     at Object.<anonymous> (C:\setup0\Unicircuit_UniComm\backend\services\whatsapp.js:18:5)
+0|unicomm-backend  | ===================================================
+PM2                | App [unicomm-backend:0] exited with code [0] via signal [SIGINT]
+PM2                | App [unicomm-backend:0] starting in -fork mode-
+PM2                | App [unicomm-backend:0] online
+0|unicomm-backend  | [SERVER] .env loaded. SMDR_PORT from env: 5001
+0|unicomm-backend  | [SERVER] .env file path: C:\setup0\Unicircuit_UniComm\backend\.env
+0|unicomm-backend  | [Security] Running startup security checks...
+0|unicomm-backend  | [Security] ℹ️  .env file found (Windows - permission check skipped)
+0|unicomm-backend  | [Security] 💡 Ensure .env file is not accessible to unauthorized users
+0|unicomm-backend  | [Security] ⚠️  Environment variable warnings:
+0|unicomm-backend  |   - MS_CLIENT_SECRET is not set
+0|unicomm-backend  |   - AI_API_KEY is not set
+0|unicomm-backend  | [Security] ✅ SSL/TLS configured
+0|unicomm-backend  | [Security] ⚠️  Some security checks failed - review warnings above
+0|unicomm-backend  | [Security] Security checks: 2/3 passed
+0|unicomm-backend  | [Outlook] Could not log OAuth env: invalid_client_credential: See https://aka.ms/msal.js.errors#invalid_client_credential for details
+0|unicomm-backend  | Error [ERR_REQUIRE_ESM]: require() of ES Module C:\setup0\Unicircuit_UniComm\backend\node_modules\@whiskeysockets\baileys\lib\index.js from C:\setup0\Unicircuit_UniComm\backend\services\whatsapp.js not supported.
+0|unicomm-backend  | Instead change the require of index.js in C:\setup0\Unicircuit_UniComm\backend\services\whatsapp.js to a dynamic import() which is available in all CommonJS modules.
+0|unicomm-backend  |     at Object.<anonymous> (C:\setup0\Unicircuit_UniComm\backend\services\whatsapp.js:18:5) {
+0|unicomm-backend  |   code: 'ERR_REQUIRE_ESM'
+0|unicomm-backend  | }
+0|unicomm-backend  | ===================================================
+0|unicomm-backend  | [GLOBAL] Uncaught Exception: Error [ERR_REQUIRE_ESM]: require() of ES Module C:\setup0\Unicircuit_UniComm\backend\node_modules\@whiskeysockets\baileys\lib\index.js from C:\setup0\Unicircuit_UniComm\backend\services\whatsapp.js not supported.
+0|unicomm-backend  | Instead change the require of index.js in C:\setup0\Unicircuit_UniComm\backend\services\whatsapp.js to a dynamic import() which is available in all CommonJS modules.
+0|unicomm-backend  |     at Object.<anonymous> (C:\setup0\Unicircuit_UniComm\backend\services\whatsapp.js:18:5) {
+0|unicomm-backend  |   code: 'ERR_REQUIRE_ESM'
+0|unicomm-backend  | }
+0|unicomm-backend  | Stack: Error [ERR_REQUIRE_ESM]: require() of ES Module C:\setup0\Unicircuit_UniComm\backend\node_modules\@whiskeysockets\baileys\lib\index.js from C:\setup0\Unicircuit_UniComm\backend\services\whatsapp.js not supported.
+0|unicomm-backend  | Instead change the require of index.js in C:\setup0\Unicircuit_UniComm\backend\services\whatsapp.js to a dynamic import() which is available in all CommonJS modules.
+0|unicomm-backend  |     at Object.<anonymous> (C:\setup0\Unicircuit_UniComm\backend\services\whatsapp.js:18:5)
+0|unicomm-backend  | ===================================================
+PM2                | App [unicomm-backend:0] exited with code [0] via signal [SIGINT]
+PM2                | App [unicomm-backend:0] starting in -fork mode-
+PM2                | App [unicomm-backend:0] online
+0|unicomm-backend  | [SERVER] .env loaded. SMDR_PORT from env: 5001
+0|unicomm-backend  | [SERVER] .env file path: C:\setup0\Unicircuit_UniComm\backend\.env
+0|unicomm-backend  | [Security] Running startup security checks...
+0|unicomm-backend  | [Security] ℹ️  .env file found (Windows - permission check skipped)
+0|unicomm-backend  | [Security] 💡 Ensure .env file is not accessible to unauthorized users
+0|unicomm-backend  | [Security] ⚠️  Environment variable warnings:
+0|unicomm-backend  |   - MS_CLIENT_SECRET is not set
+0|unicomm-backend  |   - AI_API_KEY is not set
+0|unicomm-backend  | [Security] ✅ SSL/TLS configured
+0|unicomm-backend  | [Security] Security checks: 2/3 passed
+0|unicomm-backend  | [Security] ⚠️  Some security checks failed - review warnings above
+0|unicomm-backend  | [Outlook] Could not log OAuth env: invalid_client_credential: See https://aka.ms/msal.js.errors#invalid_client_credential for details
+0|unicomm-backend  | Error [ERR_REQUIRE_ESM]: require() of ES Module C:\setup0\Unicircuit_UniComm\backend\node_modules\@whiskeysockets\baileys\lib\index.js from C:\setup0\Unicircuit_UniComm\backend\services\whatsapp.js not supported.
+0|unicomm-backend  | Instead change the require of index.js in C:\setup0\Unicircuit_UniComm\backend\services\whatsapp.js to a dynamic import() which is available in all CommonJS modules.
+0|unicomm-backend  |     at Object.<anonymous> (C:\setup0\Unicircuit_UniComm\backend\services\whatsapp.js:18:5) {
+0|unicomm-backend  |   code: 'ERR_REQUIRE_ESM'
+0|unicomm-backend  | }
+0|unicomm-backend  | ===================================================
+0|unicomm-backend  | [GLOBAL] Uncaught Exception: Error [ERR_REQUIRE_ESM]: require() of ES Module C:\setup0\Unicircuit_UniComm\backend\node_modules\@whiskeysockets\baileys\lib\index.js from C:\setup0\Unicircuit_UniComm\backend\services\whatsapp.js not supported.
+0|unicomm-backend  | Instead change the require of index.js in C:\setup0\Unicircuit_UniComm\backend\services\whatsapp.js to a dynamic import() which is available in all CommonJS modules.
+0|unicomm-backend  |     at Object.<anonymous> (C:\setup0\Unicircuit_UniComm\backend\services\whatsapp.js:18:5) {
+0|unicomm-backend  |   code: 'ERR_REQUIRE_ESM'
+0|unicomm-backend  | }
+0|unicomm-backend  | Stack: Error [ERR_REQUIRE_ESM]: require() of ES Module C:\setup0\Unicircuit_UniComm\backend\node_modules\@whiskeysockets\baileys\lib\index.js from C:\setup0\Unicircuit_UniComm\backend\services\whatsapp.js not supported.
+0|unicomm-backend  | Instead change the require of index.js in C:\setup0\Unicircuit_UniComm\backend\services\whatsapp.js to a dynamic import() which is available in all CommonJS modules.
+0|unicomm-backend  |     at Object.<anonymous> (C:\setup0\Unicircuit_UniComm\backend\services\whatsapp.js:18:5)
+0|unicomm-backend  | ===================================================
+PM2                | App [unicomm-backend:0] exited with code [0] via signal [SIGINT]
+PM2                | App [unicomm-backend:0] starting in -fork mode-
+PM2                | App [unicomm-backend:0] online
+0|unicomm-backend  | [SERVER] .env loaded. SMDR_PORT from env: 5001
+0|unicomm-backend  | [SERVER] .env file path: C:\setup0\Unicircuit_UniComm\backend\.env
+0|unicomm-backend  | [Security] Running startup security checks...
+0|unicomm-backend  | [Security] ℹ️  .env file found (Windows - permission check skipped)
+0|unicomm-backend  | [Security] 💡 Ensure .env file is not accessible to unauthorized users
+0|unicomm-backend  | [Security] ⚠️  Environment variable warnings:
+0|unicomm-backend  |   - MS_CLIENT_SECRET is not set
+0|unicomm-backend  |   - AI_API_KEY is not set
+0|unicomm-backend  | [Security] ✅ SSL/TLS configured
+0|unicomm-backend  | [Security] Security checks: 2/3 passed
+0|unicomm-backend  | [Security] ⚠️  Some security checks failed - review warnings above
+0|unicomm-backend  | [Outlook] Could not log OAuth env: invalid_client_credential: See https://aka.ms/msal.js.errors#invalid_client_credential for details
+0|unicomm-backend  | Error [ERR_REQUIRE_ESM]: require() of ES Module C:\setup0\Unicircuit_UniComm\backend\node_modules\@whiskeysockets\baileys\lib\index.js from C:\setup0\Unicircuit_UniComm\backend\services\whatsapp.js not supported.
+0|unicomm-backend  | Instead change the require of index.js in C:\setup0\Unicircuit_UniComm\backend\services\whatsapp.js to a dynamic import() which is available in all CommonJS modules.
+0|unicomm-backend  |     at Object.<anonymous> (C:\setup0\Unicircuit_UniComm\backend\services\whatsapp.js:18:5) {
+0|unicomm-backend  |   code: 'ERR_REQUIRE_ESM'
+0|unicomm-backend  | }
+0|unicomm-backend  | ===================================================
+0|unicomm-backend  | [GLOBAL] Uncaught Exception: Error [ERR_REQUIRE_ESM]: require() of ES Module C:\setup0\Unicircuit_UniComm\backend\node_modules\@whiskeysockets\baileys\lib\index.js from C:\setup0\Unicircuit_UniComm\backend\services\whatsapp.js not supported.
+0|unicomm-backend  | Instead change the require of index.js in C:\setup0\Unicircuit_UniComm\backend\services\whatsapp.js to a dynamic import() which is available in all CommonJS modules.
+0|unicomm-backend  |     at Object.<anonymous> (C:\setup0\Unicircuit_UniComm\backend\services\whatsapp.js:18:5) {
+0|unicomm-backend  |   code: 'ERR_REQUIRE_ESM'
+0|unicomm-backend  | }
+0|unicomm-backend  | Stack: Error [ERR_REQUIRE_ESM]: require() of ES Module C:\setup0\Unicircuit_UniComm\backend\node_modules\@whiskeysockets\baileys\lib\index.js from C:\setup0\Unicircuit_UniComm\backend\services\whatsapp.js not supported.
+0|unicomm-backend  | Instead change the require of index.js in C:\setup0\Unicircuit_UniComm\backend\services\whatsapp.js to a dynamic import() which is available in all CommonJS modules.
+0|unicomm-backend  |     at Object.<anonymous> (C:\setup0\Unicircuit_UniComm\backend\services\whatsapp.js:18:5)
+0|unicomm-backend  | ===================================================
+PM2                | App [unicomm-backend:0] exited with code [0] via signal [SIGINT]
+PM2                | App [unicomm-backend:0] starting in -fork mode-
+PM2                | App [unicomm-backend:0] online
+0|unicomm-backend  | [SERVER] .env loaded. SMDR_PORT from env: 5001
+0|unicomm-backend  | [SERVER] .env file path: C:\setup0\Unicircuit_UniComm\backend\.env
+0|unicomm-backend  | [Security] Running startup security checks...
+0|unicomm-backend  | [Security] ℹ️  .env file found (Windows - permission check skipped)
+0|unicomm-backend  | [Security] 💡 Ensure .env file is not accessible to unauthorized users
+0|unicomm-backend  | [Security] ⚠️  Environment variable warnings:
+0|unicomm-backend  |   - MS_CLIENT_SECRET is not set
+0|unicomm-backend  |   - AI_API_KEY is not set
+0|unicomm-backend  | [Security] ✅ SSL/TLS configured
+0|unicomm-backend  | [Security] Security checks: 2/3 passed
+0|unicomm-backend  | [Security] ⚠️  Some security checks failed - review warnings above
+0|unicomm-backend  | [Outlook] Could not log OAuth env: invalid_client_credential: See https://aka.ms/msal.js.errors#invalid_client_credential for details
+0|unicomm-backend  | Error [ERR_REQUIRE_ESM]: require() of ES Module C:\setup0\Unicircuit_UniComm\backend\node_modules\@whiskeysockets\baileys\lib\index.js from C:\setup0\Unicircuit_UniComm\backend\services\whatsapp.js not supported.
+0|unicomm-backend  | Instead change the require of index.js in C:\setup0\Unicircuit_UniComm\backend\services\whatsapp.js to a dynamic import() which is available in all CommonJS modules.
+0|unicomm-backend  |     at Object.<anonymous> (C:\setup0\Unicircuit_UniComm\backend\services\whatsapp.js:18:5) {
+0|unicomm-backend  |   code: 'ERR_REQUIRE_ESM'
+0|unicomm-backend  | }
+0|unicomm-backend  | ===================================================
+0|unicomm-backend  | [GLOBAL] Uncaught Exception: Error [ERR_REQUIRE_ESM]: require() of ES Module C:\setup0\Unicircuit_UniComm\backend\node_modules\@whiskeysockets\baileys\lib\index.js from C:\setup0\Unicircuit_UniComm\backend\services\whatsapp.js not supported.
+0|unicomm-backend  | Instead change the require of index.js in C:\setup0\Unicircuit_UniComm\backend\services\whatsapp.js to a dynamic import() which is available in all CommonJS modules.
+0|unicomm-backend  |     at Object.<anonymous> (C:\setup0\Unicircuit_UniComm\backend\services\whatsapp.js:18:5) {
+0|unicomm-backend  |   code: 'ERR_REQUIRE_ESM'
+0|unicomm-backend  | }
+0|unicomm-backend  | Stack: Error [ERR_REQUIRE_ESM]: require() of ES Module C:\setup0\Unicircuit_UniComm\backend\node_modules\@whiskeysockets\baileys\lib\index.js from C:\setup0\Unicircuit_UniComm\backend\services\whatsapp.js not supported.
+0|unicomm-backend  | Instead change the require of index.js in C:\setup0\Unicircuit_UniComm\backend\services\whatsapp.js to a dynamic import() which is available in all CommonJS modules.
+0|unicomm-backend  |     at Object.<anonymous> (C:\setup0\Unicircuit_UniComm\backend\services\whatsapp.js:18:5)
+0|unicomm-backend  | ===================================================
+PM2                | App [unicomm-backend:0] exited with code [0] via signal [SIGINT]
+PM2                | App [unicomm-backend:0] starting in -fork mode-
+PM2                | App [unicomm-backend:0] online
+0|unicomm-backend  | [SERVER] .env loaded. SMDR_PORT from env: 5001
+0|unicomm-backend  | [SERVER] .env file path: C:\setup0\Unicircuit_UniComm\backend\.env
+0|unicomm-backend  | [Security] Running startup security checks...
+0|unicomm-backend  | [Security] ℹ️  .env file found (Windows - permission check skipped)
+0|unicomm-backend  | [Security] 💡 Ensure .env file is not accessible to unauthorized users
+0|unicomm-backend  | [Security] ⚠️  Environment variable warnings:
+0|unicomm-backend  |   - MS_CLIENT_SECRET is not set
+0|unicomm-backend  |   - AI_API_KEY is not set
+0|unicomm-backend  | [Security] ✅ SSL/TLS configured
+0|unicomm-backend  | [Security] Security checks: 2/3 passed
+0|unicomm-backend  | [Security] ⚠️  Some security checks failed - review warnings above
+0|unicomm-backend  | [Outlook] Could not log OAuth env: invalid_client_credential: See https://aka.ms/msal.js.errors#invalid_client_credential for details
+0|unicomm-backend  | Error [ERR_REQUIRE_ESM]: require() of ES Module C:\setup0\Unicircuit_UniComm\backend\node_modules\@whiskeysockets\baileys\lib\index.js from C:\setup0\Unicircuit_UniComm\backend\services\whatsapp.js not supported.
+0|unicomm-backend  | Instead change the require of index.js in C:\setup0\Unicircuit_UniComm\backend\services\whatsapp.js to a dynamic import() which is available in all CommonJS modules.
+0|unicomm-backend  |     at Object.<anonymous> (C:\setup0\Unicircuit_UniComm\backend\services\whatsapp.js:18:5) {
+0|unicomm-backend  |   code: 'ERR_REQUIRE_ESM'
+0|unicomm-backend  | }
+0|unicomm-backend  | ===================================================
+0|unicomm-backend  | [GLOBAL] Uncaught Exception: Error [ERR_REQUIRE_ESM]: require() of ES Module C:\setup0\Unicircuit_UniComm\backend\node_modules\@whiskeysockets\baileys\lib\index.js from C:\setup0\Unicircuit_UniComm\backend\services\whatsapp.js not supported.
+0|unicomm-backend  | Instead change the require of index.js in C:\setup0\Unicircuit_UniComm\backend\services\whatsapp.js to a dynamic import() which is available in all CommonJS modules.
+0|unicomm-backend  |     at Object.<anonymous> (C:\setup0\Unicircuit_UniComm\backend\services\whatsapp.js:18:5) {
+0|unicomm-backend  |   code: 'ERR_REQUIRE_ESM'
+0|unicomm-backend  | }
+0|unicomm-backend  | Stack: Error [ERR_REQUIRE_ESM]: require() of ES Module C:\setup0\Unicircuit_UniComm\backend\node_modules\@whiskeysockets\baileys\lib\index.js from C:\setup0\Unicircuit_UniComm\backend\services\whatsapp.js not supported.
+0|unicomm-backend  | Instead change the require of index.js in C:\setup0\Unicircuit_UniComm\backend\services\whatsapp.js to a dynamic import() which is available in all CommonJS modules.
+0|unicomm-backend  |     at Object.<anonymous> (C:\setup0\Unicircuit_UniComm\backend\services\whatsapp.js:18:5)
+0|unicomm-backend  | ===================================================
+PM2                | App [unicomm-backend:0] exited with code [0] via signal [SIGINT]
+PM2                | App [unicomm-backend:0] starting in -fork mode-
+PM2                | App [unicomm-backend:0] online
+0|unicomm-backend  | [SERVER] .env loaded. SMDR_PORT from env: 5001
+0|unicomm-backend  | [SERVER] .env file path: C:\setup0\Unicircuit_UniComm\backend\.env
+0|unicomm-backend  | [Security] Running startup security checks...
+0|unicomm-backend  | [Security] ℹ️  .env file found (Windows - permission check skipped)
+0|unicomm-backend  | [Security] 💡 Ensure .env file is not accessible to unauthorized users
+0|unicomm-backend  | [Security] ⚠️  Environment variable warnings:
+0|unicomm-backend  |   - MS_CLIENT_SECRET is not set
+0|unicomm-backend  |   - AI_API_KEY is not set
+0|unicomm-backend  | [Security] ✅ SSL/TLS configured
+0|unicomm-backend  | [Security] Security checks: 2/3 passed
+0|unicomm-backend  | [Security] ⚠️  Some security checks failed - review warnings above
+0|unicomm-backend  | [Outlook] Could not log OAuth env: invalid_client_credential: See https://aka.ms/msal.js.errors#invalid_client_credential for details
+0|unicomm-backend  | Error [ERR_REQUIRE_ESM]: require() of ES Module C:\setup0\Unicircuit_UniComm\backend\node_modules\@whiskeysockets\baileys\lib\index.js from C:\setup0\Unicircuit_UniComm\backend\services\whatsapp.js not supported.
+0|unicomm-backend  | Instead change the require of index.js in C:\setup0\Unicircuit_UniComm\backend\services\whatsapp.js to a dynamic import() which is available in all CommonJS modules.
+0|unicomm-backend  |     at Object.<anonymous> (C:\setup0\Unicircuit_UniComm\backend\services\whatsapp.js:18:5) {
+0|unicomm-backend  |   code: 'ERR_REQUIRE_ESM'
+0|unicomm-backend  | }
+0|unicomm-backend  | ===================================================
+0|unicomm-backend  | [GLOBAL] Uncaught Exception: Error [ERR_REQUIRE_ESM]: require() of ES Module C:\setup0\Unicircuit_UniComm\backend\node_modules\@whiskeysockets\baileys\lib\index.js from C:\setup0\Unicircuit_UniComm\backend\services\whatsapp.js not supported.
+0|unicomm-backend  | Instead change the require of index.js in C:\setup0\Unicircuit_UniComm\backend\services\whatsapp.js to a dynamic import() which is available in all CommonJS modules.
+0|unicomm-backend  |     at Object.<anonymous> (C:\setup0\Unicircuit_UniComm\backend\services\whatsapp.js:18:5) {
+0|unicomm-backend  |   code: 'ERR_REQUIRE_ESM'
+0|unicomm-backend  | }
+0|unicomm-backend  | Stack: Error [ERR_REQUIRE_ESM]: require() of ES Module C:\setup0\Unicircuit_UniComm\backend\node_modules\@whiskeysockets\baileys\lib\index.js from C:\setup0\Unicircuit_UniComm\backend\services\whatsapp.js not supported.
+0|unicomm-backend  | Instead change the require of index.js in C:\setup0\Unicircuit_UniComm\backend\services\whatsapp.js to a dynamic import() which is available in all CommonJS modules.
+0|unicomm-backend  |     at Object.<anonymous> (C:\setup0\Unicircuit_UniComm\backend\services\whatsapp.js:18:5)
+0|unicomm-backend  | ===================================================
+PM2                | App [unicomm-backend:0] exited with code [0] via signal [SIGINT]
+PM2                | App [unicomm-backend:0] starting in -fork mode-
+PM2                | App [unicomm-backend:0] online
+0|unicomm-backend  | [SERVER] .env loaded. SMDR_PORT from env: 5001
+0|unicomm-backend  | [SERVER] .env file path: C:\setup0\Unicircuit_UniComm\backend\.env
+0|unicomm-backend  | [Security] Running startup security checks...
+0|unicomm-backend  | [Security] ℹ️  .env file found (Windows - permission check skipped)
+0|unicomm-backend  | [Security] 💡 Ensure .env file is not accessible to unauthorized users
+0|unicomm-backend  | [Security] ⚠️  Environment variable warnings:
+0|unicomm-backend  |   - MS_CLIENT_SECRET is not set
+0|unicomm-backend  |   - AI_API_KEY is not set
+0|unicomm-backend  | [Security] ✅ SSL/TLS configured
+0|unicomm-backend  | [Security] Security checks: 2/3 passed
+0|unicomm-backend  | [Security] ⚠️  Some security checks failed - review warnings above
+0|unicomm-backend  | [Outlook] Could not log OAuth env: invalid_client_credential: See https://aka.ms/msal.js.errors#invalid_client_credential for details
+0|unicomm-backend  | Error [ERR_REQUIRE_ESM]: require() of ES Module C:\setup0\Unicircuit_UniComm\backend\node_modules\@whiskeysockets\baileys\lib\index.js from C:\setup0\Unicircuit_UniComm\backend\services\whatsapp.js not supported.
+0|unicomm-backend  | Instead change the require of index.js in C:\setup0\Unicircuit_UniComm\backend\services\whatsapp.js to a dynamic import() which is available in all CommonJS modules.
+0|unicomm-backend  |     at Object.<anonymous> (C:\setup0\Unicircuit_UniComm\backend\services\whatsapp.js:18:5) {
+0|unicomm-backend  |   code: 'ERR_REQUIRE_ESM'
+0|unicomm-backend  | }
+0|unicomm-backend  | ===================================================
+0|unicomm-backend  | [GLOBAL] Uncaught Exception: Error [ERR_REQUIRE_ESM]: require() of ES Module C:\setup0\Unicircuit_UniComm\backend\node_modules\@whiskeysockets\baileys\lib\index.js from C:\setup0\Unicircuit_UniComm\backend\services\whatsapp.js not supported.
+0|unicomm-backend  | Instead change the require of index.js in C:\setup0\Unicircuit_UniComm\backend\services\whatsapp.js to a dynamic import() which is available in all CommonJS modules.
+0|unicomm-backend  |     at Object.<anonymous> (C:\setup0\Unicircuit_UniComm\backend\services\whatsapp.js:18:5) {
+0|unicomm-backend  |   code: 'ERR_REQUIRE_ESM'
+0|unicomm-backend  | }
+0|unicomm-backend  | Stack: Error [ERR_REQUIRE_ESM]: require() of ES Module C:\setup0\Unicircuit_UniComm\backend\node_modules\@whiskeysockets\baileys\lib\index.js from C:\setup0\Unicircuit_UniComm\backend\services\whatsapp.js not supported.
+0|unicomm-backend  | Instead change the require of index.js in C:\setup0\Unicircuit_UniComm\backend\services\whatsapp.js to a dynamic import() which is available in all CommonJS modules.
+0|unicomm-backend  |     at Object.<anonymous> (C:\setup0\Unicircuit_UniComm\backend\services\whatsapp.js:18:5)
+0|unicomm-backend  | ===================================================
+PM2                | App [unicomm-backend:0] exited with code [0] via signal [SIGINT]
+PM2                | App [unicomm-backend:0] starting in -fork mode-
+PM2                | App [unicomm-backend:0] online
