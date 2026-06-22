@@ -1025,6 +1025,19 @@ async function ensureTables(retries = 3) {
         )
       `);
 
+      // One-time group name cleanup
+      await pool.query(`
+        UPDATE wa_chats
+        SET name = NULL
+        WHERE is_group = true
+          AND name IS NOT NULL
+          AND (
+            name = id
+            OR name = split_part(id,'@',1)
+            OR (name ~ '^[0-9]{12,}' AND name NOT LIKE '%@%')
+          )
+      `).catch(() => {});
+
       return; // Success
     } catch (err) {
       console.warn(`[WA] Table ensure attempt ${i + 1} failed: ${err.message}`);

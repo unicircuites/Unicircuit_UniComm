@@ -13,7 +13,9 @@ async function pruneAntigravityLogs() {
     const conversationsDir = path.join(os.homedir(), '.gemini', 'antigravity', 'conversations');
     
     if (!fs.existsSync(conversationsDir)) {
-        console.log('[Maintenance] Antigravity conversations directory not found. Skipping pruning.');
+        if (process.env.NODE_ENV !== 'production') {
+            console.log('[Maintenance] Antigravity conversations directory not found. Skipping pruning.');
+        }
         return;
     }
 

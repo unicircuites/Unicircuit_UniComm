@@ -89,6 +89,7 @@ async function ensureTable(retries = 3) {
       `);
 
       await pool.query(`ALTER TABLE ai_tasks ADD COLUMN IF NOT EXISTS duration_ms INTEGER;`);
+      await pool.query(`ALTER TABLE ai_tasks ADD COLUMN IF NOT EXISTS batch_id VARCHAR(100);`);
       await pool.query(`CREATE INDEX IF NOT EXISTS idx_ai_tasks_status ON ai_tasks(status)`);
       await pool.query(`CREATE INDEX IF NOT EXISTS idx_ai_tasks_batch ON ai_tasks(batch_id)`);
 

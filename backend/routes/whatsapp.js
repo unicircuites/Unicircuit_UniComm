@@ -10,18 +10,7 @@ const { authenticate } = require('../middleware/auth');
 const router = express.Router();
 const WA_DEBUG_ACCOUNT_SCOPE = String(process.env.WA_DEBUG_ACCOUNT_SCOPE || 'false').toLowerCase() === 'true';
 
-// ── One-time cleanup: NULL out any wa_chats.name that is the group's own JID ──
-pool.query(`
-  UPDATE wa_chats
-  SET name = NULL
-  WHERE is_group = true
-    AND name IS NOT NULL
-    AND (
-      name = id
-      OR name = split_part(id,'@',1)
-      OR (name ~ '^[0-9]{12,}' AND name NOT LIKE '%@%')
-    )
-`).catch(e => console.error('[WA] group name cleanup:', e.message));
+// ── One-time cleanup has been moved to services/whatsapp.js to run after tables are ensured ──
 
 function normalizeDigits(value) {
   return String(value || '').replace(/\D/g, '');
