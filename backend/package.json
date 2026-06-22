@@ -11,7 +11,7 @@
   },
   "dependencies": {
     "@azure/msal-node": "^5.1.5",
-    "@whiskeysockets/baileys": "^7.0.0-rc.9",
+    "@whiskeysockets/baileys": "~6.6.0",
     "archiver": "^7.0.1",
     "axios": "^1.16.1",
     "bcryptjs": "2.4.3",

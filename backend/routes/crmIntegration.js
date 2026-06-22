@@ -138,8 +138,11 @@ async function auditAgentWrite(req) {
 }
 
 async function emitWebhook(event, entity, data) {
-  const url = process.env.CRM_N8N_WEBHOOK_URL;
+  let url = process.env.CRM_N8N_WEBHOOK_URL;
   if (!url) return;
+  if (process.env.SSL_KEY_PATH && process.env.SSL_CERT_PATH && (url.startsWith('http://localhost') || url.startsWith('http://127.0.0.1'))) {
+    url = url.replace('http://', 'https://');
+  }
   const payload = {
     event,
     entity,

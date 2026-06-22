@@ -6909,7 +6909,7 @@
           <div style="display: grid; grid-template-columns: 1fr 400px; gap: 16px; height: calc(100vh - 120px);">
             <!-- Left: n8n Editor Iframe -->
             <div class="card" style="padding: 0; overflow: hidden; border: 1px solid var(--border); border-radius: 12px; height: 100%;">
-              <iframe src="http://localhost:5678" style="width: 100%; height: 100%; border: none;"></iframe>
+              <iframe id="n8n-iframe" src="" style="width: 100%; height: 100%; border: none;"></iframe>
             </div>
             
             <!-- Right: Workflow Tester Console -->
@@ -8114,7 +8114,13 @@ Always write in a professional yet warm Indian B2B communication style. Use form
       document.getElementById('page-h').textContent = m[0];
       document.getElementById('page-sub').textContent = m[1];
       if (id === 'usermgmt') { umCancelEdit(); umLoadUsers(); }
-      if (id === 'n8n') { loadTesterLeads(); }
+      if (id === 'n8n') {
+        loadTesterLeads();
+        const iframe = document.getElementById('n8n-iframe');
+        if (iframe && !iframe.src) {
+          iframe.src = `${window.location.protocol}//${window.location.hostname}:5678`;
+        }
+      }
       const topCompose = document.getElementById('topbar-compose-email');
       if (topCompose) topCompose.style.display = id === 'email' ? '' : 'none';
       if (id === 'contacts') { refreshContactsSection(); }
