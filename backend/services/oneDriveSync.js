@@ -25,7 +25,7 @@ const fetch   = require('node-fetch');
 const { getAccessToken, getClientCredentialsToken } = require('./msGraph');
 
 // ── Config ─────────────────────────────────────────────────────────────────
-const PBX_SOURCE_DIR  = process.env.PBX_RECORDINGS_DIR       || '\\\\UNISERVER\\MatrixVMS';
+const PBX_SOURCE_DIR  = process.env.PBX_RECORDINGS_DIR       || '\\\\UNISERVER\\MatrixVMS\\Voicemail_Backup';
 const LOCAL_CACHE_DIR = process.env.PBX_LOCAL_RECORDINGS_DIR || 'D:\\Unicomm_Storage';
 const CACHE_DAYS      = parseInt(process.env.ONEDRIVE_CACHE_DAYS || '30', 10);
 const OD_FOLDER       = process.env.ONEDRIVE_FOLDER           || 'UniComm_Recordings';

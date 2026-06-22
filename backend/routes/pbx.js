@@ -42,7 +42,7 @@ let scanProgress = {
 
 const PBX_ROOT =
   process.env.PBX_RECORDINGS_DIR ||
-  '\\\\UNISERVER\\MatrixVMS';
+  '\\\\UNISERVER\\MatrixVMS\\Voicemail_Backup';
 
 const LOCAL_RECORDINGS =
   process.env.PBX_LOCAL_RECORDINGS_DIR ||

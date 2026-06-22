@@ -5040,7 +5040,7 @@
                     ">
                     <option value="network">
                       Network Drive
-                      (\\UNISERVER\MatrixVMS)
+                      (\\UNISERVER\MatrixVMS\Voicemail_Backup)
                     </option>
 
                     <option value="database">
@@ -5055,7 +5055,7 @@
                       word-break:break-all;
                       line-height:1.5;
                     ">
-                    \\UNISERVER\MatrixVMS
+                    \\UNISERVER\MatrixVMS\Voicemail_Backup
                   </div>
 
                 </div>
@@ -32110,7 +32110,7 @@ ${plainText}`;
           if (mode === 'network') {
 
             pathText.innerText =
-              '\\\\UNISERVER\\MatrixVMS';
+              '\\\\UNISERVER\\MatrixVMS\\Voicemail_Backup';
 
             pbxSelectedDbFolder = null;
             pbxNetworkHasRecordings = false;
@@ -32889,7 +32889,7 @@ ${plainText}`;
     }
 
     async function uploadPBXRecordingsToOneDrive(button) {
-      if (!confirm('Upload unique PBX recordings from \\\\UNISERVER\\MatrixVMS to OneDrive?')) {
+      if (!confirm('Upload unique PBX recordings from \\\\UNISERVER\\MatrixVMS\\Voicemail_Backup to OneDrive?')) {
         return;
       }
 
