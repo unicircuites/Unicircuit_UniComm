@@ -88,7 +88,7 @@ if ($pgService) {
     
     Write-Host "Installing PostgreSQL 16 silently... Database password will be 'Unicircuit@2026'" -ForegroundColor Gray
     # Silent install arguments for EnterpriseDB postgres installer
-    $pgArgs = "--mode unattended --postgrespassword `"Unicircuit@2026`""
+    $pgArgs = "--mode unattended --superpassword `"Unicircuit@2026`""
     Start-Process $pgExe -ArgumentList $pgArgs -Wait
     
     $pgService = Get-Service -Name "postgresql*" -ErrorAction SilentlyContinue
