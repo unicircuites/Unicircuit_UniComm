@@ -114,14 +114,19 @@ async function init() {
     // ── CALL LOGS ──────────────────────────────────────────────────────────
     await client.query(`
       CREATE TABLE IF NOT EXISTS call_logs (
-        id          SERIAL PRIMARY KEY,
-        caller      VARCHAR(120),
-        extension   VARCHAR(20),
-        destination VARCHAR(120),
-        duration    VARCHAR(20),
-        call_type   VARCHAR(20),
-        ai_summary  TEXT,
-        created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        id             SERIAL PRIMARY KEY,
+        caller         VARCHAR(120),
+        extension      VARCHAR(20),
+        destination    VARCHAR(120),
+        duration       VARCHAR(20),
+        call_type      VARCHAR(20),
+        ai_summary     TEXT,
+        call_date      DATE,
+        call_time      VARCHAR(50),
+        trunk          VARCHAR(100),
+        raw_line       TEXT,
+        recording_file VARCHAR(255),
+        created_at     TIMESTAMPTZ NOT NULL DEFAULT NOW()
       );
     `);
 
