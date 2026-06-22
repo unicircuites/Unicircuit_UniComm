@@ -110,7 +110,7 @@ $config["CALL_REPO_BACKUP_DIR"] = "$safeOneDrivePath\\call_backups"
 # Defaults for database if not already present
 if (-not $config.Contains("DB_NAME")) { $config["DB_NAME"] = "unicomm_db" }
 if (-not $config.Contains("DB_USER")) { $config["DB_USER"] = "postgres" }
-if (-not $config.Contains("DB_PASSWORD")) { $config["DB_PASSWORD"] = "Unicircuit@2026" }
+if (-not $config.Contains("DB_PASSWORD") -or $config["DB_PASSWORD"] -eq "your_password_here") { $config["DB_PASSWORD"] = "Unicircuit@2026" }
 if (-not $config.Contains("DB_HOST")) { $config["DB_HOST"] = "localhost" }
 if (-not $config.Contains("DB_PORT")) { $config["DB_PORT"] = "5432" }
 

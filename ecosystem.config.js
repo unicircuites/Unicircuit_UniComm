@@ -15,6 +15,7 @@ module.exports = {
       args: 'n8n',
       cwd: '.',
       watch: false,
+      shell: true,
       env: {
         N8N_DISABLE_UI_SECURITY: 'true'
       }
