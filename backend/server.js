@@ -67,13 +67,169 @@ const httpsAgent = new https.Agent({
 // ── DATABASE SCHEMA MIGRATION (Self-Healing) ───────────────────────────────
 async function ensureSchema() {
   try {
+    // 1. Ensure pbx_recordings table and indexes exist
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS pbx_recordings (
+        id SERIAL PRIMARY KEY,
+        original_filename VARCHAR(255) UNIQUE NOT NULL,
+        display_name VARCHAR(255),
+        extension_number VARCHAR(30),
+        customer_number VARCHAR(30),
+        recording_date TIMESTAMPTZ,
+        file_size BIGINT,
+        backup_folder VARCHAR(255),
+        extension_folder VARCHAR(255),
+        local_path TEXT,
+        created_at TIMESTAMPTZ DEFAULT NOW()
+      )
+    `);
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_pbx_recordings_original_filename ON pbx_recordings (original_filename)`).catch(() => {});
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_pbx_recordings_recording_date ON pbx_recordings (recording_date DESC NULLS LAST)`).catch(() => {});
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_pbx_recordings_lookup ON pbx_recordings (backup_folder, extension_folder)`).catch(() => {});
+    console.log('[DB] ✅ pbx_recordings table and indexes ensured.');
+
+    // 2. Ensure mail_reply_tasks table and indexes exist
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS mail_reply_tasks (
+        id                    SERIAL PRIMARY KEY,
+        message_id            TEXT NOT NULL,
+        conversation_id       TEXT,
+        subject               TEXT,
+        sender_name           TEXT,
+        sender_email          TEXT,
+        preview               TEXT,
+        importance            VARCHAR(20)  DEFAULT 'normal',
+        priority              VARCHAR(20)  DEFAULT 'normal',
+        status                VARCHAR(30)  DEFAULT 'open',
+        assigned_to           INT REFERENCES users(id) ON DELETE SET NULL,
+        assigned_by           INT REFERENCES users(id) ON DELETE SET NULL,
+        assigned_to_name      TEXT,
+        assigned_to_email     VARCHAR(200),
+        assigned_to_phone     VARCHAR(30),
+        notify_channel        VARCHAR(10)  DEFAULT 'wa',
+        notify_before_minutes INTEGER      DEFAULT 60,
+        triage_tag            VARCHAR(10)  DEFAULT 'none',
+        replied_at            TIMESTAMPTZ,
+        notified_at           TIMESTAMPTZ,
+        due_at                TIMESTAMPTZ,
+        notes                 TEXT,
+        created_at            TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+        updated_at            TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+        completed_at          TIMESTAMPTZ
+      )
+    `);
+    
+    // Add columns to existing tables if needed (idempotent)
+    const newColsMailTasks = [
+      `ALTER TABLE mail_reply_tasks ADD COLUMN IF NOT EXISTS assigned_to_name      TEXT`,
+      `ALTER TABLE mail_reply_tasks ADD COLUMN IF NOT EXISTS assigned_to_email     VARCHAR(200)`,
+      `ALTER TABLE mail_reply_tasks ADD COLUMN IF NOT EXISTS assigned_to_phone     VARCHAR(30)`,
+      `ALTER TABLE mail_reply_tasks ADD COLUMN IF NOT EXISTS notify_channel        VARCHAR(10)  DEFAULT 'wa'`,
+      `ALTER TABLE mail_reply_tasks ADD COLUMN IF NOT EXISTS notify_before_minutes INTEGER      DEFAULT 60`,
+      `ALTER TABLE mail_reply_tasks ADD COLUMN IF NOT EXISTS triage_tag            VARCHAR(10)  DEFAULT 'none'`,
+      `ALTER TABLE mail_reply_tasks ADD COLUMN IF NOT EXISTS replied_at            TIMESTAMPTZ`,
+      `ALTER TABLE mail_reply_tasks ADD COLUMN IF NOT EXISTS notified_at           TIMESTAMPTZ`,
+    ];
+    for (const sql of newColsMailTasks) {
+      await pool.query(sql).catch(() => {});
+    }
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_mail_reply_tasks_status      ON mail_reply_tasks(status)`).catch(() => {});
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_mail_reply_tasks_assigned_to ON mail_reply_tasks(assigned_to)`).catch(() => {});
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_mail_reply_tasks_message_id  ON mail_reply_tasks(message_id)`).catch(() => {});
+    console.log('[DB] ✅ mail_reply_tasks table, columns and indexes ensured.');
+
+    // 3. Ensure call_logs.recording_file exists
     await pool.query(`ALTER TABLE call_logs ADD COLUMN IF NOT EXISTS recording_file TEXT`);
-    console.log('[DB] ✅ Schema check complete: recording_file column ensured.');
+
+    // 3a. Ensure PBX contacts exists before routes or call-list joins use it.
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS pbx_contacts (
+        id           SERIAL PRIMARY KEY,
+        phone        VARCHAR(50) UNIQUE NOT NULL,
+        name         VARCHAR(150),
+        company      VARCHAR(150),
+        notes        TEXT,
+        email        VARCHAR(254),
+        mobile_phone VARCHAR(50),
+        created_at   TIMESTAMPTZ DEFAULT NOW(),
+        updated_at   TIMESTAMPTZ DEFAULT NOW()
+      )
+    `);
+    await pool.query(`ALTER TABLE pbx_contacts ADD COLUMN IF NOT EXISTS email VARCHAR(254)`).catch(() => {});
+    await pool.query(`ALTER TABLE pbx_contacts ADD COLUMN IF NOT EXISTS mobile_phone VARCHAR(50)`).catch(() => {});
+    console.log('[DB] pbx_contacts table ensured.');
+
+    // 4. Alter call_logs.call_time to TIME if it is VARCHAR/character varying
+    const callTimeTypeRes = await pool.query(`
+      SELECT data_type 
+      FROM information_schema.columns 
+      WHERE table_name = 'call_logs' AND column_name = 'call_time'
+    `);
+    if (callTimeTypeRes.rows.length > 0 && callTimeTypeRes.rows[0].data_type !== 'time without time zone') {
+      console.log('[DB] Migrating call_logs.call_time column type to TIME...');
+      // Safe conversion using USING clause
+      await pool.query(`
+        ALTER TABLE call_logs 
+        ALTER COLUMN call_time TYPE TIME 
+        USING (
+          CASE 
+            WHEN call_time IS NULL OR trim(call_time::text) = '' OR call_time::text = '-' THEN NULL 
+            WHEN trim(call_time::text) ~ '^\\d{1,2}:\\d{2}(:\\d{2})?$' THEN call_time::time
+            ELSE NULL 
+          END
+        )
+      `);
+      console.log('[DB] ✅ Migrated call_logs.call_time column type to TIME.');
+    }
+
+    // 5. Ensure deduped call materialized view used by /api/calls exists.
+    await pool.query(`
+      CREATE MATERIALIZED VIEW IF NOT EXISTS call_logs_deduped AS
+      SELECT DISTINCT ON (
+        CASE
+          WHEN raw_line IS NOT NULL AND trim(raw_line) <> ''
+            THEN regexp_replace(trim(raw_line), '^\\d+\\s+', '')
+          ELSE 'id:' || id::text
+        END
+      ) *
+      FROM call_logs candidate
+      WHERE NOT (
+        candidate.raw_line ~ '\\sT\\s*$'
+        AND EXISTS (
+          SELECT 1
+          FROM call_logs primary_leg
+          WHERE primary_leg.id <> candidate.id
+            AND primary_leg.raw_line ~ '\\sD\\s*$'
+            AND primary_leg.call_date IS NOT DISTINCT FROM candidate.call_date
+            AND COALESCE(primary_leg.trunk, '') = COALESCE(candidate.trunk, '')
+            AND regexp_replace(COALESCE(primary_leg.caller, ''), '[^0-9]', '', 'g') = regexp_replace(COALESCE(candidate.caller, ''), '[^0-9]', '', 'g')
+            AND ABS(EXTRACT(EPOCH FROM (
+              (primary_leg.call_date::timestamp + COALESCE(primary_leg.call_time, TIME '00:00:00')) -
+              (candidate.call_date::timestamp + COALESCE(candidate.call_time, TIME '00:00:00'))
+            ))) <= 90
+        )
+      )
+      ORDER BY
+        CASE
+          WHEN raw_line IS NOT NULL AND trim(raw_line) <> ''
+            THEN regexp_replace(trim(raw_line), '^\\d+\\s+', '')
+          ELSE 'id:' || id::text
+        END,
+        created_at DESC,
+        id DESC
+    `);
+    await pool.query(`CREATE UNIQUE INDEX IF NOT EXISTS idx_call_logs_deduped_id ON call_logs_deduped (id)`).catch(() => {});
+    await pool.query(`REFRESH MATERIALIZED VIEW call_logs_deduped`).catch(err => {
+      console.warn('[DB] call_logs_deduped refresh skipped:', err.message);
+    });
+    console.log('[DB] call_logs_deduped materialized view ensured.');
+
+    console.log('[DB] ✅ Schema check complete: self-healing complete.');
   } catch (err) {
     console.error('[DB] ❌ Schema check failed:', err.message);
   }
 }
-ensureSchema();
+const schemaReady = ensureSchema();
 
 
 const app = express();
@@ -567,6 +723,10 @@ server.listen(PORT, HOST, async () => {
   // Sequential Service Initialization for stability
   try {
     console.log('[System] Initializing services...');
+
+    // Background services query these tables immediately; wait for self-healing
+    // schema setup so a fresh tower database does not spam relation errors.
+    await schemaReady;
 
     // 1. Matrix SMDR listener (Critical for call logging)
     await smdr.start().catch(err => console.error('[SMDR] Start error:', err.message));

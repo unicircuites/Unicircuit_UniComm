@@ -136,7 +136,7 @@ router.get('/overview', async (req, res) => {
         OR regexp_replace(COALESCE(c.phone, ''), '[^0-9]', '', 'g') = regexp_replace(COALESCE(cl.destination, ''), '[^0-9]', '', 'g')
       )
       WHERE NOT (cl.duration IS NULL OR cl.duration = '' OR cl.duration = '00:00:00')
-      ORDER BY COALESCE(cl.call_date::timestamp + COALESCE(cl.call_time, TIME '00:00:00'), cl.created_at) DESC
+      ORDER BY COALESCE(cl.call_date::timestamp + COALESCE(cl.call_time::time, TIME '00:00:00'), cl.created_at) DESC
       LIMIT 5
     `);
 

@@ -52,6 +52,7 @@ function checkEnvFilePermissions() {
  */
 function checkSensitiveEnvVars() {
   const warnings = [];
+  const optional = [];
   
   // Check for default/weak secrets
   const jwtSecret = process.env.JWT_SECRET;
@@ -60,17 +61,33 @@ function checkSensitiveEnvVars() {
   }
   
   // Check for missing critical env vars
-  const critical = ['DB_PASSWORD', 'MS_CLIENT_SECRET', 'AI_API_KEY'];
+  const critical = ['DB_PASSWORD'];
   for (const key of critical) {
     if (!process.env[key]) {
       warnings.push(`${key} is not set`);
     }
   }
+
+  if (!process.env.MS_CLIENT_SECRET) {
+    optional.push('MS_CLIENT_SECRET is not set; Outlook integration is disabled');
+  }
+  if (!process.env.PICOCLAW_API_KEY && !process.env.AI_API_KEY) {
+    optional.push('PICOCLAW_API_KEY/AI_API_KEY is not set; AI chat is disabled');
+  }
+  if (!process.env.AI_API_KEY && process.env.PICOCLAW_API_KEY) {
+    optional.push('AI_API_KEY is not set; using PICOCLAW_API_KEY');
+  }
   
   if (warnings.length > 0) {
     console.warn('[Security] ⚠️  Environment variable warnings:');
     warnings.forEach(w => console.warn(`  - ${w}`));
+    optional.forEach(w => console.warn(`  - ${w}`));
     return false;
+  }
+
+  if (optional.length > 0) {
+    console.warn('[Security] Optional integration warnings:');
+    optional.forEach(w => console.warn(`  - ${w}`));
   }
   
   console.log('[Security] ✅ Environment variables OK');

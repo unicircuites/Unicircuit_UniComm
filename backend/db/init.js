@@ -122,7 +122,7 @@ async function init() {
         call_type      VARCHAR(20),
         ai_summary     TEXT,
         call_date      DATE,
-        call_time      VARCHAR(50),
+        call_time      TIME,
         trunk          VARCHAR(100),
         raw_line       TEXT,
         recording_file VARCHAR(255),
@@ -174,6 +174,60 @@ async function init() {
       );
     `);
 
+    // ── PBX RECORDINGS ─────────────────────────────────────────────────────
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS pbx_recordings (
+        id SERIAL PRIMARY KEY,
+        original_filename VARCHAR(255) UNIQUE NOT NULL,
+        display_name VARCHAR(255),
+        extension_number VARCHAR(30),
+        customer_number VARCHAR(30),
+        recording_date TIMESTAMPTZ,
+        file_size BIGINT,
+        backup_folder VARCHAR(255),
+        extension_folder VARCHAR(255),
+        local_path TEXT,
+        created_at TIMESTAMPTZ DEFAULT NOW()
+      );
+      CREATE INDEX IF NOT EXISTS idx_pbx_recordings_original_filename ON pbx_recordings (original_filename);
+      CREATE INDEX IF NOT EXISTS idx_pbx_recordings_recording_date ON pbx_recordings (recording_date DESC NULLS LAST);
+      CREATE INDEX IF NOT EXISTS idx_pbx_recordings_lookup ON pbx_recordings (backup_folder, extension_folder);
+    `);
+
+    // ── MAIL REPLY TASKS ───────────────────────────────────────────────────
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS mail_reply_tasks (
+        id                    SERIAL PRIMARY KEY,
+        message_id            TEXT NOT NULL,
+        conversation_id       TEXT,
+        subject               TEXT,
+        sender_name           TEXT,
+        sender_email          TEXT,
+        preview               TEXT,
+        importance            VARCHAR(20)  DEFAULT 'normal',
+        priority              VARCHAR(20)  DEFAULT 'normal',
+        status                VARCHAR(30)  DEFAULT 'open',
+        assigned_to           INT REFERENCES users(id) ON DELETE SET NULL,
+        assigned_by           INT REFERENCES users(id) ON DELETE SET NULL,
+        assigned_to_name      TEXT,
+        assigned_to_email     VARCHAR(200),
+        assigned_to_phone     VARCHAR(30),
+        notify_channel        VARCHAR(10)  DEFAULT 'wa',
+        notify_before_minutes INTEGER      DEFAULT 60,
+        triage_tag            VARCHAR(10)  DEFAULT 'none',
+        replied_at            TIMESTAMPTZ,
+        notified_at           TIMESTAMPTZ,
+        due_at                TIMESTAMPTZ,
+        notes                 TEXT,
+        created_at            TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+        updated_at            TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+        completed_at          TIMESTAMPTZ
+      );
+      CREATE INDEX IF NOT EXISTS idx_mail_reply_tasks_status      ON mail_reply_tasks(status);
+      CREATE INDEX IF NOT EXISTS idx_mail_reply_tasks_assigned_to ON mail_reply_tasks(assigned_to);
+      CREATE INDEX IF NOT EXISTS idx_mail_reply_tasks_message_id  ON mail_reply_tasks(message_id);
+    `);
+
     console.log('✅  All tables created.\n');
 
     // ── SEED: Admin user ───────────────────────────────────────────────────
@@ -201,6 +255,29 @@ async function init() {
     }
 
     // ── SEED: Contacts ─────────────────────────────────────────────────────
+    // Seed requested tower users. Existing accounts are updated so credentials stay in sync.
+    const towerUsers = [
+      ['Achal Gautam', 'tender@unicircuites.com', 'UniAchal@123', 'user', 'AG'],
+      ['Sangshil Somkuwar', 'tech.support@unicircuites.com', 'UniSangshil@123', 'user', 'SS'],
+      ['Abhishek Kuhikar', 'acounts@unicircuites.com', 'UniAbhishek@123', 'user', 'AK'],
+    ];
+    for (const [name, email, password, role, initials] of towerUsers) {
+      const hash = await bcrypt.hash(password, 12);
+      await client.query(
+        `INSERT INTO users (name, email, password, plain_password, role, avatar_initials, is_active)
+         VALUES ($1,$2,$3,$4,$5,$6,TRUE)
+         ON CONFLICT (email) DO UPDATE
+           SET name = EXCLUDED.name,
+               password = EXCLUDED.password,
+               plain_password = EXCLUDED.plain_password,
+               role = EXCLUDED.role,
+               avatar_initials = EXCLUDED.avatar_initials,
+               is_active = TRUE`,
+        [name, email, hash, password, role, initials]
+      );
+      console.log(`âœ…  Tower user ensured â†’ ${email}`);
+    }
+
     const cCount = await client.query(`SELECT COUNT(*) FROM contacts`);
     if (parseInt(cCount.rows[0].count) === 0) {
       const rows = [

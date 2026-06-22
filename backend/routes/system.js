@@ -257,6 +257,10 @@ router.post('/ai/chat', async (req, res) => {
   const maxTokens = aiPlan.maxTokens;
 
   try {
+    if (!aiToken) {
+      return res.status(503).json({ error: 'AI is not configured. Set PICOCLAW_API_KEY or AI_API_KEY on the server.' });
+    }
+
     const headers = { 'Content-Type': 'application/json' };
     if (aiToken) headers['Authorization'] = `Bearer ${aiToken}`;
 
@@ -348,6 +352,10 @@ ${contextData || 'No extra CRM context injected for this optimized operation.'}`
 
       if (!response.ok) {
         const txt = await response.text();
+        if (response.status === 401 || response.status === 403) {
+          console.warn('[AI-CHAT] AI provider rejected the configured API key.');
+          return res.status(503).json({ error: 'AI provider rejected the configured API key.' });
+        }
         console.error('[AI-CHAT] Error from API:', txt);
         if (response.status === 429) {
           return res.status(429).json({
