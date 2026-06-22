@@ -58,6 +58,13 @@ function checkCCA() {
   }
 }
 
+function getRedirectUri() {
+  const configured = String(process.env.MS_REDIRECT_URI || '').trim();
+  if (configured) return configured;
+  const publicUrl = String(process.env.APP_PUBLIC_URL || `http://localhost:${process.env.PORT || 8088}`).replace(/\/$/, '');
+  return `${publicUrl}/auth/callback`;
+}
+
 const SCOPES = [
   'https://graph.microsoft.com/Mail.Read',
   'https://graph.microsoft.com/Mail.Send',
@@ -195,11 +202,12 @@ async function getAccessTokenForScopes(email, scopes) {
 // ── BUILD AUTH URL ─────────────────────────────────────────────────────────
 async function getAuthUrl(state) {
   const authority = msAuthority();
+  const redirectUri = getRedirectUri();
   console.log('\n[Outlook OAuth] getAuthUrl() — values actually used this request:');
   console.log('  authority (tenant segment) =', authority);
   console.log('  MS_TENANT_ID (raw .env)     =', process.env.MS_TENANT_ID || '(empty)');
   console.log('  MS_CLIENT_ID                =', process.env.MS_CLIENT_ID || '(empty)');
-  console.log('  MS_REDIRECT_URI             =', process.env.MS_REDIRECT_URI || '(empty)');
+  console.log('  MS_REDIRECT_URI             =', redirectUri);
   console.log('  MS_USER_EMAIL (login_hint)  =', process.env.MS_USER_EMAIL || '(empty)');
   console.log('  client_secret in .env?      =', process.env.MS_CLIENT_SECRET ? `yes (${process.env.MS_CLIENT_SECRET.length} chars)` : 'NO — OAuth will fail');
   console.log('  scopes                      =', AUTH_SCOPES.join(', '));
@@ -208,7 +216,7 @@ async function getAuthUrl(state) {
     checkCCA();
     const url = await cca.getAuthCodeUrl({
       scopes:      AUTH_SCOPES,
-      redirectUri: process.env.MS_REDIRECT_URI,
+      redirectUri,
       loginHint:   process.env.MS_USER_EMAIL,
       state:       state || 'unicomm',
       prompt:      'select_account',
@@ -237,7 +245,7 @@ async function getAuthUrl(state) {
 function logOutlookOAuthConfigAtStartup() {
   const tid = (process.env.MS_TENANT_ID || '').trim() || '(missing)';
   const cid = (process.env.MS_CLIENT_ID || '').trim() || '(missing)';
-  const redir = (process.env.MS_REDIRECT_URI || '').trim() || '(missing)';
+  const redir = getRedirectUri();
   const email = (process.env.MS_USER_EMAIL || '').trim() || '(missing)';
   const secretOk = !!(process.env.MS_CLIENT_SECRET && String(process.env.MS_CLIENT_SECRET).length > 8);
   console.log('\n── Microsoft Graph / Outlook (.env) ──────────────────────────────────');
@@ -260,7 +268,7 @@ async function exchangeCode(code) {
     const result = await cca.acquireTokenByCode({
       code,
       scopes:      AUTH_SCOPES,
-      redirectUri: process.env.MS_REDIRECT_URI,
+      redirectUri: getRedirectUri(),
     });
     console.log('[MSAL] ✅ Token acquired for:', result.account?.username);
     const email = result.account?.username || process.env.MS_USER_EMAIL;
@@ -419,5 +427,6 @@ module.exports = {
   graphDelete,
   isAuthenticated,
   saveTokens,
+  getRedirectUri,
   logOutlookOAuthConfigAtStartup,
 };

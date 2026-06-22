@@ -110,6 +110,59 @@ async function storeMessagesInDB(messages, folder) {
   }
 }
 
+async function getCachedFolderStats() {
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS outlook_emails_cache (
+      id                TEXT PRIMARY KEY,
+      conversation_id   TEXT,
+      subject           TEXT,
+      from_address      TEXT,
+      from_name         TEXT,
+      to_recipients     JSONB,
+      cc_recipients     JSONB,
+      received_datetime TIMESTAMPTZ,
+      sent_datetime     TIMESTAMPTZ,
+      is_read           BOOLEAN DEFAULT FALSE,
+      body_preview      TEXT,
+      has_attachments   BOOLEAN DEFAULT FALSE,
+      importance        TEXT,
+      folder            TEXT DEFAULT 'inbox',
+      category          TEXT DEFAULT 'GENERAL',
+      synced_at         TIMESTAMPTZ DEFAULT NOW()
+    )
+  `);
+  const result = await pool.query(`
+    SELECT
+      COALESCE(NULLIF(folder, ''), 'inbox') AS folder,
+      COUNT(*)::int AS total_count,
+      COALESCE(SUM(CASE WHEN is_read IS FALSE THEN 1 ELSE 0 END), 0)::int AS unread_count
+    FROM outlook_emails_cache
+    GROUP BY COALESCE(NULLIF(folder, ''), 'inbox')
+  `);
+
+  const labels = {
+    inbox: 'Inbox',
+    sent: 'Sent Items',
+    drafts: 'Drafts',
+    deleted: 'Deleted Items',
+    junk: 'Junk Email',
+    archive: 'Archive',
+    notes: 'Notes',
+  };
+
+  return result.rows.map((row) => {
+    const key = String(row.folder || 'inbox').toLowerCase();
+    return {
+      id: `cached-${key}`,
+      displayName: labels[key] || row.folder,
+      totalItemCount: Number(row.total_count || 0),
+      unreadItemCount: Number(row.unread_count || 0),
+      childFolderCount: 0,
+      source: 'cache',
+    };
+  });
+}
+
 const APP_PUBLIC_URL = (process.env.APP_PUBLIC_URL || `http://localhost:${process.env.PORT || 8088}`).replace(/\/$/, '');
 const GRAPH_ROOT = 'https://graph.microsoft.com/v1.0';
 const MESSAGE_SIZE_PROPS = ['Integer 0x0E08', 'Long 0x0E08'];
@@ -1632,7 +1685,13 @@ router.get('/auth', async (req, res) => {
     const url = await graph.getAuthUrl('unicomm-dashboard');
     return res.json({ url });
   } catch (err) {
-    return res.status(500).json({ error: err.message });
+    console.error('[Outlook] Auth URL error:', err.message);
+    return res.json({
+      url: null,
+      error: err.message,
+      configured: false,
+      redirectUri: typeof graph.getRedirectUri === 'function' ? graph.getRedirectUri() : null,
+    });
   }
 });
 
@@ -2626,7 +2685,14 @@ router.get('/folders', async (req, res) => {
     return res.json(data.value);
   } catch (err) {
     console.error('[Outlook] ❌ Folders fetch error:', err.message);
-    if (err.message === 'NOT_AUTHENTICATED') return res.status(401).json({ error: 'NOT_AUTHENTICATED' });
+    if (err.message === 'NOT_AUTHENTICATED') {
+      const cachedFolders = await getCachedFolderStats().catch((cacheErr) => {
+        console.warn('[Outlook] Folder cache fallback failed:', cacheErr.message);
+        return [];
+      });
+      res.set('X-Outlook-Fallback', 'cache');
+      return res.json(cachedFolders);
+    }
     return res.status(500).json({ error: err.message });
   }
 });
