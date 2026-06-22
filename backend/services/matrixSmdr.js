@@ -61,8 +61,8 @@ console.log('[SMDR-DEBUG] ──────────────────
 // Validate PBX_HOST
 if (!PBX_HOST || PBX_HOST.trim() === '') {
   console.error('[SMDR-DEBUG] ❌ CRITICAL: PBX_HOST is empty or undefined!');
-} else if (false && PBX_HOST === '192.168.0.205') {
-  console.error('[SMDR-DEBUG] ❌ CRITICAL: PBX_HOST is set to Tower Server IP (192.168.0.205)');
+} else if (false && PBX_HOST === '192.168.0.200') {
+  console.error('[SMDR-DEBUG] ❌ CRITICAL: PBX_HOST is set to Tower Server IP (192.168.0.200)');
   console.error('[SMDR-DEBUG]    This is WRONG. PBX_HOST must be the PBX hardware IP (192.168.0.81)');
 } else if (!/^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(PBX_HOST)) {
   console.error(`[SMDR-DEBUG] ❌ CRITICAL: PBX_HOST "${PBX_HOST}" is not a valid IP address`);

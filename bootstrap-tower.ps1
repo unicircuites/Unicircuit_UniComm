@@ -189,5 +189,5 @@ try {
 Write-Host "`n=========================================================" -ForegroundColor Green
 Write-Host "         BOOTSTRAP INSTALLATION COMPLETED!                " -ForegroundColor Green
 Write-Host "=========================================================" -ForegroundColor Green
-Write-Host "You can now test the server at: https://192.168.0.205:8088" -ForegroundColor Gray
+Write-Host "You can now test the server at: https://192.168.0.200:8088" -ForegroundColor Gray
 Write-Host "=========================================================" -ForegroundColor Green
