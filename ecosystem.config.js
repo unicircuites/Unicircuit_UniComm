@@ -48,7 +48,7 @@ module.exports = {
     {
       name: 'n8n',
       script: 'cmd.exe',
-      args: ['/c', 'npx', 'n8n'],
+      args: ['/c', 'n8n'],
       cwd: '.',
       watch: false,
       env: n8nEnv
