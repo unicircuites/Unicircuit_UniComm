@@ -1317,6 +1317,15 @@ async function saveMessage(msg) {
       media_path: mediaPath,
       sender_phone: senderJid && !String(senderJid).endsWith('@g.us')
         ? (() => {
+          // LID JIDs are internal WA identifiers, not phone numbers — resolve from contactsStore
+          if (String(senderJid).endsWith('@lid')) {
+            const resolvedPhone = contactsStore[senderJid]?.phone;
+            if (!resolvedPhone) return null;
+            const digits = String(resolvedPhone).replace(/\D/g, '');
+            if (!digits) return null;
+            if (digits.startsWith('91') && digits.length === 12) return '+91 ' + digits.slice(2, 7) + ' ' + digits.slice(7);
+            return '+' + digits;
+          }
           const digits = String(senderJid).split('@')[0].split(':')[0].replace(/\D/g, '');
           if (!digits) return null;
           if (digits.startsWith('91') && digits.length === 12) return '+91 ' + digits.slice(2, 7) + ' ' + digits.slice(7);

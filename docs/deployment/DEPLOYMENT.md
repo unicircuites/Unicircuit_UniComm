@@ -6,7 +6,7 @@
 - **IP:** 192.168.0.205
 - **Port:** 8088
 - **URL:** https://192.168.0.205:8088
-- **Project Path:** `C:\UniComm\Unicircuit_UniComm-main`
+- **Project Path:** `C:\setup0\Unicircuit_UniComm`
 - **OS:** Windows
 - **Node:** v24+
 - **PostgreSQL:** v16
@@ -27,9 +27,9 @@
 
 ### 1. Download code from GitHub
 ```powershell
-powershell -Command "Invoke-WebRequest -Uri 'https://github.com/unicircuites/Unicircuit_UniComm/archive/refs/heads/main.zip' -Headers @{Authorization='token GITHUB_TOKEN_HERE'} -OutFile 'C:\UniComm.zip'"
-powershell -Command "Expand-Archive -Path 'C:\UniComm.zip' -DestinationPath 'C:\UniComm' -Force"
-cd C:\UniComm\Unicircuit_UniComm-main\backend
+powershell -Command "Invoke-WebRequest -Uri 'https://github.com/unicircuites/Unicircuit_UniComm/archive/refs/heads/main.zip' -Headers @{Authorization='token GITHUB_TOKEN_HERE'} -OutFile 'C:\setup0\UniComm.zip'"
+powershell -Command "Expand-Archive -Path 'C:\setup0\UniComm.zip' -DestinationPath 'C:\setup0\Unicircuit_UniComm' -Force"
+cd C:\setup0\Unicircuit_UniComm\backend
 ```
 
 ### 2. Install dependencies
@@ -71,7 +71,7 @@ AI_API_KEY=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
 WA_WATCHDOG_ENABLED=true
 WA_WATCHDOG_INTERVAL_MS=45000
 WA_STALE_RESTART_MS=180000
-"@ | Set-Content -Path "C:\UniComm\Unicircuit_UniComm-main\backend\.env" -Encoding UTF8
+"@ | Set-Content -Path "C:\setup0\Unicircuit_UniComm\backend\.env" -Encoding UTF8
 ```
 
 ### 4. Initialize Database (first time only)
@@ -92,7 +92,7 @@ pm2 save
 
 ### 6. Auto-start on Windows reboot
 ```powershell
-$action = New-ScheduledTaskAction -Execute "pm2" -Argument "resurrect" -WorkingDirectory "C:\UniComm\Unicircuit_UniComm-main\backend"
+$action = New-ScheduledTaskAction -Execute "pm2" -Argument "resurrect" -WorkingDirectory "C:\setup0\Unicircuit_UniComm\backend"
 $trigger = New-ScheduledTaskTrigger -AtStartup
 $principal = New-ScheduledTaskPrincipal -UserId "pbaro" -RunLevel Highest
 Register-ScheduledTask -TaskName "PM2-UniComm" -Action $action -Trigger $trigger -Principal $principal -Force
@@ -111,7 +111,7 @@ The Tower server **MUST** run on HTTPS for Microsoft Graph (Outlook) authenticat
 
 ### 1. SSL Certificate Location
 Certificates must be placed in:
-`C:\UniComm\Unicircuit_UniComm-main\backend\certs\`
+`C:\setup0\Unicircuit_UniComm\backend\certs\`
 
 Required files:
 - `server.crt`
@@ -122,8 +122,8 @@ Newer versions of Node.js (20+) block legacy Windows certificate encryption form
 
 Run this in PowerShell on the Tower server:
 ```powershell
-mkdir -Path "C:\UniComm\Unicircuit_UniComm-main\backend\certs" -ErrorAction SilentlyContinue
-& "C:\Program Files\Git\usr\bin\openssl.exe" req -x509 -nodes -days 3650 -newkey rsa:2048 -keyout "C:\UniComm\Unicircuit_UniComm-main\backend\certs\server.key" -out "C:\UniComm\Unicircuit_UniComm-main\backend\certs\server.crt" -subj "/CN=192.168.0.205"
+mkdir -Path "C:\setup0\Unicircuit_UniComm\backend\certs" -ErrorAction SilentlyContinue
+& "C:\Program Files\Git\usr\bin\openssl.exe" req -x509 -nodes -days 3650 -newkey rsa:2048 -keyout "C:\setup0\Unicircuit_UniComm\backend\certs\server.key" -out "C:\setup0\Unicircuit_UniComm\backend\certs\server.crt" -subj "/CN=192.168.0.205"
 ```
 
 ---
@@ -157,33 +157,33 @@ powershell -ExecutionPolicy Bypass -File C:\update-unicomm.ps1
 ```powershell
 @"
 Write-Host "Downloading latest code..." -ForegroundColor Cyan
-Invoke-WebRequest -Uri 'https://github.com/unicircuites/Unicircuit_UniComm/archive/refs/heads/main.zip' -Headers @{Authorization='token GITHUB_TOKEN_HERE'} -OutFile 'C:\UniComm_update.zip'
+Invoke-WebRequest -Uri 'https://github.com/unicircuites/Unicircuit_UniComm/archive/refs/heads/main.zip' -Headers @{Authorization='token GITHUB_TOKEN_HERE'} -OutFile 'C:\setup0\UniComm_update.zip'
 
 Write-Host "Extracting..." -ForegroundColor Cyan
-Expand-Archive -Path 'C:\UniComm_update.zip' -DestinationPath 'C:\UniComm_update' -Force
+Expand-Archive -Path 'C:\setup0\UniComm_update.zip' -DestinationPath 'C:\setup0\UniComm_update' -Force
 
 Write-Host "Backing up server-local files (.env + certs)..." -ForegroundColor Cyan
-New-Item -ItemType Directory -Path 'C:\UniComm_server_backup' -Force | Out-Null
-if (Test-Path 'C:\UniComm\Unicircuit_UniComm-main\backend\.env') {
-  Copy-Item 'C:\UniComm\Unicircuit_UniComm-main\backend\.env' 'C:\UniComm_server_backup\.env' -Force
+New-Item -ItemType Directory -Path 'C:\setup0\UniComm_server_backup' -Force | Out-Null
+if (Test-Path 'C:\setup0\Unicircuit_UniComm\backend\.env') {
+  Copy-Item 'C:\setup0\Unicircuit_UniComm\backend\.env' 'C:\setup0\UniComm_server_backup\.env' -Force
 }
-if (Test-Path 'C:\UniComm\Unicircuit_UniComm-main\backend\certs') {
-  Copy-Item 'C:\UniComm\Unicircuit_UniComm-main\backend\certs' 'C:\UniComm_server_backup\certs' -Recurse -Force
+if (Test-Path 'C:\setup0\Unicircuit_UniComm\backend\certs') {
+  Copy-Item 'C:\setup0\Unicircuit_UniComm\backend\certs' 'C:\setup0\UniComm_server_backup\certs' -Recurse -Force
 }
 
 Write-Host "Copying files..." -ForegroundColor Cyan
-Copy-Item -Path 'C:\UniComm_update\Unicircuit_UniComm-main\*' -Destination 'C:\UniComm\Unicircuit_UniComm-main\' -Recurse -Force
+Copy-Item -Path 'C:\setup0\UniComm_update\Unicircuit_UniComm\*' -Destination 'C:\setup0\Unicircuit_UniComm\' -Recurse -Force
 
 Write-Host "Restoring server-local files (.env + certs)..." -ForegroundColor Cyan
-if (Test-Path 'C:\UniComm_server_backup\.env') {
-  Copy-Item 'C:\UniComm_server_backup\.env' 'C:\UniComm\Unicircuit_UniComm-main\backend\.env' -Force
+if (Test-Path 'C:\setup0\UniComm_server_backup\.env') {
+  Copy-Item 'C:\setup0\UniComm_server_backup\.env' 'C:\setup0\Unicircuit_UniComm\backend\.env' -Force
 }
-if (Test-Path 'C:\UniComm_server_backup\certs') {
-  Copy-Item 'C:\UniComm_server_backup\certs' 'C:\UniComm\Unicircuit_UniComm-main\backend\certs' -Recurse -Force
+if (Test-Path 'C:\setup0\UniComm_server_backup\certs') {
+  Copy-Item 'C:\setup0\UniComm_server_backup\certs' 'C:\setup0\Unicircuit_UniComm\backend\certs' -Recurse -Force
 }
 
 Write-Host "Installing dependencies..." -ForegroundColor Cyan
-Set-Location 'C:\UniComm\Unicircuit_UniComm-main\backend'
+Set-Location 'C:\setup0\Unicircuit_UniComm\backend'
 npm install
 
 Write-Host "Restarting server..." -ForegroundColor Cyan
@@ -195,8 +195,8 @@ if (pm2 describe unicomm | Select-String "status") {
 }
 
 Write-Host "Cleaning up..." -ForegroundColor Cyan
-Remove-Item 'C:\UniComm_update.zip' -Force
-Remove-Item 'C:\UniComm_update' -Recurse -Force
+Remove-Item 'C:\setup0\UniComm_update.zip' -Force
+Remove-Item 'C:\setup0\UniComm_update' -Recurse -Force
 
 Write-Host "Done! Server updated and restarted." -ForegroundColor Green
 pm2 status
@@ -209,7 +209,7 @@ pm2 status
 ### Manual Git update (agar script use nahi kar rahe)
 
 ```powershell
-cd C:\UniComm\Unicircuit_UniComm-main
+cd C:\setup0\Unicircuit_UniComm
 
 # Sirf tracked local changes stash karo. -u mat lagao, warna certs jaise untracked server files stash ho sakte hain.
 git stash push -m "tower tracked changes before deploy"
@@ -232,7 +232,7 @@ if (Test-Path .\certs\server.crt) {
 ### Restore certs if they were accidentally stashed
 
 ```powershell
-cd C:\UniComm\Unicircuit_UniComm-main
+cd C:\setup0\Unicircuit_UniComm
 git stash list
 git stash show --name-only "stash@{0}"
 git checkout "stash@{0}" -- backend/certs
@@ -426,12 +426,12 @@ Phir Step 2 dobara karo.
 
 ```powershell
 # Pehle current value dekho
-Get-Content C:\UniComm\Unicircuit_UniComm-main\backend\.env | Select-String "MS_CLIENT_SECRET"
+Get-Content C:\setup0\Unicircuit_UniComm\backend\.env | Select-String "MS_CLIENT_SECRET"
 
 # Naya secret set karo (PASTE_NEW_SECRET_HERE ki jagah actual value daalo)
-(Get-Content C:\UniComm\Unicircuit_UniComm-main\backend\.env) `
+(Get-Content C:\setup0\Unicircuit_UniComm\backend\.env) `
   -replace 'MS_CLIENT_SECRET=.*', 'MS_CLIENT_SECRET=PASTE_NEW_SECRET_HERE' `
-  | Set-Content C:\UniComm\Unicircuit_UniComm-main\backend\.env -Encoding UTF8
+  | Set-Content C:\setup0\Unicircuit_UniComm\backend\.env -Encoding UTF8
 
 # Server restart karo
 pm2 restart unicomm
@@ -532,7 +532,7 @@ Logs mein `[Graph]` aur `[MSAL]` lines dekho — exact error wahan hoga.
 ### Step 1 — Stop PM2 server & navigate to project folder
 ```powershell
 pm2 stop unicomm
-cd C:\UniComm\Unicircuit_UniComm-main
+cd C:\setup0\Unicircuit_UniComm
 ```
 
 ### Step 2 — Tracked local changes stash karo (safe)
@@ -584,7 +584,7 @@ pm2 logs unicomm --lines 80
 ### ⚡ One-liner (sab ek saath — copy-paste ready)
 
 ```powershell
-pm2 stop unicomm; cd C:\UniComm\Unicircuit_UniComm-main; git config core.askyesno false; git stash push -m "tower deploy stash"; git checkout main; git fetch origin; git reset --hard origin/main; cd backend; npm install --prefer-offline; pm2 restart unicomm --update-env; pm2 save; pm2 flush unicomm; pm2 status
+pm2 stop unicomm; cd C:\setup0\Unicircuit_UniComm; git config core.askyesno false; git stash push -m "tower deploy stash"; git checkout main; git fetch origin; git reset --hard origin/main; cd backend; npm install --prefer-offline; pm2 restart unicomm --update-env; pm2 save; pm2 flush unicomm; pm2 status
 ```
 
 ---
@@ -593,7 +593,7 @@ pm2 stop unicomm; cd C:\UniComm\Unicircuit_UniComm-main; git config core.askyesn
 
 ```
 [ ] pm2 stop unicomm
-[ ] cd C:\UniComm\Unicircuit_UniComm-main
+[ ] cd C:\setup0\Unicircuit_UniComm
 [ ] git config core.askyesno false
 [ ] git stash push -m "tower tracked changes before deploy"
 [ ] git fetch origin
@@ -613,7 +613,7 @@ pm2 stop unicomm; cd C:\UniComm\Unicircuit_UniComm-main; git config core.askyesn
 ```powershell
 # certs/ gitignore mein hai isliye reset se delete nahi honi chahiye.
 # Agar phir bhi missing ho:
-cd C:\UniComm\Unicircuit_UniComm-main\backend
+cd C:\setup0\Unicircuit_UniComm\backend
 mkdir certs -ErrorAction SilentlyContinue
 & "C:\Program Files\Git\usr\bin\openssl.exe" req -x509 -nodes -days 3650 -newkey rsa:2048 `
   -keyout ".\certs\server.key" -out ".\certs\server.crt" -subj "/CN=192.168.0.205"

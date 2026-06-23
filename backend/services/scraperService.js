@@ -4,7 +4,8 @@ const { chromium } = require('playwright');
 
 const activeSessions = new Map();
 
-// Helper to detect 2-step verification, CAPTCHAs, or robot challenge pages
+// Helper to detect 2-step verification, CAPTCHAs, robot challenge pages,
+// OR any generic post-login popup/modal/overlay (start challenge, accept terms, surveys, etc.)
 async function isVerificationOrRobotPage(page) {
   try {
     const url = page.url().toLowerCase();
@@ -15,14 +16,21 @@ async function isVerificationOrRobotPage(page) {
       return true;
     }
     
-    // Check page text content for verification cues
+    // Check page text content for verification/challenge cues
     const bodyText = (await page.textContent('body') || '').toLowerCase();
     const verificationTexts = [
       'verification code', 'verify your identity', 'two-step verification', 
       'enter the code', 'sent a code', 'one-time password', 'security code',
       'i am not a robot', 'check your phone', 'confirm your phone', 'authenticator',
       'prove you are human', 'cloudflare', 'hcaptcha', 'recaptcha', 'robot',
-      'verify you are human'
+      'verify you are human',
+      // Generic post-login popups/challenges:
+      'start new challenge', 'start a challenge', 'new challenge',
+      'accept terms', 'terms and conditions', 'terms of service', 'agree to terms',
+      'take a survey', 'complete your profile', 'finish setup',
+      'get started', 'welcome to', 'setup your account',
+      'before you continue', 'confirm your account',
+      'update your information', 'additional verification'
     ];
     if (verificationTexts.some(text => bodyText.includes(text))) {
       return true;
@@ -33,6 +41,27 @@ async function isVerificationOrRobotPage(page) {
     const hasCaptchaElements = await page.$('iframe[src*="recaptcha" i], iframe[src*="hcaptcha" i], div.cf-turnstile, div.g-recaptcha, iframe[src*="cloudflare" i]');
     if (hasOtpInput || hasCaptchaElements) {
       return true;
+    }
+
+    // Check for visible modal/overlay/dialog/popup elements (post-login challenges)
+    const hasModal = await page.$(
+      'div[role="dialog"], div[role="alertdialog"], ' +
+      '[class*="modal" i][style*="display: block"], ' +
+      '[class*="modal" i][style*="visibility: visible"], ' +
+      '[class*="overlay" i][style*="display: block"], ' +
+      '[class*="popup" i][style*="display: block"], ' +
+      '[class*="challenge" i], ' +
+      '[id*="challenge" i], ' +
+      '[class*="dialog" i][style*="display: block"]'
+    );
+    if (hasModal) {
+      // Only count it as a challenge if it has visible text content
+      try {
+        const modalText = await hasModal.textContent();
+        if (modalText && modalText.trim().length > 10) {
+          return true;
+        }
+      } catch (_) {}
     }
     
     return false;
@@ -481,18 +510,18 @@ async function startScrape(sessionId, params) {
       const maxPages = parseInt(endPoint) || 5;
 
       const parsedCookies = parseCookies(cookies);
-      const useBrowser = (parsedCookies.length > 0) || showBrowser;
+      // Always use a visible browser regardless of cookies or showBrowser flag
       let browserPage = null;
 
-      if (useBrowser) {
-        console.log(`[SCRAPER] Session ${sessionId}: Browser use required. Starting browser context (visible: ${showBrowser}).`);
-        try {
-          browserInstance = await chromium.launch({ headless: !showBrowser });
-          const context = await browserInstance.newContext({
-            userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
-          });
+      console.log(`[SCRAPER] Session ${sessionId}: Starting visible Chrome browser for URL: ${url}`);
+      try {
+        browserInstance = await chromium.launch({ headless: false });
+        const context = await browserInstance.newContext({
+          userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+        });
 
-          // Inject parsed cookies
+        // Inject parsed cookies if any
+        if (parsedCookies.length > 0) {
           const formattedCookies = parsedCookies.map(cookie => {
             if (!cookie.domain && !cookie.url) {
               try {
@@ -512,14 +541,14 @@ async function startScrape(sessionId, params) {
           });
           await context.addCookies(formattedCookies);
           console.log(`[SCRAPER] Session ${sessionId}: Successfully injected ${formattedCookies.length} cookies.`);
-          
-          browserPage = await context.newPage();
-        } catch (pwErr) {
-          console.error(`[SCRAPER ERROR] Session ${sessionId}: Failed to boot Playwright browser context:`, pwErr.message);
-          if (browserInstance) {
-            await browserInstance.close();
-            browserInstance = null;
-          }
+        }
+        
+        browserPage = await context.newPage();
+      } catch (pwErr) {
+        console.error(`[SCRAPER ERROR] Session ${sessionId}: Failed to boot Playwright browser context:`, pwErr.message);
+        if (browserInstance) {
+          await browserInstance.close();
+          browserInstance = null;
         }
       }
 
@@ -551,11 +580,14 @@ async function startScrape(sessionId, params) {
           }
 
           if (browserInstance && browserPage) {
-            console.log(`[SCRAPER] Session ${sessionId}: Fetching URL via browser: ${targetUrl}`);
-            await browserPage.goto(targetUrl, { timeout: 8000, waitUntil: 'domcontentloaded' });
+            console.log(`[SCRAPER] Session ${sessionId}: Fetching URL via visible browser: ${targetUrl}`);
+            await browserPage.goto(targetUrl, { timeout: 15000, waitUntil: 'domcontentloaded' });
+            // Wait briefly for dynamic content to settle
+            await sleep(1500);
             html = await browserPage.content();
           } else {
-            console.log(`[SCRAPER] Session ${sessionId}: Fetching URL via static Axios: ${targetUrl}`);
+            // Fallback to Axios only if browser failed to start
+            console.log(`[SCRAPER] Session ${sessionId}: Browser unavailable, falling back to Axios: ${targetUrl}`);
             const response = await axios.get(targetUrl, {
               headers: {
                 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
@@ -748,10 +780,10 @@ async function analyzeURL(url, cookies = null, showBrowser = false) {
     let extractedCookies = null;
     const parsedCookies = parseCookies(cookies);
 
-    // 2. Try utilizing Playwright for dynamic JS rendering and credential / placeholder checks
+    // 2. Always use a visible Playwright browser for analysis regardless of showBrowser flag
     try {
-      console.log(`[SCRAPER] Analyzing URL with Playwright browser (visible: ${showBrowser}): ${url}`);
-      playwrightBrowser = await chromium.launch({ headless: !showBrowser });
+      console.log(`[SCRAPER] Analyzing URL with visible Chrome browser: ${url}`);
+      playwrightBrowser = await chromium.launch({ headless: false });
       const context = await playwrightBrowser.newContext({
         userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
       });
@@ -780,8 +812,10 @@ async function analyzeURL(url, cookies = null, showBrowser = false) {
 
       const page = await context.newPage();
       
-      // Navigate with 8-second timeout and wait for DOM loaded
-      await page.goto(url, { timeout: 8000, waitUntil: 'domcontentloaded' });
+      // Navigate with 15-second timeout and wait for DOM loaded
+      await page.goto(url, { timeout: 15000, waitUntil: 'domcontentloaded' });
+      // Brief pause for dynamic content to settle
+      await sleep(1500);
       
       const currentUrl = page.url();
       
@@ -790,11 +824,10 @@ async function analyzeURL(url, cookies = null, showBrowser = false) {
       const isLoginWall = hasPasswordInput || currentUrl.includes('login') || currentUrl.includes('signin') || currentUrl.includes('auth');
       
       if (isLoginWall) {
-        console.log(`[SCRAPER] Login wall detected on ${url}. Launching headed Chrome for manual login...`);
-        // Close headless browser context
+        console.log(`[SCRAPER] Login wall detected on ${url}. Browser already visible — waiting for manual login...`);
+        // Close current context and relaunch fresh visible browser for clean login
         await playwrightBrowser.close();
         
-        // Relaunch headed browser
         playwrightBrowser = await chromium.launch({ headless: false });
         const headedContext = await playwrightBrowser.newContext({
           userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
@@ -804,15 +837,17 @@ async function analyzeURL(url, cookies = null, showBrowser = false) {
         // Go to original target URL to let user log in
         await headedPage.goto(url, { timeout: 15000, waitUntil: 'domcontentloaded' });
         
-        // Poll and wait for login completion (up to 60 seconds)
+        // Poll and wait for login completion (up to 120 seconds)
         let loggedIn = false;
         const startTime = Date.now();
-        let timeoutMs = 60000;
+        let timeoutMs = 120000;
         let verificationDetected = false;
-        
+        let consecutiveErrors = 0;
+
         while (Date.now() - startTime < timeoutMs) {
-          await sleep(1000);
+          await sleep(1500);
           try {
+            consecutiveErrors = 0; // reset on any successful poll
             const currentHeadedUrl = headedPage.url();
             const hasHeadedPassword = await headedPage.$('input[type="password"]');
             const isVerification = await isVerificationOrRobotPage(headedPage);
@@ -824,19 +859,60 @@ async function analyzeURL(url, cookies = null, showBrowser = false) {
               verificationDetected = true;
             }
             
-            // Check if login wall has been bypassed and not stuck on verification screen
-            if (!hasHeadedPassword && 
-                !currentHeadedUrl.includes('login') && 
-                !currentHeadedUrl.includes('signin') && 
-                !currentHeadedUrl.includes('auth') &&
-                !isVerification) {
-              console.log(`[SCRAPER] Login wall and verification bypassed successfully! Current URL: ${currentHeadedUrl}`);
-              loggedIn = true;
-              break;
+            // Primary signal: no password input visible = login likely complete.
+            // We do NOT rely on URL patterns (login/auth/signin) because many sites
+            // briefly redirect through /auth/callback or /oauth/redirect after login,
+            // which would cause false negatives. Wait 2.5s and recheck to confirm.
+            if (!hasHeadedPassword && !isVerification) {
+              console.log(`[SCRAPER] No password field detected at: ${currentHeadedUrl}. Confirming login in 2.5s...`);
+              await sleep(2500);
+              // Double-check: confirm we're still not on a login/verification screen
+              const recheckPassword = await headedPage.$('input[type="password"]');
+              const recheckVerification = await isVerificationOrRobotPage(headedPage);
+              const finalUrl = headedPage.url();
+              if (!recheckPassword && !recheckVerification) {
+                console.log(`[SCRAPER] Login confirmed! Landed on: ${finalUrl}`);
+                // --- POST-LOGIN BLOCKER: Wait for any challenge/popup/modal to be dismissed ---
+                // Some sites show "Start New Challenge", "Accept Terms", survey popups, etc.
+                // after login. We keep polling until the page looks clean.
+                let postLoginBlocker = await isVerificationOrRobotPage(headedPage);
+                if (postLoginBlocker) {
+                  console.log(`[SCRAPER] Post-login popup/challenge detected at: ${headedPage.url()}`);
+                  console.log(`[SCRAPER] Waiting for user to dismiss the popup/challenge (extended to 3 min)...`);
+                  timeoutMs = Math.max(timeoutMs, startTime + 180000 - Date.now() + 180000); // ensure 3 more min
+                  let popupWaitStart = Date.now();
+                  while (Date.now() - popupWaitStart < 180000) {
+                    await sleep(1500);
+                    try {
+                      const stillBlocked = await isVerificationOrRobotPage(headedPage);
+                      const stillHasPassword = await headedPage.$('input[type="password"]');
+                      if (!stillBlocked && !stillHasPassword) {
+                        console.log(`[SCRAPER] Post-login popup dismissed. Page clear at: ${headedPage.url()}`);
+                        break;
+                      }
+                      console.log(`[SCRAPER] Still waiting for popup dismissal at: ${headedPage.url()}`);
+                    } catch (popupErr) {
+                      console.warn(`[SCRAPER] Transient error during popup wait: ${popupErr.message}`);
+                    }
+                  }
+                }
+                // --- END POST-LOGIN BLOCKER ---
+                loggedIn = true;
+                break;
+              }
             }
           } catch (pageErr) {
-            console.warn('[SCRAPER WARNING] Headed browser window was closed or navigation failed.');
-            break;
+            consecutiveErrors++;
+            // Transient navigation errors (SPA redirects, Facebook/Google internal routing,
+            // Playwright page briefly detaching during navigation) should NOT kill the poll.
+            // Only bail if the browser process itself is gone OR we've had 8 consecutive errors.
+            const browserGone = !playwrightBrowser.isConnected();
+            if (browserGone || consecutiveErrors >= 8) {
+              console.warn(`[SCRAPER WARNING] ${browserGone ? 'Browser closed by user' : '8 consecutive poll errors'}. Stopping login poll.`);
+              break;
+            }
+            console.warn(`[SCRAPER] Transient navigation error #${consecutiveErrors} (retrying in 2s): ${pageErr.message}`);
+            await sleep(2000);
           }
         }
         
@@ -845,13 +921,18 @@ async function analyzeURL(url, cookies = null, showBrowser = false) {
           return {
             success: false,
             url,
-            error: 'Website requires login. The manual login window timed out (60s) or was closed.'
+            error: 'Website requires login. The manual login window timed out (2 min) or was closed before login completed.'
           };
         }
         
         // Bypassed! Navigate back to the original target URL under the logged-in session state
-        console.log(`[SCRAPER] Reloading target URL: ${url}`);
-        await headedPage.goto(url, { timeout: 10000, waitUntil: 'domcontentloaded' });
+        console.log(`[SCRAPER] Reloading target URL under logged-in session: ${url}`);
+        try {
+          await headedPage.goto(url, { timeout: 25000, waitUntil: 'domcontentloaded' });
+          await sleep(1500); // Let dynamic content settle
+        } catch (reloadErr) {
+          console.warn(`[SCRAPER] Reload timed out, using current page content: ${reloadErr.message}`);
+        }
         html = await headedPage.content();
         extractedCookies = await headedContext.cookies();
         usedPlaywright = true;
@@ -1131,12 +1212,42 @@ async function analyzeURL(url, cookies = null, showBrowser = false) {
       fieldMappingHelp['phone'] = 'phone';
     }
 
+    // ── FIELD DETECTION LOGS ──────────────────────────────────────────────────
+    const uniqueFields = suggestedFields.filter((v, i, self) => self.indexOf(v) === i);
+    console.log(`[SCRAPER] ── URL Analysis Complete: ${url}`);
+    console.log(`[SCRAPER] ── Item Container Selector : "${detectedItemSelector}"`);
+    console.log(`[SCRAPER] ── Pagination Detected     : ${detectedPagination.enabled ? 'YES' : 'NO'}${
+      detectedPagination.enabled
+        ? ` | param="${detectedPagination.paramName}" | selector="${detectedPagination.selector || 'none'}"`
+        : ''
+    }`);
+    console.log(`[SCRAPER] ── Fields Detected (${uniqueFields.length}) ──────────────────`);
+    if (uniqueFields.length === 0) {
+      console.log(`[SCRAPER]    (no fields detected — page may require login or be empty)`);
+    } else {
+      uniqueFields.forEach((field, idx) => {
+        const mapping = fieldMappingHelp[field] || field;
+        const hasSel = mapping.includes('|');
+        const parts = mapping.split('|').map(p => p.trim());
+        if (hasSel) {
+          console.log(`[SCRAPER]    [${idx + 1}] Field: "${field}"`);
+          console.log(`[SCRAPER]        → Selector : "${parts[1] || '(none)'}"`);
+          if (parts[2]) console.log(`[SCRAPER]        → Attribute: "${parts[2]}"`);
+          console.log(`[SCRAPER]        → Mapping  : "${mapping}"`);
+        } else {
+          console.log(`[SCRAPER]    [${idx + 1}] Field: "${field}" → Mapping: "${mapping}" (heuristic fallback)`);
+        }
+      });
+    }
+    console.log(`[SCRAPER] ─────────────────────────────────────────────────────`);
+    // ─────────────────────────────────────────────────────────────────────────
+
     return {
       success: true,
       url,
       itemSelector: detectedItemSelector,
       pagination: detectedPagination,
-      suggestedFields: suggestedFields.filter((v, i, self) => self.indexOf(v) === i), // unique
+      suggestedFields: uniqueFields,
       fieldMappingHelp,
       cookies: extractedCookies ? JSON.stringify(extractedCookies) : undefined
     };

@@ -208,11 +208,19 @@ function getCallMatchKeys(call) {
 }
 
 function timestampMatches(recMs, callStartMs, callEndMs) {
-  // Window already includes tolerance (baked in by getCallTimestamps).
-  // Hard-reject anything outside the window to prevent 1h+ mismatches.
-  if (recMs < callStartMs || recMs > callEndMs) return null;
-  // Score = 0 (all matches within window are equally valid; extension penalty breaks ties)
-  return 0;
+  const POSSIBLE_SKEWS_MS = [
+    0,
+    7 * 24 * 60 * 60 * 1000,  // 7 days slow (PBX clock is 7 days behind)
+    -7 * 24 * 60 * 60 * 1000  // 7 days fast (PBX clock is 7 days ahead)
+  ];
+
+  for (const skew of POSSIBLE_SKEWS_MS) {
+    const adjustedRecMs = recMs + skew;
+    if (adjustedRecMs >= callStartMs && adjustedRecMs <= callEndMs) {
+      return { inWindow: true, skew, adjustedRecMs };
+    }
+  }
+  return null;
 }
 
 function findBestMatch(call, index, usedPaths) {
@@ -250,12 +258,14 @@ function findBestMatch(call, index, usedPaths) {
       for (const rec of candidates) {
         if (usedPaths.has(rec.playbackPath)) continue;
 
-        const inWindow = timestampMatches(rec.timestampMs, times.callStartMs, times.callEndMs);
-        if (inWindow === null) continue;
+        const matchInfo = timestampMatches(rec.timestampMs, times.callStartMs, times.callEndMs);
+        if (matchInfo === null) continue;
 
         // Use proximity to bare call start as tiebreaker (closer = better)
-        const proximity = Math.abs(rec.timestampMs - bareCallStartMs);
-        const score = proximity + penalty;
+        // Direct matches are heavily preferred over skewed matches by adding a skew penalty.
+        const proximity = Math.abs(matchInfo.adjustedRecMs - bareCallStartMs);
+        const skewPenalty = matchInfo.skew === 0 ? 0 : 5000000;
+        const score = proximity + penalty + skewPenalty;
         if (score < bestScore) {
           bestScore = score;
           bestMatch = rec;

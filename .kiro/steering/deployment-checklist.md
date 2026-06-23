@@ -126,7 +126,7 @@ Azure portal mein dono URIs registered hone chahiye:
 ## Tower Deploy Steps (after git push)
 
 ```powershell
-cd C:\UniComm\Unicircuit_UniComm-main
+cd C:\setup0\Unicircuit_UniComm
 git pull origin main
 cd backend
 npm install
@@ -142,7 +142,7 @@ pm2 restart unicomm --update-env
 
 **SSL cert regenerate karna ho (expire ya fresh setup):**
 ```powershell
-cd C:\UniComm\Unicircuit_UniComm-main\backend
+cd C:\setup0\Unicircuit_UniComm\backend
 node scratch/gen_cert.js
 pm2 restart unicomm --update-env
 ```

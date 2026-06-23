@@ -62,7 +62,7 @@ Open your web browser (on the server or any PC on the same network) and go to:
 
 ## ⚙️ Operational Commands (Cheatsheet)
 
-Run these commands inside `C:\UniComm\Unicircuit_UniComm-main` to manage the server:
+Run these commands inside `C:\setup0\Unicircuit_UniComm` to manage the server:
 
 | Command | Action |
 | :--- | :--- |
