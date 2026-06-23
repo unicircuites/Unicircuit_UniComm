@@ -1,4 +1,4 @@
-$k = "YOUR_GROQ_API_KEY_HERE"
+$k = "YOUR_GROQ_KEY_HERE"  # Replace with your actual Groq API key before running
 $p = "C:\setup0\Unicircuit_UniComm"
 
 # Update picoclaw config files

@@ -24911,7 +24911,45 @@ ${plainText}`;
       area.onscroll = function () {
         if (area.scrollTop <= 40) waLoadOlderMessages();
       };
-      await waLoadActiveMessages({ showLoader: true });
+
+      // For group chats: fetch group metadata FIRST (resolves LID phones) then load messages.
+      // This ensures sender names/phones are in waLidMap before bubbles are rendered.
+      if (isGroup) {
+        // Show a brief "Resolving contacts..." placeholder in the chat area
+        if (area) area.innerHTML = '<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;gap:10px;color:var(--muted);font-size:13px;"><span class="spin-loader" style="width:18px;height:18px;"></span>Resolving group contacts&hellip;</div>';
+        try {
+          var gRes = await fetch(API_BASE + '/wa/group/' + encodeURIComponent(jid) + '?limit=2000', { headers: getAuthHeaders() });
+          var gData = await gRes.json();
+          if (jid !== waActiveJid) return; // user navigated away
+          if (gRes.ok && gData && gData.participants) {
+            var cnt = gData.total_participants || gData.participants.length;
+            var realGroupName = (gData.name && String(gData.name).trim() && !/^group$/i.test(String(gData.name).trim()))
+              ? String(gData.name).trim() : null;
+            if (realGroupName && titleEl) titleEl.textContent = realGroupName;
+            if (phEl) phEl.textContent = (realGroupName || name || 'Group') + ' \u00b7 ' + cnt + ' members';
+            // Populate waLidMap from group participants so bubble renders resolve correctly
+            if (Array.isArray(gData.participants)) {
+              gData.participants.forEach(function(p) {
+                if (p && p.jid && String(p.jid).endsWith('@lid') && p.phone) {
+                  var ph = String(p.phone).replace(/\D/g, '');
+                  if (ph.length >= 7 && ph.length <= 14) {
+                    var lidNum = p.jid.split('@')[0];
+                    waLidMap[lidNum] = { name: p.name || '', phone: ph.startsWith('91') && ph.length === 12 ? '+91 ' + ph.slice(2,7) + ' ' + ph.slice(7) : '+' + ph };
+                  }
+                }
+              });
+            }
+            waPopulateGroupInfo(gData);
+          } else {
+            if (phEl && phEl.textContent === 'Group \u00b7 loading...') phEl.textContent = name || 'Group';
+          }
+        } catch (_) {
+          if (phEl && phEl.textContent === 'Group \u00b7 loading...') phEl.textContent = name || 'Group';
+        }
+        if (jid !== waActiveJid) return;
+      }
+
+      await waLoadActiveMessages({ showLoader: !isGroup });
 
       // Mark chat read: persist unread=0 in DB + sync with linked WhatsApp session
       fetch(API_BASE + '/wa/chats/' + encodeURIComponent(jid) + '/read', {
@@ -24933,28 +24971,6 @@ ${plainText}`;
         draftInput.value = saved;
         draftInput.style.height = 'auto';
         draftInput.style.height = Math.min(draftInput.scrollHeight, 110) + 'px';
-      }
-
-      // Load group info in background
-      if (isGroup) {
-        try {
-          var gRes = await fetch(API_BASE + '/wa/group/' + encodeURIComponent(jid) + '?limit=2000', { headers: getAuthHeaders() });
-          var gData = await gRes.json();
-          if (jid !== waActiveJid) return;
-          if (gRes.ok && gData && gData.participants) {
-            var cnt = gData.total_participants || gData.participants.length;
-            var realGroupName = (gData.name && String(gData.name).trim() && !/^group$/i.test(String(gData.name).trim()))
-              ? String(gData.name).trim() : null;
-            if (realGroupName && titleEl) titleEl.textContent = realGroupName;
-            if (phEl) phEl.textContent = (realGroupName || name || 'Group') + ' · ' + cnt + ' members';
-            waPopulateGroupInfo(gData);
-          } else {
-            // Fetch failed/null — clear "loading..." 
-            if (phEl && phEl.textContent === 'Group · loading...') phEl.textContent = name || 'Group';
-          }
-        } catch (_) {
-          if (phEl && phEl.textContent === 'Group · loading...') phEl.textContent = name || 'Group';
-        }
       }
     }
     var waReplyTo = null;
@@ -25234,10 +25250,10 @@ ${plainText}`;
           } else if (fbEntry && fbEntry.phone) {
             senderDisplay = fbEntry.phone;
           } else if (fbLidNum && fbLidNum.length >= 15) {
-            // Raw LID — unresolvable, show placeholder
-            senderDisplay = 'Unknown';
+            // Raw LID — unresolved, show neutral placeholder (never show raw ID)
+            senderDisplay = '\u00b7\u00b7\u00b7';
           } else {
-            senderDisplay = fbLidNum || 'Unknown';
+            senderDisplay = fbLidNum ? ('\u00b7\u00b7\u00b7') : '';
           }
         }
       }
@@ -26264,11 +26280,21 @@ ${plainText}`;
         var weAreAdmin = allParts.some(function(p) { return p.admin && p.jid && (p.jid.split('@')[0] === waConnectedPhone || (p.phone && p.phone.replace(/\D/g,'').endsWith(waConnectedPhone || ''))); });
         window._waGiIsAnnounce = isAnnounce;
         window._waGiWeAreAdmin = weAreAdmin;
+        // Filter out unresolved LID members — only show if they have a real phone or real name
+        var visibleParts = allParts.filter(function(p) {
+          if (!p || !p.jid) return false;
+          if (String(p.jid).endsWith('@lid')) {
+            // Only show LID member if we have a real phone resolved
+            var ph = p.phone ? String(p.phone).replace(/\D/g, '') : '';
+            return ph.length >= 7 && ph.length <= 14;
+          }
+          return true;
+        });
         // If announcement group and we are NOT admin: show only admins
         if (isAnnounce && !weAreAdmin) {
-          window._waGiAllParticipants = allParts.filter(function(p) { return p.admin; });
+          window._waGiAllParticipants = visibleParts.filter(function(p) { return p.admin; });
         } else {
-          window._waGiAllParticipants = allParts;
+          window._waGiAllParticipants = visibleParts;
         }
         window._waGiLoadedJid = waActiveJid;
         window._waGiPage = 0;
