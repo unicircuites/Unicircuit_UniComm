@@ -24922,6 +24922,51 @@ ${plainText}`;
           var gData = await gRes.json();
           if (jid !== waActiveJid) return; // user navigated away
           if (gRes.ok && gData && gData.participants) {
+            // Count unresolved LIDs
+            var unresolved = gData.participants.filter(function(p) {
+              if (p && p.jid && String(p.jid).endsWith('@lid')) {
+                var ph = p.phone ? String(p.phone).replace(/\D/g, '') : '';
+                return ph.length < 7 || ph.length > 14;
+              }
+              return false;
+            });
+
+            if (unresolved.length > 0) {
+              // Group has unresolved LIDs! Refuse to load the group chat at the frontend.
+              if (area) {
+                area.innerHTML = '<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;gap:15px;color:var(--muted);font-size:14px;padding:20px;text-align:center;">' +
+                  '<i class="fas fa-lock" style="font-size:28px;color:var(--gold2);margin-bottom:5px;"></i>' +
+                  '<div><strong>Group Chat Locked</strong><br>' +
+                  '<span style="font-size:12px;color:var(--muted2);margin-top:5px;display:inline-block;">' +
+                  'Waiting for WhatsApp to resolve all LID contacts to phone numbers...<br>' +
+                  '(' + unresolved.length + ' of ' + gData.participants.filter(function(p){return String(p.jid).endsWith('@lid')}).length + ' LIDs remaining)' +
+                  '</span></div>' +
+                  '<span class="spin-loader" style="width:20px;height:20px;"></span>' +
+                  '</div>';
+              }
+              if (phEl) phEl.textContent = 'Resolving group LIDs (' + unresolved.length + ' left)...';
+
+              // Lock the group info sidebar members section too
+              var giMembers = document.getElementById('wa-gi-members');
+              if (giMembers) {
+                giMembers.innerHTML = '<div style="padding:20px;color:var(--muted);font-size:12px;text-align:center;">' +
+                  '<i class="fas fa-sync-alt spin" style="margin-right:5px;"></i>' +
+                  'Waiting for LID resolution... (' + unresolved.length + ' left)' +
+                  '</div>';
+              }
+
+              // Update sidebar group counts if needed
+              var realGroupName = (gData.name && String(gData.name).trim() && !/^group$/i.test(String(gData.name).trim()))
+                ? String(gData.name).trim() : null;
+              if (realGroupName && titleEl) titleEl.textContent = realGroupName;
+
+              // Schedule retry in 5 seconds
+              setTimeout(function() {
+                if (waActiveJid === jid) waOpenChat(jid, name, isGroup);
+              }, 5000);
+              return;
+            }
+
             var cnt = gData.total_participants || gData.participants.length;
             var realGroupName = (gData.name && String(gData.name).trim() && !/^group$/i.test(String(gData.name).trim()))
               ? String(gData.name).trim() : null;
@@ -24941,10 +24986,30 @@ ${plainText}`;
             }
             waPopulateGroupInfo(gData);
           } else {
-            if (phEl && phEl.textContent === 'Group \u00b7 loading...') phEl.textContent = name || 'Group';
+            // Fetch failed, show retrying message
+            if (area) {
+              area.innerHTML = '<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;gap:10px;color:var(--red2);font-size:13px;">' +
+                '<i class="fas fa-exclamation-triangle" style="font-size:20px;"></i>' +
+                'Failed to load group metadata. Retrying in 5s...' +
+                '</div>';
+            }
+            setTimeout(function() {
+              if (waActiveJid === jid) waOpenChat(jid, name, isGroup);
+            }, 5000);
+            return;
           }
-        } catch (_) {
-          if (phEl && phEl.textContent === 'Group \u00b7 loading...') phEl.textContent = name || 'Group';
+        } catch (err) {
+          if (jid !== waActiveJid) return;
+          if (area) {
+            area.innerHTML = '<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;gap:10px;color:var(--red2);font-size:13px;">' +
+              '<i class="fas fa-exclamation-triangle" style="font-size:20px;"></i>' +
+              'Error: ' + err.message + '. Retrying in 5s...' +
+              '</div>';
+          }
+          setTimeout(function() {
+            if (waActiveJid === jid) waOpenChat(jid, name, isGroup);
+          }, 5000);
+          return;
         }
         if (jid !== waActiveJid) return;
       }
@@ -25189,6 +25254,10 @@ ${plainText}`;
       body = replaceLidMentions(body);
       var type = msg.type || msg.msg_type || msg.msgType || 'conversation';
       var senderName = msg.contactName || msg.contact_name || msg.senderName || msg.sender_name || '';
+      // LID Suppression: If senderName is a raw LID number (13-16 digits), treat it as unresolved (empty)
+      if (senderName && /^\d{13,16}$/.test(senderName.replace(/\D/g, ''))) {
+        senderName = '';
+      }
 
       // Deduplication: Don't append if message ID already exists on screen
       if (document.getElementById('msg-' + msgId)) return;
@@ -25249,11 +25318,9 @@ ${plainText}`;
             if (fbEntry.phone) senderPhone = fbEntry.phone;
           } else if (fbEntry && fbEntry.phone) {
             senderDisplay = fbEntry.phone;
-          } else if (fbLidNum && fbLidNum.length >= 15) {
-            // Raw LID — unresolved, show neutral placeholder (never show raw ID)
-            senderDisplay = '\u00b7\u00b7\u00b7';
           } else {
-            senderDisplay = fbLidNum ? ('\u00b7\u00b7\u00b7') : '';
+            // Raw LID or unknown — unresolved, show neutral placeholder (never show raw ID)
+            senderDisplay = '\u00b7\u00b7\u00b7';
           }
         }
       }
