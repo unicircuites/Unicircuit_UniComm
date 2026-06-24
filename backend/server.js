@@ -720,6 +720,7 @@ app.use('/api/eb', apiLimiter, require('./routes/engagebay'));
 app.use('/api/marketing', apiLimiter, require('./routes/marketing'));
 app.use('/api/broadcast', apiLimiter, require('./routes/broadcast'));
 app.use('/api/templates', apiLimiter, require('./routes/emailTemplates'));
+app.use('/api/email-templates', apiLimiter, require('./routes/emailTemplates')); // alias — frontend uses this path
 app.use('/api/marquee', require('./routes/marquee'));
 app.use('/api/groups', apiLimiter, require('./routes/recipientGroups'));
 app.use('/api/mail-tasks', apiLimiter, require('./routes/mailTasks'));

@@ -670,10 +670,19 @@ router.get('/resolution-stats', authenticate, async (req, res) => {
           WHERE id LIKE '%@lid'
             AND COALESCE(phone_digits, '') = ''
             AND NULLIF(name, '') IS NULL
-        )::int AS hidden_lid_pending
+        )::int AS hidden_lid_pending,
+        -- Total @lid contacts and those already resolved to a real phone
+        COUNT(*) FILTER (WHERE id LIKE '%@lid')::int AS total_lids,
+        COUNT(*) FILTER (
+          WHERE id LIKE '%@lid'
+            AND phone_digits ~ '^[0-9]{7,14}$'
+            AND phone_digits != split_part(id, '@', 1)
+        )::int AS resolved_lids
       FROM keyed
     `, [accountPhone]);
     const stats = result.rows[0] || {};
+    const totalLids  = Number(stats.total_lids   || 0);
+    const resolvedLids = Number(stats.resolved_lids || 0);
     res.json({
       account_phone: accountPhone,
       total: Number(stats.total || 0),
@@ -681,6 +690,9 @@ router.get('/resolution-stats', authenticate, async (req, res) => {
       pending: Number(stats.lid_pending || 0),
       named_pending: Number(stats.named_lid_pending || 0),
       hidden_pending: Number(stats.hidden_lid_pending || 0),
+      // Explicit LID resolution counters so the UI can show accurate progress
+      total_lids: totalLids,
+      resolved_lids: resolvedLids,
       exhausted: wa.isLidResolutionExhausted(),
       cooldown_mins: wa.getLidResolutionCooldownMins()
     });

@@ -3486,6 +3486,7 @@ async function syncAllGroupParticipants() {
     console.log(`[WA] Syncing participants for ${groups.rows.length} groups (batch)...`);
     recordActivity('participants', 'Group participant sync started', { groups: groups.rows.length });
     const pendingContacts = [];
+    const seenJids = new Set();  // Deduplicate across groups
     let total = 0;
 
     await runWithConcurrency(groups.rows, GROUP_METADATA_CONCURRENCY, async (group) => {

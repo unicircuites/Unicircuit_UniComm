@@ -7237,7 +7237,26 @@
                     <!-- Broadcast Testing Card inside Outlook -->
                     <div id="settings-outlook-broadcast-card" style="border-top: 1px solid var(--border2); padding-top: 16px; margin-top: 8px; display: flex; flex-direction: column; gap: 12px;">
                       <div style="font-size: 13px; font-weight: 700; color: var(--text);">Outlook Broadcast / Send Test Email</div>
-                      
+
+                      <!-- Template Picker — top, prominent (matches Create Broadcast modal) -->
+                      <div style="display:flex; gap:8px; align-items:center; padding:8px 10px; background:rgba(59,130,246,0.06); border:1px solid rgba(59,130,246,0.15); border-radius:8px;">
+                        <i class="fas fa-file-alt" style="color:var(--blue2);font-size:12px;flex-shrink:0;"></i>
+                        <select id="settings-outlook-template-select" class="inp"
+                          style="font-size:12px;padding:5px 8px;flex:1;background:transparent;border:none;outline:none;">
+                          <option value="">— Use a saved template —</option>
+                        </select>
+                        <button type="button" class="btn btn-blue btn-xs" onclick="settingsOutlookLoadTemplate()"><i class="fas fa-check"></i> Apply</button>
+                        <button type="button" class="btn btn-ghost btn-xs" onclick="settingsOutlookPreviewTemplate()" title="Preview template HTML"><i class="fas fa-eye"></i></button>
+                      </div>
+                      <!-- Template Preview -->
+                      <div id="settings-outlook-tpl-preview" style="display:none; border: 1px solid var(--border2); border-radius: 6px; overflow: hidden; background: #fff;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; padding: 6px 10px; background: var(--bg2); border-bottom: 1px solid var(--border2);">
+                          <span style="font-size: 11px; font-weight: 600; color: var(--muted2); text-transform: uppercase;"><i class="fas fa-eye" style="margin-right:4px;"></i>Template Preview</span>
+                          <button class="btn btn-ghost btn-xs" onclick="document.getElementById('settings-outlook-tpl-preview').style.display='none'"><i class="fas fa-times"></i></button>
+                        </div>
+                        <iframe id="settings-outlook-tpl-iframe" style="width: 100%; height: 300px; border: none; display: block;" sandbox="allow-same-origin"></iframe>
+                      </div>
+
                       <!-- To Field with Group Loader -->
                       <div>
                         <label class="form-label" style="font-size: 11px; font-weight: 600; color: var(--muted2); display: block; margin-bottom: 4px; text-transform: uppercase;">To Recipients *</label>
@@ -7272,26 +7291,6 @@
                           <button type="button" class="btn btn-blue btn-xs" onclick="settingsOutlookLoadGroup('bcc')"><i class="fas fa-users"></i> Load</button>
                         </div>
                         <input class="inp" id="settings-outlook-bcc" placeholder="bcc1@email.com, bcc2@email.com" style="width: 100%; box-sizing: border-box; font-size: 12px; padding: 6px 10px; height: 36px; background: var(--bg2); border: 1px solid var(--border2); color: var(--text); border-radius: 6px;" autocomplete="off" />
-                      </div>
-
-                      <!-- Template Picker -->
-                      <div>
-                        <label class="form-label" style="font-size: 11px; font-weight: 600; color: var(--muted2); display: block; margin-bottom: 4px; text-transform: uppercase;">Use HTML Template (Optional)</label>
-                        <div style="display: flex; gap: 6px; align-items: center; margin-bottom: 8px;">
-                          <select id="settings-outlook-template-select" class="inp" style="font-size: 12px; padding: 5px 8px; flex: 1; background: transparent;">
-                            <option value="">— Select a template —</option>
-                          </select>
-                          <button type="button" class="btn btn-blue btn-xs" onclick="settingsOutlookLoadTemplate()"><i class="fas fa-check"></i> Apply</button>
-                          <button type="button" class="btn btn-ghost btn-xs" onclick="settingsOutlookPreviewTemplate()" title="Preview template HTML"><i class="fas fa-eye"></i></button>
-                        </div>
-                        <!-- Template Preview -->
-                        <div id="settings-outlook-tpl-preview" style="display:none; border: 1px solid var(--border2); border-radius: 6px; overflow: hidden; background: #fff;">
-                          <div style="display: flex; justify-content: space-between; align-items: center; padding: 6px 10px; background: var(--bg2); border-bottom: 1px solid var(--border2);">
-                            <span style="font-size: 11px; font-weight: 600; color: var(--muted2); text-transform: uppercase;"><i class="fas fa-eye" style="margin-right:4px;"></i>Template Preview</span>
-                            <button class="btn btn-ghost btn-xs" onclick="document.getElementById('settings-outlook-tpl-preview').style.display='none'"><i class="fas fa-times"></i></button>
-                          </div>
-                          <iframe id="settings-outlook-tpl-iframe" style="width: 100%; height: 300px; border: none; display: block;" sandbox="allow-same-origin"></iframe>
-                        </div>
                       </div>
 
                       <!-- Subject Field -->
@@ -19333,14 +19332,18 @@ Best regards,<br>
         const res = await fetch(`${API_BASE}/wa/resolution-stats`, { headers: getAuthHeaders() });
         if (res.ok) {
           const stats = await res.json();
-          const total = stats.totalChats || 0;
-          const pending = stats.pending || 0;
-          const resolved = stats.resolved || 0;
-          const percentage = total > 0 ? Math.round((resolved / total) * 100) : 0;
+          // Use explicit total_lids / resolved_lids from the API (correct fields)
+          const totalLids    = stats.total_lids    || 0;
+          const resolvedLids = stats.resolved_lids || 0;
+          const pending      = stats.pending        || 0;
+          const percentage   = totalLids > 0 ? Math.min(100, Math.round((resolvedLids / totalLids) * 100)) : (pending === 0 ? 100 : 0);
 
           document.getElementById('settings-wa-lid-progress-percent').textContent = `${percentage}%`;
           document.getElementById('settings-wa-lid-progress-bar').style.width = `${percentage}%`;
-          document.getElementById('settings-wa-lid-stats-text').textContent = `${resolved} resolved, ${pending} pending / ${total} total`;
+          document.getElementById('settings-wa-lid-stats-text').textContent =
+            totalLids > 0
+              ? `${resolvedLids} resolved, ${pending} pending / ${totalLids} total`
+              : (pending > 0 ? `${pending} pending` : 'All LIDs resolved');
 
           const tileLid = document.getElementById('settings-tile-lid');
           if (tileLid) {
@@ -19553,7 +19556,7 @@ Best regards,<br>
         const res = await fetch(`${API_BASE}/wa/resolution-stats`, { headers: getAuthHeaders() });
         if (res.ok) {
           const stats = await res.json();
-          settingsAppendLog('whatsapp', `✅ Resolution stats active: ${stats.resolved || 0} resolved, ${stats.pending || 0} pending`);
+          settingsAppendLog('whatsapp', `✅ Resolution stats active: ${stats.resolved_lids || 0} resolved, ${stats.pending || 0} pending / ${stats.total_lids || 0} total LIDs`);
         } else {
           settingsAppendLog('whatsapp', '⚠️ Resolution stats returned error code.');
         }
@@ -19641,7 +19644,7 @@ Best regards,<br>
       let testTemplateId = null;
       let testTemplateName = null;
       try {
-        const res = await fetch(`${API_BASE}/email-templates`, { headers: getAuthHeaders() });
+        const res = await fetch(`${API_BASE}/templates`, { headers: getAuthHeaders() });
         if (res.ok) {
           const templates = await res.json();
           const count = Array.isArray(templates) ? templates.length : 0;
@@ -19669,7 +19672,7 @@ Best regards,<br>
       // Step 4: Template HTML body load test (fetch full template and verify html_body)
       if (testTemplateId) {
         try {
-          const res = await fetch(`${API_BASE}/email-templates/${testTemplateId}`, { headers: getAuthHeaders() });
+          const res = await fetch(`${API_BASE}/templates/${testTemplateId}`, { headers: getAuthHeaders() });
           if (res.ok) {
             const tplData = await res.json();
             const htmlBody = tplData.html_body || tplData.body || '';
@@ -19779,8 +19782,8 @@ Best regards,<br>
       if (selTo) selTo.innerHTML = '<option value="">— Or load To from a group —</option>';
       if (selCc) selCc.innerHTML = '<option value="">— Or load CC from a group —</option>';
       if (selBcc) selBcc.innerHTML = '<option value="">— Or load BCC from a group —</option>';
-      if (selTpl) selTpl.innerHTML = '<option value="">— Select a template —</option>';
-      if (selTplModal) selTplModal.innerHTML = '<option value="">— Select a template —</option>';
+      if (selTpl) selTpl.innerHTML = '<option value="">— Use a saved template —</option>';
+      if (selTplModal) selTplModal.innerHTML = '<option value="">— Use a saved template —</option>';
 
       try {
         // Fetch groups
@@ -19815,20 +19818,21 @@ Best regards,<br>
 
       try {
         // Fetch templates — populate both settings panel and modal dropdowns
-        const res = await fetch(`${API_BASE}/email-templates`, { headers: getAuthHeaders() });
+        const res = await fetch(`${API_BASE}/templates`, { headers: getAuthHeaders() });
         if (res.ok) {
           const templates = await res.json();
           templates.forEach(t => {
+            const label = t.name + (t.subject ? ' — ' + t.subject : '');
             if (selTpl) {
               const opt = document.createElement('option');
               opt.value = t.id;
-              opt.textContent = t.name;
+              opt.textContent = label;
               selTpl.appendChild(opt);
             }
             if (selTplModal) {
               const opt = document.createElement('option');
               opt.value = t.id;
-              opt.textContent = t.name;
+              opt.textContent = label;
               selTplModal.appendChild(opt);
             }
           });
@@ -19880,7 +19884,7 @@ Best regards,<br>
         return;
       }
       try {
-        const res = await fetch(`${API_BASE}/email-templates/${sel.value}`, { headers: getAuthHeaders() });
+        const res = await fetch(`${API_BASE}/templates/${sel.value}`, { headers: getAuthHeaders() });
         const data = await res.json();
         if (!res.ok) throw new Error(data.error || 'Failed');
         
@@ -19910,7 +19914,7 @@ Best regards,<br>
 
       if (!html && sel && sel.value) {
         try {
-          const res = await fetch(`${API_BASE}/email-templates/${sel.value}`, { headers: getAuthHeaders() });
+          const res = await fetch(`${API_BASE}/templates/${sel.value}`, { headers: getAuthHeaders() });
           const data = await res.json();
           // API returns html_body — fixed from data.body
           if (res.ok) html = data.html_body || data.body || '';
@@ -19954,7 +19958,7 @@ Best regards,<br>
 
       // Try to find and auto-select "HTML render Test" template
       try {
-        const res = await fetch(`${API_BASE}/email-templates`, { headers: getAuthHeaders() });
+        const res = await fetch(`${API_BASE}/templates`, { headers: getAuthHeaders() });
         if (res.ok) {
           const templates = await res.json();
           const testTpl = templates.find(t => t.name && t.name.toLowerCase().includes('html render test'));
@@ -19972,7 +19976,7 @@ Best regards,<br>
             }
             // Fetch full template including html_body (list endpoint doesn't include html_body)
             try {
-              const tplRes = await fetch(`${API_BASE}/email-templates/${testTpl.id}`, { headers: getAuthHeaders() });
+              const tplRes = await fetch(`${API_BASE}/templates/${testTpl.id}`, { headers: getAuthHeaders() });
               const tplData = await tplRes.json();
               if (tplRes.ok) {
                 if (subjectEl) subjectEl.value = tplData.subject || testTpl.subject || 'HTML Render Test';
@@ -20008,13 +20012,14 @@ Best regards,<br>
       sel.innerHTML = '<option value="">— Loading... —</option>';
       settingsAppendLog('outlook', '🔄 Reloading email templates...');
       try {
-        const res = await fetch(`${API_BASE}/email-templates`, { headers: getAuthHeaders() });
+        const res = await fetch(`${API_BASE}/templates`, { headers: getAuthHeaders() });
         if (res.ok) {
           const templates = await res.json();
-          sel.innerHTML = '<option value="">— Select a template —</option>';
+          sel.innerHTML = '<option value="">— Use a saved template —</option>';
           templates.forEach(t => {
             const opt = document.createElement('option');
-            opt.value = t.id; opt.textContent = t.name;
+            opt.value = t.id;
+            opt.textContent = t.name + (t.subject ? ' — ' + t.subject : '');
             sel.appendChild(opt);
           });
           const tplEl = document.getElementById('settings-outlook-template-count');
@@ -20040,7 +20045,7 @@ Best regards,<br>
         return;
       }
       try {
-        const res = await fetch(`${API_BASE}/email-templates/${sel.value}`, { headers: getAuthHeaders() });
+        const res = await fetch(`${API_BASE}/templates/${sel.value}`, { headers: getAuthHeaders() });
         const data = await res.json();
         if (!res.ok) throw new Error(data.error || 'Failed');
         // These share IDs with settings panel — use settings-outlook-subject / body (same element, shown in modal)
@@ -20066,7 +20071,7 @@ Best regards,<br>
 
       if (!html && sel && sel.value) {
         try {
-          const res = await fetch(`${API_BASE}/email-templates/${sel.value}`, { headers: getAuthHeaders() });
+          const res = await fetch(`${API_BASE}/templates/${sel.value}`, { headers: getAuthHeaders() });
           const data = await res.json();
           if (res.ok) html = data.html_body || data.body || '';
         } catch (_) {}
@@ -20103,7 +20108,7 @@ Best regards,<br>
       settingsAppendLog('outlook', '  → BCC: biz.dev@unicircuites.com');
 
       try {
-        const res = await fetch(`${API_BASE}/email-templates`, { headers: getAuthHeaders() });
+        const res = await fetch(`${API_BASE}/templates`, { headers: getAuthHeaders() });
         if (res.ok) {
           const templates = await res.json();
           const testTpl = templates.find(t => t.name && t.name.toLowerCase().includes('html render test'));
@@ -20118,7 +20123,7 @@ Best regards,<br>
               tplSel.appendChild(opt); tplSel.value = testTpl.id;
             }
             try {
-              const tplRes = await fetch(`${API_BASE}/email-templates/${testTpl.id}`, { headers: getAuthHeaders() });
+              const tplRes = await fetch(`${API_BASE}/templates/${testTpl.id}`, { headers: getAuthHeaders() });
               const tplData = await tplRes.json();
               if (tplRes.ok) {
                 if (subjectEl) subjectEl.value = tplData.subject || 'HTML Render Test';
@@ -28217,7 +28222,11 @@ ${plainText}`;
         var weAreAdmin = allParts.some(function(p) { return p.admin && p.jid && (p.jid.split('@')[0] === waConnectedPhone || (p.phone && p.phone.replace(/\D/g,'').endsWith(waConnectedPhone || ''))); });
         window._waGiIsAnnounce = isAnnounce;
         window._waGiWeAreAdmin = weAreAdmin;
-        // Show LID members even if unresolved — use name if available, else "Unknown"
+        // Show LID members even if unresolved.
+        // RULE: Only group members who have LEFT the group should be shown as "Unknown".
+        // Baileys never includes left members in the participants list — so any participant
+        // we see here is a current member who just hasn't been resolved yet.
+        // Use their name if available, else fall back to their LID digits (never "Unknown").
         var visibleParts = allParts.filter(function(p) {
           return !!(p && p.jid);
         }).map(function(p) {
@@ -28228,8 +28237,10 @@ ${plainText}`;
             if (mapped) {
               return Object.assign({}, p, { phone: mapped.phone, name: p.name || mapped.name });
             }
-            // Still unresolved — show with name or "Unknown"
-            return Object.assign({}, p, { phone: '', name: p.name || p.pushName || 'Unknown' });
+            // Still unresolved current member — show their name if known, else LID digits as
+            // placeholder. NEVER show "Unknown" — they haven't left the group, just pending resolution.
+            var fallbackName = p.name || p.pushName || null;
+            return Object.assign({}, p, { phone: '', name: fallbackName, _lidPending: true, _lidNum: lidNum });
           }
           return p;
         });
@@ -28279,17 +28290,27 @@ ${plainText}`;
       giMembers.innerHTML = announceNote + slice.map(function (p) {
         var phoneSafe = p && p.phone ? waFormatPhoneForDisplay(p.phone) : '';
         var displayName = (p && p.name && String(p.name).trim()) ? p.name : (phoneSafe || null);
-        var initials = displayName ? displayName.charAt(0).toUpperCase() : '?';
+        var isPendingLid = !!(p && p._lidPending);
+        // Pending LID: show initials from name if known, else a clock icon
+        var initials = displayName ? displayName.charAt(0).toUpperCase() : (isPendingLid ? '⏳' : '?');
         var adminBadge = p && p.admin
           ? '<span style="font-size:9px;background:rgba(39,150,196,0.15);color:var(--gold2);padding:1px 6px;border-radius:4px;font-weight:700;white-space:nowrap;">Admin</span>'
           : '';
+        // Pending LID members: show "Resolving…" italic tag instead of blank/Unknown
+        var pendingBadge = isPendingLid && !phoneSafe
+          ? '<span style="font-size:9px;font-style:italic;color:var(--muted);opacity:0.75;margin-left:2px;">Resolving…</span>'
+          : '';
         var phoneStr = (phoneSafe && phoneSafe !== displayName) ? phoneSafe : '';
         var phoneHtml = phoneStr ? '<div style="font-size:10.5px;color:var(--muted);margin-top:1px;">' + phoneStr + '</div>' : '';
+        // Show LID digits as subtle sub-label for pending members with no phone
+        var lidHint = (isPendingLid && !phoneSafe && p._lidNum)
+          ? '<div style="font-size:9.5px;color:var(--muted2);opacity:0.55;margin-top:1px;font-family:monospace;">' + p._lidNum.slice(-8) + '@lid</div>'
+          : '';
         return '<div style="display:flex;align-items:center;gap:10px;padding:7px 6px;border-radius:8px;cursor:default;">' +
-          '<div style="width:34px;height:34px;border-radius:50%;background:rgba(37,211,102,0.15);display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;color:#25D366;flex-shrink:0;">' + initials + '</div>' +
+          '<div style="width:34px;height:34px;border-radius:50%;background:' + (isPendingLid && !phoneSafe ? 'rgba(120,120,120,0.12)' : 'rgba(37,211,102,0.15)') + ';display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;color:' + (isPendingLid && !phoneSafe ? 'var(--muted)' : '#25D366') + ';flex-shrink:0;">' + initials + '</div>' +
           '<div style="flex:1;min-width:0;"><div style="display:flex;align-items:center;gap:5px;flex-wrap:wrap;">' +
-          '<span style="font-size:12.5px;color:var(--text);font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:140px;">' + (displayName || '—') + '</span>' +
-          adminBadge + '</div>' + phoneHtml + '</div></div>';
+          '<span style="font-size:12.5px;color:' + (isPendingLid && !phoneSafe ? 'var(--muted)' : 'var(--text)') + ';font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:140px;">' + (displayName || (isPendingLid ? '' : '—')) + '</span>' +
+          pendingBadge + adminBadge + '</div>' + phoneHtml + lidHint + '</div></div>';
       }).join('') || '<div style="padding:12px;color:var(--muted);font-size:12px;text-align:center;">No members match.</div>';
       // Pagination
       if (total > _WA_GI_PAGE_SIZE) {
