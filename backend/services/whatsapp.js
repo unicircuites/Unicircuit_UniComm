@@ -106,7 +106,14 @@ function isAllowedWaNumber(value) {
 }
 
 function normalizeWaPhone(value) {
-  const digits = String(value || '').replace(/\D/g, '');
+  let digits = String(value || '').replace(/\D/g, '');
+  if (digits.length === 10) {
+    digits = '91' + digits;
+  } else if (digits.length === 11 && digits.startsWith('0')) {
+    digits = '91' + digits.slice(1);
+  } else if (digits.length === 13 && digits.startsWith('910')) {
+    digits = '91' + digits.slice(3);
+  }
   return isAllowedWaNumber(digits) ? digits : '';
 }
 
@@ -144,13 +151,20 @@ function normalizeRawJid(rawJid) {
   const raw = String(rawJid || '').trim().toLowerCase();
   if (!raw || !raw.includes('@')) return raw;
   const atIdx = raw.indexOf('@');
-  const local = raw.slice(0, atIdx).split(':')[0];
+  let local = raw.slice(0, atIdx).split(':')[0];
   const rest = raw.slice(atIdx + 1);
   const domain = rest.includes('g.us') ? 'g.us'
     : rest.includes('lid') ? 'lid'
     : rest.includes('newsletter') ? 'newsletter'
     : rest.includes('broadcast') ? 'broadcast'
     : 's.whatsapp.net';
+
+  if (domain === 's.whatsapp.net') {
+    const cleaned = normalizeWaPhone(local);
+    if (cleaned) {
+      local = cleaned;
+    }
+  }
   return `${local}@${domain}`;
 }
 
@@ -694,12 +708,13 @@ function getContactName(jid, pushName) {
 }
 
 const GROUP_METADATA_CONCURRENCY = 2;
-const GROUP_METADATA_DELAY_MS = 600;
+const GROUP_METADATA_DELAY_MS = 1000;
 const LID_CONTACT_BATCH_SIZE = 200;
 const LID_RESOLUTION_BATCH_SIZE = 100;
-const LID_RESOLUTION_BATCH_DELAY_MS = 2500;
-const MAX_GROUPS_PER_LID_BATCH = 16;
+const LID_RESOLUTION_BATCH_DELAY_MS = 5000;
+const MAX_GROUPS_PER_LID_BATCH = 10;
 let lidResolutionWorkerTimer = null;
+let lidResolutionWorkerGen = 0;
 let lidResolutionInFlight = false;
 let lidResolutionGroupCursor = 0;
 let lidResolutionGroupIds = [];
@@ -1315,8 +1330,9 @@ async function ensureTables(retries = 3) {
       await pool.query(`ALTER TABLE wa_contacts ADD COLUMN IF NOT EXISTS verified_name TEXT`).catch(() => { });
       await pool.query(`ALTER TABLE wa_contacts ADD COLUMN IF NOT EXISTS is_business BOOLEAN DEFAULT FALSE`).catch(() => { });
       await pool.query(`UPDATE wa_contacts SET is_business = true WHERE verified_name IS NOT NULL AND is_business = false`).catch(() => { });
-      // Clean up: LID contacts with no resolved phone should not carry stale names (wrong data from old syncs)
-      await pool.query(`UPDATE wa_contacts SET name = NULL, notify = NULL WHERE jid LIKE '%@lid' AND (phone IS NULL OR phone = '')`).catch(() => { });
+      // Clean up: LID contacts with no phone should not carry stale saved-contact names.
+      // BUT preserve notify — that's the contact's own WA display name from contacts.upsert events.
+      await pool.query(`UPDATE wa_contacts SET name = NULL WHERE jid LIKE '%@lid' AND (phone IS NULL OR phone = '')`).catch(() => { });
       // Fix wa_messages: if a sender_name appears for 3+ distinct @lid senders in same group, it's a bleed — clear it
       await pool.query(`
         UPDATE wa_messages SET sender_name = NULL
@@ -1443,6 +1459,73 @@ async function ensureTables(retries = 3) {
             OR (name ~ '^[0-9]{12,}' AND name NOT LIKE '%@%')
           )
       `).catch(() => {});
+
+      // One-time phone number normalization & duplicate consolidation migration
+      await pool.query(`
+        DO $$
+        DECLARE
+            r RECORD;
+            v_old_id VARCHAR(100);
+            v_new_id VARCHAR(100);
+            v_local VARCHAR(50);
+            v_clean_local VARCHAR(50);
+        BEGIN
+            IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'wa_chats') THEN
+                FOR r IN 
+                    SELECT id, account_phone FROM wa_chats 
+                    WHERE id LIKE '%@s.whatsapp.net'
+                LOOP
+                    v_old_id := r.id;
+                    v_local := split_part(v_old_id, '@', 1);
+                    v_clean_local := regexp_replace(v_local, '[^0-9]', '', 'g');
+                    
+                    IF (length(v_clean_local) = 10) OR (length(v_clean_local) = 11 AND v_clean_local LIKE '0%') OR (length(v_clean_local) = 13 AND v_clean_local LIKE '910%') THEN
+                        IF length(v_clean_local) = 10 THEN
+                            v_clean_local := '91' || v_clean_local;
+                        ELSIF length(v_clean_local) = 11 THEN
+                            v_clean_local := '91' || substr(v_clean_local, 2);
+                        ELSIF length(v_clean_local) = 13 THEN
+                            v_clean_local := '91' || substr(v_clean_local, 4);
+                        END IF;
+                        
+                        v_new_id := v_clean_local || '@s.whatsapp.net';
+                        
+                        IF v_new_id <> v_old_id THEN
+                            -- Merge messages
+                            UPDATE wa_messages SET chat_id = v_new_id WHERE chat_id = v_old_id AND account_phone = r.account_phone;
+                            UPDATE wa_messages SET sender = v_new_id WHERE sender = v_old_id AND account_phone = r.account_phone;
+                            
+                            -- Merge labels
+                            IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'wa_label_associations') THEN
+                                DELETE FROM wa_label_associations WHERE chat_id = v_old_id AND label_id IN (SELECT label_id FROM wa_label_associations WHERE chat_id = v_new_id AND account_phone = r.account_phone) AND account_phone = r.account_phone;
+                                UPDATE wa_label_associations SET chat_id = v_new_id WHERE chat_id = v_old_id AND account_phone = r.account_phone;
+                            END IF;
+                            
+                            -- Merge blocklist
+                            IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'wa_chat_blocklist') THEN
+                                DELETE FROM wa_chat_blocklist WHERE chat_id = v_old_id AND account_phone = r.account_phone AND EXISTS (SELECT 1 FROM wa_chat_blocklist WHERE chat_id = v_new_id AND account_phone = r.account_phone);
+                                UPDATE wa_chat_blocklist SET chat_id = v_new_id WHERE chat_id = v_old_id AND account_phone = r.account_phone;
+                            END IF;
+                            
+                            -- Merge chats
+                            IF EXISTS (SELECT 1 FROM wa_chats WHERE id = v_new_id AND account_phone = r.account_phone) THEN
+                                UPDATE wa_chats 
+                                SET unread = unread + COALESCE((SELECT unread FROM wa_chats WHERE id = v_old_id AND account_phone = r.account_phone), 0),
+                                    last_time = GREATEST(last_time, (SELECT last_time FROM wa_chats WHERE id = v_old_id AND account_phone = r.account_phone))
+                                WHERE id = v_new_id AND account_phone = r.account_phone;
+                                
+                                DELETE FROM wa_chats WHERE id = v_old_id AND account_phone = r.account_phone;
+                            ELSE
+                                UPDATE wa_chats SET id = v_new_id, phone = '+91 ' || substr(v_clean_local, 3) WHERE id = v_old_id AND account_phone = r.account_phone;
+                            END IF;
+                        END IF;
+                    END IF;
+                END LOOP;
+            END IF;
+        END $$;
+      `).catch((err) => {
+        console.warn('[WA-Startup] One-time phone normalization migration failed:', err.message);
+      });
 
       return; // Success
     } catch (err) {
@@ -3195,33 +3278,76 @@ async function processLidResolutionBatch(batchSize = LID_RESOLUTION_BATCH_SIZE) 
 
       try {
         await runWithConcurrency(chunk, GROUP_METADATA_CONCURRENCY, async (gid) => {
-          // Skip if this JID is in rate-limit cooldown
+          // Skip if this JID is in rate-limit cooldown or forbidden
           if ((groupMetadataRateCooldown.get(gid) || 0) > Date.now()) return;
-          if (GROUP_METADATA_DELAY_MS > 0) await sleep(GROUP_METADATA_DELAY_MS);
-           const meta = await getRawGroupMetadata(gid);
-          for (const p of meta?.participants || []) {
-            const lidJid = p.id?.endsWith('@lid') ? p.id : (p.lid || null);
-            let phoneJid = p.id?.endsWith('@s.whatsapp.net') ? p.id : null;
-            if (!phoneJid && p.phoneNumber) {
-              phoneJid = typeof p.phoneNumber === 'string' ? p.phoneNumber : (p.phoneNumber.jid || null);
+          if ((groupMetadataForbidden.get(gid) || 0) > Date.now()) return;
+
+          try {
+            if (GROUP_METADATA_DELAY_MS > 0) await sleep(GROUP_METADATA_DELAY_MS);
+            const meta = await getRawGroupMetadata(gid);
+            for (const p of meta?.participants || []) {
+              const pJid = p.id;
+              if (!pJid || seenJids.has(pJid)) continue;
+              seenJids.add(pJid);
+
+              // Extract phone if available
+              let phone = null;
+              if (pJid.endsWith('@s.whatsapp.net')) {
+                phone = pJid.split('@')[0].split(':')[0];
+              } else if (p.phoneNumber) {
+                const pn = typeof p.phoneNumber === 'string' ? p.phoneNumber : (p.phoneNumber.jid || '');
+                const digits = pn.split('@')[0].replace(/\D/g, '');
+                if (isAllowedWaNumber(digits)) phone = digits;
+              }
+
+              const name = (!pJid.endsWith('@lid') && p.name && !isInvalidContactLabel(p.name)) ? p.name : null;
+
+              pendingContacts.push({
+                jid: pJid,
+                name: name || (contactsStore[pJid]?.name || null),
+                phone: phone,
+              });
+
+              // Also map separate LID to phone if this JID has a phone number
+              const lidJid = pJid.endsWith('@lid') ? pJid : (p.lid || null);
+              let phoneJid = pJid.endsWith('@s.whatsapp.net') ? pJid : null;
+              if (!phoneJid && p.phoneNumber) {
+                phoneJid = typeof p.phoneNumber === 'string' ? p.phoneNumber : (p.phoneNumber.jid || null);
+              }
+              if (lidJid && phoneJid && lidJid !== pJid) {
+                const rawPhone = String(phoneJid).split('@')[0].split(':')[0].replace(/\D/g, '');
+                if (rawPhone && isAllowedWaNumber(rawPhone) && !seenJids.has(lidJid)) {
+                  seenJids.add(lidJid);
+                  pendingContacts.push({
+                    jid: lidJid,
+                    name: p.name && !isInvalidContactLabel(p.name) ? p.name : (contactsStore[lidJid]?.name || null),
+                    phone: rawPhone,
+                  });
+                }
+              }
             }
-            if (!lidJid || !phoneJid) continue;
-            const rawPhone = String(phoneJid).split('@')[0].split(':')[0].replace(/\D/g, '');
-            if (!rawPhone || !isAllowedWaNumber(rawPhone) || seenJids.has(lidJid)) continue;
-            seenJids.add(lidJid);
-            pendingContacts.push({
-              jid: lidJid,
-              name: p.name && !isInvalidContactLabel(p.name) ? p.name : (contactsStore[lidJid]?.name || null),
-              phone: rawPhone,
-            });
+          } catch (err) {
+            const errMsg = String(err?.message || '');
+            if (/forbidden|403|not-authorized/i.test(errMsg)) {
+              groupMetadataForbidden.set(gid, Date.now() + 24 * 60 * 60 * 1000); // 24h cooldown
+              console.warn(`[WA] Group metadata skipped for ${gid}: forbidden`);
+            } else if (errMsg.includes('timed out') || /rate.?overlimit|rate.?limit|429/i.test(errMsg)) {
+              groupMetadataRateCooldown.set(gid, Date.now() + GROUP_METADATA_RATE_COOLDOWN_MS);
+              hitRateLimit = true;
+            } else {
+              console.warn(`[WA] Group metadata failed for ${gid}:`, err.message);
+            }
           }
         });
       } catch (err) {
         const errMsg = String(err?.message || '');
         if (errMsg.includes('timed out') || /rate.?overlimit|rate.?limit|429/i.test(errMsg)) {
           hitRateLimit = true;
-          break;
         }
+      }
+
+      if (hitRateLimit) {
+        break;
       }
     }
 
@@ -3235,9 +3361,12 @@ async function processLidResolutionBatch(batchSize = LID_RESOLUTION_BATCH_SIZE) 
       lidResolutionExhausted = true;
     }
 
-    const upserted = await upsertGroupMemberContacts(pendingContacts, accPhone);
-    await consolidateLidChats();
-    await loadLidPhoneMapFromDB();
+    let upserted = 0;
+    if (pendingContacts.length > 0) {
+      upserted = await upsertGroupMemberContacts(pendingContacts, accPhone);
+      await consolidateLidChats();
+      await loadLidPhoneMapFromDB();
+    }
 
     const afterPending = await countPendingLids(accPhone);
     const resolved = Math.max(0, beforePending - afterPending);
@@ -3252,10 +3381,9 @@ async function processLidResolutionBatch(batchSize = LID_RESOLUTION_BATCH_SIZE) 
     if (resolved > 0 || upserted > 0) {
       emit('wa:lid_batch', result);
       emit('wa:participants_synced', { total: resolved || upserted, pending: afterPending, ...result });
+      console.log('[WA] LID resolution batch:', result);
+      recordActivity('lid_batch', 'LID resolution batch', result);
     }
-
-    console.log('[WA] LID resolution batch:', result);
-    recordActivity('lid_batch', 'LID resolution batch', result);
     return result;
   } finally {
     lidResolutionInFlight = false;
@@ -3263,13 +3391,15 @@ async function processLidResolutionBatch(batchSize = LID_RESOLUTION_BATCH_SIZE) 
 }
 
 function stopLidResolutionWorker() {
+  lidResolutionWorkerGen++;
   if (lidResolutionWorkerTimer) {
     clearTimeout(lidResolutionWorkerTimer);
     lidResolutionWorkerTimer = null;
   }
 }
 
-async function tickLidResolutionWorker() {
+async function tickLidResolutionWorker(generation) {
+  if (generation !== lidResolutionWorkerGen) return;
   if (!sock || !isConnected || !phoneNumber) {
     stopLidResolutionWorker();
     return;
@@ -3277,7 +3407,9 @@ async function tickLidResolutionWorker() {
   try {
     if (isProcessingHistoryQueue || historySyncQueue.length > 0) {
       // Pause worker if history sync is active to prevent socket congestion
-      lidResolutionWorkerTimer = setTimeout(tickLidResolutionWorker, LID_RESOLUTION_BATCH_DELAY_MS);
+      if (generation === lidResolutionWorkerGen) {
+        lidResolutionWorkerTimer = setTimeout(() => tickLidResolutionWorker(generation), LID_RESOLUTION_BATCH_DELAY_MS);
+      }
       return;
     }
 
@@ -3285,7 +3417,7 @@ async function tickLidResolutionWorker() {
     if (pending === 0) {
       console.log('[WA] LID resolution worker complete');
       stopLidResolutionWorker();
-      emit('wa:lid_resolution_complete', {});
+      emit('wa:lid_resolution_complete', { accountPhone: phoneNumber });
       return;
     }
     if (lidResolutionExhausted) {
@@ -3294,6 +3426,7 @@ async function tickLidResolutionWorker() {
       if (resolved === 0) {
         console.log(`[WA] LID resolution: full pass with 0 new resolutions — ${pending} LIDs unresolvable from available group data. Stopping worker.`);
         stopLidResolutionWorker();
+        emit('wa:lid_resolution_complete', { pending, unresolvable: true, accountPhone: phoneNumber });
         return;
       }
       console.log(`[WA] LID resolution exhausted pass, ${pending} still pending — resetting for another pass`);
@@ -3301,7 +3434,9 @@ async function tickLidResolutionWorker() {
       lidResolutionGroupCursor = 0;
       lidResolutionGroupIds = [];
       lidResolutionLastPassResolved = 0;
-      lidResolutionWorkerTimer = setTimeout(tickLidResolutionWorker, 60 * 1000);
+      if (generation === lidResolutionWorkerGen) {
+        lidResolutionWorkerTimer = setTimeout(() => tickLidResolutionWorker(generation), 60 * 1000);
+      }
       return;
     }
     const batchResult = await processLidResolutionBatch(LID_RESOLUTION_BATCH_SIZE);
@@ -3313,16 +3448,19 @@ async function tickLidResolutionWorker() {
   const cooldownWait = lidResolutionCooldownUntil > Date.now()
     ? Math.min(lidResolutionCooldownUntil - Date.now() + 2000, 15 * 60 * 1000)
     : LID_RESOLUTION_BATCH_DELAY_MS;
-  lidResolutionWorkerTimer = setTimeout(tickLidResolutionWorker, cooldownWait);
+  if (generation === lidResolutionWorkerGen) {
+    lidResolutionWorkerTimer = setTimeout(() => tickLidResolutionWorker(generation), cooldownWait);
+  }
 }
 
 function startLidResolutionWorker() {
   stopLidResolutionWorker();
+  const currentGen = lidResolutionWorkerGen;
   lidResolutionGroupCursor = 0;
   lidResolutionGroupIds = [];
   lidResolutionLastPassResolved = 0;
   console.log('[WA] Starting LID resolution worker (batch size ' + LID_RESOLUTION_BATCH_SIZE + ')');
-  lidResolutionWorkerTimer = setTimeout(tickLidResolutionWorker, 1500);
+  lidResolutionWorkerTimer = setTimeout(() => tickLidResolutionWorker(currentGen), 1500);
 }
 
 // ── SYNC ALL GROUP PARTICIPANTS → populate LID→phone in wa_contacts ────────
@@ -3409,6 +3547,8 @@ async function resetAndResyncGroupContacts() {
   // 3. Clear group metadata caches so fresh data is fetched
   groupMetadataCache.clear();
   rawGroupMetadataCache.clear();
+  groupMetadataRateCooldown.clear();
+  groupMetadataForbidden.clear();
 
   // 4. Reset LID resolution state so it re-scans everything
   lastGroupParticipantSyncAt = 0;
@@ -3416,47 +3556,14 @@ async function resetAndResyncGroupContacts() {
   lidResolutionGroupCursor = 0;
   lidResolutionExhausted = false;
 
-  // 5. Fresh sync: fetch ALL group participants from live Baileys socket
-  // Capture LID-only members too (with name/notify), not just LID+phone pairs
-  const groupIds = [...new Set([
-    ...(await pool.query(`SELECT id FROM wa_chats WHERE is_group=true AND account_phone=$1`, [accPhone])).rows.map(r => r.id),
-    ...getSocketGroupIds(),
-  ])];
-
-  console.log(`[WA] Reset: re-syncing ${groupIds.length} groups fresh from Baileys...`);
-  const allContacts = [];
-  const seenJids = new Set();
-
-  await runWithConcurrency(groupIds.map(id => ({ id })), GROUP_METADATA_CONCURRENCY, async (group) => {
-    if (!isConnected) return;
-    try {
-      if (GROUP_METADATA_DELAY_MS > 0) await new Promise(r => setTimeout(r, GROUP_METADATA_DELAY_MS));
-      const meta = await sock.groupMetadata(group.id);
-      for (const p of meta.participants || []) {
-        const pJid = p.id;
-        if (!pJid || seenJids.has(pJid)) continue;
-        seenJids.add(pJid);
-        // Extract phone if available
-        let phone = null;
-        if (pJid.endsWith('@s.whatsapp.net')) {
-          phone = pJid.split('@')[0].split(':')[0];
-        } else if (p.phoneNumber) {
-          const pn = typeof p.phoneNumber === 'string' ? p.phoneNumber : (p.phoneNumber.jid || '');
-          const digits = pn.split('@')[0].replace(/\D/g, '');
-          if (isAllowedWaNumber(digits)) phone = digits;
-        }
-        const name = (!pJid.endsWith('@lid') && p.name && !isInvalidContactLabel(p.name)) ? p.name : null;
-        allContacts.push({ jid: pJid, name, phone });
-      }
-    } catch (_) {}
-  });
-
-  const saved = await upsertGroupMemberContacts(allContacts, accPhone);
-  await consolidateLidChats();
-  await loadLidPhoneMapFromDB();
-  console.log(`[WA] Reset: fresh sync complete — ${saved} group contacts saved (${allContacts.filter(c => c.phone).length} with phones, ${allContacts.filter(c => !c.phone).length} LID-only)`);
-  recordActivity('participants', 'Group contacts reset + fresh sync', { saved, groups: groupIds.length });
-  emit('wa:participants_synced', { total: saved, reset: true });
+  // 5. Trigger the background resolution worker to sync all group participants politely.
+  // This does the sync incrementally with proper concurrency, delay, and rate limit backoff.
+  console.log('[WA] Reset: group-member contacts wiped. Restarting LID resolution worker to sync groups in the background.');
+  recordActivity('participants', 'Group contacts reset initiated (background sync)');
+  lidResolutionCooldownUntil = 0;
+  startLidResolutionWorker();
+  emit('wa:participants_synced', { total: 0, reset: true });
+  return deleted.rowCount || 0;
 }
 
 // ── CLEAR SESSION ────────────────────────────────────────────────────────────────────
@@ -3775,7 +3882,8 @@ async function sendMediaMessage(jid, media, quotedMsgId) {
 
 // ── GROUP METADATA ───────────────────────────────────────────────────────────
 const groupMetadataRateCooldown = new Map(); // jid → cooldown-until timestamp
-const GROUP_METADATA_RATE_COOLDOWN_MS = 5 * 60 * 1000; // 5 min cooldown after rate-limit
+const groupMetadataForbidden = new Map(); // jid → forbidden-until timestamp
+const GROUP_METADATA_RATE_COOLDOWN_MS = 15 * 60 * 1000; // 15 min cooldown after rate-limit
 const groupMetadataInFlight = new Map(); // jid → Promise (dedup concurrent calls)
 
 async function getRawGroupMetadata(jid) {
@@ -3783,6 +3891,12 @@ async function getRawGroupMetadata(jid) {
   const CACHE_TTL = 15 * 60 * 1000;
   const cached = rawGroupMetadataCache.get(jid);
   if (cached && (Date.now() - cached.ts < CACHE_TTL)) return cached.data;
+
+  // If this group is forbidden, throw forbidden
+  const forbiddenUntil = groupMetadataForbidden.get(jid) || 0;
+  if (Date.now() < forbiddenUntil) {
+    throw new Error('forbidden: Group metadata is forbidden (cooldown active)');
+  }
 
   // If this group is in rate-limit cooldown, serve cached data or throw
   const cooldownUntil = groupMetadataRateCooldown.get(jid) || 0;
@@ -3810,6 +3924,9 @@ async function getRawGroupMetadata(jid) {
       groupMetadataRateCooldown.set(jid, Date.now() + GROUP_METADATA_RATE_COOLDOWN_MS);
       console.warn(`[WA] Rate-overlimit for group ${jid} — cooldown ${GROUP_METADATA_RATE_COOLDOWN_MS / 1000}s`);
       if (cached) { resolveInFlight(cached.data); return cached.data; }
+    } else if (/forbidden|403|not-authorized/i.test(msg)) {
+      groupMetadataForbidden.set(jid, Date.now() + 24 * 60 * 60 * 1000);
+      console.warn(`[WA] Group metadata refresh skipped for ${jid}: forbidden`);
     }
     rejectInFlight(err);
     throw err;
@@ -3824,6 +3941,14 @@ async function getRawGroupMetadata(jid) {
     const rlErr = new Error('rate-overlimit: WhatsApp rate limit hit for group metadata');
     rejectInFlight(rlErr);
     throw rlErr;
+  } else if (/forbidden|403|not-authorized/i.test(String(meta?.message || ''))) {
+    groupMetadataInFlight.delete(jid);
+    groupMetadataForbidden.set(jid, Date.now() + 24 * 60 * 60 * 1000);
+    console.warn(`[WA] Group metadata refresh skipped for ${jid}: forbidden`);
+    if (cached) { resolveInFlight(cached.data); return cached.data; }
+    const forbidErr = new Error('forbidden: Not authorized to view group metadata');
+    rejectInFlight(forbidErr);
+    throw forbidErr;
   }
 
   rawGroupMetadataCache.set(jid, { ts: Date.now(), data: meta });
@@ -3975,8 +4100,10 @@ async function resyncDirectoryFromSocket(options = {}) {
 
   await runWithConcurrency(targetGroups, GROUP_METADATA_CONCURRENCY, async (gid) => {
     try {
+      if ((groupMetadataRateCooldown.get(gid) || 0) > Date.now()) return;
+      if ((groupMetadataForbidden.get(gid) || 0) > Date.now()) return;
       if (GROUP_METADATA_DELAY_MS > 0) await sleep(GROUP_METADATA_DELAY_MS);
-      const meta = await sock.groupMetadata(gid);
+      const meta = await getRawGroupMetadata(gid);
       if (meta?.subject) {
         await saveChat(gid, meta.subject, '', null, 0, true);
       }
@@ -4033,14 +4160,14 @@ async function refreshCurrentAccountGroupMetadata(limit = 25) {
     FROM wa_chats
     WHERE account_phone=$1
       AND is_group=true
+      AND (name IS NULL OR name = '' OR name ~ '^[0-9]{10,}$')
     ORDER BY
-      (name IS NULL OR name = '' OR name ~ '^[0-9]{10,}$') DESC,
       updated_at DESC NULLS LAST, last_time DESC NULLS LAST
     LIMIT $2
   `, [accPhone, maxGroups])).rows.map(r => r.id);
 
   if (!groupIds.length) {
-    groupIds = getSocketGroupIds().slice(0, maxGroups);
+    return { groups_checked: 0, groups_updated: 0, lid_contacts_updated: 0 };
   }
 
   const groups = { rows: groupIds.map(id => ({ id, name: null })) };
@@ -4050,8 +4177,9 @@ async function refreshCurrentAccountGroupMetadata(limit = 25) {
 
   await runWithConcurrency(groups.rows, GROUP_METADATA_CONCURRENCY, async (row) => {
     try {
-      // Skip if this JID is in rate-limit cooldown
+      // Skip if this JID is in rate-limit cooldown or forbidden
       if ((groupMetadataRateCooldown.get(row.id) || 0) > Date.now()) return;
+      if ((groupMetadataForbidden.get(row.id) || 0) > Date.now()) return;
       if (GROUP_METADATA_DELAY_MS > 0) await new Promise(resolve => setTimeout(resolve, GROUP_METADATA_DELAY_MS));
       const meta = await getRawGroupMetadata(row.id);
       if (meta?.subject) {
@@ -4156,6 +4284,8 @@ async function logout() {
     importedLastTsMap = {};
     groupMetadataCache.clear();
     rawGroupMetadataCache.clear();
+    groupMetadataRateCooldown.clear();
+    groupMetadataForbidden.clear();
   }
   clearSession();
 }

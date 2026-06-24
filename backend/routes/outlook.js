@@ -1,4 +1,4 @@
-﻿/**
+/**
  * Outlook / Microsoft Graph Routes
  * GET  /api/outlook/status          — check if authenticated
  * GET  /api/outlook/auth            — get OAuth2 login URL
@@ -2434,12 +2434,13 @@ router.get('/drafts/fallback', async (req, res) => {
 // ── POST /api/outlook/drafts ─────────────────────────────────────────────
 // Create a draft message in Outlook Drafts folder via Microsoft Graph API
 router.post('/drafts', async (req, res) => {
-  const { to, subject, body, cc, attachments } = req.body;
+  const { to, subject, body, cc, bcc, attachments } = req.body;
 
   console.log('[Outlook] POST /drafts — subject:', subject, '| body length:', (body||'').length);
 
   const toRecipients = normalizeMailRecipients(to).map(addr => ({ emailAddress: { address: addr } }));
   const ccRecipients = normalizeMailRecipients(cc).map(addr => ({ emailAddress: { address: addr } }));
+  const bccRecipients = normalizeMailRecipients(bcc).map(addr => ({ emailAddress: { address: addr } }));
   const graphAttachments = buildGraphFileAttachments(attachments);
 
   const message = {
@@ -2447,6 +2448,7 @@ router.post('/drafts', async (req, res) => {
     body: { contentType: 'HTML', content: body || '' },
     ...(toRecipients.length ? { toRecipients } : {}),
     ...(ccRecipients.length ? { ccRecipients } : {}),
+    ...(bccRecipients.length ? { bccRecipients } : {}),
   };
 
   try {
@@ -2699,13 +2701,14 @@ router.get('/folders', async (req, res) => {
 
 // ── POST /api/outlook/send ────────────────────────────────────────────────
 router.post('/send', async (req, res) => {
-  const { to, subject, body, cc, importance, attachments } = req.body;
+  const { to, subject, body, cc, bcc, importance, attachments } = req.body;
   if (!to || !subject || !body) {
     return res.status(400).json({ error: 'to, subject, and body are required.' });
   }
 
   const normalizedTo = normalizeMailRecipients(to);
   const normalizedCc = normalizeMailRecipients(cc);
+  const normalizedBcc = normalizeMailRecipients(bcc);
   if (!normalizedTo.length) {
     return res.status(400).json({ error: 'At least one valid recipient is required.' });
   }
@@ -2714,6 +2717,7 @@ router.post('/send', async (req, res) => {
     emailAddress: { address: addr }
   }));
   const ccRecipients = normalizedCc.map(addr => ({ emailAddress: { address: addr } }));
+  const bccRecipients = normalizedBcc.map(addr => ({ emailAddress: { address: addr } }));
   const graphAttachments = buildGraphFileAttachments(attachments);
 
   const message = {
@@ -2722,6 +2726,7 @@ router.post('/send', async (req, res) => {
     body:       { contentType: 'HTML', content: body },
     toRecipients,
     ...(ccRecipients.length ? { ccRecipients } : {}),
+    ...(bccRecipients.length ? { bccRecipients } : {}),
   };
 
   try {

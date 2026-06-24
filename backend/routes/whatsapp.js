@@ -13,16 +13,32 @@ const WA_DEBUG_ACCOUNT_SCOPE = String(process.env.WA_DEBUG_ACCOUNT_SCOPE || 'fal
 // ── One-time cleanup has been moved to services/whatsapp.js to run after tables are ensured ──
 
 function normalizeDigits(value) {
-  return String(value || '').replace(/\D/g, '');
+  let digits = String(value || '').replace(/\D/g, '');
+  if (digits.length === 10) {
+    digits = '91' + digits;
+  } else if (digits.length === 11 && digits.startsWith('0')) {
+    digits = '91' + digits.slice(1);
+  } else if (digits.length === 13 && digits.startsWith('910')) {
+    digits = '91' + digits.slice(3);
+  }
+  return digits;
 }
 
 function normalizeWaRouteJid(value) {
   const jid = String(value || '')
     .replace(/@g\.us@g\.us$/, '@g.us')
     .replace(/@s\.whatsapp\.net@s\.whatsapp\.net$/, '@s.whatsapp.net');
-  return jid.includes(':') && jid.includes('@')
-    ? jid.split(':')[0] + '@' + jid.split('@').slice(1).join('@')
-    : jid;
+  if (!jid || !jid.includes('@')) return jid;
+  const parts = jid.split('@');
+  let local = parts[0].split(':')[0];
+  const domain = parts[1];
+  if (domain === 's.whatsapp.net') {
+    const cleaned = normalizeDigits(local);
+    if (cleaned) {
+      local = cleaned;
+    }
+  }
+  return `${local}@${domain}`;
 }
 
 function isAllowedWaNumber(value) {
@@ -230,10 +246,7 @@ function canonicalizeChats(rows) {
   }
 
   if (dupLog.length > 0) {
-    console.warn(`[WA-DEDUP] ⚠️  ${dupLog.length} duplicate name(s) suppressed — UNIQUE NAMES ONLY policy:`);
-    dupLog.forEach(l => console.warn(l));
-  } else {
-    console.log(`[WA-DEDUP] ✅ All ${nameMap.size} chat names are unique.`);
+    console.log(`[WA-DEDUP] Suppressed ${dupLog.length} duplicate name(s) — UNIQUE NAMES ONLY policy.`);
   }
 
   return Array.from(nameMap.values())
@@ -269,7 +282,25 @@ async function ensureBlocklistTable() {
 
 // -- PUBLIC (no auth) -------------------------------------------------------
 router.get('/qr',     async (req, res) => { res.json({ qr: await wa.requestQR() || null }); });
-router.get('/status', (req, res)       => { res.json(wa.getStatus()); });
+router.get('/status', async (req, res) => {
+  const status = wa.getStatus();
+  const phone = wa.getConnectedPhone();
+  if (phone) {
+    try {
+      const chatsRes = await pool.query('SELECT COUNT(*)::int AS count FROM wa_chats WHERE account_phone = $1', [phone]);
+      const contactsRes = await pool.query('SELECT COUNT(*)::int AS count FROM wa_contacts WHERE account_phone = $1', [phone]);
+      status.chatCount = chatsRes.rows[0]?.count || 0;
+      status.contactCount = contactsRes.rows[0]?.count || 0;
+    } catch (e) {
+      status.chatCount = 0;
+      status.contactCount = 0;
+    }
+  } else {
+    status.chatCount = 0;
+    status.contactCount = 0;
+  }
+  res.json(status);
+});
 
 // -- PROTECTED --------------------------------------------------------------
 router.post('/logout', authenticate, async (req, res) => {
@@ -717,8 +748,8 @@ router.post('/reset-group-contacts', authenticate, async (req, res) => {
   try {
     const accountPhone = connectedAccount(res);
     if (!accountPhone) return;
-    await wa.resetAndResyncGroupContacts();
-    res.json({ success: true });
+    const deletedCount = await wa.resetAndResyncGroupContacts();
+    res.json({ success: true, deleted: deletedCount });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
@@ -840,7 +871,7 @@ router.get('/profile-pic/:jid', authenticate, async (req, res) => {
   try {
     const accountPhone = connectedAccount(res);
     if (!accountPhone) return;
-    const jid = decodeURIComponent(req.params.jid);
+    const jid = normalizeWaRouteJid(decodeURIComponent(req.params.jid));
     const url = await wa.getProfilePicUrl(jid, accountPhone);
     res.json({ url: url || null });
   } catch (err) { res.json({ url: null }); }
@@ -851,9 +882,7 @@ router.get('/group/:jid', authenticate, async (req, res) => {
     const accountPhone = connectedAccount(res);
     if (!accountPhone) return;
     await ensureBlocklistTable();
-    let jid = decodeURIComponent(req.params.jid);
-    // Fix double domain suffix
-    jid = jid.replace(/@g\.us@g\.us$/, '@g.us').replace(/@s\.whatsapp\.net@s\.whatsapp\.net$/, '@s.whatsapp.net');
+    const jid = normalizeWaRouteJid(decodeURIComponent(req.params.jid));
     const blocked = await pool.query(
       `SELECT 1 FROM wa_chat_blocklist WHERE account_phone=$1 AND chat_id=$2 LIMIT 1`,
       [accountPhone, jid]
@@ -880,7 +909,7 @@ router.get('/group/:jid', authenticate, async (req, res) => {
 });
 
 router.get('/messages/:jid', authenticate, async (req, res) => {
-  const jid   = decodeURIComponent(req.params.jid).replace(/@g\.us@g\.us$/, '@g.us').replace(/@s\.whatsapp\.net@s\.whatsapp\.net$/, '@s.whatsapp.net');
+  const jid = normalizeWaRouteJid(decodeURIComponent(req.params.jid));
   const limit = Math.min(Math.max(parseInt(req.query.limit || '100', 10) || 100, 1), 200);
   const before = req.query.before ? new Date(String(req.query.before)) : null;
   try {
@@ -1002,7 +1031,7 @@ router.get('/messages/:jid', authenticate, async (req, res) => {
 });
 
 router.get('/messages-live/:jid', authenticate, async (req, res) => {
-  const jid = decodeURIComponent(req.params.jid).replace(/@g\.us@g\.us$/, '@g.us').replace(/@s\.whatsapp\.net@s\.whatsapp\.net$/, '@s.whatsapp.net');
+  const jid = normalizeWaRouteJid(decodeURIComponent(req.params.jid));
   const limit = Math.min(Math.max(parseInt(req.query.limit || '100', 10) || 100, 1), 200);
   const before = req.query.before ? new Date(String(req.query.before)) : null;
   try {
@@ -1137,13 +1166,12 @@ router.post('/broadcast', authenticate, async (req, res) => {
 
   function normalizeBroadcastJid(value) {
     const jid = String(value || '').trim();
-    if (!jid) return '';
     if (jid.endsWith('@g.us') || jid.endsWith('@lid')) return jid;
     if (jid.endsWith('@s.whatsapp.net')) {
-      const phone = jid.split('@')[0].split(':')[0].replace(/\D/g, '');
+      const phone = normalizeDigits(jid.split('@')[0].split(':')[0]);
       return phone ? `${phone}@s.whatsapp.net` : jid;
     }
-    const phone = jid.replace(/\D/g, '');
+    const phone = normalizeDigits(jid);
     return phone ? `${phone}@s.whatsapp.net` : jid;
   }
 
@@ -1152,8 +1180,7 @@ router.post('/broadcast', authenticate, async (req, res) => {
   for (const item of targets) {
     const rawJid = normalizeBroadcastJid(typeof item === 'string' ? item : item?.jid || '');
     if (!rawJid || !rawJid.includes('@')) continue;
-    const phone = rawJid.endsWith('@s.whatsapp.net') ? rawJid.split('@')[0].split(':')[0].replace(/\D/g, '') : '';
-    if (ownPhone && phone && phone === ownPhone) continue;
+    const phone = rawJid.endsWith('@s.whatsapp.net') ? normalizeDigits(rawJid.split('@')[0].split(':')[0]) : '';
     const dedupeKey = rawJid.endsWith('@g.us') ? `group:${rawJid}` : (phone ? `phone:${phone}` : `jid:${rawJid}`);
     if (seen.has(dedupeKey)) continue;
     seen.add(dedupeKey);
@@ -1593,7 +1620,7 @@ router.delete('/chats/:jid/labels/:labelId', authenticate, async (req, res) => {
 router.put('/contacts/:jid', authenticate, async (req, res) => {
   const accountPhone = connectedAccount(res);
   if (!accountPhone) return;
-  const jid = decodeURIComponent(req.params.jid);
+  const jid = normalizeWaRouteJid(decodeURIComponent(req.params.jid));
   const name = String(req.body.name || '').trim();
   if (!name) return res.status(400).json({ error: 'name required' });
   try {

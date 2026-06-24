@@ -4531,6 +4531,8 @@
         <div class="nav-item" id="nav-n8n" onclick="nav('n8n',this)" style="display:none;"><i class="fas fa-network-wired"></i> Automation (n8n)</div>
         <div class="nav-item" id="nav-webscraper" onclick="nav('webscraper',this)" style="display:none;"><i class="fas fa-spider"></i> Lead Web Scraper</div>
         <div class="nav-item" id="nav-usermgmt" onclick="nav('usermgmt',this)" style="display:none;"><i class="fas fa-users-cog"></i> User Management</div>
+        <div class="nav-label" id="nav-label-system" style="margin-top:15px;text-transform:uppercase;font-size:10px;font-weight:700;color:var(--muted);letter-spacing:0.5px;padding-left:12px;margin-bottom:8px;">System</div>
+        <div class="nav-item" id="nav-settings" onclick="nav('settings',this)"><i class="fas fa-cog"></i> Settings & Sync</div>
       </nav>
 
       <div class="user-block">
@@ -6964,6 +6966,384 @@
                 </tbody>
               </table>
             </div>
+          </div>
+        </div>
+
+        <!-- ─── SETTINGS & SYNC SECTION ─────────────────────────────────────────── -->
+        <div class="section-view fu" id="sec-settings">
+          <div class="settings-container" style="display: flex; gap: 20px; height: calc(100vh - 120px); overflow: hidden;">
+            
+            <!-- Left Navigation Sidebar -->
+            <div class="settings-sidebar" style="width: 180px; flex-shrink: 0; background: var(--bg3); border: 1px solid var(--border2); border-radius: 12px; padding: 12px; display: flex; flex-direction: column; gap: 6px;">
+              <div class="settings-nav-item active" onclick="settingsShowTab('whatsapp')" id="settings-nav-whatsapp" style="padding: 10px 14px; border-radius: 8px; cursor: pointer; color: var(--text); font-weight: 600; font-size: 13px; display: flex; align-items: center; gap: 10px; transition: background 0.2s;">
+                <i class="fab fa-whatsapp" style="color: #25D366; width: 16px;"></i> WhatsApp
+              </div>
+              <div class="settings-nav-item" onclick="settingsShowTab('pbx')" id="settings-nav-pbx" style="padding: 10px 14px; border-radius: 8px; cursor: pointer; color: var(--muted); font-weight: 600; font-size: 13px; display: flex; align-items: center; gap: 10px; transition: background 0.2s;">
+                <i class="fas fa-phone-alt" style="color: var(--gold); width: 16px;"></i> PBX
+              </div>
+              <div class="settings-nav-item" onclick="settingsShowTab('outlook')" id="settings-nav-outlook" style="padding: 10px 14px; border-radius: 8px; cursor: pointer; color: var(--muted); font-weight: 600; font-size: 13px; display: flex; align-items: center; gap: 10px; transition: background 0.2s;">
+                <i class="fab fa-microsoft" style="color: #0078d4; width: 16px;"></i> Outlook
+              </div>
+              <div class="settings-nav-item" onclick="settingsShowTab('system')" id="settings-nav-system" style="padding: 10px 14px; border-radius: 8px; cursor: pointer; color: var(--muted); font-weight: 600; font-size: 13px; display: flex; align-items: center; gap: 10px; transition: background 0.2s;">
+                <i class="fas fa-server" style="color: var(--blue2); width: 16px;"></i> System
+              </div>
+            </div>
+
+            <!-- Right Content Panels + Actions Log -->
+            <div class="settings-content-wrapper" style="flex: 1; display: flex; flex-direction: column; gap: 16px; min-width: 0; height: 100%;">
+              
+              <!-- Tab Panels Container -->
+              <div class="settings-panels" style="flex: 1; overflow-y: auto; padding-right: 4px; min-height: 0;">
+                
+                <!-- WHATSAPP TAB PANEL -->
+                <div class="settings-panel-view" id="settings-panel-whatsapp" style="display: block;">
+                  <div class="card" style="background: var(--bg3); border: 1px solid var(--border2); border-radius: 12px; padding: 20px; display: flex; flex-direction: column; gap: 16px;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border2); padding-bottom: 12px;">
+                      <div style="font-size: 15px; font-weight: 700; color: var(--text); display: flex; align-items: center; gap: 8px;">
+                        <i class="fab fa-whatsapp" style="color: #25D366;"></i> WhatsApp Management
+                      </div>
+                      <button class="btn btn-green btn-xs" onclick="settingsRunWaTest()"><i class="fas fa-flask"></i> Run WA Test</button>
+                    </div>
+
+                    <!-- Status Display Grid -->
+                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px;">
+                      <div style="background: var(--bg2); border: 1px solid var(--border2); padding: 12px; border-radius: 8px;">
+                        <div style="font-size: 11px; color: var(--muted2); text-transform: uppercase; font-weight: 600; margin-bottom: 4px;">Connection Status</div>
+                        <div id="settings-wa-status-text" style="font-size: 13px; font-weight: 700; color: var(--text);">Disconnected</div>
+                      </div>
+                      <div style="background: var(--bg2); border: 1px solid var(--border2); padding: 12px; border-radius: 8px;">
+                        <div style="font-size: 11px; color: var(--muted2); text-transform: uppercase; font-weight: 600; margin-bottom: 4px;">Phone Number</div>
+                        <div id="settings-wa-phone-text" style="font-size: 13px; font-weight: 700; color: var(--text);">-</div>
+                      </div>
+                      <div style="background: var(--bg2); border: 1px solid var(--border2); padding: 12px; border-radius: 8px;">
+                        <div style="font-size: 11px; color: var(--muted2); text-transform: uppercase; font-weight: 600; margin-bottom: 4px;">Chats in DB</div>
+                        <div id="settings-wa-chat-count" style="font-size: 13px; font-weight: 700; color: var(--text);">0</div>
+                      </div>
+                      <div style="background: var(--bg2); border: 1px solid var(--border2); padding: 12px; border-radius: 8px;">
+                        <div style="font-size: 11px; color: var(--muted2); text-transform: uppercase; font-weight: 600; margin-bottom: 4px;">Contacts in DB</div>
+                        <div id="settings-wa-contact-count" style="font-size: 13px; font-weight: 700; color: var(--text);">0</div>
+                      </div>
+                    </div>
+
+                    <!-- LID Progress Status Bar -->
+                    <div style="background: var(--bg2); border: 1px solid var(--border2); padding: 12px; border-radius: 8px; display: flex; flex-direction: column; gap: 8px;">
+                      <div style="display: flex; justify-content: space-between; font-size: 11.5px; font-weight: 600;">
+                        <span style="color: var(--muted2); text-transform: uppercase;">LID Resolution Progress</span>
+                        <span id="settings-wa-lid-progress-percent" style="color: var(--green2);">0%</span>
+                      </div>
+                      <div style="height: 8px; background: rgba(255,255,255,0.06); border-radius: 4px; overflow: hidden; position: relative;">
+                        <div id="settings-wa-lid-progress-bar" style="height: 100%; background: #25D366; width: 0%; transition: width 0.35s ease;"></div>
+                      </div>
+                      <div id="settings-wa-lid-stats-text" style="font-size: 11px; color: var(--muted); text-align: right;">-</div>
+                    </div>
+
+                    <!-- Sync Actions Grid -->
+                    <div>
+                      <div style="font-size: 12px; font-weight: 700; color: var(--muted2); text-transform: uppercase; margin-bottom: 10px;">WhatsApp Sync Actions</div>
+                      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 10px;">
+                        <button class="btn btn-ghost" onclick="waSync(); settingsAppendLog('whatsapp', 'Sync Chats & Contacts initiated.')" style="text-align: left; padding: 10px 14px; justify-content: flex-start; height: auto; border: 1px solid var(--border2); display: flex; align-items: center; gap: 8px;">
+                          <i class="fas fa-sync-alt" style="color: #25D366;"></i>
+                          <div>
+                            <div style="font-size: 12px; font-weight: 600; color: var(--text);">Sync Chats & Contacts</div>
+                            <div style="font-size: 10px; color: var(--muted);">Pull all live messages & chats from WhatsApp</div>
+                          </div>
+                        </button>
+                        <button class="btn btn-ghost" onclick="waRefreshChats(); settingsAppendLog('whatsapp', 'Reload Chats (UI) refreshed.')" style="text-align: left; padding: 10px 14px; justify-content: flex-start; height: auto; border: 1px solid var(--border2); display: flex; align-items: center; gap: 8px;">
+                          <i class="fas fa-redo" style="color: var(--blue2);"></i>
+                          <div>
+                            <div style="font-size: 12px; font-weight: 600; color: var(--text);">Reload Chats (UI)</div>
+                            <div style="font-size: 10px; color: var(--muted);">Refresh the sidebar conversation lists</div>
+                          </div>
+                        </button>
+                        <button class="btn btn-ghost" onclick="waForceLidResolution(); settingsAppendLog('whatsapp', 'Resolve LIDs worker kicked off.')" style="text-align: left; padding: 10px 14px; justify-content: flex-start; height: auto; border: 1px solid var(--border2); display: flex; align-items: center; gap: 8px;">
+                          <i class="fas fa-fingerprint" style="color: var(--gold);"></i>
+                          <div>
+                            <div style="font-size: 12px; font-weight: 600; color: var(--text);">Resolve LIDs</div>
+                            <div style="font-size: 10px; color: var(--muted);">Match WhatsApp LIDs to real phone numbers</div>
+                          </div>
+                        </button>
+                        <button class="btn btn-ghost" onclick="settingsConfirmResetGroupContacts()" style="text-align: left; padding: 10px 14px; justify-content: flex-start; height: auto; border: 1px solid var(--border2); display: flex; align-items: center; gap: 8px;">
+                          <i class="fas fa-users-slash" style="color: var(--red2);"></i>
+                          <div>
+                            <div style="font-size: 12px; font-weight: 600; color: var(--text);">Reset Group Contacts</div>
+                            <div style="font-size: 10px; color: var(--muted);">Wipe all local group participants and sync fresh</div>
+                          </div>
+                        </button>
+                        <button class="btn btn-ghost" onclick="waCreateBackup(); settingsAppendLog('whatsapp', 'Backup process started.')" style="text-align: left; padding: 10px 14px; justify-content: flex-start; height: auto; border: 1px solid var(--border2); display: flex; align-items: center; gap: 8px;">
+                          <i class="fas fa-archive" style="color: var(--blue2);"></i>
+                          <div>
+                            <div style="font-size: 12px; font-weight: 600; color: var(--text);">Create Backup</div>
+                            <div style="font-size: 10px; color: var(--muted);">Generate a zip snapshot of database chats</div>
+                          </div>
+                        </button>
+                        <button class="btn btn-ghost" onclick="waOpenImport(); settingsAppendLog('whatsapp', 'Import Chat modal opened.')" style="text-align: left; padding: 10px 14px; justify-content: flex-start; height: auto; border: 1px solid var(--border2); display: flex; align-items: center; gap: 8px;">
+                          <i class="fas fa-file-import" style="color: var(--green2);"></i>
+                          <div>
+                            <div style="font-size: 12px; font-weight: 600; color: var(--text);">Import Chat (.txt)</div>
+                            <div style="font-size: 10px; color: var(--muted);">Import an exported chat TXT format history</div>
+                          </div>
+                        </button>
+                        <button class="btn btn-ghost" onclick="waOpenBackupInventory(); settingsAppendLog('whatsapp', 'Load Backup dialog opened.')" style="text-align: left; padding: 10px 14px; justify-content: flex-start; height: auto; border: 1px solid var(--border2); display: flex; align-items: center; gap: 8px;">
+                          <i class="fas fa-database" style="color: var(--gold);"></i>
+                          <div>
+                            <div style="font-size: 12px; font-weight: 600; color: var(--text);">Load Backup</div>
+                            <div style="font-size: 10px; color: var(--muted);">Restore contacts/messages from a backup zip</div>
+                          </div>
+                        </button>
+                        <button class="btn btn-ghost" onclick="waLogout(); settingsAppendLog('whatsapp', 'Log out / Disconnect triggered.')" style="text-align: left; padding: 10px 14px; justify-content: flex-start; height: auto; border: 1px solid var(--border2); display: flex; align-items: center; gap: 8px;">
+                          <i class="fas fa-sign-out-alt" style="color: var(--red2);"></i>
+                          <div>
+                            <div style="font-size: 12px; font-weight: 600; color: var(--text);">Disconnect WhatsApp</div>
+                            <div style="font-size: 10px; color: var(--muted);">Log out linked device session & clear cached token</div>
+                          </div>
+                        </button>
+                        <button class="btn btn-ghost" onclick="settingsConfirmResetWaData()" style="text-align: left; padding: 10px 14px; justify-content: flex-start; height: auto; border: 1px solid var(--border2); grid-column: span 1; display: flex; align-items: center; gap: 8px;">
+                          <i class="fas fa-trash-alt" style="color: var(--red2);"></i>
+                          <div>
+                            <div style="font-size: 12px; font-weight: 600; color: var(--red2);">Reset WA Data</div>
+                            <div style="font-size: 10px; color: var(--muted);">DANGER: Purge database chats, contacts and history</div>
+                          </div>
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- PBX TAB PANEL -->
+                <div class="settings-panel-view" id="settings-panel-pbx" style="display: none;">
+                  <div class="card" style="background: var(--bg3); border: 1px solid var(--border2); border-radius: 12px; padding: 20px; display: flex; flex-direction: column; gap: 16px;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border2); padding-bottom: 12px;">
+                      <div style="font-size: 15px; font-weight: 700; color: var(--text); display: flex; align-items: center; gap: 8px;">
+                        <i class="fas fa-phone-alt" style="color: var(--gold);"></i> PBX / SMDR Integration
+                      </div>
+                      <button class="btn btn-green btn-xs" onclick="settingsRunPbxTest()"><i class="fas fa-flask"></i> Run PBX Test</button>
+                    </div>
+
+                    <!-- Status Display Grid -->
+                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px;">
+                      <div style="background: var(--bg2); border: 1px solid var(--border2); padding: 12px; border-radius: 8px; display: flex; align-items: center; justify-content: space-between;">
+                        <div>
+                          <div style="font-size: 11px; color: var(--muted2); text-transform: uppercase; font-weight: 600; margin-bottom: 4px;">TCP Server Status</div>
+                          <div id="settings-pbx-tcp-status" style="font-size: 13px; font-weight: 700; color: var(--text);">Checking...</div>
+                        </div>
+                        <div id="settings-pbx-tcp-dot" style="width: 10px; height: 10px; border-radius: 50%; background: var(--muted);"></div>
+                      </div>
+                      <div style="background: var(--bg2); border: 1px solid var(--border2); padding: 12px; border-radius: 8px;">
+                        <div style="font-size: 11px; color: var(--muted2); text-transform: uppercase; font-weight: 600; margin-bottom: 4px;">Last SMDR Record</div>
+                        <div id="settings-pbx-last-smdr" style="font-size: 13px; font-weight: 700; color: var(--text);">-</div>
+                      </div>
+                      <div style="background: var(--bg2); border: 1px solid var(--border2); padding: 12px; border-radius: 8px;">
+                        <div style="font-size: 11px; color: var(--muted2); text-transform: uppercase; font-weight: 600; margin-bottom: 4px;">Total Logs in DB</div>
+                        <div id="settings-pbx-total-logs" style="font-size: 13px; font-weight: 700; color: var(--text);">0</div>
+                      </div>
+                    </div>
+
+                    <!-- Actions -->
+                    <div>
+                      <div style="font-size: 12px; font-weight: 700; color: var(--muted2); text-transform: uppercase; margin-bottom: 10px;">PBX Actions</div>
+                      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 10px;">
+                        <button class="btn btn-ghost" onclick="pbxSyncNow(); settingsAppendLog('pbx', 'Sync Call Logs triggered.')" style="text-align: left; padding: 10px 14px; justify-content: flex-start; height: auto; border: 1px solid var(--border2); display: flex; align-items: center; gap: 8px;">
+                          <i class="fas fa-sync-alt" style="color: var(--gold);"></i>
+                          <div>
+                            <div style="font-size: 12px; font-weight: 600; color: var(--text);">Sync Call Logs</div>
+                            <div style="font-size: 10px; color: var(--muted);">Sync latest SMDR data from backend</div>
+                          </div>
+                        </button>
+                        <button class="btn btn-ghost" onclick="settingsReconnectPbxTcp()" style="text-align: left; padding: 10px 14px; justify-content: flex-start; height: auto; border: 1px solid var(--border2); display: flex; align-items: center; gap: 8px;">
+                          <i class="fas fa-network-wired" style="color: var(--blue2);"></i>
+                          <div>
+                            <div style="font-size: 12px; font-weight: 600; color: var(--text);">Reconnect TCP Connection</div>
+                            <div style="font-size: 10px; color: var(--muted);">Force TCP server restart and bind port 5001</div>
+                          </div>
+                        </button>
+                        <button class="btn btn-ghost" onclick="syncPBXRecordingsToDB(this); settingsAppendLog('pbx', 'Sync Recordings triggered.')" style="text-align: left; padding: 10px 14px; justify-content: flex-start; height: auto; border: 1px solid var(--border2); display: flex; align-items: center; gap: 8px;">
+                          <i class="fas fa-file-audio" style="color: var(--green2);"></i>
+                          <div>
+                            <div style="font-size: 12px; font-weight: 600; color: var(--text);">Sync Recordings to DB</div>
+                            <div style="font-size: 10px; color: var(--muted);">Scan file recordings directory and index into database</div>
+                          </div>
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- OUTLOOK TAB PANEL -->
+                <div class="settings-panel-view" id="settings-panel-outlook" style="display: none;">
+                  <div class="card" style="background: var(--bg3); border: 1px solid var(--border2); border-radius: 12px; padding: 20px; display: flex; flex-direction: column; gap: 16px;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border2); padding-bottom: 12px;">
+                      <div style="font-size: 15px; font-weight: 700; color: var(--text); display: flex; align-items: center; gap: 8px;">
+                        <i class="fab fa-microsoft" style="color: #0078d4;"></i> Outlook & MS Graph Configuration
+                      </div>
+                      <button class="btn btn-green btn-xs" onclick="settingsRunOutlookTest()"><i class="fas fa-flask"></i> Run Outlook Test</button>
+                    </div>
+
+                    <!-- Status Display Grid -->
+                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px;">
+                      <div style="background: var(--bg2); border: 1px solid var(--border2); padding: 12px; border-radius: 8px;">
+                        <div style="font-size: 11px; color: var(--muted2); text-transform: uppercase; font-weight: 600; margin-bottom: 4px;">Auth Status</div>
+                        <div id="settings-outlook-status-text" style="font-size: 13px; font-weight: 700; color: var(--text);">Disconnected</div>
+                      </div>
+                      <div style="background: var(--bg2); border: 1px solid var(--border2); padding: 12px; border-radius: 8px;">
+                        <div style="font-size: 11px; color: var(--muted2); text-transform: uppercase; font-weight: 600; margin-bottom: 4px;">Mail Sync Status</div>
+                        <div id="settings-outlook-sync-text" style="font-size: 12px; font-weight: 700; color: var(--text);">-</div>
+                      </div>
+                    </div>
+
+                    <!-- Actions -->
+                    <div>
+                      <div style="font-size: 12px; font-weight: 700; color: var(--muted2); text-transform: uppercase; margin-bottom: 10px;">Outlook Actions</div>
+                      <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+                        <button class="btn btn-blue" onclick="connectOutlook()"><i class="fab fa-microsoft" style="margin-right: 6px;"></i>Connect Outlook</button>
+                        <button class="btn btn-ghost" onclick="syncOutlookStats(); settingsAppendLog('outlook', 'Sync Stats initiated.')" id="settings-outlook-sync-btn"><i class="fas fa-sync-alt" style="margin-right: 6px;"></i>Sync Mail Stats</button>
+                        <button class="btn btn-red" onclick="disconnectOutlook()"><i class="fas fa-sign-out-alt" style="margin-right: 6px;"></i>Disconnect</button>
+                      </div>
+                    </div>
+
+                    <!-- Broadcast Testing Card inside Outlook -->
+                    <div id="settings-outlook-broadcast-card" style="border-top: 1px solid var(--border2); padding-top: 16px; margin-top: 8px; display: flex; flex-direction: column; gap: 12px;">
+                      <div style="font-size: 13px; font-weight: 700; color: var(--text);">Outlook Broadcast / Send Test Email</div>
+                      
+                      <!-- To Field with Group Loader -->
+                      <div>
+                        <label class="form-label" style="font-size: 11px; font-weight: 600; color: var(--muted2); display: block; margin-bottom: 4px; text-transform: uppercase;">To Recipients *</label>
+                        <div style="display: flex; gap: 6px; align-items: center; margin-bottom: 5px;">
+                          <select id="settings-outlook-group-select" class="inp" style="font-size: 12px; padding: 5px 8px; flex: 1; background: transparent;">
+                            <option value="">— Or load To from a group —</option>
+                          </select>
+                          <button type="button" class="btn btn-blue btn-xs" onclick="settingsOutlookLoadGroup('to')"><i class="fas fa-users"></i> Load</button>
+                        </div>
+                        <input class="inp" id="settings-outlook-to" placeholder="recipient1@email.com, recipient2@email.com" style="width: 100%; box-sizing: border-box; font-size: 12px; padding: 6px 10px; height: 36px; background: var(--bg2); border: 1px solid var(--border2); color: var(--text); border-radius: 6px;" autocomplete="off" />
+                      </div>
+
+                      <!-- CC Field with Group Loader -->
+                      <div>
+                        <label class="form-label" style="font-size: 11px; font-weight: 600; color: var(--muted2); display: block; margin-bottom: 4px; text-transform: uppercase;">CC Recipients</label>
+                        <div style="display: flex; gap: 6px; align-items: center; margin-bottom: 5px;">
+                          <select id="settings-outlook-cc-group-select" class="inp" style="font-size: 12px; padding: 5px 8px; flex: 1; background: transparent;">
+                            <option value="">— Or load CC from a group —</option>
+                          </select>
+                          <button type="button" class="btn btn-blue btn-xs" onclick="settingsOutlookLoadGroup('cc')"><i class="fas fa-users"></i> Load</button>
+                        </div>
+                        <input class="inp" id="settings-outlook-cc" placeholder="cc1@email.com, cc2@email.com" style="width: 100%; box-sizing: border-box; font-size: 12px; padding: 6px 10px; height: 36px; background: var(--bg2); border: 1px solid var(--border2); color: var(--text); border-radius: 6px;" autocomplete="off" />
+                      </div>
+
+                      <!-- BCC Field with Group Loader -->
+                      <div>
+                        <label class="form-label" style="font-size: 11px; font-weight: 600; color: var(--muted2); display: block; margin-bottom: 4px; text-transform: uppercase;">BCC Recipients</label>
+                        <div style="display: flex; gap: 6px; align-items: center; margin-bottom: 5px;">
+                          <select id="settings-outlook-bcc-group-select" class="inp" style="font-size: 12px; padding: 5px 8px; flex: 1; background: transparent;">
+                            <option value="">— Or load BCC from a group —</option>
+                          </select>
+                          <button type="button" class="btn btn-blue btn-xs" onclick="settingsOutlookLoadGroup('bcc')"><i class="fas fa-users"></i> Load</button>
+                        </div>
+                        <input class="inp" id="settings-outlook-bcc" placeholder="bcc1@email.com, bcc2@email.com" style="width: 100%; box-sizing: border-box; font-size: 12px; padding: 6px 10px; height: 36px; background: var(--bg2); border: 1px solid var(--border2); color: var(--text); border-radius: 6px;" autocomplete="off" />
+                      </div>
+
+                      <!-- Template Picker -->
+                      <div>
+                        <label class="form-label" style="font-size: 11px; font-weight: 600; color: var(--muted2); display: block; margin-bottom: 4px; text-transform: uppercase;">Use HTML Template (Optional)</label>
+                        <div style="display: flex; gap: 6px; align-items: center;">
+                          <select id="settings-outlook-template-select" class="inp" style="font-size: 12px; padding: 5px 8px; flex: 1; background: transparent;">
+                            <option value="">— Select a template —</option>
+                          </select>
+                          <button type="button" class="btn btn-blue btn-xs" onclick="settingsOutlookLoadTemplate()"><i class="fas fa-check"></i> Apply</button>
+                        </div>
+                      </div>
+
+                      <!-- Subject Field -->
+                      <div>
+                        <label class="form-label" style="font-size: 11px; font-weight: 600; color: var(--muted2); display: block; margin-bottom: 4px; text-transform: uppercase;">Subject *</label>
+                        <input class="inp" id="settings-outlook-subject" placeholder="Broadcast Subject" style="width: 100%; box-sizing: border-box; font-size: 12px; padding: 6px 10px; height: 36px; background: var(--bg2); border: 1px solid var(--border2); color: var(--text); border-radius: 6px;" autocomplete="off" />
+                      </div>
+
+                      <!-- Body / HTML Field -->
+                      <div>
+                        <label class="form-label" style="font-size: 11px; font-weight: 600; color: var(--muted2); display: block; margin-bottom: 4px; text-transform: uppercase;">HTML or Plain Text Body *</label>
+                        <textarea class="inp" id="settings-outlook-body-content" placeholder="<p>Write your email body...</p>" style="width: 100%; box-sizing: border-box; font-size: 12px; padding: 8px 10px; min-height: 100px; resize:vertical; background: var(--bg2); border: 1px solid var(--border2); color: var(--text); border-radius: 6px;"></textarea>
+                      </div>
+
+                      <!-- Delay between sends -->
+                      <div>
+                        <label class="form-label" style="font-size: 11px; font-weight: 600; color: var(--muted2); display: block; margin-bottom: 4px; text-transform: uppercase;">Delay Between Recipients</label>
+                        <div style="display: flex; align-items: center; gap: 8px;">
+                          <input class="inp" id="settings-outlook-delay" type="number" min="0" value="2" style="width: 80px; text-align: center; box-sizing: border-box; font-size: 12px; padding: 6px 10px; height: 36px; background: var(--bg2); border: 1px solid var(--border2); color: var(--text); border-radius: 6px;" />
+                          <span style="font-size: 12px; color: var(--muted);">seconds delay between each individual recipient send.</span>
+                        </div>
+                      </div>
+
+                      <!-- Submit Button -->
+                      <div style="display: flex; justify-content: flex-end; margin-top: 6px;">
+                        <button class="btn btn-blue" id="settings-outlook-send-btn" onclick="settingsSendOutlookTestEmail()" style="background: #0078d4; border-color: #0078d4;"><i class="fas fa-paper-plane" style="margin-right: 6px;"></i>Send Broadcast</button>
+                      </div>
+
+                      <!-- Broadcast Progress / Status Table -->
+                      <div id="settings-outlook-broadcast-status-container" style="margin-top: 16px; display: none; flex-direction: column; gap: 8px;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border); padding-bottom: 6px;">
+                          <span style="font-size: 12.5px; font-weight: 700; color: var(--text);" id="settings-outlook-broadcast-progress-title">Broadcast Progress</span>
+                          <span id="settings-outlook-broadcast-progress-stats" style="font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: 10px; background: rgba(0,120,212,0.15); color: #0078d4;">0 / 0 Sent</span>
+                        </div>
+                        <div style="max-height: 300px; overflow-y: auto; border: 1px solid var(--border2); border-radius: 8px;">
+                          <table style="width: 100%; border-collapse: collapse; text-align: left; font-size: 12px;">
+                            <thead>
+                              <tr style="background: var(--bg2); border-bottom: 1px solid var(--border2); color: var(--muted2);">
+                                <th style="padding: 8px 12px; font-weight: 600;">Recipient</th>
+                                <th style="padding: 8px 12px; font-weight: 600; width: 100px;">Status</th>
+                                <th style="padding: 8px 12px; font-weight: 600;">Details</th>
+                              </tr>
+                            </thead>
+                            <tbody id="settings-outlook-broadcast-status-tbody">
+                              <!-- Rows will be injected here -->
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- SYSTEM TAB PANEL -->
+                <div class="settings-panel-view" id="settings-panel-system" style="display: none;">
+                  <div class="card" style="background: var(--bg3); border: 1px solid var(--border2); border-radius: 12px; padding: 20px; display: flex; flex-direction: column; gap: 16px;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border2); padding-bottom: 12px;">
+                      <div style="font-size: 15px; font-weight: 700; color: var(--text); display: flex; align-items: center; gap: 8px;">
+                        <i class="fas fa-server" style="color: var(--blue2);"></i> System Status & Diagnostics
+                      </div>
+                      <button class="btn btn-green btn-xs" onclick="settingsRunSystemTest()"><i class="fas fa-flask"></i> Run Health Test</button>
+                    </div>
+
+                    <!-- Status Display Grid -->
+                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px;">
+                      <div style="background: var(--bg2); border: 1px solid var(--border2); padding: 12px; border-radius: 8px;">
+                        <div style="font-size: 11px; color: var(--muted2); text-transform: uppercase; font-weight: 600; margin-bottom: 4px;">Database Health (PostgreSQL)</div>
+                        <div id="settings-sys-db-status" style="font-size: 13px; font-weight: 700; color: var(--text);">Checking...</div>
+                      </div>
+                      <div style="background: var(--bg2); border: 1px solid var(--border2); padding: 12px; border-radius: 8px;">
+                        <div style="font-size: 11px; color: var(--muted2); text-transform: uppercase; font-weight: 600; margin-bottom: 4px;">System Mode</div>
+                        <div style="font-size: 13px; font-weight: 700; color: var(--text);">Production / Standalone</div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+              </div>
+
+              <!-- Persistent Actions Log Area (Fixed at Bottom) -->
+              <div class="settings-log-area" style="height: 180px; flex-shrink: 0; background: var(--bg3); border: 1px solid var(--border2); border-radius: 12px; display: flex; flex-direction: column; overflow: hidden;">
+                <div style="padding: 10px 14px; border-bottom: 1px solid var(--border2); display: flex; justify-content: space-between; align-items: center; background: var(--bg2);">
+                  <div style="font-size: 12px; font-weight: 700; color: var(--text); display: flex; align-items: center; gap: 6px;">
+                    <i class="fas fa-list-alt" style="color: var(--gold);"></i> Settings Action & Diagnostic Log
+                  </div>
+                  <div style="display: flex; gap: 8px;">
+                    <button class="btn btn-ghost btn-xs" onclick="settingsCopyLog()"><i class="fas fa-copy"></i> Copy Log</button>
+                    <button class="btn btn-ghost btn-xs" onclick="settingsClearLog()"><i class="fas fa-trash-alt"></i> Clear</button>
+                  </div>
+                </div>
+                <div id="settings-console-log" style="flex: 1; overflow-y: auto; padding: 10px; font-family: monospace; font-size: 11px; color: #a3b8cc; line-height: 1.5; background: #0f172a; white-space: pre-wrap;">[System] Settings control panel loaded — ready.</div>
+              </div>
+
+            </div>
+
           </div>
         </div>
 
@@ -17411,6 +17791,9 @@ Best regards,<br>
         if (sec) sec.style.display = s === id ? 'block' : 'none';
         if (nav) nav.classList.toggle('oa-nav-active', s === id);
       });
+      if (id === 'mail') {
+        settingsOutlookLoadGroupsDropdown();
+      }
     }
 
     function oaShowSub(id) {
@@ -18749,6 +19132,243 @@ Best regards,<br>
       }
     }
 
+    async function settingsOutlookLoadGroupsDropdown() {
+      const selTo = document.getElementById('settings-outlook-group-select');
+      const selCc = document.getElementById('settings-outlook-cc-group-select');
+      const selBcc = document.getElementById('settings-outlook-bcc-group-select');
+      const selTpl = document.getElementById('settings-outlook-template-select');
+
+      if (selTo) selTo.innerHTML = '<option value="">— Or load To from a group —</option>';
+      if (selCc) selCc.innerHTML = '<option value="">— Or load CC from a group —</option>';
+      if (selBcc) selBcc.innerHTML = '<option value="">— Or load BCC from a group —</option>';
+      if (selTpl) selTpl.innerHTML = '<option value="">— Select a template —</option>';
+
+      try {
+        // Fetch groups
+        const res = await fetch(`${API_BASE}/groups`, { headers: getAuthHeaders() });
+        if (res.ok) {
+          const groups = await res.json();
+          groups.forEach(g => {
+            const optText = `${g.name} (${g.member_count})`;
+            if (selTo) {
+              const opt = document.createElement('option');
+              opt.value = g.id;
+              opt.textContent = optText;
+              selTo.appendChild(opt);
+            }
+            if (selCc) {
+              const opt = document.createElement('option');
+              opt.value = g.id;
+              opt.textContent = optText;
+              selCc.appendChild(opt);
+            }
+            if (selBcc) {
+              const opt = document.createElement('option');
+              opt.value = g.id;
+              opt.textContent = optText;
+              selBcc.appendChild(opt);
+            }
+          });
+        }
+      } catch (err) {
+        console.error('Failed to load groups for outlook settings:', err);
+      }
+
+      try {
+        // Fetch templates
+        const res = await fetch(`${API_BASE}/email-templates`, { headers: getAuthHeaders() });
+        if (res.ok) {
+          const templates = await res.json();
+          templates.forEach(t => {
+            if (selTpl) {
+              const opt = document.createElement('option');
+              opt.value = t.id;
+              opt.textContent = t.name;
+              selTpl.appendChild(opt);
+            }
+          });
+        }
+      } catch (err) {
+        console.error('Failed to load templates for outlook settings:', err);
+      }
+    }
+
+    async function settingsOutlookLoadGroup(target) {
+      let selId = '';
+      let inputId = '';
+      if (target === 'to') { selId = 'settings-outlook-group-select'; inputId = 'settings-outlook-to'; }
+      else if (target === 'cc') { selId = 'settings-outlook-cc-group-select'; inputId = 'settings-outlook-cc'; }
+      else if (target === 'bcc') { selId = 'settings-outlook-bcc-group-select'; inputId = 'settings-outlook-bcc'; }
+
+      const sel = document.getElementById(selId);
+      const inp = document.getElementById(inputId);
+
+      if (!sel || !sel.value) {
+        notify('Select a group first', '', 'var(--red)', 'fas fa-exclamation-circle');
+        return;
+      }
+
+      try {
+        const res = await fetch(`${API_BASE}/groups/${sel.value}`, { headers: getAuthHeaders() });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Failed');
+        const emails = (data.members || []).filter(m => m.email).map(m => {
+          const fname = (m.fname && m.fname !== 'null') ? m.fname : '';
+          const lname = (m.lname && m.lname !== 'null' && m.lname !== '-') ? m.lname : '';
+          const name = (fname + ' ' + lname).trim() || m.company || '';
+          return name ? `${name} <${m.email}>` : m.email;
+        });
+
+        if (inp) {
+          inp.value = emails.join(', ');
+        }
+        notify(`Loaded ${target.toUpperCase()}: ${data.name}`, `${emails.length} recipients`, 'var(--green)', 'fas fa-users');
+      } catch (e) {
+        notify('Error', e.message, 'var(--red)', 'fas fa-exclamation-circle');
+      }
+    }
+
+    async function settingsOutlookLoadTemplate() {
+      const sel = document.getElementById('settings-outlook-template-select');
+      if (!sel || !sel.value) {
+        notify('Select a template first', '', 'var(--red)', 'fas fa-exclamation-circle');
+        return;
+      }
+      try {
+        const res = await fetch(`${API_BASE}/email-templates/${sel.value}`, { headers: getAuthHeaders() });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Failed');
+        
+        const subjectEl = document.getElementById('settings-outlook-subject');
+        const bodyEl = document.getElementById('settings-outlook-body-content');
+
+        if (subjectEl) subjectEl.value = data.subject || '';
+        if (bodyEl) bodyEl.value = data.body || '';
+
+        notify('Template Applied', data.name, 'var(--green)', 'fas fa-check');
+      } catch (e) {
+        notify('Error', e.message, 'var(--red)', 'fas fa-exclamation-circle');
+      }
+    }
+
+    async function settingsSendOutlookTestEmail() {
+      const toRaw = (document.getElementById('settings-outlook-to')?.value || '').trim();
+      const ccRaw = (document.getElementById('settings-outlook-cc')?.value || '').trim();
+      const bccRaw = (document.getElementById('settings-outlook-bcc')?.value || '').trim();
+      const subject = (document.getElementById('settings-outlook-subject')?.value || '').trim();
+      const body = (document.getElementById('settings-outlook-body-content')?.value || '').trim();
+      const delayVal = parseInt(document.getElementById('settings-outlook-delay')?.value || '2', 10);
+
+      const sendBtn = document.getElementById('settings-outlook-send-btn');
+      const progressContainer = document.getElementById('settings-outlook-broadcast-status-container');
+      const progressTitle = document.getElementById('settings-outlook-broadcast-progress-title');
+      const progressStats = document.getElementById('settings-outlook-broadcast-progress-stats');
+      const tbody = document.getElementById('settings-outlook-broadcast-status-tbody');
+
+      if (!toRaw && !ccRaw && !bccRaw) {
+        notify('Missing recipients', 'Please specify To, CC, or BCC recipients', 'var(--red)', 'fas fa-exclamation-circle');
+        return;
+      }
+      if (!subject || !body) {
+        notify('Missing fields', 'Subject and Message are required', 'var(--red)', 'fas fa-exclamation-circle');
+        return;
+      }
+
+      // Parse emails using our validateComposeRecipients helper
+      const recipients = validateComposeRecipients(toRaw, ccRaw, bccRaw);
+      if (!recipients) return; // validateComposeRecipients will trigger notify on invalid emails
+
+      const { to, cc, bcc } = recipients;
+
+      if (sendBtn) {
+        sendBtn.disabled = true;
+        sendBtn.innerHTML = '<span class="spin-loader"></span> Sending...';
+      }
+
+      if (progressContainer) progressContainer.style.display = 'flex';
+      if (tbody) tbody.innerHTML = '';
+      if (progressTitle) progressTitle.textContent = 'Sending Broadcast...';
+      if (progressStats) progressStats.textContent = `0 / ${to.length || 1} Sent`;
+
+      // Helper sleep function
+      const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
+
+      // We will loop and send to each TO recipient individually.
+      // If there are no TO recipients (e.g. only CC/BCC specified), we will send exactly one email with CC/BCC.
+      const toList = to.length ? to : [null];
+      let sentCount = 0;
+
+      for (let i = 0; i < toList.length; i++) {
+        const recipient = toList[i];
+        const row = document.createElement('tr');
+        row.style.borderBottom = '1px solid var(--border2)';
+        
+        const tdRecipient = document.createElement('td');
+        tdRecipient.style.padding = '8px 12px';
+        tdRecipient.textContent = recipient || '(No To Recipient)';
+        row.appendChild(tdRecipient);
+
+        const tdStatus = document.createElement('td');
+        tdStatus.style.padding = '8px 12px';
+        tdStatus.innerHTML = '<span class="badge b-blue">Sending...</span>';
+        row.appendChild(tdStatus);
+
+        const tdDetails = document.createElement('td');
+        tdDetails.style.padding = '8px 12px';
+        tdDetails.style.color = 'var(--muted)';
+        tdDetails.textContent = 'Pending send request';
+        row.appendChild(tdDetails);
+
+        if (tbody) tbody.appendChild(row);
+
+        try {
+          const payload = {
+            to: recipient ? [recipient] : [],
+            cc: cc.length ? cc : undefined,
+            bcc: bcc.length ? bcc : undefined,
+            subject,
+            body
+          };
+
+          const res = await fetch(`${API_BASE}/outlook/send`, {
+            method: 'POST',
+            headers: getAuthHeaders(),
+            body: JSON.stringify(payload)
+          });
+          const data = await res.json();
+
+          if (res.ok) {
+            tdStatus.innerHTML = '<span class="badge b-green">Success</span>';
+            tdDetails.textContent = `Sent at ${new Date().toLocaleTimeString()}`;
+            tdDetails.style.color = 'var(--green2)';
+          } else {
+            throw new Error(data.error || 'Server error');
+          }
+        } catch (err) {
+          tdStatus.innerHTML = '<span class="badge b-red">Failed</span>';
+          tdDetails.textContent = err.message || 'Send failed';
+          tdDetails.style.color = 'var(--red2)';
+        }
+
+        sentCount++;
+        if (progressStats) progressStats.textContent = `${sentCount} / ${toList.length} Sent`;
+
+        // If not the last item, wait for the specified delay duration
+        if (i < toList.length - 1 && delayVal > 0) {
+          await sleep(delayVal * 1000);
+        }
+      }
+
+      if (sendBtn) {
+        sendBtn.disabled = false;
+        sendBtn.innerHTML = '<i class="fas fa-paper-plane" style="margin-right:6px;"></i>Send Broadcast';
+      }
+      if (progressTitle) {
+        progressTitle.textContent = 'Broadcast Complete ✓';
+      }
+      notify('Broadcast Finished', `Completed sending ${sentCount} messages.`, 'var(--green)', 'fas fa-check-double');
+    }
+
     // Initialize global categorized emails to prevent 'map' errors
     window.categorizedEmails = window.categorizedEmails || [];
 
@@ -19400,10 +20020,11 @@ Best regards,<br>
     function composeHasContent() {
       const to = (document.getElementById('compose-to')?.value || '').trim();
       const cc = (document.getElementById('compose-cc')?.value || '').trim();
+      const bcc = (document.getElementById('compose-bcc')?.value || '').trim();
       const subject = (document.getElementById('compose-subject')?.value || '').trim();
       const body = (document.getElementById('compose-body')?.innerHTML || '').trim();
 
-      return !!(to || cc || subject || body);
+      return !!(to || cc || bcc || subject || body);
     }
 
     /**
@@ -19413,6 +20034,7 @@ Best regards,<br>
       return {
         to: document.getElementById('compose-to')?.value || '',
         cc: document.getElementById('compose-cc')?.value || '',
+        bcc: document.getElementById('compose-bcc')?.value || '',
         subject: document.getElementById('compose-subject')?.value || '',
         body: document.getElementById('compose-body')?.innerHTML || '',
         savedAt: new Date().toISOString()
@@ -19441,15 +20063,16 @@ Best regards,<br>
       return { emails, invalid };
     }
 
-    function validateComposeRecipients(toRaw, ccRaw) {
+    function validateComposeRecipients(toRaw, ccRaw, bccRaw) {
       const toParsed = parseComposeRecipientEmails(toRaw);
       const ccParsed = parseComposeRecipientEmails(ccRaw);
-      const invalid = toParsed.invalid.concat(ccParsed.invalid);
+      const bccParsed = parseComposeRecipientEmails(bccRaw);
+      const invalid = toParsed.invalid.concat(ccParsed.invalid).concat(bccParsed.invalid);
       if (invalid.length) {
         notify('Invalid recipient', invalid.slice(0, 2).join(', '), 'var(--red)', 'fas fa-exclamation-circle');
         return null;
       }
-      return { to: toParsed.emails, cc: ccParsed.emails };
+      return { to: toParsed.emails, cc: ccParsed.emails, bcc: bccParsed.emails };
     }
 
     /**
@@ -22881,6 +23504,7 @@ ${plainText}`;
     async function sendEmail() {
       const toRaw = document.getElementById('compose-to')?.value.trim();
       const ccRaw = document.getElementById('compose-cc')?.value.trim();
+      const bccRaw = document.getElementById('compose-bcc')?.value.trim();
       const subject = document.getElementById('compose-subject')?.value.trim();
       const bodyEl = document.getElementById('compose-body');
       const statusEl = document.getElementById('compose-status');
@@ -22912,12 +23536,12 @@ ${plainText}`;
       console.log('[SEND] Final body to send — length:', body.length, 'preview:', body.substring(0, 200));
 
       // Split comma/semicolon separated emails, including Outlook-style "Name <email>" recipients.
-      const recipients = validateComposeRecipients(toRaw, ccRaw);
+      const recipients = validateComposeRecipients(toRaw, ccRaw, bccRaw);
       if (!recipients) {
         restoreSendButton();
         return;
       }
-      const { to, cc } = recipients;
+      const { to, cc, bcc } = recipients;
 
       // Determine if this is a reply or new compose
       const isReply = !!activeMessageId;
@@ -22934,8 +23558,13 @@ ${plainText}`;
         }
       } else {
         // New compose — To, Subject, Body all required
-        if (!to.length || !subject || !body || body === '<br>') {
-          notify('Missing fields', 'To, Subject and Message are required', 'var(--red)', 'fas fa-exclamation-circle');
+        if (!to.length && !cc.length && !bcc.length) {
+          notify('Missing fields', 'At least one recipient (To, CC, or BCC) is required', 'var(--red)', 'fas fa-exclamation-circle');
+          restoreSendButton();
+          return;
+        }
+        if (!subject || !body || body === '<br>') {
+          notify('Missing fields', 'Subject and Message are required', 'var(--red)', 'fas fa-exclamation-circle');
           restoreSendButton();
           return;
         }
@@ -22959,7 +23588,7 @@ ${plainText}`;
           res = await fetch(`${API_BASE}/outlook/send`, {
             method: 'POST',
             headers: getAuthHeaders(),
-            body: JSON.stringify({ to, cc: cc.length ? cc : undefined, subject, body, attachments }),
+            body: JSON.stringify({ to, cc: cc.length ? cc : undefined, bcc: bcc.length ? bcc : undefined, subject, body, attachments }),
           });
           data = await res.json();
         }
@@ -34496,7 +35125,43 @@ Provide insight in a numbered list. Highlight risks and positives.`;
             </span>
           </label>
           <div class="compose-field-inputs">
+            <div style="display:flex;gap:6px;align-items:center;margin-bottom:5px;">
+              <select id="compose-cc-group-select" class="inp"
+                style="font-size:12px;padding:5px 8px;flex:1;background:transparent;">
+                <option value="">— Or load CC from a group —</option>
+              </select>
+              <button type="button" class="btn btn-blue btn-xs" onclick="composeLoadFromGroupCc()"><i
+                  class="fas fa-users"></i> Load</button>
+            </div>
             <input class="inp" id="compose-cc" placeholder="cc@company.com, cc2@email.com" style="font-size:12.5px;"
+              autocomplete="off" />
+          </div>
+        </div>
+        <!-- BCC field -->
+        <div class="compose-field-row">
+          <label class="compose-field-label">BCC <span
+              style="color:var(--muted);font-weight:400;font-size:10.5px;">(opt)</span>
+            <span style="position:relative;display:inline-flex;align-items:center;"
+              onmouseenter="this.querySelector('.tt').style.display='block'"
+              onmouseleave="this.querySelector('.tt').style.display='none'">
+              <i class="fas fa-info-circle" style="font-size:11px;color:var(--muted);cursor:default;"></i>
+              <span class="tt"
+                style="display:none;position:absolute;left:18px;top:-4px;background:#1a2035;border:1px solid var(--border2);border-radius:7px;padding:8px 11px;font-size:11.5px;color:var(--text);white-space:nowrap;z-index:999;box-shadow:0 4px 16px rgba(0,0,0,0.4);font-weight:400;">
+                Multiple emails: separate with <b style="color:var(--gold);">comma</b> or <b
+                  style="color:var(--gold);">semicolon</b>
+              </span>
+            </span>
+          </label>
+          <div class="compose-field-inputs">
+            <div style="display:flex;gap:6px;align-items:center;margin-bottom:5px;">
+              <select id="compose-bcc-group-select" class="inp"
+                style="font-size:12px;padding:5px 8px;flex:1;background:transparent;">
+                <option value="">— Or load BCC from a group —</option>
+              </select>
+              <button type="button" class="btn btn-blue btn-xs" onclick="composeLoadFromGroupBcc()"><i
+                  class="fas fa-users"></i> Load</button>
+            </div>
+            <input class="inp" id="compose-bcc" placeholder="bcc@company.com, bcc2@email.com" style="font-size:12.5px;"
               autocomplete="off" />
           </div>
         </div>
@@ -36225,6 +36890,111 @@ Nagpur, Maharashtra, 440017, India<br>
                 </div>
                 <button class="btn btn-ghost btn-sm" onclick="syncOutlookStats();closeModal('outlook-account-modal')"><i
                     class="fas fa-database"></i> Sync Now</button>
+              </div>
+
+              <!-- Outlook Broadcast / Send Test Email Card -->
+              <div class="card" style="background:var(--card2); border:1px solid var(--border); border-radius:10px; padding:20px; display:flex; flex-direction:column; gap:14px; margin-top:14px;">
+                <div style="font-size:14px; font-weight:700; color:var(--text); border-bottom:1px solid var(--border); padding-bottom:8px;">
+                  <i class="fas fa-paper-plane" style="color:#0078d4; margin-right:6px;"></i>Outlook Broadcast / Send Test Email
+                </div>
+                
+                <div style="display:flex; flex-direction:column; gap:12px;">
+                  
+                  <!-- To Field with Group Loader -->
+                  <div>
+                    <label class="form-label" style="font-size:11px; font-weight:600; color:var(--muted2); display:block; margin-bottom:4px; text-transform:uppercase;">To Recipients *</label>
+                    <div style="display:flex; gap:6px; align-items:center; margin-bottom:5px;">
+                      <select id="settings-outlook-group-select" class="inp" style="font-size:12px; padding:5px 8px; flex:1; background:transparent;">
+                        <option value="">— Or load To from a group —</option>
+                      </select>
+                      <button type="button" class="btn btn-blue btn-xs" onclick="settingsOutlookLoadGroup('to')"><i class="fas fa-users"></i> Load</button>
+                    </div>
+                    <input class="inp" id="settings-outlook-to" placeholder="recipient1@email.com, recipient2@email.com" style="width:100%; box-sizing:border-box; font-size:12px; padding:6px 10px; height:36px; background:var(--bg2); border:1px solid var(--border2); color:var(--text); border-radius:6px;" autocomplete="off" />
+                  </div>
+
+                  <!-- CC Field with Group Loader -->
+                  <div>
+                    <label class="form-label" style="font-size:11px; font-weight:600; color:var(--muted2); display:block; margin-bottom:4px; text-transform:uppercase;">CC Recipients</label>
+                    <div style="display:flex; gap:6px; align-items:center; margin-bottom:5px;">
+                      <select id="settings-outlook-cc-group-select" class="inp" style="font-size:12px; padding:5px 8px; flex:1; background:transparent;">
+                        <option value="">— Or load CC from a group —</option>
+                      </select>
+                      <button type="button" class="btn btn-blue btn-xs" onclick="settingsOutlookLoadGroup('cc')"><i class="fas fa-users"></i> Load</button>
+                    </div>
+                    <input class="inp" id="settings-outlook-cc" placeholder="cc1@email.com, cc2@email.com" style="width:100%; box-sizing:border-box; font-size:12px; padding:6px 10px; height:36px; background:var(--bg2); border:1px solid var(--border2); color:var(--text); border-radius:6px;" autocomplete="off" />
+                  </div>
+
+                  <!-- BCC Field with Group Loader -->
+                  <div>
+                    <label class="form-label" style="font-size:11px; font-weight:600; color:var(--muted2); display:block; margin-bottom:4px; text-transform:uppercase;">BCC Recipients</label>
+                    <div style="display:flex; gap:6px; align-items:center; margin-bottom:5px;">
+                      <select id="settings-outlook-bcc-group-select" class="inp" style="font-size:12px; padding:5px 8px; flex:1; background:transparent;">
+                        <option value="">— Or load BCC from a group —</option>
+                      </select>
+                      <button type="button" class="btn btn-blue btn-xs" onclick="settingsOutlookLoadGroup('bcc')"><i class="fas fa-users"></i> Load</button>
+                    </div>
+                    <input class="inp" id="settings-outlook-bcc" placeholder="bcc1@email.com, bcc2@email.com" style="width:100%; box-sizing:border-box; font-size:12px; padding:6px 10px; height:36px; background:var(--bg2); border:1px solid var(--border2); color:var(--text); border-radius:6px;" autocomplete="off" />
+                  </div>
+
+                  <!-- Template Picker -->
+                  <div>
+                    <label class="form-label" style="font-size:11px; font-weight:600; color:var(--muted2); display:block; margin-bottom:4px; text-transform:uppercase;">Use HTML Template (Optional)</label>
+                    <div style="display:flex; gap:6px; align-items:center;">
+                      <select id="settings-outlook-template-select" class="inp" style="font-size:12px; padding:5px 8px; flex:1; background:transparent;">
+                        <option value="">— Select a template —</option>
+                      </select>
+                      <button type="button" class="btn btn-blue btn-xs" onclick="settingsOutlookLoadTemplate()"><i class="fas fa-check"></i> Apply</button>
+                    </div>
+                  </div>
+
+                  <!-- Subject Field -->
+                  <div>
+                    <label class="form-label" style="font-size:11px; font-weight:600; color:var(--muted2); display:block; margin-bottom:4px; text-transform:uppercase;">Subject *</label>
+                    <input class="inp" id="settings-outlook-subject" placeholder="Broadcast Subject" style="width:100%; box-sizing:border-box; font-size:12px; padding:6px 10px; height:36px; background:var(--bg2); border:1px solid var(--border2); color:var(--text); border-radius:6px;" autocomplete="off" />
+                  </div>
+
+                  <!-- Body / HTML Field -->
+                  <div>
+                    <label class="form-label" style="font-size:11px; font-weight:600; color:var(--muted2); display:block; margin-bottom:4px; text-transform:uppercase;">HTML or Plain Text Body *</label>
+                    <textarea class="inp" id="settings-outlook-body-content" placeholder="<p>Write your email body...</p>" style="width:100%; box-sizing:border-box; font-size:12px; padding:8px 10px; min-height:100px; resize:vertical; background:var(--bg2); border:1px solid var(--border2); color:var(--text); border-radius:6px;"></textarea>
+                  </div>
+
+                  <!-- Delay between sends -->
+                  <div>
+                    <label class="form-label" style="font-size:11px; font-weight:600; color:var(--muted2); display:block; margin-bottom:4px; text-transform:uppercase;">Delay Between Recipients</label>
+                    <div style="display:flex; align-items:center; gap:8px;">
+                      <input class="inp" id="settings-outlook-delay" type="number" min="0" value="2" style="width:80px; text-align:center; box-sizing:border-box; font-size:12px; padding:6px 10px; height:36px; background:var(--bg2); border:1px solid var(--border2); color:var(--text); border-radius:6px;" />
+                      <span style="font-size:12px; color:var(--muted);">seconds delay between each individual recipient send.</span>
+                    </div>
+                  </div>
+
+                  <!-- Submit Button -->
+                  <div style="display:flex; justify-content:flex-end; margin-top:6px;">
+                    <button class="btn btn-blue" id="settings-outlook-send-btn" onclick="settingsSendOutlookTestEmail()" style="background:#0078d4; border-color:#0078d4;"><i class="fas fa-paper-plane" style="margin-right:6px;"></i>Send Broadcast</button>
+                  </div>
+
+                  <!-- Broadcast Progress / Status Table -->
+                  <div id="settings-outlook-broadcast-status-container" style="margin-top:16px; display:none; flex-direction:column; gap:8px;">
+                    <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid var(--border); padding-bottom:6px;">
+                      <span style="font-size:12.5px; font-weight:700; color:var(--text);" id="settings-outlook-broadcast-progress-title">Broadcast Progress</span>
+                      <span id="settings-outlook-broadcast-progress-stats" style="font-size:11px; font-weight:600; padding:2px 8px; border-radius:10px; background:rgba(0,120,212,0.15); color:#0078d4;">0 / 0 Sent</span>
+                    </div>
+                    <div style="max-height:300px; overflow-y:auto; border:1px solid var(--border2); border-radius:8px;">
+                      <table style="width:100%; border-collapse:collapse; text-align:left; font-size:12px;">
+                        <thead>
+                          <tr style="background:var(--bg2); border-bottom:1px solid var(--border2); color:var(--muted2);">
+                            <th style="padding:8px 12px; font-weight:600;">Recipient</th>
+                            <th style="padding:8px 12px; font-weight:600; width:100px;">Status</th>
+                            <th style="padding:8px 12px; font-weight:600;">Details</th>
+                          </tr>
+                        </thead>
+                        <tbody id="settings-outlook-broadcast-status-tbody">
+                          <!-- Rows will be injected here -->
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
           </div>

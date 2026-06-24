@@ -282,8 +282,21 @@ if (process.env.DEBUG_REQUESTS === '1') {
 }
 
 // Keep health available before static files, body parsing, auth, and API routers.
-app.get('/api/health', (_req, res) => {
-  res.json({ status: 'ok', service: 'UniComm Pro API', version: '3.0.0', timestamp: new Date().toISOString() });
+app.get('/api/health', async (_req, res) => {
+  let dbStatus = 'unknown';
+  try {
+    const dbRes = await pool.query('SELECT 1');
+    if (dbRes.rowCount === 1) dbStatus = 'connected';
+  } catch (err) {
+    dbStatus = 'error: ' + err.message;
+  }
+  res.json({
+    status: dbStatus === 'connected' ? 'ok' : 'error',
+    database: dbStatus,
+    service: 'UniComm Pro API',
+    version: '3.0.0',
+    timestamp: new Date().toISOString()
+  });
 });
 const io = new Server(server, {
   cors: { origin: '*', methods: ['GET', 'POST'] },
