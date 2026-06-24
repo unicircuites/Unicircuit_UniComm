@@ -214,15 +214,17 @@ function canonicalizeChats(rows) {
     } else {
       const ta = row._lastTs ?? (row.last_time ? new Date(row.last_time).getTime() : 0);
       const tb = existing._lastTs ?? (existing.last_time ? new Date(existing.last_time).getTime() : 0);
+      const combinedUnread = (row._unread || 0) + (existing._unread || 0);
       if (ta >= tb) {
         const merged = { ...row };
-        merged.unread = row._unread;
-        merged._unread = row._unread;
-        dupLog.push(`  DROPPED  [${existing.id}]  kept  [${row.id}]  name="${row.name}"`);
+        merged.unread = combinedUnread;
+        merged._unread = combinedUnread;
+        dupLog.push(`  DROPPED  [${existing.id}]  kept  [${row.id}]  name="${row.name}"  unread=${combinedUnread}`);
         nameMap.set(nameKey, merged);
       } else {
-        existing.unread = existing._unread;
-        dupLog.push(`  DROPPED  [${row.id}]  kept  [${existing.id}]  name="${existing.name}"`);
+        existing.unread = combinedUnread;
+        existing._unread = combinedUnread;
+        dupLog.push(`  DROPPED  [${row.id}]  kept  [${existing.id}]  name="${existing.name}"  unread=${combinedUnread}`);
       }
     }
   }
@@ -1037,6 +1039,21 @@ router.delete('/message/:msgId', authenticate, async (req, res) => {
   if (!chatJid) return res.status(400).json({ error: 'chatJid query param required' });
   try {
     await wa.deleteWaMessage(chatJid, msgId, scope === 'everyone');
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ── Edit WA Message ───────────────────────────────────────────────────────────
+router.post('/message/:msgId/edit', authenticate, async (req, res) => {
+  const { msgId } = req.params;
+  const { chatJid, newText } = req.body;
+  const chatJidParam = chatJid || req.query.chatJid;
+  if (!chatJidParam) return res.status(400).json({ error: 'chatJid is required in body or query' });
+  if (newText === undefined || newText === null) return res.status(400).json({ error: 'newText is required' });
+  try {
+    await wa.editWaMessage(chatJidParam, msgId, newText);
     res.json({ success: true });
   } catch (err) {
     res.status(500).json({ error: err.message });

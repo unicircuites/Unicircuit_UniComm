@@ -3,9 +3,9 @@
 ---
 
 ## Tower Server Info
-- **IP:** 192.168.0.205
+- **IP:** 192.168.0.200
 - **Port:** 8088
-- **URL:** https://192.168.0.205:8088
+- **URL:** https://192.168.0.200:8088
 - **Project Path:** `C:\setup0\Unicircuit_UniComm`
 - **OS:** Windows
 - **Node:** v24+
@@ -55,9 +55,9 @@ CTI_PORT=5001
 MS_TENANT_ID=407ec761-e4ad-4d41-9ea4-6ae7fe391047
 MS_CLIENT_ID=d6224f70-6728-4f68-93aa-75a91f4adaa8
 MS_CLIENT_SECRET=nzF8Q~v7eZui9WgYylxIebCoD2hCjzWao6gDpazR
-MS_REDIRECT_URI=https://192.168.0.205:8088/auth/callback
+MS_REDIRECT_URI=https://192.168.0.200:8088/auth/callback
 MS_USER_EMAIL=sales@unicircuites.com
-APP_PUBLIC_URL=https://192.168.0.205:8088
+APP_PUBLIC_URL=https://192.168.0.200:8088
 ENGAGEBAY_API_KEY=your_engagebay_api_key_here
 SMTP_HOST=smtp.office365.com
 SMTP_PORT=587
@@ -123,7 +123,7 @@ Newer versions of Node.js (20+) block legacy Windows certificate encryption form
 Run this in PowerShell on the Tower server:
 ```powershell
 mkdir -Path "C:\setup0\Unicircuit_UniComm\backend\certs" -ErrorAction SilentlyContinue
-& "C:\Program Files\Git\usr\bin\openssl.exe" req -x509 -nodes -days 3650 -newkey rsa:2048 -keyout "C:\setup0\Unicircuit_UniComm\backend\certs\server.key" -out "C:\setup0\Unicircuit_UniComm\backend\certs\server.crt" -subj "/CN=192.168.0.205"
+& "C:\Program Files\Git\usr\bin\openssl.exe" req -x509 -nodes -days 3650 -newkey rsa:2048 -keyout "C:\setup0\Unicircuit_UniComm\backend\certs\server.key" -out "C:\setup0\Unicircuit_UniComm\backend\certs\server.crt" -subj "/CN=192.168.0.200"
 ```
 
 ---
@@ -279,9 +279,9 @@ net stop postgresql-x64-16; net start postgresql-x64-16
 ```
 Matrix PBX (192.168.0.81)
     ↓ TCP SMDR push to whichever server is set in PBX
-Dev Machine (192.168.0.149:5001)  OR  Tower (192.168.0.205:5001)
+Dev Machine (192.168.0.149:5001)  OR  Tower (192.168.0.200:5001)
     ↓
-Tower PostgreSQL DB (192.168.0.205:5432)  ← both use same DB
+Tower PostgreSQL DB (192.168.0.200:5432)  ← both use same DB
 ```
 
 ### PBX Settings (SMDR Online page)
@@ -290,26 +290,54 @@ All three sections (Outgoing / Incoming / Internal):
 
 | Field | Dev Testing | Tower Production |
 |---|---|---|
-| Destination IP | `192.168.0.149` | `192.168.0.205` |
+| Destination IP | `192.168.0.149` | `192.168.0.200` |
 | Port | `5001` | `5001` |
 | Mode | Ethernet | Ethernet |
 
-### Dev Machine .env
+### Dev Machine .env (localhost — `http://localhost:8088`)
 ```
-DB_HOST=192.168.0.205
+DB_HOST=127.0.0.1
+DB_PORT=5432
+DB_NAME=unicomm_db
+DB_USER=postgres
+DB_PASSWORD=Unicircuit@2026
+SMDR_PORT=5001
+PBX_HOST=192.168.0.81
+PORT=8088
+HOST=0.0.0.0
+NODE_ENV=development
+
+# Leave these COMMENTED OUT on localhost — code defaults to local folders
+# PBX_RECORDINGS_DIR=\\UNISERVER\MatrixVMS\Voicemail_Backup
+# PBX_LOCAL_RECORDINGS_DIR=D:\Unicomm_Storage
+# CALL_BACKUP_DIR=\\UNISERVER\MatrixVMS\_BACKUPS
+```
+
+> **Why?** UNC paths (`\\UNISERVER\...`) point to Tower's network share. On localhost that
+> share doesn't exist — Windows will hang trying to resolve it and block server startup.
+> Leave them unset so the code falls back to local `recordings/` and `call_backups/` folders.
+
+### Tower .env (`https://192.168.0.200:8088`)
+```
+DB_HOST=localhost
 DB_PORT=5432
 DB_NAME=unicircuit_db
 DB_USER=postgres
 DB_PASSWORD=Unicircuit@2026
 SMDR_PORT=5001
 PBX_HOST=192.168.0.81
-```
+PORT=8088
+HOST=0.0.0.0
+NODE_ENV=production
+SSL_KEY_PATH=certs/server.key
+SSL_CERT_PATH=certs/server.crt
+MS_REDIRECT_URI=https://192.168.0.200:8088/auth/callback
+APP_PUBLIC_URL=https://192.168.0.200:8088
 
-### Tower .env
-```
-DB_HOST=localhost
-SMDR_PORT=5001
-PBX_HOST=192.168.0.81
+# Tower-specific paths — UNC network shares on UNISERVER
+PBX_RECORDINGS_DIR=\\UNISERVER\MatrixVMS\Voicemail_Backup
+PBX_LOCAL_RECORDINGS_DIR=D:\Unicomm_Storage
+CALL_BACKUP_DIR=\\UNISERVER\MatrixVMS\_BACKUPS
 ```
 
 ### Tower PostgreSQL Remote Access (run ONCE on tower)
@@ -341,7 +369,7 @@ net stop postgresql-x64-16; net start postgresql-x64-16
 | Tenant ID | `407ec761-e4ad-4d41-9ea4-6ae7fe391047` |
 | Client ID | `d6224f70-6728-4f68-93aa-75a91f4adaa8` |
 | Redirect URI (Web) | `http://localhost:8088/auth/callback` |
-| Redirect URI (Web) | `https://192.168.0.205:8088/auth/callback` |
+| Redirect URI (Web) | `https://192.168.0.200:8088/auth/callback` |
 | Mailbox | `sales@unicircuites.com` |
 
 > **Azure Redirect URI Rules (important):**
@@ -352,8 +380,8 @@ net stop postgresql-x64-16; net start postgresql-x64-16
 > **Matlab:** Tower server pe Outlook connect karne ke liye **HTTPS** mandatory hai.
 > SSL certificate setup karo (self-signed bhi chalega) aur `.env` mein update karo:
 > ```
-> MS_REDIRECT_URI=https://192.168.0.205:8088/auth/callback
-> APP_PUBLIC_URL=https://192.168.0.205:8088
+> MS_REDIRECT_URI=https://192.168.0.200:8088/auth/callback
+> APP_PUBLIC_URL=https://192.168.0.200:8088
 > ```
 
 ---
@@ -389,7 +417,7 @@ Kya dikhe:
 
 ### Step 2 — Dashboard se reconnect karo (sabse pehle yeh try karo)
 
-1. Browser mein kholo: `http://192.168.0.205:8088/dashboard.html`
+1. Browser mein kholo: `http://192.168.0.200:8088/dashboard.html`
 2. Login karo (Uniadmin / Uniadmin@123)
 3. **Email / Outlook** tab pe jao
 4. **"Connect Outlook"** button dhundo — click karo
@@ -450,7 +478,7 @@ Agar Azure login ke baad error aaye: *"The reply URL specified in the request do
 3. **Web → Redirect URIs** mein yeh dono hone chahiye:
    ```
    http://localhost:8088/auth/callback
-   http://192.168.0.205:8088/auth/callback
+   http://192.168.0.200:8088/auth/callback
    ```
 4. Agar missing hai → **Add URI** → save karo
 5. Phir Step 2 dobara karo
@@ -513,6 +541,56 @@ Logs mein `[Graph]` aur `[MSAL]` lines dekho — exact error wahan hoga.
 
 ---
 
+## 💻 Run on Localhost (Dev Machine)
+
+> Use this to test the app locally before pushing to Tower.
+
+### Option A — Quick Start (Backend + n8n together)
+
+```powershell
+cd "C:\Users\unius\Documents\code workout\UNI_CRM"
+npm install
+npm start
+```
+
+> `npm start` runs `node start-services.js` which launches:
+> - **CRM Backend** (nodemon, auto-reload on code changes)
+> - **n8n workflow engine** on `http://127.0.0.1:5678`
+
+---
+
+### Option B — Backend Only (no n8n)
+
+```powershell
+cd "C:\Users\unius\Documents\code workout\UNI_CRM"
+cd backend
+npm install
+npm run dev
+```
+
+> `npm run dev` runs `nodemon server.js` — auto-restarts on file changes.
+
+---
+
+### Access the App
+
+| Service | URL |
+|---|---|
+| Dashboard | `http://localhost:8088/dashboard.html` |
+| Login | `http://localhost:8088/login.html` |
+| n8n UI (Option A only) | `http://127.0.0.1:5678` |
+
+> **Note:** On dev machine, `http://` localhost is used (no SSL required).
+> Login: `Uniadmin` / `Uniadmin@123`
+
+---
+
+### Stop the Dev Server
+
+Press `Ctrl + C` in the terminal where the server is running.
+
+---
+
 ## 🚀 Tower Server — Git Pull & Deploy (Run These Commands)
 
 > **Copy-paste these commands directly into Tower server PowerShell (as Administrator).**
@@ -524,6 +602,7 @@ Logs mein `[Graph]` aur `[MSAL]` lines dekho — exact error wahan hoga.
 
 | Date | Commit | What Changed | Special Steps |
 |---|---|---|---|
+| 24-Jun-2026 | `latest` | Fixed UNC path hang on localhost — `BACKUP_DIR` default changed to local folder, UNC paths skipped in mkdirSync; DEPLOYMENT.md localhost/Tower env sections updated | On Tower: verify `.env` still has `CALL_BACKUP_DIR=\\UNISERVER\MatrixVMS\_BACKUPS` and `PBX_RECORDINGS_DIR=\\UNISERVER\MatrixVMS\Voicemail_Backup` (code no longer sets these as defaults) |
 | 01-Jun-2026 | `cfeff91` | Added Power Generation PSU + State PSU email templates (2 new banner presets, 2 new seed templates, dashboard dropdowns updated) | **Re-seed email templates after deploy** — run `node db/seedEmailTemplates.js` (or `node db/init.js` if no separate seed script) from the `backend/` folder |
 | 01-Jun-2026 | `273acd5` | Sync line endings, updated image.png, added `scripts/sync-email-templates.js` | No special steps — standard pull + restart |
 
@@ -560,7 +639,7 @@ mkdir certs -ErrorAction SilentlyContinue
 if (!(Test-Path ".\certs\server.key") -or !(Test-Path ".\certs\server.crt")) {
   Write-Host "SSL certs missing — generating..." -ForegroundColor Yellow
   & "C:\Program Files\Git\usr\bin\openssl.exe" req -x509 -nodes -days 3650 -newkey rsa:2048 `
-    -keyout ".\certs\server.key" -out ".\certs\server.crt" -subj "/CN=192.168.0.205"
+    -keyout ".\certs\server.key" -out ".\certs\server.crt" -subj "/CN=192.168.0.200"
 } else {
   Write-Host "SSL certs OK" -ForegroundColor Green
 }
@@ -603,7 +682,7 @@ pm2 stop unicomm; cd C:\setup0\Unicircuit_UniComm; git config core.askyesno fals
 [ ] pm2 restart unicomm --update-env
 [ ] pm2 status → "online" dikha
 [ ] pm2 logs unicomm --lines 80 → koi crash nahi
-[ ] Browser: https://192.168.0.205:8088 → dashboard load hua
+[ ] Browser: https://192.168.0.200:8088 → dashboard load hua
 ```
 
 ---
@@ -616,7 +695,7 @@ pm2 stop unicomm; cd C:\setup0\Unicircuit_UniComm; git config core.askyesno fals
 cd C:\setup0\Unicircuit_UniComm\backend
 mkdir certs -ErrorAction SilentlyContinue
 & "C:\Program Files\Git\usr\bin\openssl.exe" req -x509 -nodes -days 3650 -newkey rsa:2048 `
-  -keyout ".\certs\server.key" -out ".\certs\server.crt" -subj "/CN=192.168.0.205"
+  -keyout ".\certs\server.key" -out ".\certs\server.crt" -subj "/CN=192.168.0.200"
 pm2 restart unicomm --update-env
 ```
 

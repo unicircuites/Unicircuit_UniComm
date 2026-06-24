@@ -1,0 +1,19 @@
+{
+  "verbose": true,
+  "watch": ["."],
+  "ext": "js,mjs,cjs",
+  "ignore": [
+    "**/wa_auth/**",
+    "**/node_modules/**",
+    "**/wa_media/**",
+    "**/wa_backups/**",
+    "**/backups/**",
+    "**/outlook_backups/**",
+    "**/pbx_recordings/**",
+    "**/scratch/**",
+    "**/*.json",
+    "**/.env",
+    "**/*.log",
+    "**/data/**"
+  ]
+}

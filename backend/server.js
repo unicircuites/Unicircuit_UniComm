@@ -66,8 +66,10 @@ const httpsAgent = new https.Agent({
 
 // ── DATABASE SCHEMA MIGRATION (Self-Healing) ───────────────────────────────
 async function ensureSchema() {
+  console.log('[DB] Starting schema check...');
   try {
     // 1. Ensure pbx_recordings table and indexes exist
+    console.log('[DB] 1. Creating pbx_recordings table...');
     await pool.query(`
       CREATE TABLE IF NOT EXISTS pbx_recordings (
         id SERIAL PRIMARY KEY,
@@ -83,12 +85,14 @@ async function ensureSchema() {
         created_at TIMESTAMPTZ DEFAULT NOW()
       )
     `);
+    console.log('[DB] 2. Creating pbx_recordings indexes...');
     await pool.query(`CREATE INDEX IF NOT EXISTS idx_pbx_recordings_original_filename ON pbx_recordings (original_filename)`).catch(() => {});
     await pool.query(`CREATE INDEX IF NOT EXISTS idx_pbx_recordings_recording_date ON pbx_recordings (recording_date DESC NULLS LAST)`).catch(() => {});
     await pool.query(`CREATE INDEX IF NOT EXISTS idx_pbx_recordings_lookup ON pbx_recordings (backup_folder, extension_folder)`).catch(() => {});
     console.log('[DB] ✅ pbx_recordings table and indexes ensured.');
 
     // 2. Ensure mail_reply_tasks table and indexes exist
+    console.log('[DB] 3. Creating mail_reply_tasks table...');
     await pool.query(`
       CREATE TABLE IF NOT EXISTS mail_reply_tasks (
         id                    SERIAL PRIMARY KEY,
@@ -120,6 +124,7 @@ async function ensureSchema() {
     `);
     
     // Add columns to existing tables if needed (idempotent)
+    console.log('[DB] 4. Altering mail_reply_tasks columns...');
     const newColsMailTasks = [
       `ALTER TABLE mail_reply_tasks ADD COLUMN IF NOT EXISTS assigned_to_name      TEXT`,
       `ALTER TABLE mail_reply_tasks ADD COLUMN IF NOT EXISTS assigned_to_email     VARCHAR(200)`,
@@ -139,9 +144,11 @@ async function ensureSchema() {
     console.log('[DB] ✅ mail_reply_tasks table, columns and indexes ensured.');
 
     // 3. Ensure call_logs.recording_file exists
+    console.log('[DB] 5. Altering call_logs table...');
     await pool.query(`ALTER TABLE call_logs ADD COLUMN IF NOT EXISTS recording_file TEXT`);
 
     // 3a. Ensure PBX contacts exists before routes or call-list joins use it.
+    console.log('[DB] 6. Creating pbx_contacts table...');
     await pool.query(`
       CREATE TABLE IF NOT EXISTS pbx_contacts (
         id           SERIAL PRIMARY KEY,
@@ -160,6 +167,7 @@ async function ensureSchema() {
     console.log('[DB] pbx_contacts table ensured.');
 
     // 4. Alter call_logs.call_time to TIME if it is VARCHAR/character varying
+    console.log('[DB] 7. Checking call_logs.call_time column type...');
     const callTimeTypeRes = await pool.query(`
       SELECT data_type 
       FROM information_schema.columns 
@@ -183,6 +191,7 @@ async function ensureSchema() {
     }
 
     // 5. Ensure deduped call materialized view used by /api/calls exists.
+    console.log('[DB] 8. Creating call_logs_deduped materialized view...');
     await pool.query(`
       CREATE MATERIALIZED VIEW IF NOT EXISTS call_logs_deduped AS
       SELECT DISTINCT ON (
@@ -219,6 +228,7 @@ async function ensureSchema() {
         id DESC
     `);
     await pool.query(`CREATE UNIQUE INDEX IF NOT EXISTS idx_call_logs_deduped_id ON call_logs_deduped (id)`).catch(() => {});
+    console.log('[DB] 9. Refreshing call_logs_deduped materialized view...');
     await pool.query(`REFRESH MATERIALIZED VIEW call_logs_deduped`).catch(err => {
       console.warn('[DB] call_logs_deduped refresh skipped:', err.message);
     });
@@ -262,6 +272,18 @@ app.use((_req, res, next) => {
     return sendJson(body);
   };
   next();
+});
+
+if (process.env.DEBUG_REQUESTS === '1') {
+  app.use((req, _res, next) => {
+    console.log(`[HTTP] ${req.method} ${req.originalUrl}`);
+    next();
+  });
+}
+
+// Keep health available before static files, body parsing, auth, and API routers.
+app.get('/api/health', (_req, res) => {
+  res.json({ status: 'ok', service: 'UniComm Pro API', version: '3.0.0', timestamp: new Date().toISOString() });
 });
 const io = new Server(server, {
   cors: { origin: '*', methods: ['GET', 'POST'] },
@@ -697,10 +719,6 @@ app.use('/api/crm', require('./routes/crmIntegration'));
 // OAuth2 callback - must be at root level to match redirect URI
 app.use('/auth', require('./routes/outlook'));
 
-// -- HEALTH CHECK -----------------------------------------------------------
-app.get('/api/health', (_req, res) => {
-  res.json({ status: 'ok', service: 'UniComm Pro API', version: '3.0.0', timestamp: new Date().toISOString() });
-});
 
 // -- 404 --------------------------------------------------------------------
 app.use((req, res) => {
@@ -714,6 +732,20 @@ app.use((err, _req, res, _next) => {
   res.status(500).json({ error: 'Internal server error.' });
 });
 
+function withTimeout(promise, ms, label) {
+  let timer;
+  const timeout = new Promise((resolve) => {
+    timer = setTimeout(() => {
+      console.warn(`[System] ${label} did not finish within ${ms}ms; continuing startup.`);
+      resolve(false);
+    }, ms);
+  });
+
+  return Promise.race([
+    Promise.resolve(promise).then(() => true),
+    timeout,
+  ]).finally(() => clearTimeout(timer));
+}
 // -- START ------------------------------------------------------------------
 server.listen(PORT, HOST, async () => {
   console.log(`\nUniComm Pro API  ->  ${urlScheme}://localhost:${PORT}  (bind ${HOST})`);
@@ -726,10 +758,14 @@ server.listen(PORT, HOST, async () => {
 
     // Background services query these tables immediately; wait for self-healing
     // schema setup so a fresh tower database does not spam relation errors.
-    await schemaReady;
+    console.log('[System] Waiting for schema initialization...');
+    const schemaCompleted = await withTimeout(schemaReady, parseInt(process.env.SCHEMA_READY_TIMEOUT_MS || '8000', 10), 'Schema initialization');
+    console.log('[System] Schema initialization gate completed: ' + (schemaCompleted ? 'ready' : 'timed out'));
 
     // 1. Matrix SMDR listener (Critical for call logging)
+    console.log('[System] Starting SMDR service...');
     await smdr.start().catch(err => console.error('[SMDR] Start error:', err.message));
+    console.log('[System] SMDR start returned.');
 
     // 2. WhatsApp — auto-reconnects, QR pushed via Socket.IO
     await wa.startWA().catch(err => console.error('[WA] Start error:', err.message));

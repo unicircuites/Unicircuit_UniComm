@@ -54,14 +54,26 @@ const REC_DIR = process.env.PBX_RECORDINGS_DIR
 console.log('[REC_DIR]', REC_DIR);
 
 // ── Backup directory ──────────────────────────────────────────────────────
+// CALL_BACKUP_DIR: On Tower set this in .env to \\UNISERVER\MatrixVMS\_BACKUPS
+// On localhost leave unset — defaults to local call_backups folder
 const BACKUP_DIR = process.env.CALL_BACKUP_DIR
-  || '\\\\UNISERVER\\MatrixVMS\\_BACKUPS';
+  || path.join(__dirname, '../../call_backups');
 const REPO_BACKUP_DIR = process.env.CALL_REPO_BACKUP_DIR
   || path.join(__dirname, '../../call_backups');
 const BACKUP_DIRS = [...new Set([BACKUP_DIR, REPO_BACKUP_DIR])];
 
-// Ensure directories exist
-[REC_DIR, ...BACKUP_DIRS].forEach(d => { try { fs.mkdirSync(d, { recursive: true }); } catch (_) { } });
+// Ensure directories exist (non-blocking).
+// IMPORTANT: Skip UNC network shares (\\server\share) — Windows blocks/hangs
+// trying to mkdirSync an unreachable network path. Those shares are managed
+// externally (Tower NAS/UNISERVER). Only create local paths.
+setTimeout(() => {
+  [REC_DIR, ...BACKUP_DIRS].forEach(d => {
+    if (d.startsWith('\\\\') || d.startsWith('//')) return; // skip UNC network shares
+    try {
+      fs.mkdirSync(d, { recursive: true });
+    } catch (_) { }
+  });
+}, 0);
 
 function getSafeBackupPath(filename) {
   const name = String(filename || '').trim();

@@ -43,6 +43,7 @@ let pairingPhone = null;
 let isConnected = false;
 let phoneNumber = null; // This will store the REAL phone number
 let userJid = null; // This will store the active JID (Phone or LID)
+let userLid = null; // This will store the user's LID if available
 let io = null;
 let currentState = 'INIT'; // INIT | QR_READY | CONNECTED | DISCONNECTED | RECONNECTING
 let reconnectAttempts = 0;
@@ -76,6 +77,7 @@ const liveMessagesStore = new Map();
 let importedLastTsMap = {};
 // In-memory group metadata cache to prevent hangs on large groups
 const groupMetadataCache = new Map();
+const rawGroupMetadataCache = new Map();
 
 const AUTH_DIR = path.join(__dirname, '../wa_auth');
 const SYNC_FULL_HISTORY = String(process.env.WA_SYNC_FULL_HISTORY || 'false').toLowerCase() === 'true';
@@ -150,6 +152,22 @@ function normalizeRawJid(rawJid) {
     : rest.includes('broadcast') ? 'broadcast'
     : 's.whatsapp.net';
   return `${local}@${domain}`;
+}
+
+function getSocketJid(chatJid) {
+  if (!chatJid) return chatJid;
+  const formatted = formatJid(chatJid);
+  if (formatted.endsWith('@s.whatsapp.net')) {
+    // Check if we have a mapped LID JID for this phone JID in contactsStore
+    const lidMatch = Object.keys(contactsStore).find(
+      k => contactsStore[k] && contactsStore[k].phoneJid === formatted
+    );
+    if (lidMatch) {
+      console.log(`[WA] Mapping phone JID ${formatted} back to socket LID JID ${lidMatch} for Baileys`);
+      return lidMatch;
+    }
+  }
+  return formatted;
 }
 
 function clearContactsStore() {
@@ -476,6 +494,7 @@ function setActiveAccountPhone(value) {
     liveMessagesStore.clear();
     importedLastTsMap = {};
     groupMetadataCache.clear();
+    rawGroupMetadataCache.clear();
     lastGroupParticipantSyncAt = 0;
   }
   phoneNumber = nextPhone;
@@ -485,7 +504,14 @@ function setActiveAccountPhone(value) {
 function setIO(socketIO) { io = socketIO; }
 
 function emit(event, data) {
-  if (io) io.emit(event, data);
+  if (io) {
+    if (data && typeof data === 'object' && !Array.isArray(data)) {
+      if (phoneNumber && !data.accountPhone) {
+        data.accountPhone = phoneNumber;
+      }
+    }
+    io.emit(event, data);
+  }
 }
 
 function sleep(ms) {
@@ -763,8 +789,345 @@ function isRealMessage(msg) {
     'messageContextInfo', 'reactionMessage',
     'pollUpdateMessage', 'callLogMesssage',
     'encReactionMessage', 'ptvMessage',
+    'secretEncryptedMessage'
   ];
   return !skip.includes(type);
+}
+
+// Helper: Resolve LID JID to Phone JID using contactsStore or database
+async function resolveJidToPhone(rawJid) {
+  let jid = formatJid(rawJid);
+  if (jid.endsWith('@lid')) {
+    const mapped = contactsStore[jid];
+    if (mapped?.phoneJid) {
+      return mapped.phoneJid;
+    }
+    const accPhone = phoneNumber;
+    if (accPhone) {
+      try {
+        const lidLookup = await pool.query(
+          `SELECT phone FROM wa_contacts
+           WHERE jid=$1 AND account_phone=$2
+             AND phone IS NOT NULL AND phone != ''
+           LIMIT 1`,
+          [jid, accPhone]
+        );
+        const resolvedPhone = resolvedPhoneForLid(jid, lidLookup.rows?.[0]?.phone);
+        if (resolvedPhone) {
+          const resolvedPhoneJid = `${resolvedPhone}@s.whatsapp.net`;
+          if (!contactsStore[jid]) contactsStore[jid] = { id: jid };
+          contactsStore[jid].phoneJid = resolvedPhoneJid;
+          return resolvedPhoneJid;
+        }
+      } catch (_) { }
+    }
+  }
+  return jid;
+}
+
+// ── HANDLE PROTOCOL MESSAGE EDIT ────────────────────────────────────────────────
+async function handleProtocolMessageEdit(msg) {
+  const protocolMsg = msg.message?.protocolMessage;
+  const secretEncMsg = msg.message?.secretEncryptedMessage;
+  
+  // Can be a protocolMessage (upsert/update) or editedMessage directly on message (update)
+  let editedMsg = null;
+  let targetKey = null;
+
+  if (msg.message?.editedMessage) {
+    editedMsg = msg.message.editedMessage.message || msg.message.editedMessage;
+    targetKey = msg.key;
+  } else if (protocolMsg?.type === 14 || protocolMsg?.editedMessage) {
+    editedMsg = protocolMsg.editedMessage;
+    targetKey = protocolMsg.key;
+  } else if (secretEncMsg && (secretEncMsg.secretEncType === 'MESSAGE_EDIT' || secretEncMsg.secretEncType === 2)) {
+    targetKey = secretEncMsg.targetMessageKey;
+    if (targetKey && targetKey.id) {
+      try {
+        const accPhone = phoneNumber;
+        if (accPhone) {
+          // 1. Get the original message's secret from DB
+          const checkRes = await pool.query(
+            `SELECT message_secret FROM wa_messages WHERE id=$1 AND account_phone=$2 LIMIT 1`,
+            [targetKey.id, accPhone]
+          );
+          if (checkRes.rows[0]?.message_secret) {
+            const secretBuf = Buffer.from(checkRes.rows[0].message_secret, 'base64');
+            // 2. Determine the sender JID
+            const fromMe = targetKey.fromMe || false;
+            const isLidChat = targetKey.remoteJid?.endsWith('@lid');
+            let senderJid = null;
+            if (fromMe) {
+              senderJid = isLidChat ? (userLid || userJid) : userJid;
+            } else {
+              senderJid = targetKey.participant || msg.key?.participant || targetKey.remoteJid;
+            }
+            if (senderJid) {
+              const sender = normalizeRawJid(senderJid);
+              
+              // 3. Normalize payload and IV
+              let payloadBuf = secretEncMsg.encPayload;
+              if (typeof payloadBuf === 'string') {
+                payloadBuf = Buffer.from(payloadBuf, 'base64');
+              } else if (payloadBuf && payloadBuf.type === 'Buffer' && Array.isArray(payloadBuf.data)) {
+                payloadBuf = Buffer.from(payloadBuf.data);
+              } else {
+                payloadBuf = Buffer.from(payloadBuf);
+              }
+
+              let ivBuf = secretEncMsg.encIv;
+              if (typeof ivBuf === 'string') {
+                ivBuf = Buffer.from(ivBuf, 'base64');
+              } else if (ivBuf && ivBuf.type === 'Buffer' && Array.isArray(ivBuf.data)) {
+                ivBuf = Buffer.from(ivBuf.data);
+              } else {
+                ivBuf = Buffer.from(ivBuf);
+              }
+
+              const { aesDecryptGCM, hmacSign, proto } = require('@whiskeysockets/baileys');
+              
+              const toBinary = (txt) => Buffer.from(txt);
+              const senderBuf = toBinary(sender);
+              
+              const sign = Buffer.concat([
+                toBinary(targetKey.id),
+                senderBuf,
+                senderBuf,
+                toBinary('Message Edit'),
+                new Uint8Array([1])
+              ]);
+
+              const key = hmacSign(secretBuf, new Uint8Array(32));
+              const decKey = hmacSign(sign, key);
+              
+              const decryptedBytes = aesDecryptGCM(payloadBuf, decKey, ivBuf, '');
+              const decryptedMsg = proto.Message.decode(decryptedBytes);
+              
+              editedMsg = decryptedMsg;
+              console.log(`[WA] Successfully decrypted secretEncryptedMessage for target ${targetKey.id}`);
+            } else {
+              console.warn(`[WA] Could not determine sender JID for secretEncryptedMessage decryption`);
+            }
+          } else {
+            console.warn(`[WA] Original message ${targetKey.id} secret not found in database`);
+          }
+        }
+      } catch (err) {
+        console.error(`[WA] Failed to decrypt secretEncryptedMessage:`, err.message);
+      }
+    }
+  }
+
+  if (!editedMsg || !targetKey || !targetKey.id) return false;
+
+  const newText = getBody({ message: editedMsg });
+  if (newText !== undefined && newText !== null) {
+    const targetChatJid = formatJid(targetKey.remoteJid || msg.key?.remoteJid);
+    const accPhone = phoneNumber;
+    if (accPhone) {
+      // Retrieve actual stored chat JID if the message is in DB
+      const msgRow = await pool.query(
+        `SELECT chat_id FROM wa_messages WHERE id=$1 AND account_phone=$2 LIMIT 1`,
+        [targetKey.id, accPhone]
+      );
+      
+      const resolvedJid = msgRow.rows[0]
+        ? msgRow.rows[0].chat_id
+        : await resolveJidToPhone(targetChatJid);
+
+      console.log(`[WA] Intercepted edit for message ${targetKey.id} in chat ${resolvedJid} (original JID: ${targetChatJid}): ${newText.substring(0, 30)}`);
+      
+      await pool.query(
+        `UPDATE wa_messages SET body=$1 WHERE id=$2 AND chat_id=$3 AND account_phone=$4`,
+        [newText, targetKey.id, resolvedJid, accPhone]
+      );
+      try {
+        const latestRow = await pool.query(
+          `SELECT id FROM wa_messages WHERE chat_id=$1 AND account_phone=$2 ORDER BY timestamp DESC LIMIT 1`,
+          [resolvedJid, accPhone]
+        );
+        if (latestRow.rows[0] && latestRow.rows[0].id === targetKey.id) {
+          await pool.query(
+            `UPDATE wa_chats SET last_message=$1 WHERE id=$2 AND account_phone=$3`,
+            [newText, resolvedJid, accPhone]
+          );
+          emit('wa:chats_updated', {});
+        }
+      } catch (_) {}
+      emit('wa:message_edited', {
+        id: targetKey.id,
+        chatId: resolvedJid,
+        body: newText
+      });
+      return true;
+    }
+  }
+  return false;
+}
+
+// ── HANDLE PROTOCOL MESSAGE REVOKE (delete for everyone) ────────────────────────
+async function handleProtocolMessageRevoke(msg) {
+  const protocolMsg = msg.message?.protocolMessage;
+  const isRevoke = (protocolMsg && (protocolMsg.type === 0 || protocolMsg.type === 'REVOKE'))
+    || msg.messageStubType === 0
+    || msg.messageStubType === 'REVOKE';
+
+  if (!isRevoke) return false;
+
+  const targetKey = protocolMsg ? protocolMsg.key : msg.key;
+  if (targetKey && targetKey.id) {
+    const targetChatJid = formatJid(targetKey.remoteJid || msg.key?.remoteJid);
+    const accPhone = phoneNumber;
+    if (accPhone) {
+      // Retrieve actual stored chat JID if the message is in DB
+      const msgRow = await pool.query(
+        `SELECT chat_id FROM wa_messages WHERE id=$1 AND account_phone=$2 LIMIT 1`,
+        [targetKey.id, accPhone]
+      );
+      
+      const resolvedJid = msgRow.rows[0]
+        ? msgRow.rows[0].chat_id
+        : await resolveJidToPhone(targetChatJid);
+
+      console.log(`[WA] Intercepted revoke/delete for message ${targetKey.id} in chat ${resolvedJid}`);
+      
+      // Remove the message from the local DB
+      await pool.query(
+        `DELETE FROM wa_messages WHERE id=$1 AND chat_id=$2 AND account_phone=$3`,
+        [targetKey.id, resolvedJid, accPhone]
+      );
+      
+      // If it was the last message, update the chat's last message
+      try {
+        const latestRow = await pool.query(
+          `SELECT body FROM wa_messages WHERE chat_id=$1 AND account_phone=$2 ORDER BY timestamp DESC LIMIT 1`,
+          [resolvedJid, accPhone]
+        );
+        const newLastMsg = latestRow.rows[0] ? latestRow.rows[0].body : '';
+        await pool.query(
+          `UPDATE wa_chats SET last_message=$1 WHERE id=$2 AND account_phone=$3`,
+          [newLastMsg, resolvedJid, accPhone]
+        );
+        emit('wa:chats_updated', {});
+      } catch (_) {}
+      
+      emit('wa:message_deleted', {
+        id: targetKey.id,
+        chatId: resolvedJid
+      });
+      return true;
+    }
+  }
+  return false;
+}
+
+// ── SYNC CHAT DELETIONS (polling + diff workaround) ───────────────────────────
+async function syncChatDeletions(chatJid) {
+  if (!sock || !isConnected || !phoneNumber) return;
+  const accPhone = phoneNumber;
+  const formattedJid = formatJid(chatJid);
+  const socketJid = getSocketJid(formattedJid);
+
+  console.log(`[WA] Syncing deletions for chat: ${formattedJid} (socket JID: ${socketJid})`);
+
+  try {
+    // 1. Fetch latest 100 messages from WhatsApp servers
+    const currentMsgs = await sock.fetchMessagesFromWA(socketJid, 100);
+    if (!Array.isArray(currentMsgs)) return;
+
+    const currentIds = new Set(currentMsgs.map(m => m.key?.id).filter(Boolean));
+
+    // 2. Get messages we have in CRM for this chat
+    // Find oldest timestamp in the fetched messages to avoid falsely deleting older messages
+    let oldestTimestamp = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000); // default to 30 days
+    if (currentMsgs.length > 0) {
+      const timestamps = currentMsgs
+        .map(m => m.messageTimestamp ? toDate(m.messageTimestamp).getTime() : null)
+        .filter(Boolean);
+      if (timestamps.length > 0) {
+        oldestTimestamp = new Date(Math.min(...timestamps) - 10000); // 10s buffer
+      }
+    }
+
+    const crmMsgs = await pool.query(
+      `SELECT id FROM wa_messages 
+       WHERE chat_id=$1 AND account_phone=$2 AND timestamp >= $3`,
+      [formattedJid, accPhone, oldestTimestamp]
+    );
+
+    const crmRows = crmMsgs.rows;
+    if (crmRows.length === 0) return;
+
+    // 3. Diff: delete in CRM if exists in CRM but NOT in current WA messages list
+    let deletedCount = 0;
+    for (const row of crmRows) {
+      if (!currentIds.has(row.id)) {
+        console.log(`[WA-DIFF] Message ${row.id} in chat ${formattedJid} was deleted on phone. Deleting from CRM.`);
+        await pool.query(
+          `DELETE FROM wa_messages WHERE id=$1 AND chat_id=$2 AND account_phone=$3`,
+          [row.id, formattedJid, accPhone]
+        );
+        emit('wa:message_deleted', {
+          id: row.id,
+          chatId: formattedJid
+        });
+        deletedCount++;
+      }
+    }
+
+    if (deletedCount > 0) {
+      // Update last message of chat
+      try {
+        const latestRow = await pool.query(
+          `SELECT body FROM wa_messages WHERE chat_id=$1 AND account_phone=$2 ORDER BY timestamp DESC LIMIT 1`,
+          [formattedJid, accPhone]
+        );
+        const newLastMsg = latestRow.rows[0] ? latestRow.rows[0].body : '';
+        await pool.query(
+          `UPDATE wa_chats SET last_message=$1 WHERE id=$2 AND account_phone=$3`,
+          [newLastMsg, formattedJid, accPhone]
+        );
+        emit('wa:chats_updated', {});
+      } catch (_) {}
+    }
+  } catch (err) {
+    console.warn(`[WA] syncChatDeletions failed for ${formattedJid}:`, err.message);
+  }
+}
+
+let deletionSyncTimer = null;
+
+function startDeletionSyncWorker() {
+  if (deletionSyncTimer) return;
+  deletionSyncTimer = setInterval(async () => {
+    if (!sock || !isConnected || !phoneNumber) return;
+    try {
+      // Get the top 5 most recently active chats in the last 7 days to poll
+      const activeChats = await pool.query(
+        `SELECT id FROM wa_chats 
+         WHERE account_phone=$1 AND last_time >= NOW() - INTERVAL '7 days'
+         ORDER BY last_time DESC LIMIT 5`,
+        [phoneNumber]
+      );
+      
+      for (const row of activeChats.rows) {
+        await syncChatDeletions(row.id);
+        // Delay between chats to avoid rate limit spikes
+        await new Promise(resolve => setTimeout(resolve, 1000));
+      }
+    } catch (e) {
+      console.error('[WA] Deletion sync worker error:', e.message);
+    }
+  }, 2 * 60 * 1000); // Run every 2 minutes
+  console.log('[WA] Deletion sync worker started.');
+}
+
+function stopDeletionSyncWorker() {
+  if (deletionSyncTimer) {
+    clearInterval(deletionSyncTimer);
+    deletionSyncTimer = null;
+    console.log('[WA] Deletion sync worker stopped.');
+  }
 }
 
 // ── GET MESSAGE BODY + METADATA ─────────────────────────────────────────────────
@@ -849,6 +1212,24 @@ function getReplyInfo(msg) {
   }
 }
 
+// Helper: Extract message secret from the message context metadata
+function getMessageSecret(msg) {
+  try {
+    if (!msg || !msg.message) return null;
+    if (msg.message.messageContextInfo?.messageSecret) {
+      return msg.message.messageContextInfo.messageSecret;
+    }
+    const types = Object.keys(msg.message);
+    for (const type of types) {
+      const subMsg = msg.message[type];
+      if (subMsg && typeof subMsg === 'object' && subMsg.contextInfo?.messageSecret) {
+        return subMsg.contextInfo.messageSecret;
+      }
+    }
+  } catch (_) {}
+  return null;
+}
+
 // ── ENSURE DB TABLES ──────────────────────────────────────────────────────────
 async function ensureTables(retries = 3) {
   for (let i = 0; i < retries; i++) {
@@ -898,6 +1279,7 @@ async function ensureTables(retries = 3) {
           is_reply     BOOLEAN DEFAULT FALSE,
           reply_to_msg_id VARCHAR(200),
           media_path   TEXT,
+          message_secret TEXT,
           PRIMARY KEY (id, chat_id, account_phone)
         )
       `);
@@ -905,6 +1287,7 @@ async function ensureTables(retries = 3) {
       await pool.query(`ALTER TABLE wa_messages ADD COLUMN IF NOT EXISTS is_reply BOOLEAN DEFAULT FALSE`).catch(() => { });
       await pool.query(`ALTER TABLE wa_messages ADD COLUMN IF NOT EXISTS reply_to_msg_id VARCHAR(200)`).catch(() => { });
       await pool.query(`ALTER TABLE wa_messages ADD COLUMN IF NOT EXISTS media_path TEXT`).catch(() => { });
+      await pool.query(`ALTER TABLE wa_messages ADD COLUMN IF NOT EXISTS message_secret TEXT`).catch(() => { });
       await pool.query(`ALTER TABLE wa_chats ADD COLUMN IF NOT EXISTS imported_last_ts TIMESTAMPTZ`).catch(() => { });
       await pool.query(`ALTER TABLE wa_chats ADD COLUMN IF NOT EXISTS is_announce BOOLEAN DEFAULT FALSE`).catch(() => { });
       await pool.query(`
@@ -1156,16 +1539,25 @@ async function saveContact(contact) {
   }
 
   // Identity Mapping: If this is an LID, extract the real phone number
-  if (isLidJid(jid) && contact.phoneNumber) {
-    const pNum = typeof contact.phoneNumber === 'string' ? contact.phoneNumber : contact.phoneNumber.jid;
-    const realPhone = resolvedPhoneForLid(jid, pNum);
-    if (realPhone) {
-      phone = realPhone;
-      contactsStore[jid].phone = realPhone;
-      contactsStore[jid].phoneJid = `${realPhone}@s.whatsapp.net`;
+  if (isLidJid(jid)) {
+    if (contact.id && contact.id.endsWith('@s.whatsapp.net')) {
+      const realPhone = resolvedPhoneForLid(jid, contact.id);
+      if (realPhone) {
+        phone = realPhone;
+        contactsStore[jid].phone = realPhone;
+        contactsStore[jid].phoneJid = `${realPhone}@s.whatsapp.net`;
+      }
+    } else if (contact.phoneNumber) {
+      const pNum = typeof contact.phoneNumber === 'string' ? contact.phoneNumber : contact.phoneNumber.jid;
+      const realPhone = resolvedPhoneForLid(jid, pNum);
+      if (realPhone) {
+        phone = realPhone;
+        contactsStore[jid].phone = realPhone;
+        contactsStore[jid].phoneJid = `${realPhone}@s.whatsapp.net`;
+      }
+    } else {
+      phone = '';
     }
-  } else if (isLidJid(jid)) {
-    phone = '';
   }
 
   if (!WA_DYNAMIC_DB_STORE) return;
@@ -1333,6 +1725,9 @@ async function saveMessage(msg) {
         })()
         : null,
     };
+    const secret = getMessageSecret(msg);
+    const messageSecretBase64 = secret ? Buffer.from(secret).toString('base64') : null;
+
     pushLiveMessage(jid, liveRow);
     if (!WA_DYNAMIC_DB_STORE) {
       return { id, jid, fromMe, sender: senderJid, senderName, body, type, ts, quotedBody, isReply: replyInfo.isReply, replyToMsgId: replyInfo.replyToMsgId, mediaPath, status: msgStatus || 'sent' };
@@ -1340,13 +1735,17 @@ async function saveMessage(msg) {
     // Resolve status from Baileys: 1=sent, 2=delivered, 3=read, 4=played
 
     await pool.query(`
-      INSERT INTO wa_messages (id, chat_id, account_phone, from_me, sender, sender_name, body, msg_type, timestamp, is_read, status, quoted_body, is_reply, reply_to_msg_id, media_path)
-      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)
+      INSERT INTO wa_messages (id, chat_id, account_phone, from_me, sender, sender_name, body, msg_type, timestamp, is_read, status, quoted_body, is_reply, reply_to_msg_id, media_path, message_secret)
+      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16)
       ON CONFLICT (id, chat_id, account_phone) DO UPDATE SET
-        status = EXCLUDED.status
-      WHERE CASE wa_messages.status WHEN 'played' THEN 4 WHEN 'read' THEN 3 WHEN 'delivered' THEN 2 ELSE 1 END
-          < CASE EXCLUDED.status WHEN 'played' THEN 4 WHEN 'read' THEN 3 WHEN 'delivered' THEN 2 ELSE 1 END
-    `, [id, jid, accPhone, fromMe, senderJid, senderName, body, type, ts, fromMe, msgStatus || 'sent', quotedBody, replyInfo.isReply, replyInfo.replyToMsgId, mediaPath]);
+        status = CASE
+          WHEN CASE wa_messages.status WHEN 'played' THEN 4 WHEN 'read' THEN 3 WHEN 'delivered' THEN 2 ELSE 1 END
+             < CASE EXCLUDED.status WHEN 'played' THEN 4 WHEN 'read' THEN 3 WHEN 'delivered' THEN 2 ELSE 1 END
+          THEN EXCLUDED.status
+          ELSE wa_messages.status
+        END,
+        message_secret = COALESCE(wa_messages.message_secret, EXCLUDED.message_secret)
+    `, [id, jid, accPhone, fromMe, senderJid, senderName, body, type, ts, fromMe, msgStatus || 'sent', quotedBody, replyInfo.isReply, replyInfo.replyToMsgId, mediaPath, messageSecretBase64]);
 
     // Persist pushName as notify so chat list reflects the sender's current WA profile name
     if (!fromMe && !jid.endsWith('@g.us') && msg.pushName && !isInvalidContactLabel(msg.pushName) && !isPhoneLikeLabel(msg.pushName, '')) {
@@ -1466,6 +1865,7 @@ async function startWA(options = {}) {
   if (hasCreds) {
     applyConnectedAccountPhone(state.creds.me.id);
     userJid = state.creds.me.id;
+    userLid = state.creds.me.lid || null;
     // Only load existing data when we have a known account — skip for fresh QR scan
     await loadContactsFromDB();
     await loadImportedCheckpointsFromDB();
@@ -1504,11 +1904,43 @@ async function startWA(options = {}) {
     logger: require('pino')({ level: 'info' }), // Enabled info level to see Baileys internal logs
     getMessage: async (key) => {
       if (!phoneNumber) return { conversation: '' };
-      const res = await pool.query(
-        `SELECT body FROM wa_messages WHERE id=$1 AND chat_id=$2 AND account_phone=$3`,
-        [key.id, key.remoteJid, phoneNumber]
-      );
-      return res.rows[0] ? { conversation: res.rows[0].body } : { conversation: '' };
+      console.log('[WA-DEBUG] getMessage called with key:', JSON.stringify(key));
+      try {
+        const res = await pool.query(
+          `SELECT body, message_secret, msg_type FROM wa_messages WHERE id=$1 AND account_phone=$2`,
+          [key.id, phoneNumber]
+        );
+        if (!res.rows[0]) {
+          console.log('[WA-DEBUG] getMessage: no message found in database for ID:', key.id);
+          return { conversation: '' };
+        }
+        const row = res.rows[0];
+        console.log('[WA-DEBUG] getMessage: found message in database:', JSON.stringify({ id: key.id, body: row.body, msg_type: row.msg_type, has_secret: !!row.message_secret }));
+        const message = { conversation: row.body || '' };
+        if (row.message_secret) {
+          const secretBuf = Buffer.from(row.message_secret, 'base64');
+          message.messageContextInfo = {
+            messageSecret: secretBuf
+          };
+          const msgType = row.msg_type || 'conversation';
+          if (msgType === 'extendedTextMessage') {
+            message.extendedTextMessage = { text: row.body || '', contextInfo: { messageSecret: secretBuf } };
+          } else if (msgType === 'imageMessage') {
+            message.imageMessage = { caption: row.body || '', contextInfo: { messageSecret: secretBuf } };
+          } else if (msgType === 'videoMessage') {
+            message.videoMessage = { caption: row.body || '', contextInfo: { messageSecret: secretBuf } };
+          } else if (msgType === 'documentMessage') {
+            message.documentMessage = { contextInfo: { messageSecret: secretBuf } };
+          } else if (msgType !== 'conversation') {
+            message.extendedTextMessage = { text: row.body || '', contextInfo: { messageSecret: secretBuf } };
+          }
+        }
+        console.log('[WA-DEBUG] getMessage returning constructed message structure keys:', Object.keys(message));
+        return message;
+      } catch (e) {
+        console.error('[WA] Error in getMessage:', e.message);
+        return { conversation: '' };
+      }
     },
     connectTimeoutMs: 45000,
     keepAliveIntervalMs: 25000,
@@ -1572,12 +2004,14 @@ async function startWA(options = {}) {
         liveMessagesStore.clear();
         importedLastTsMap = {};
         groupMetadataCache.clear();
+        rawGroupMetadataCache.clear();
         isReconnect = false; // treat as fresh connect
       }
 
       // sock.user.id may be phone JID or @lid — always scope DB to creds.me.id phone.
       applyConnectedAccountPhone(rawId);
       userJid = rawId;
+      userLid = sock.user?.lid || state.creds?.me?.lid || null;
       console.log(`[WA] Connected as ${phoneNumber} | raw id: ${rawId} | reconnect: ${isReconnect}`);
       recordActivity('connected', 'WhatsApp connected', { phone: phoneNumber, reconnect: isReconnect });
       await loadContactsFromDB();
@@ -1585,6 +2019,7 @@ async function startWA(options = {}) {
       await updateChatNames();
       await consolidateLidChats();
       emit('wa:connected', { phone: phoneNumber, name: sock.user?.name });
+      startDeletionSyncWorker();
 
       // Immediately refresh LID→phone map so group msg senders resolve on reconnect
       await loadLidPhoneMapFromDB();
@@ -1629,6 +2064,7 @@ async function startWA(options = {}) {
 
     if (connection === 'close') {
       stopLidResolutionWorker();
+      stopDeletionSyncWorker();
       isConnected = false;
       currentState = 'DISCONNECTED';
       const code = (lastDisconnect?.error)?.output?.statusCode || (lastDisconnect?.error)?.code;
@@ -1646,9 +2082,11 @@ async function startWA(options = {}) {
         console.log('[WA] Logged out - clearing session');
         phoneNumber = null;
         userJid = null;
+        userLid = null;
         clearContactsStore();
         importedLastTsMap = {};
         groupMetadataCache.clear();
+        rawGroupMetadataCache.clear();
         clearSession();
         reconnectAttempts = 0; // Reset attempts for a fresh start
         if (allowQrGeneration) scheduleReconnect('logged out');
@@ -1667,9 +2105,11 @@ async function startWA(options = {}) {
         console.log('[WA] Unauthorized - clearing session');
         phoneNumber = null;
         userJid = null;
+        userLid = null;
         clearContactsStore();
         importedLastTsMap = {};
         groupMetadataCache.clear();
+        rawGroupMetadataCache.clear();
         clearSession();
         reconnectAttempts = 0;
         if (allowQrGeneration) scheduleReconnect('unauthorized');
@@ -1771,6 +2211,8 @@ async function startWA(options = {}) {
             msgCache.set(msg.key.id, msg);
             if (msgCache.size > MAX_CACHE) msgCache.delete(msgCache.keys().next().value);
           }
+          const isEdit = await handleProtocolMessageEdit(msg).catch(e => console.error('[WA-History] Edit parse error:', e.message));
+          if (isEdit) continue;
           if (!isRealMessage(msg)) continue;
           const jid = msg.key?.remoteJid;
           if (!jid || isNonChatJid(jid)) continue;
@@ -2022,6 +2464,15 @@ async function startWA(options = {}) {
           }
         }
       }
+      if (msg.message) {
+        console.log(`[WA-DEBUG] messages.upsert type: ${getContentType(msg.message)} | message keys: ${Object.keys(msg.message).join(', ')} | content: ${JSON.stringify(msg.message)}`);
+      }
+      // Check if it is a message edit protocol message
+      const isEdit = await handleProtocolMessageEdit(msg).catch(err => console.error('[WA] Edit process error:', err.message));
+      if (isEdit) continue;
+      // Check if it is a message revoke protocol message
+      const isRevoke = await handleProtocolMessageRevoke(msg).catch(err => console.error('[WA] Revoke process error:', err.message));
+      if (isRevoke) continue;
       if (!isRealMessage(msg)) continue;
       const rawJid = msg.key?.remoteJid || '';
       let jid = rawJid.includes(':') ? (rawJid.split(':')[0] + '@' + rawJid.split('@')[1]) : rawJid;
@@ -2076,7 +2527,7 @@ async function startWA(options = {}) {
 
         emit('wa:message', {
           id: saved.id,
-          chatId: jid,
+          chatId: saved.jid,
           fromMe: saved.fromMe,
           sender: saved.sender,
           senderName: saved.senderName,
@@ -2101,6 +2552,97 @@ async function startWA(options = {}) {
     for (const { key, update } of updates) {
       if (update.status && key.fromMe) {
         await applyMessageStatusUpdate(key, update.status, 'messages.update');
+      }
+
+      if (update.message) {
+        console.log(`[WA-DEBUG] messages.update for key ${JSON.stringify(key)} with message keys: ${Object.keys(update.message).join(', ')} | content: ${JSON.stringify(update.message)}`);
+        try {
+          // Check if it's a message edit protocol message
+          const isEdit = await handleProtocolMessageEdit({ key, message: update.message })
+            .catch(err => console.error('[WA] messages.update edit error:', err.message));
+          if (isEdit) continue;
+
+          // Check if it's a message revoke protocol message
+          const isRevoke = await handleProtocolMessageRevoke({ key, message: update.message })
+            .catch(err => console.error('[WA] messages.update revoke error:', err.message));
+          if (isRevoke) continue;
+
+          // If not an edit, then it's a regular decrypted message update.
+          // Let's check if the message exists in the database.
+          const accPhone = phoneNumber;
+          if (accPhone) {
+            const checkRes = await pool.query(
+              `SELECT 1 FROM wa_messages WHERE id=$1 AND account_phone=$2 LIMIT 1`,
+              [key.id, accPhone]
+            );
+            
+            const targetChatJid = formatJid(key.remoteJid);
+            const resolvedJid = await resolveJidToPhone(targetChatJid);
+
+            if (checkRes.rowCount > 0) {
+              const newText = getBody({ message: update.message });
+              if (newText !== undefined && newText !== null) {
+                console.log(`[WA] Intercepted body update in messages.update for message ${key.id} in chat ${resolvedJid}: ${newText.substring(0, 30)}`);
+                await pool.query(
+                  `UPDATE wa_messages SET body=$1 WHERE id=$2 AND chat_id=$3 AND account_phone=$4`,
+                  [newText, key.id, resolvedJid, accPhone]
+                );
+                const latestRow = await pool.query(
+                  `SELECT id FROM wa_messages WHERE chat_id=$1 AND account_phone=$2 ORDER BY timestamp DESC LIMIT 1`,
+                  [resolvedJid, accPhone]
+                );
+                if (latestRow.rows[0] && latestRow.rows[0].id === key.id) {
+                  await pool.query(
+                    `UPDATE wa_chats SET last_message=$1 WHERE id=$2 AND account_phone=$3`,
+                    [newText, resolvedJid, accPhone]
+                  );
+                  emit('wa:chats_updated', {});
+                }
+                emit('wa:message_edited', {
+                  id: key.id,
+                  chatId: resolvedJid,
+                  body: newText
+                });
+              }
+            } else {
+              // Message does not exist, save it as a new message!
+              console.log(`[WA] Late decrypted message received in messages.update for message ${key.id}`);
+              const fullMsg = {
+                key,
+                message: update.message,
+                messageTimestamp: update.messageTimestamp || Math.floor(Date.now() / 1000),
+                pushName: update.pushName || null,
+                status: update.status || null
+              };
+              const saved = await saveMessage(fullMsg);
+              if (saved) {
+                const isGroup = resolvedJid.endsWith('@g.us');
+                const chatName = isGroup
+                  ? getContactName(resolvedJid, null)
+                  : getContactName(resolvedJid, key.fromMe ? null : update.pushName);
+                await saveChat(resolvedJid, chatName, saved.body, saved.ts, key.fromMe ? 0 : 1, isGroup, { unreadMode: 'increment' });
+                emit('wa:message', {
+                  id: saved.id,
+                  chatId: resolvedJid,
+                  fromMe: saved.fromMe,
+                  sender: saved.sender,
+                  senderName: saved.senderName,
+                  body: saved.body,
+                  type: saved.type,
+                  ts: saved.ts,
+                  mediaPath: saved.mediaPath,
+                  status: saved.status || (saved.fromMe ? 'sent' : null),
+                  quotedBody: saved.quotedBody,
+                  isReply: saved.isReply,
+                  replyToMsgId: saved.replyToMsgId,
+                  chatName,
+                });
+              }
+            }
+          }
+        } catch (err) {
+          console.error('[WA] Failed to process message edit update:', err.message);
+        }
       }
     }
   });
@@ -2593,23 +3135,20 @@ async function processLidResolutionBatch(batchSize = LID_RESOLUTION_BATCH_SIZE) 
           // Skip if this JID is in rate-limit cooldown
           if ((groupMetadataRateCooldown.get(gid) || 0) > Date.now()) return;
           if (GROUP_METADATA_DELAY_MS > 0) await sleep(GROUP_METADATA_DELAY_MS);
-          const meta = await sock.groupMetadata(gid);
+           const meta = await getRawGroupMetadata(gid);
           for (const p of meta?.participants || []) {
-            const pJid = p.id;
-            if (!pJid?.endsWith('@lid')) continue;
-            // Try p.phoneNumber first (older Baileys), then fall back to contactsStore
-            let rawPhone = '';
-            if (p.phoneNumber) {
-              const pNum = typeof p.phoneNumber === 'string' ? p.phoneNumber : (p.phoneNumber?.jid || '');
-              rawPhone = String(pNum).replace(/\D/g, '');
-            } else {
-              rawPhone = (contactsStore[pJid]?.phone || '').replace(/\D/g, '');
+            const lidJid = p.id?.endsWith('@lid') ? p.id : (p.lid || null);
+            let phoneJid = p.id?.endsWith('@s.whatsapp.net') ? p.id : null;
+            if (!phoneJid && p.phoneNumber) {
+              phoneJid = typeof p.phoneNumber === 'string' ? p.phoneNumber : (p.phoneNumber.jid || null);
             }
-            if (!rawPhone || !isAllowedWaNumber(rawPhone) || seenJids.has(pJid)) continue;
-            seenJids.add(pJid);
+            if (!lidJid || !phoneJid) continue;
+            const rawPhone = String(phoneJid).split('@')[0].split(':')[0].replace(/\D/g, '');
+            if (!rawPhone || !isAllowedWaNumber(rawPhone) || seenJids.has(lidJid)) continue;
+            seenJids.add(lidJid);
             pendingContacts.push({
-              jid: pJid,
-              name: p.name && !isInvalidContactLabel(p.name) ? p.name : (contactsStore[pJid]?.name || null),
+              jid: lidJid,
+              name: p.name && !isInvalidContactLabel(p.name) ? p.name : (contactsStore[lidJid]?.name || null),
               phone: rawPhone,
             });
           }
@@ -2754,11 +3293,16 @@ async function syncAllGroupParticipants() {
         if (GROUP_METADATA_DELAY_MS > 0) await new Promise(resolve => setTimeout(resolve, GROUP_METADATA_DELAY_MS));
         const meta = await sock.groupMetadata(group.id);
         for (const p of meta.participants || []) {
-          if (!p.id || !p.id.endsWith('@lid') || !p.phoneNumber) continue;
-          const pNum = typeof p.phoneNumber === 'string' ? p.phoneNumber : (p.phoneNumber?.jid || '');
-          const rawPhone = pNum.replace(/\D/g, '');
-          if (!rawPhone || !isAllowedWaNumber(rawPhone)) continue;
-          pendingContacts.push({ jid: p.id, name: null, phone: rawPhone });
+          const lidJid = p.id?.endsWith('@lid') ? p.id : (p.lid || null);
+          let phoneJid = p.id?.endsWith('@s.whatsapp.net') ? p.id : null;
+          if (!phoneJid && p.phoneNumber) {
+            phoneJid = typeof p.phoneNumber === 'string' ? p.phoneNumber : (p.phoneNumber.jid || null);
+          }
+          if (!lidJid || !phoneJid) continue;
+          const rawPhone = String(phoneJid).split('@')[0].split(':')[0].replace(/\D/g, '');
+          if (!rawPhone || !isAllowedWaNumber(rawPhone) || seenJids.has(lidJid)) continue;
+          seenJids.add(lidJid);
+          pendingContacts.push({ jid: lidJid, name: null, phone: rawPhone });
         }
       } catch (_) { }
     });
@@ -2793,6 +3337,7 @@ function clearSession() {
 async function sendMessage(jid, text, quotedMsgId) {
   if (!sock || !isConnected) throw new Error('WhatsApp not connected');
   const formattedJid = formatJid(jid);
+  const socketJid = getSocketJid(formattedJid);
   const accPhone = phoneNumber;
   if (!accPhone) throw new Error('Connected WhatsApp account is not known yet');
 
@@ -2815,7 +3360,7 @@ async function sendMessage(jid, text, quotedMsgId) {
         sendOptions.quoted = {
           key: {
             id: quotedMsgId,
-            remoteJid: formattedJid,
+            remoteJid: socketJid,
             fromMe: res.rows[0].from_me,
             participant: res.rows[0].from_me ? undefined : (res.rows[0].sender || undefined),
           },
@@ -2827,7 +3372,7 @@ async function sendMessage(jid, text, quotedMsgId) {
     }
   }
 
-  const result = await sock.sendMessage(formattedJid, sendContent, sendOptions);
+  const result = await sock.sendMessage(socketJid, sendContent, sendOptions);
   const ts = new Date();
   const savedMsg = {
     id: result.key.id,
@@ -2950,6 +3495,7 @@ async function sendPreparedMedia(formattedJid, msgType, buffer, mimetype, filena
 async function sendMediaMessage(jid, media, quotedMsgId) {
   if (!sock || !isConnected) throw new Error('WhatsApp not connected');
   const formattedJid = formatJid(jid);
+  const socketJid = getSocketJid(formattedJid);
   const accPhone = phoneNumber;
   if (!accPhone) throw new Error('Connected WhatsApp account is not known yet');
   const buffer = Buffer.isBuffer(media?.buffer) ? media.buffer : Buffer.from(media?.buffer || '');
@@ -2979,7 +3525,7 @@ async function sendMediaMessage(jid, media, quotedMsgId) {
         quoted = {
           key: {
             id: quotedMsgId,
-            remoteJid: formattedJid,
+            remoteJid: socketJid,
             fromMe: !!res.rows[0].from_me,
             participant: res.rows[0].from_me ? undefined : (res.rows[0].sender ? formatJid(res.rows[0].sender) : undefined),
           },
@@ -2995,8 +3541,8 @@ async function sendMediaMessage(jid, media, quotedMsgId) {
   let result;
   try {
     // Attempt combined send (Document + Caption in one bubble)
-    console.log(`[WA] Attempting combined send of ${finalType} to ${formattedJid} with caption: "${caption || ''}"`);
-    result = await sendPreparedMedia(formattedJid, finalType, finalBuffer, finalMimetype, filename, caption, quoted);
+    console.log(`[WA] Attempting combined send of ${finalType} to ${socketJid} with caption: "${caption || ''}"`);
+    result = await sendPreparedMedia(socketJid, finalType, finalBuffer, finalMimetype, filename, caption, quoted);
     console.log(`[WA] Send successful, ID: ${result?.key?.id}`);
   } catch (err) {
     console.error(`[WA] Combined send failed for ${finalType}:`, err.message);
@@ -3004,7 +3550,7 @@ async function sendMediaMessage(jid, media, quotedMsgId) {
     // Fallback: If combined fails, try file only to at least deliver the content
     console.warn(`[WA] Falling back to file-only transmission...`);
     try {
-      result = await sendPreparedMedia(formattedJid, finalType, finalBuffer, finalMimetype, filename, null, quoted);
+      result = await sendPreparedMedia(socketJid, finalType, finalBuffer, finalMimetype, filename, null, quoted);
       console.log(`[WA] File-only fallback successful, ID: ${result?.key?.id}`);
 
       // If file-only worked, send caption as separate follow-up
@@ -3096,11 +3642,10 @@ const groupMetadataRateCooldown = new Map(); // jid → cooldown-until timestamp
 const GROUP_METADATA_RATE_COOLDOWN_MS = 5 * 60 * 1000; // 5 min cooldown after rate-limit
 const groupMetadataInFlight = new Map(); // jid → Promise (dedup concurrent calls)
 
-async function getGroupMetadata(jid, opts = {}) {
+async function getRawGroupMetadata(jid) {
   if (!sock || !isConnected) throw new Error('WhatsApp not connected');
   const CACHE_TTL = 15 * 60 * 1000;
-  const cacheKey = `${jid}::all`;
-  const cached = groupMetadataCache.get(cacheKey);
+  const cached = rawGroupMetadataCache.get(jid);
   if (cached && (Date.now() - cached.ts < CACHE_TTL)) return cached.data;
 
   // If this group is in rate-limit cooldown, serve cached data or throw
@@ -3116,7 +3661,7 @@ async function getGroupMetadata(jid, opts = {}) {
 
   let resolveInFlight, rejectInFlight;
   const inFlightPromise = new Promise((res, rej) => { resolveInFlight = res; rejectInFlight = rej; });
-  inFlightPromise.catch(() => {}); // suppress unhandled rejection — callers await this and handle errors themselves
+  inFlightPromise.catch(() => {}); // suppress unhandled rejection
   groupMetadataInFlight.set(jid, inFlightPromise);
 
   let meta;
@@ -3144,6 +3689,19 @@ async function getGroupMetadata(jid, opts = {}) {
     rejectInFlight(rlErr);
     throw rlErr;
   }
+
+  rawGroupMetadataCache.set(jid, { ts: Date.now(), data: meta });
+  groupMetadataInFlight.delete(jid);
+  resolveInFlight(meta);
+  return meta;
+}
+
+async function getGroupMetadata(jid, opts = {}) {
+  const meta = await getRawGroupMetadata(jid);
+  const CACHE_TTL = 15 * 60 * 1000;
+  const cacheKey = `${jid}::all`;
+  const cached = groupMetadataCache.get(cacheKey);
+  if (cached && (Date.now() - cached.ts < CACHE_TTL)) return cached.data;
 
   const allParticipants = Array.isArray(meta.participants) ? meta.participants : [];
   // Deduplicate by JID — Baileys can return duplicates for large groups
@@ -3189,8 +3747,6 @@ async function getGroupMetadata(jid, opts = {}) {
     announce: meta.announce === true,
   };
   groupMetadataCache.set(cacheKey, { ts: Date.now(), data: result });
-  groupMetadataInFlight.delete(jid);
-  resolveInFlight(result);
   return result;
 }
 
@@ -3349,7 +3905,7 @@ async function refreshCurrentAccountGroupMetadata(limit = 25) {
       // Skip if this JID is in rate-limit cooldown
       if ((groupMetadataRateCooldown.get(row.id) || 0) > Date.now()) return;
       if (GROUP_METADATA_DELAY_MS > 0) await new Promise(resolve => setTimeout(resolve, GROUP_METADATA_DELAY_MS));
-      const meta = await sock.groupMetadata(row.id);
+      const meta = await getRawGroupMetadata(row.id);
       if (meta?.subject) {
         await pool.query(
           `UPDATE wa_chats SET name=$1, updated_at=NOW() WHERE id=$2 AND account_phone=$3`,
@@ -3367,7 +3923,10 @@ async function refreshCurrentAccountGroupMetadata(limit = 25) {
         pendingContacts.push({ jid: p.id, name: null, phone: rawPhone });
       }
     } catch (err) {
-      console.warn(`[WA] Group metadata refresh skipped for ${row.id}:`, err.message);
+      const errMsg = String(err?.message || '');
+      if (!errMsg.includes('rate-overlimit')) {
+        console.warn(`[WA] Group metadata refresh skipped for ${row.id}:`, err.message);
+      }
     }
   });
 
@@ -3442,11 +4001,13 @@ async function logout() {
     pairingPhone = null;
     phoneNumber = null;
     userJid = null;
+    userLid = null;
     clearContactsStore();
     liveChatsStore.clear();
     liveMessagesStore.clear();
     importedLastTsMap = {};
     groupMetadataCache.clear();
+    rawGroupMetadataCache.clear();
   }
   clearSession();
 }
@@ -3970,29 +4531,155 @@ async function deleteWaMessage(chatJid, msgId, forEveryone = false) {
   if (!accPhone) throw new Error('Connected WhatsApp account is not known yet');
   const formattedJid = formatJid(chatJid);
 
-  if (forEveryone) {
-    // Look up fromMe for the Baileys key
-    let fromMe = true;
-    try {
-      const row = await pool.query(
-        `SELECT from_me FROM wa_messages WHERE id=$1 AND chat_id=$2 AND account_phone=$3`,
-        [msgId, formattedJid, accPhone]
-      );
-      if (row.rows[0]) fromMe = !!row.rows[0].from_me;
-    } catch (_) {}
+  let actualChatJid = formattedJid;
+  let fromMe = false;
+  let sender = null;
+  let msgTimestamp = Date.now();
+  try {
+    const row = await pool.query(
+      `SELECT chat_id, from_me, sender, timestamp FROM wa_messages WHERE id=$1 AND account_phone=$2 LIMIT 1`,
+      [msgId, accPhone]
+    );
+    if (row.rows[0]) {
+      actualChatJid = row.rows[0].chat_id;
+      fromMe = !!row.rows[0].from_me;
+      sender = row.rows[0].sender;
+      if (row.rows[0].timestamp) {
+        msgTimestamp = new Date(row.rows[0].timestamp).getTime();
+      }
+    }
+  } catch (_) {}
 
-    await sock.sendMessage(formattedJid, {
-      delete: { id: msgId, remoteJid: formattedJid, fromMe }
-    });
+  // Map phone JID back to LID JID for socket operation if a mapping exists
+  let socketJid = actualChatJid;
+  if (actualChatJid.endsWith('@s.whatsapp.net')) {
+    const lidMatch = Object.keys(contactsStore).find(
+      k => contactsStore[k] && contactsStore[k].phoneJid === actualChatJid
+    );
+    if (lidMatch) {
+      console.log(`[WA] Mapping delete target JID ${actualChatJid} back to LID ${lidMatch} for socket`);
+      socketJid = lidMatch;
+    }
   }
 
-  // Always remove from local DB
+  let participant = undefined;
+  if (socketJid.endsWith('@g.us') && !fromMe && sender) {
+    participant = sender;
+  }
+
+  const msgKey = {
+    id: msgId,
+    remoteJid: socketJid,
+    fromMe,
+    ...(participant ? { participant } : {})
+  };
+
+  if (forEveryone) {
+    await sock.sendMessage(socketJid, {
+      delete: msgKey
+    });
+  } else {
+    // Sync "Delete for me" back to WhatsApp server so it deletes on phone
+    try {
+      await sock.chatModify({
+        deleteForMe: {
+          deleteMedia: true,
+          key: msgKey,
+          timestamp: Math.floor(msgTimestamp / 1000)
+        }
+      }, socketJid);
+    } catch (e) {
+      console.warn('[WA] chatModify deleteForMe failed:', e.message);
+      try {
+        await sock.chatModify({
+          deleteForMe: {
+            deleteMedia: true,
+            key: msgKey,
+            timestamp: msgTimestamp
+          }
+        }, socketJid);
+      } catch (_) {}
+    }
+  }
+
+  // Always remove from local DB using the database format (actualChatJid)
   await pool.query(
     `DELETE FROM wa_messages WHERE id=$1 AND chat_id=$2 AND account_phone=$3`,
-    [msgId, formattedJid, accPhone]
+    [msgId, actualChatJid, accPhone]
   );
 }
 
-module.exports = { startWA, sendMessage, sendMediaMessage, logout, getStatus, getQR, requestQR, requestPhonePairingCode, setIO, getGroupMetadata, getGroupSubjectFromCache, refreshCurrentAccountGroupMetadata, resyncDirectoryFromSocket, processLidResolutionBatch, startLidResolutionWorker, stopLidResolutionWorker, downloadMedia, msgCache, importExportedChat, getConnectedPhone, getLiveChats, getLiveMessages, isLidResolutionExhausted, getLidResolutionCooldownMins, updateGroupName, flushCachedMediaToDisk, getProfilePicUrl, markChatRead, markChatUnread, markIncomingMessagesReadInDb, reconcileChatUnreadFromMessages, addChatLabel, removeChatLabel, deleteWaMessage, emitEvent: emit };
+// ── EDIT MESSAGE ─────────────────────────────────────────────────────────────
+async function editWaMessage(chatJid, msgId, newText) {
+  if (!sock || !isConnected) throw new Error('WhatsApp not connected');
+  const accPhone = phoneNumber;
+  if (!accPhone) throw new Error('Connected WhatsApp account is not known yet');
+  const formattedJid = formatJid(chatJid);
+
+  let actualChatJid = formattedJid;
+  let fromMe = false;
+  try {
+    const row = await pool.query(
+      `SELECT chat_id, from_me FROM wa_messages WHERE id=$1 AND account_phone=$2 LIMIT 1`,
+      [msgId, accPhone]
+    );
+    if (row.rows[0]) {
+      actualChatJid = row.rows[0].chat_id;
+      fromMe = !!row.rows[0].from_me;
+    }
+  } catch (_) {}
+
+  if (!fromMe) throw new Error('Cannot edit messages sent by others');
+
+  // Map phone JID back to LID JID for socket operation if a mapping exists
+  let socketJid = actualChatJid;
+  if (actualChatJid.endsWith('@s.whatsapp.net')) {
+    const lidMatch = Object.keys(contactsStore).find(
+      k => contactsStore[k] && contactsStore[k].phoneJid === actualChatJid
+    );
+    if (lidMatch) {
+      console.log(`[WA] Mapping edit target JID ${actualChatJid} back to LID ${lidMatch} for socket`);
+      socketJid = lidMatch;
+    }
+  }
+
+  // Send the edit message via Baileys
+  await sock.sendMessage(socketJid, {
+    text: newText,
+    edit: { id: msgId, remoteJid: socketJid, fromMe: true }
+  });
+
+  // Update the local DB using the database format (actualChatJid)
+  await pool.query(
+    `UPDATE wa_messages SET body=$1 WHERE id=$2 AND chat_id=$3 AND account_phone=$4`,
+    [newText, msgId, actualChatJid, accPhone]
+  );
+
+  // Also update the chat's last message if this was the last message
+  try {
+    const latestRow = await pool.query(
+      `SELECT id FROM wa_messages WHERE chat_id=$1 AND account_phone=$2 ORDER BY timestamp DESC LIMIT 1`,
+      [actualChatJid, accPhone]
+    );
+    if (latestRow.rows[0] && latestRow.rows[0].id === msgId) {
+      await pool.query(
+        `UPDATE wa_chats SET last_message=$1 WHERE id=$2 AND account_phone=$3`,
+        [newText, actualChatJid, accPhone]
+      );
+      emit('wa:chats_updated', {});
+    }
+  } catch (err) {
+    console.error('[WA] Failed to update chat last_message on edit:', err.message);
+  }
+
+  // Emit real-time event to connected clients
+  emit('wa:message_edited', {
+    id: msgId,
+    chatId: actualChatJid,
+    body: newText
+  });
+}
+
+module.exports = { startWA, sendMessage, sendMediaMessage, logout, getStatus, getQR, requestQR, requestPhonePairingCode, setIO, getGroupMetadata, getGroupSubjectFromCache, refreshCurrentAccountGroupMetadata, resyncDirectoryFromSocket, processLidResolutionBatch, startLidResolutionWorker, stopLidResolutionWorker, downloadMedia, msgCache, importExportedChat, getConnectedPhone, getLiveChats, getLiveMessages, isLidResolutionExhausted, getLidResolutionCooldownMins, updateGroupName, flushCachedMediaToDisk, getProfilePicUrl, markChatRead, markChatUnread, markIncomingMessagesReadInDb, reconcileChatUnreadFromMessages, addChatLabel, removeChatLabel, deleteWaMessage, editWaMessage, emitEvent: emit };
 
 
