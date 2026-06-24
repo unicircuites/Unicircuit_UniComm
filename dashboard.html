@@ -24386,9 +24386,10 @@ ${plainText}`;
       _waStablePollCount = 0;
     }
 
-    async function waRunLidResolutionBatch(batchSize) {
+    async function waRunLidResolutionBatch(batchSize, force) {
       try {
-        var res = await fetch(API_BASE + '/wa/resolve-lids?batch=' + (batchSize || 100), {
+        var url = API_BASE + '/wa/resolve-lids?batch=' + (batchSize || 100) + (force ? '&force=true' : '');
+        var res = await fetch(url, {
           method: 'POST',
           headers: getAuthHeaders(),
         });
@@ -26533,7 +26534,8 @@ ${plainText}`;
       try {
         // Run 3 batches back-to-back to maximise coverage across all groups
         for (var i = 0; i < 3; i++) {
-          var r = await waRunLidResolutionBatch(200);
+          var force = (i === 0); // force=true on first call to reset cooldown
+          var r = await waRunLidResolutionBatch(200, force);
           if (!r || r.skipped) break;
           if (r.pending === 0) break;
         }
@@ -26653,15 +26655,21 @@ ${plainText}`;
         var weAreAdmin = allParts.some(function(p) { return p.admin && p.jid && (p.jid.split('@')[0] === waConnectedPhone || (p.phone && p.phone.replace(/\D/g,'').endsWith(waConnectedPhone || ''))); });
         window._waGiIsAnnounce = isAnnounce;
         window._waGiWeAreAdmin = weAreAdmin;
-        // Filter out unresolved LID members — only show if they have a real phone or real name
+        // Show LID members even if unresolved — use name if available, else "Unknown"
         var visibleParts = allParts.filter(function(p) {
-          if (!p || !p.jid) return false;
-          if (String(p.jid).endsWith('@lid')) {
-            // Only show LID member if we have a real phone resolved
-            var ph = p.phone ? String(p.phone).replace(/\D/g, '') : '';
-            return ph.length >= 7 && ph.length <= 14;
+          return !!(p && p.jid);
+        }).map(function(p) {
+          if (String(p.jid).endsWith('@lid') && (!p.phone || String(p.phone).replace(/\D/g,'').length < 7)) {
+            // Check waLidMap for a resolved phone
+            var lidNum = p.jid.split('@')[0];
+            var mapped = waLidMap[lidNum];
+            if (mapped) {
+              return Object.assign({}, p, { phone: mapped.phone, name: p.name || mapped.name });
+            }
+            // Still unresolved — show with name or "Unknown"
+            return Object.assign({}, p, { phone: '', name: p.name || p.pushName || 'Unknown' });
           }
-          return true;
+          return p;
         });
         // If announcement group and we are NOT admin: show only admins
         if (isAnnounce && !weAreAdmin) {

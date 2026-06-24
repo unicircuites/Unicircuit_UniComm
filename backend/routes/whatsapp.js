@@ -662,6 +662,8 @@ router.post('/resolve-lids', authenticate, async (req, res) => {
     const accountPhone = connectedAccount(res);
     if (!accountPhone) return;
     const batch = Math.max(1, Math.min(parseInt(req.body?.batch || req.query?.batch || 100, 10) || 100, 200));
+    const force = req.body?.force === true || req.query?.force === 'true';
+    if (force) wa.resetLidResolution();
     const result = await wa.processLidResolutionBatch(batch);
     res.json({ success: true, account_phone: accountPhone, ...result });
   } catch (err) { res.status(500).json({ error: err.message }); }
