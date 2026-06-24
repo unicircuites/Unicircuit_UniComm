@@ -711,6 +711,17 @@ router.post('/sync', authenticate, async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
+// Wipe stale group-member contacts from DB + memory, re-sync fresh from live Baileys socket
+router.post('/reset-group-contacts', authenticate, async (req, res) => {
+  if (!wa.getStatus().connected) return res.status(400).json({ error: 'WhatsApp not connected' });
+  try {
+    const accountPhone = connectedAccount(res);
+    if (!accountPhone) return;
+    await wa.resetAndResyncGroupContacts();
+    res.json({ success: true });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
 router.post('/backups/create', authenticate, async (req, res) => {
   try {
     const accountPhone = connectedAccount(res);

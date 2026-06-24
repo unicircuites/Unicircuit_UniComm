@@ -26530,18 +26530,14 @@ ${plainText}`;
 
     async function waForceLidResolution() {
       var btn = document.getElementById('wa-resolve-lids-btn');
-      if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Resolving...'; }
+      if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Resetting...'; }
       try {
-        // Run 3 batches back-to-back to maximise coverage across all groups
-        for (var i = 0; i < 3; i++) {
-          var force = (i === 0); // force=true on first call to reset cooldown
-          var r = await waRunLidResolutionBatch(200, force);
-          if (!r || r.skipped) break;
-          if (r.pending === 0) break;
-        }
+        // Wipe stale group contacts from DB + memory, fresh sync from live Baileys
+        await fetch(API_BASE + '/wa/reset-group-contacts', { method: 'POST', headers: getAuthHeaders() });
         await waLoadLidMap();
         await waLoadChats({ force: true });
         waLoadResolutionStats(waAllChats.length);
+      } catch (_) { }
       } catch (_) { }
       if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fas fa-fingerprint"></i> Resolve LIDs'; }
     }

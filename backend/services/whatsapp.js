@@ -3374,6 +3374,79 @@ async function syncAllGroupParticipants() {
   }
 }
 
+// ── RESET & FRESH SYNC GROUP CONTACTS ────────────────────────────────────────────────
+// Wipes all group-member contacts from DB + memory, then re-syncs fresh from live Baileys.
+// Does NOT touch WA session, individual chats, or messages.
+async function resetAndResyncGroupContacts() {
+  if (!sock || !isConnected) throw new Error('WhatsApp not connected');
+  const accPhone = phoneNumber;
+  if (!accPhone) throw new Error('No connected account');
+
+  // 1. Wipe group-member contacts from DB
+  const deleted = await pool.query(
+    `DELETE FROM wa_contacts WHERE account_phone=$1 AND is_group_member=true`,
+    [accPhone]
+  );
+  console.log(`[WA] Reset: deleted ${deleted.rowCount} group-member contacts from DB`);
+
+  // 2. Remove group-member entries from in-memory contactsStore
+  for (const [key, entry] of Object.entries(contactsStore)) {
+    if (entry?.is_group_member) delete contactsStore[key];
+  }
+
+  // 3. Clear group metadata caches so fresh data is fetched
+  groupMetadataCache.clear();
+  rawGroupMetadataCache.clear();
+
+  // 4. Reset LID resolution state so it re-scans everything
+  lastGroupParticipantSyncAt = 0;
+  lidResolutionGroupIds = [];
+  lidResolutionGroupCursor = 0;
+  lidResolutionExhausted = false;
+
+  // 5. Fresh sync: fetch ALL group participants from live Baileys socket
+  // Capture LID-only members too (with name/notify), not just LID+phone pairs
+  const groupIds = [...new Set([
+    ...(await pool.query(`SELECT id FROM wa_chats WHERE is_group=true AND account_phone=$1`, [accPhone])).rows.map(r => r.id),
+    ...getSocketGroupIds(),
+  ])];
+
+  console.log(`[WA] Reset: re-syncing ${groupIds.length} groups fresh from Baileys...`);
+  const allContacts = [];
+  const seenJids = new Set();
+
+  await runWithConcurrency(groupIds.map(id => ({ id })), GROUP_METADATA_CONCURRENCY, async (group) => {
+    if (!isConnected) return;
+    try {
+      if (GROUP_METADATA_DELAY_MS > 0) await new Promise(r => setTimeout(r, GROUP_METADATA_DELAY_MS));
+      const meta = await sock.groupMetadata(group.id);
+      for (const p of meta.participants || []) {
+        const pJid = p.id;
+        if (!pJid || seenJids.has(pJid)) continue;
+        seenJids.add(pJid);
+        // Extract phone if available
+        let phone = null;
+        if (pJid.endsWith('@s.whatsapp.net')) {
+          phone = pJid.split('@')[0].split(':')[0];
+        } else if (p.phoneNumber) {
+          const pn = typeof p.phoneNumber === 'string' ? p.phoneNumber : (p.phoneNumber.jid || '');
+          const digits = pn.split('@')[0].replace(/\D/g, '');
+          if (isAllowedWaNumber(digits)) phone = digits;
+        }
+        const name = (p.name && !isInvalidContactLabel(p.name)) ? p.name : null;
+        allContacts.push({ jid: pJid, name, phone });
+      }
+    } catch (_) {}
+  });
+
+  const saved = await upsertGroupMemberContacts(allContacts, accPhone);
+  await consolidateLidChats();
+  await loadLidPhoneMapFromDB();
+  console.log(`[WA] Reset: fresh sync complete — ${saved} group contacts saved (${allContacts.filter(c => c.phone).length} with phones, ${allContacts.filter(c => !c.phone).length} LID-only)`);
+  recordActivity('participants', 'Group contacts reset + fresh sync', { saved, groups: groupIds.length });
+  emit('wa:participants_synced', { total: saved, reset: true });
+}
+
 // ── CLEAR SESSION ────────────────────────────────────────────────────────────────────
 function clearSession() {
   try {
@@ -4741,6 +4814,6 @@ async function editWaMessage(chatJid, msgId, newText) {
   });
 }
 
-module.exports = { startWA, sendMessage, sendMediaMessage, logout, getStatus, getQR, requestQR, requestPhonePairingCode, setIO, getGroupMetadata, clearGroupMetadataCache: () => { groupMetadataCache.clear(); rawGroupMetadataCache.clear(); }, getGroupSubjectFromCache, refreshCurrentAccountGroupMetadata, resyncDirectoryFromSocket, processLidResolutionBatch, startLidResolutionWorker, stopLidResolutionWorker, downloadMedia, msgCache, importExportedChat, getConnectedPhone, getLiveChats, getLiveMessages, isLidResolutionExhausted, getLidResolutionCooldownMins, resetLidResolution, updateGroupName, flushCachedMediaToDisk, getProfilePicUrl, markChatRead, markChatUnread, markIncomingMessagesReadInDb, reconcileChatUnreadFromMessages, addChatLabel, removeChatLabel, deleteWaMessage, editWaMessage, emitEvent: emit };
+module.exports = { startWA, sendMessage, sendMediaMessage, logout, getStatus, getQR, requestQR, requestPhonePairingCode, setIO, getGroupMetadata, clearGroupMetadataCache: () => { groupMetadataCache.clear(); rawGroupMetadataCache.clear(); }, getGroupSubjectFromCache, refreshCurrentAccountGroupMetadata, resyncDirectoryFromSocket, processLidResolutionBatch, startLidResolutionWorker, stopLidResolutionWorker, downloadMedia, msgCache, importExportedChat, getConnectedPhone, getLiveChats, getLiveMessages, isLidResolutionExhausted, getLidResolutionCooldownMins, resetLidResolution, updateGroupName, flushCachedMediaToDisk, getProfilePicUrl, markChatRead, markChatUnread, markIncomingMessagesReadInDb, reconcileChatUnreadFromMessages, addChatLabel, removeChatLabel, deleteWaMessage, editWaMessage, resetAndResyncGroupContacts, emitEvent: emit };
 
 
