@@ -7025,6 +7025,31 @@
                       </div>
                     </div>
 
+                    <!-- QR Code / Pairing Section -->
+                    <div id="settings-wa-qr-section" style="background: var(--bg2); border: 1px solid var(--border2); padding: 16px; border-radius: 8px; display: flex; flex-direction: column; gap: 12px;">
+                      <div style="display: flex; justify-content: space-between; align-items: center;">
+                        <div style="font-size: 12px; font-weight: 700; color: var(--muted2); text-transform: uppercase; display: flex; align-items: center; gap: 6px;">
+                          <i class="fas fa-qrcode" style="color: #25D366;"></i> Link Device / QR Code
+                        </div>
+                        <div style="display: flex; gap: 8px;">
+                          <button class="btn btn-ghost btn-xs" onclick="settingsLoadWaQR()" id="settings-wa-qr-refresh-btn">
+                            <i class="fas fa-sync-alt"></i> Load QR
+                          </button>
+                          <button class="btn btn-ghost btn-xs" onclick="settingsToggleQrSection()" style="color: var(--muted);">
+                            <i class="fas fa-chevron-up" id="settings-wa-qr-chevron"></i>
+                          </button>
+                        </div>
+                      </div>
+                      <div id="settings-wa-qr-body" style="display: flex; flex-direction: column; align-items: center; gap: 10px;">
+                        <div id="settings-wa-qr-placeholder" style="width: 200px; height: 200px; background: rgba(255,255,255,0.04); border: 2px dashed var(--border2); border-radius: 8px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; color: var(--muted);">
+                          <i class="fas fa-qrcode" style="font-size: 36px; opacity: 0.3;"></i>
+                          <span style="font-size: 11px;">Click "Load QR" to scan</span>
+                        </div>
+                        <img id="settings-wa-qr-img" style="display: none; width: 200px; height: 200px; border-radius: 8px; border: 2px solid #25D366; background: #fff;" alt="WhatsApp QR Code" />
+                        <div id="settings-wa-qr-status-text" style="font-size: 11px; color: var(--muted); text-align: center;"></div>
+                      </div>
+                    </div>
+
                     <!-- LID Progress Status Bar -->
                     <div style="background: var(--bg2); border: 1px solid var(--border2); padding: 12px; border-radius: 8px; display: flex; flex-direction: column; gap: 8px;">
                       <div style="display: flex; justify-content: space-between; font-size: 11.5px; font-weight: 600;">
@@ -7179,7 +7204,7 @@
                     </div>
 
                     <!-- Status Display Grid -->
-                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px;">
+                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px;">
                       <div style="background: var(--bg2); border: 1px solid var(--border2); padding: 12px; border-radius: 8px;">
                         <div style="font-size: 11px; color: var(--muted2); text-transform: uppercase; font-weight: 600; margin-bottom: 4px;">Auth Status</div>
                         <div id="settings-outlook-status-text" style="font-size: 13px; font-weight: 700; color: var(--text);">Disconnected</div>
@@ -7187,6 +7212,14 @@
                       <div style="background: var(--bg2); border: 1px solid var(--border2); padding: 12px; border-radius: 8px;">
                         <div style="font-size: 11px; color: var(--muted2); text-transform: uppercase; font-weight: 600; margin-bottom: 4px;">Mail Sync Status</div>
                         <div id="settings-outlook-sync-text" style="font-size: 12px; font-weight: 700; color: var(--text);">-</div>
+                      </div>
+                      <div style="background: var(--bg2); border: 1px solid var(--border2); padding: 12px; border-radius: 8px;">
+                        <div style="font-size: 11px; color: var(--muted2); text-transform: uppercase; font-weight: 600; margin-bottom: 4px;">Inbox Count</div>
+                        <div id="settings-outlook-inbox-count" style="font-size: 13px; font-weight: 700; color: var(--text);">-</div>
+                      </div>
+                      <div style="background: var(--bg2); border: 1px solid var(--border2); padding: 12px; border-radius: 8px;">
+                        <div style="font-size: 11px; color: var(--muted2); text-transform: uppercase; font-weight: 600; margin-bottom: 4px;">Templates</div>
+                        <div id="settings-outlook-template-count" style="font-size: 13px; font-weight: 700; color: var(--text);">-</div>
                       </div>
                     </div>
 
@@ -7196,6 +7229,7 @@
                       <div style="display: flex; gap: 10px; flex-wrap: wrap;">
                         <button class="btn btn-blue" onclick="connectOutlook()"><i class="fab fa-microsoft" style="margin-right: 6px;"></i>Connect Outlook</button>
                         <button class="btn btn-ghost" onclick="syncOutlookStats(); settingsAppendLog('outlook', 'Sync Stats initiated.')" id="settings-outlook-sync-btn"><i class="fas fa-sync-alt" style="margin-right: 6px;"></i>Sync Mail Stats</button>
+                        <button class="btn btn-ghost" onclick="settingsOutlookRefreshTemplates()" title="Reload templates from server"><i class="fas fa-layer-group" style="margin-right: 6px;"></i>Reload Templates</button>
                         <button class="btn btn-red" onclick="disconnectOutlook()"><i class="fas fa-sign-out-alt" style="margin-right: 6px;"></i>Disconnect</button>
                       </div>
                     </div>
@@ -7243,11 +7277,20 @@
                       <!-- Template Picker -->
                       <div>
                         <label class="form-label" style="font-size: 11px; font-weight: 600; color: var(--muted2); display: block; margin-bottom: 4px; text-transform: uppercase;">Use HTML Template (Optional)</label>
-                        <div style="display: flex; gap: 6px; align-items: center;">
+                        <div style="display: flex; gap: 6px; align-items: center; margin-bottom: 8px;">
                           <select id="settings-outlook-template-select" class="inp" style="font-size: 12px; padding: 5px 8px; flex: 1; background: transparent;">
                             <option value="">— Select a template —</option>
                           </select>
                           <button type="button" class="btn btn-blue btn-xs" onclick="settingsOutlookLoadTemplate()"><i class="fas fa-check"></i> Apply</button>
+                          <button type="button" class="btn btn-ghost btn-xs" onclick="settingsOutlookPreviewTemplate()" title="Preview template HTML"><i class="fas fa-eye"></i></button>
+                        </div>
+                        <!-- Template Preview -->
+                        <div id="settings-outlook-tpl-preview" style="display:none; border: 1px solid var(--border2); border-radius: 6px; overflow: hidden; background: #fff;">
+                          <div style="display: flex; justify-content: space-between; align-items: center; padding: 6px 10px; background: var(--bg2); border-bottom: 1px solid var(--border2);">
+                            <span style="font-size: 11px; font-weight: 600; color: var(--muted2); text-transform: uppercase;"><i class="fas fa-eye" style="margin-right:4px;"></i>Template Preview</span>
+                            <button class="btn btn-ghost btn-xs" onclick="document.getElementById('settings-outlook-tpl-preview').style.display='none'"><i class="fas fa-times"></i></button>
+                          </div>
+                          <iframe id="settings-outlook-tpl-iframe" style="width: 100%; height: 300px; border: none; display: block;" sandbox="allow-same-origin"></iframe>
                         </div>
                       </div>
 
@@ -7272,8 +7315,11 @@
                         </div>
                       </div>
 
-                      <!-- Submit Button -->
-                      <div style="display: flex; justify-content: flex-end; margin-top: 6px;">
+                      <!-- Quick Fill + Submit Buttons -->
+                      <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 6px; flex-wrap: wrap; gap: 8px;">
+                        <button class="btn btn-ghost btn-sm" id="settings-outlook-quickfill-btn" onclick="settingsOutlookQuickFillTest()" style="color: var(--gold); border-color: var(--gold);">
+                          <i class="fas fa-magic" style="margin-right: 5px;"></i>Quick Fill Test
+                        </button>
                         <button class="btn btn-blue" id="settings-outlook-send-btn" onclick="settingsSendOutlookTestEmail()" style="background: #0078d4; border-color: #0078d4;"><i class="fas fa-paper-plane" style="margin-right: 6px;"></i>Send Broadcast</button>
                       </div>
 
@@ -19263,8 +19309,8 @@ Best regards,<br>
 
         document.getElementById('settings-wa-status-text').textContent = connected ? 'Connected' : 'Disconnected';
         document.getElementById('settings-wa-phone-text').textContent = phone;
-        document.getElementById('settings-wa-chat-count').textContent = d.savedCallCount || 0;
-        document.getElementById('settings-wa-contact-count').textContent = d.resolvedCallCount || 0;
+        document.getElementById('settings-wa-chat-count').textContent = d.chatCount || 0;
+        document.getElementById('settings-wa-contact-count').textContent = d.contactCount || 0;
 
         const tileWa = document.getElementById('settings-tile-whatsapp');
         if (tileWa) {
@@ -19274,7 +19320,7 @@ Best regards,<br>
 
         const tileChats = document.getElementById('settings-tile-chats');
         if (tileChats) {
-          tileChats.textContent = d.savedCallCount || 0;
+          tileChats.textContent = d.chatCount || 0;
         }
 
         updateServiceIndicator('whatsapp', connected);
@@ -19303,19 +19349,17 @@ Best regards,<br>
         }
       } catch (_) {}
 
-      // 4. PBX Status (Retrieve dot color and last calls count)
+      // 4. PBX Status
       try {
-        // Fetch TCP state from status
-        const res = await fetch(`${API_BASE}/wa/status`, { headers: getAuthHeaders() });
+        const res = await fetch(`${API_BASE}/calls/pbx-status`, { headers: getAuthHeaders() });
         const d = await res.json();
-        const smdr = d.smdr || {};
-        const connected = smdr.activeSocket === true;
-        const lastActivity = smdr.lastActivity ? new Date(smdr.lastActivity).toLocaleTimeString() : 'Never';
+        const connected = d.activeSocket === true;
+        const lastActivity = d.lastActivity ? new Date(d.lastActivity).toLocaleTimeString() : 'Never';
 
         document.getElementById('settings-pbx-tcp-status').textContent = connected ? 'Connected (Listening)' : 'Disconnected';
         document.getElementById('settings-pbx-tcp-dot').style.background = connected ? 'var(--green)' : 'var(--red)';
         document.getElementById('settings-pbx-last-smdr').textContent = lastActivity;
-        document.getElementById('settings-pbx-total-logs').textContent = smdr.savedCallCount || 0;
+        document.getElementById('settings-pbx-total-logs').textContent = d.savedCallCount || 0;
 
         const tilePbx = document.getElementById('settings-tile-pbx');
         if (tilePbx) {
@@ -19365,12 +19409,22 @@ Best regards,<br>
     }
 
     // Double confirms and actions
-    function settingsConfirmResetGroupContacts() {
+    async function settingsConfirmResetGroupContacts() {
       if (!confirm('Are you sure you want to reset group contacts? All locally cached group member data will be deleted.')) return;
       if (!confirm('This action cannot be undone. Do you wish to proceed?')) return;
       
-      settingsAppendLog('whatsapp', 'Reset Group Contacts initiated.');
-      resetAndResyncGroupContacts();
+      settingsAppendLog('whatsapp', 'Reset Group Contacts initiated...');
+      try {
+        const res = await fetch(`${API_BASE}/wa/reset-group-contacts`, { method: 'POST', headers: getAuthHeaders() });
+        const d = await res.json();
+        if (!res.ok) throw new Error(d.error || 'Reset failed');
+        notify('Group Contacts Reset', `Deleted ${d.deleted || 0} entries. Re-syncing now...`, 'var(--green)', 'fas fa-users-slash');
+        settingsAppendLog('whatsapp', `✅ Group contacts reset. ${d.deleted || 0} entries removed.`);
+        settingsRefreshStatus();
+      } catch (err) {
+        notify('Error', err.message, 'var(--red)', 'fas fa-exclamation-circle');
+        settingsAppendLog('whatsapp', `❌ Reset failed: ${err.message}`);
+      }
     }
 
     async function settingsConfirmResetWaData() {
@@ -19390,6 +19444,72 @@ Best regards,<br>
       } catch (err) {
         notify('Error', err.message, 'var(--red)', 'fas fa-exclamation-circle');
         settingsAppendLog('whatsapp', `❌ Reset failed: ${err.message}`);
+      }
+    }
+
+    let _waQrPollInterval = null;
+    async function settingsLoadWaQR() {
+      const btn = document.getElementById('settings-wa-qr-refresh-btn');
+      const img = document.getElementById('settings-wa-qr-img');
+      const placeholder = document.getElementById('settings-wa-qr-placeholder');
+      const statusText = document.getElementById('settings-wa-qr-status-text');
+
+      if (btn) btn.disabled = true;
+      if (statusText) statusText.textContent = 'Fetching QR code...';
+      if (_waQrPollInterval) { clearInterval(_waQrPollInterval); _waQrPollInterval = null; }
+
+      async function fetchQR() {
+        try {
+          const res = await fetch(`${API_BASE}/wa/qr`, { headers: getAuthHeaders() });
+          const d = await res.json();
+          if (d.qr) {
+            // Use QRServer API to render QR from raw string
+            const encoded = encodeURIComponent(d.qr);
+            const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encoded}`;
+            if (img) { img.src = qrUrl; img.style.display = 'block'; }
+            if (placeholder) placeholder.style.display = 'none';
+            if (statusText) statusText.textContent = 'Scan with WhatsApp → Linked Devices → Link a Device';
+          } else {
+            // No QR means already connected
+            if (img) img.style.display = 'none';
+            if (placeholder) placeholder.style.display = 'flex';
+            if (statusText) statusText.textContent = 'WhatsApp is already connected. No QR needed.';
+            if (_waQrPollInterval) { clearInterval(_waQrPollInterval); _waQrPollInterval = null; }
+          }
+        } catch (err) {
+          if (statusText) statusText.textContent = `Error: ${err.message}`;
+        }
+      }
+
+      await fetchQR();
+      if (btn) btn.disabled = false;
+
+      // Poll every 20 seconds to auto-refresh QR or detect connection
+      _waQrPollInterval = setInterval(async () => {
+        const waRes = await fetch(`${API_BASE}/wa/status`, { headers: getAuthHeaders() }).catch(() => null);
+        if (waRes) {
+          const wd = await waRes.json().catch(() => ({}));
+          if (wd.connected) {
+            if (img) img.style.display = 'none';
+            if (placeholder) placeholder.style.display = 'flex';
+            if (statusText) statusText.textContent = '✅ Connected! QR scan successful.';
+            clearInterval(_waQrPollInterval); _waQrPollInterval = null;
+            settingsRefreshStatus();
+            return;
+          }
+        }
+        await fetchQR();
+      }, 20000);
+    }
+
+    function settingsToggleQrSection() {
+      const body = document.getElementById('settings-wa-qr-body');
+      const chevron = document.getElementById('settings-wa-qr-chevron');
+      if (!body) return;
+      const collapsed = body.style.display === 'none';
+      body.style.display = collapsed ? 'flex' : 'none';
+      if (chevron) {
+        chevron.className = collapsed ? 'fas fa-chevron-up' : 'fas fa-chevron-down';
       }
     }
 
@@ -19463,11 +19583,11 @@ Best regards,<br>
         passed = false;
       }
 
-      // Check if TCP connection is active from status
+      // Check if TCP connection is active from pbx-status endpoint
       try {
-        const res = await fetch(`${API_BASE}/wa/status`, { headers: getAuthHeaders() });
+        const res = await fetch(`${API_BASE}/calls/pbx-status`, { headers: getAuthHeaders() });
         const d = await res.json();
-        if (d.smdr && d.smdr.activeSocket === true) {
+        if (d.activeSocket === true) {
           settingsAppendLog('pbx', '✅ PBX TCP Server listener is actively bound on port 5001.');
         } else {
           settingsAppendLog('pbx', '⚠️ PBX TCP socket listener has no active connections.');
@@ -19481,35 +19601,123 @@ Best regards,<br>
     async function settingsRunOutlookTest() {
       settingsAppendLog('outlook', '🧪 Running Outlook end-to-end diagnostics...');
       let passed = true;
+      let connectedEmail = '';
 
+      // Step 1: Auth status
       try {
         const res = await fetch(`${API_BASE}/outlook/status`, { headers: getAuthHeaders() });
         const d = await res.json();
         if (d.connected === true) {
-          settingsAppendLog('outlook', `✅ Outlook authenticated as: ${d.email}`);
+          connectedEmail = d.email || '';
+          settingsAppendLog('outlook', `✅ [Step 1] Outlook authenticated as: ${connectedEmail}`);
         } else {
-          settingsAppendLog('outlook', '❌ Outlook authentication check failed: Not connected.');
+          settingsAppendLog('outlook', '❌ [Step 1] Outlook authentication check failed: Not connected.');
           passed = false;
         }
       } catch (err) {
-        settingsAppendLog('outlook', `❌ Authentication check failed: ${err.message}`);
+        settingsAppendLog('outlook', `❌ [Step 1] Authentication check failed: ${err.message}`);
         passed = false;
       }
 
+      // Step 2: Inbox retrieval
       try {
-        const res = await fetch(`${API_BASE}/outlook/inbox?limit=1`, { headers: getAuthHeaders() });
+        const res = await fetch(`${API_BASE}/outlook/inbox?limit=5`, { headers: getAuthHeaders() });
         const d = await res.json();
         if (res.ok) {
-          settingsAppendLog('outlook', '✅ Mailbox connection test passed. Retrieved inbox items.');
+          const count = Array.isArray(d) ? d.length : (d.messages?.length || 0);
+          settingsAppendLog('outlook', `✅ [Step 2] Mailbox connection OK. Retrieved ${count} inbox items.`);
+          const inboxEl = document.getElementById('settings-outlook-inbox-count');
+          if (inboxEl) inboxEl.textContent = count + '+ items';
         } else {
-          settingsAppendLog('outlook', `❌ Mailbox retrieval test failed: ${d.error || 'Server error'}`);
+          settingsAppendLog('outlook', `❌ [Step 2] Mailbox retrieval failed: ${d.error || 'Server error'}`);
           passed = false;
         }
       } catch (err) {
-        settingsAppendLog('outlook', `❌ Mailbox query failed: ${err.message}`);
+        settingsAppendLog('outlook', `❌ [Step 2] Mailbox query failed: ${err.message}`);
         passed = false;
       }
 
+      // Step 3: Template API list check
+      let testTemplateId = null;
+      let testTemplateName = null;
+      try {
+        const res = await fetch(`${API_BASE}/email-templates`, { headers: getAuthHeaders() });
+        if (res.ok) {
+          const templates = await res.json();
+          const count = Array.isArray(templates) ? templates.length : 0;
+          settingsAppendLog('outlook', `✅ [Step 3] Email Templates API OK: ${count} template(s) found.`);
+          const tplEl = document.getElementById('settings-outlook-template-count');
+          if (tplEl) tplEl.textContent = count + ' templates';
+          // Look for HTML render Test template specifically
+          const testTpl = templates.find(t => t.name && t.name.toLowerCase().includes('html render test'));
+          if (testTpl) {
+            testTemplateId = testTpl.id;
+            testTemplateName = testTpl.name;
+            settingsAppendLog('outlook', `✅ [Step 3] "HTML render Test" template found (id: ${testTpl.id}, subject: "${testTpl.subject || '(none)'}").`);
+          } else {
+            settingsAppendLog('outlook', '⚠️ [Step 3] "HTML render Test" template not found in library.');
+          }
+        } else {
+          settingsAppendLog('outlook', '❌ [Step 3] Templates API returned error.');
+          passed = false;
+        }
+      } catch (err) {
+        settingsAppendLog('outlook', `❌ [Step 3] Templates API failed: ${err.message}`);
+        passed = false;
+      }
+
+      // Step 4: Template HTML body load test (fetch full template and verify html_body)
+      if (testTemplateId) {
+        try {
+          const res = await fetch(`${API_BASE}/email-templates/${testTemplateId}`, { headers: getAuthHeaders() });
+          if (res.ok) {
+            const tplData = await res.json();
+            const htmlBody = tplData.html_body || tplData.body || '';
+            if (htmlBody.length > 0) {
+              settingsAppendLog('outlook', `✅ [Step 4] Template "${testTemplateName}" html_body loaded OK — ${htmlBody.length} chars.`);
+              // Show a snippet of the HTML body in the log
+              const snippet = htmlBody.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 120);
+              settingsAppendLog('outlook', `   📄 Body preview: "${snippet}..."`);
+            } else {
+              settingsAppendLog('outlook', `⚠️ [Step 4] Template "${testTemplateName}" has empty html_body.`);
+            }
+            // Also auto-populate the broadcast form with this template for quick testing
+            const subjectEl = document.getElementById('settings-outlook-subject');
+            const bodyEl = document.getElementById('settings-outlook-body-content');
+            const tplSel = document.getElementById('settings-outlook-template-select');
+            if (subjectEl && !subjectEl.value) subjectEl.value = tplData.subject || 'HTML Render Test';
+            if (bodyEl && !bodyEl.value) bodyEl.value = htmlBody;
+            if (tplSel) {
+              for (let i = 0; i < tplSel.options.length; i++) {
+                if (tplSel.options[i].value == testTemplateId) { tplSel.value = testTemplateId; break; }
+              }
+            }
+            settingsAppendLog('outlook', '   📋 Template auto-applied to broadcast form (subject+body pre-filled).');
+          } else {
+            settingsAppendLog('outlook', `⚠️ [Step 4] Template detail fetch returned error for id=${testTemplateId}.`);
+          }
+        } catch (err) {
+          settingsAppendLog('outlook', `❌ [Step 4] Template html_body load failed: ${err.message}`);
+          passed = false;
+        }
+      } else {
+        settingsAppendLog('outlook', '⚠️ [Step 4] Skipped template html_body load — "HTML render Test" not found.');
+      }
+
+      // Step 5: Sync status
+      try {
+        const res = await fetch(`${API_BASE}/outlook/sync-status`, { headers: getAuthHeaders() });
+        if (res.ok) {
+          const d = await res.json();
+          if (d && d.synced_at) {
+            settingsAppendLog('outlook', `✅ [Step 5] Last mail sync: ${new Date(d.synced_at).toLocaleString()} (${d.message_count || 0} msgs cached)`);
+          } else {
+            settingsAppendLog('outlook', '⚠️ [Step 5] No mail sync record found yet.');
+          }
+        }
+      } catch (_) { settingsAppendLog('outlook', '⚠️ [Step 5] Sync status endpoint not available (non-critical).'); }
+
+      settingsAppendLog('outlook', '─'.repeat(50));
       settingsAppendLog('outlook', passed ? '✅ Outlook diagnostic test PASSED.' : '❌ Outlook diagnostic test FAILED.');
       return passed;
     }
@@ -19565,11 +19773,14 @@ Best regards,<br>
       const selCc = document.getElementById('settings-outlook-cc-group-select');
       const selBcc = document.getElementById('settings-outlook-bcc-group-select');
       const selTpl = document.getElementById('settings-outlook-template-select');
+      // Modal equivalents
+      const selTplModal = document.getElementById('settings-outlook-template-select-modal');
 
       if (selTo) selTo.innerHTML = '<option value="">— Or load To from a group —</option>';
       if (selCc) selCc.innerHTML = '<option value="">— Or load CC from a group —</option>';
       if (selBcc) selBcc.innerHTML = '<option value="">— Or load BCC from a group —</option>';
       if (selTpl) selTpl.innerHTML = '<option value="">— Select a template —</option>';
+      if (selTplModal) selTplModal.innerHTML = '<option value="">— Select a template —</option>';
 
       try {
         // Fetch groups
@@ -19603,7 +19814,7 @@ Best regards,<br>
       }
 
       try {
-        // Fetch templates
+        // Fetch templates — populate both settings panel and modal dropdowns
         const res = await fetch(`${API_BASE}/email-templates`, { headers: getAuthHeaders() });
         if (res.ok) {
           const templates = await res.json();
@@ -19613,6 +19824,12 @@ Best regards,<br>
               opt.value = t.id;
               opt.textContent = t.name;
               selTpl.appendChild(opt);
+            }
+            if (selTplModal) {
+              const opt = document.createElement('option');
+              opt.value = t.id;
+              opt.textContent = t.name;
+              selTplModal.appendChild(opt);
             }
           });
         }
@@ -19671,12 +19888,261 @@ Best regards,<br>
         const bodyEl = document.getElementById('settings-outlook-body-content');
 
         if (subjectEl) subjectEl.value = data.subject || '';
-        if (bodyEl) bodyEl.value = data.body || '';
+        // API returns html_body — fixed from data.body
+        if (bodyEl) bodyEl.value = data.html_body || data.body || '';
 
+        settingsAppendLog('outlook', `✅ Template "${data.name}" applied — subject: "${data.subject || '(none)'}" | HTML body: ${(data.html_body || '').length} chars`);
         notify('Template Applied', data.name, 'var(--green)', 'fas fa-check');
       } catch (e) {
+        settingsAppendLog('outlook', `❌ Template load failed: ${e.message}`);
         notify('Error', e.message, 'var(--red)', 'fas fa-exclamation-circle');
       }
+    }
+
+    async function settingsOutlookPreviewTemplate() {
+      const sel = document.getElementById('settings-outlook-template-select');
+      const bodyEl = document.getElementById('settings-outlook-body-content');
+      const previewDiv = document.getElementById('settings-outlook-tpl-preview');
+      const iframe = document.getElementById('settings-outlook-tpl-iframe');
+
+      // Use current body content if already applied, else fetch from selected template
+      let html = bodyEl ? bodyEl.value.trim() : '';
+
+      if (!html && sel && sel.value) {
+        try {
+          const res = await fetch(`${API_BASE}/email-templates/${sel.value}`, { headers: getAuthHeaders() });
+          const data = await res.json();
+          // API returns html_body — fixed from data.body
+          if (res.ok) html = data.html_body || data.body || '';
+        } catch (_) {}
+      }
+
+      if (!html) {
+        notify('No template content', 'Apply a template first or type body content.', 'var(--red)', 'fas fa-exclamation-circle');
+        return;
+      }
+
+      if (previewDiv) previewDiv.style.display = 'block';
+      if (iframe) {
+        const doc = iframe.contentDocument || iframe.contentWindow?.document;
+        if (doc) {
+          doc.open();
+          doc.write(html);
+          doc.close();
+        }
+      }
+      settingsAppendLog('outlook', `👁️ Template preview rendered (${html.length} chars HTML).`);
+    }
+
+    async function settingsOutlookQuickFillTest() {
+      // Pre-fill with user-specified test recipients
+      const toEl = document.getElementById('settings-outlook-to');
+      const ccEl = document.getElementById('settings-outlook-cc');
+      const subjectEl = document.getElementById('settings-outlook-subject');
+      const bodyEl = document.getElementById('settings-outlook-body-content');
+      const tplSel = document.getElementById('settings-outlook-template-select');
+
+      if (toEl) toEl.value = 'chinmaytriesharder7@gmail.com, sarkarchinmayhgworld7@gmail.com';
+      if (ccEl) ccEl.value = 'sarkarcn@rknec.edu';
+      const bccEl = document.getElementById('settings-outlook-bcc');
+      if (bccEl) bccEl.value = 'biz.dev@unicircuites.com';
+
+      settingsAppendLog('outlook', '🪄 Quick Fill: Pre-filling test recipients...');
+      settingsAppendLog('outlook', '  → TO: chinmaytriesharder7@gmail.com, sarkarchinmayhgworld7@gmail.com');
+      settingsAppendLog('outlook', '  → CC: sarkarcn@rknec.edu');
+      settingsAppendLog('outlook', '  → BCC: biz.dev@unicircuites.com');
+
+      // Try to find and auto-select "HTML render Test" template
+      try {
+        const res = await fetch(`${API_BASE}/email-templates`, { headers: getAuthHeaders() });
+        if (res.ok) {
+          const templates = await res.json();
+          const testTpl = templates.find(t => t.name && t.name.toLowerCase().includes('html render test'));
+          if (testTpl && tplSel) {
+            // Make sure option exists in dropdown, add if needed
+            let found = false;
+            for (let i = 0; i < tplSel.options.length; i++) {
+              if (tplSel.options[i].value == testTpl.id) { tplSel.value = testTpl.id; found = true; break; }
+            }
+            if (!found) {
+              const opt = document.createElement('option');
+              opt.value = testTpl.id; opt.textContent = testTpl.name;
+              tplSel.appendChild(opt);
+              tplSel.value = testTpl.id;
+            }
+            // Fetch full template including html_body (list endpoint doesn't include html_body)
+            try {
+              const tplRes = await fetch(`${API_BASE}/email-templates/${testTpl.id}`, { headers: getAuthHeaders() });
+              const tplData = await tplRes.json();
+              if (tplRes.ok) {
+                if (subjectEl) subjectEl.value = tplData.subject || testTpl.subject || 'HTML Render Test';
+                // API returns html_body — fixed from testTpl.body
+                if (bodyEl) bodyEl.value = tplData.html_body || tplData.body || '';
+                settingsAppendLog('outlook', `✅ Template "${tplData.name}" loaded — html_body: ${(tplData.html_body || '').length} chars`);
+              } else {
+                if (subjectEl) subjectEl.value = testTpl.subject || 'HTML Render Test';
+                settingsAppendLog('outlook', '⚠️ Could not fetch template html_body, subject set from list data.');
+              }
+            } catch (fetchErr) {
+              if (subjectEl) subjectEl.value = testTpl.subject || 'HTML Render Test';
+              settingsAppendLog('outlook', `⚠️ Template detail fetch failed: ${fetchErr.message}`);
+            }
+            notify('Quick Fill Ready', 'Emails filled. Template applied. Click Send Broadcast to test.', 'var(--gold)', 'fas fa-magic');
+          } else {
+            // Fallback subject/body if no template found
+            if (subjectEl && !subjectEl.value) subjectEl.value = 'HTML Render Test — UniComm';
+            if (bodyEl && !bodyEl.value) bodyEl.value = '<h2 style="color:#0078d4;font-family:sans-serif;">HTML Render Test</h2><p>This is a <strong>test email</strong> sent from <em>UniComm CRM</em> to verify the Outlook HTML render pipeline.</p><p>&#9989; If you see this email with proper formatting, the system is working correctly.</p><hr/><small>Sent via UniComm CRM &mdash; Outlook MS Graph</small>';
+            settingsAppendLog('outlook', '⚠️ "HTML render Test" template not found in library — using default HTML fallback body.');
+            notify('Quick Fill Ready', 'Recipients pre-filled. Default HTML body applied (template not found in library).', 'var(--gold)', 'fas fa-magic');
+          }
+        }
+      } catch (err) {
+        if (subjectEl && !subjectEl.value) subjectEl.value = 'HTML Render Test';
+        settingsAppendLog('outlook', `⚠️ Template fetch failed: ${err.message}. Using defaults.`);
+      }
+    }
+
+    async function settingsOutlookRefreshTemplates() {
+      const sel = document.getElementById('settings-outlook-template-select');
+      if (!sel) return;
+      sel.innerHTML = '<option value="">— Loading... —</option>';
+      settingsAppendLog('outlook', '🔄 Reloading email templates...');
+      try {
+        const res = await fetch(`${API_BASE}/email-templates`, { headers: getAuthHeaders() });
+        if (res.ok) {
+          const templates = await res.json();
+          sel.innerHTML = '<option value="">— Select a template —</option>';
+          templates.forEach(t => {
+            const opt = document.createElement('option');
+            opt.value = t.id; opt.textContent = t.name;
+            sel.appendChild(opt);
+          });
+          const tplEl = document.getElementById('settings-outlook-template-count');
+          if (tplEl) tplEl.textContent = templates.length + ' templates';
+          settingsAppendLog('outlook', `✅ Templates reloaded: ${templates.length} found.`);
+          notify('Templates Refreshed', `${templates.length} email templates loaded.`, 'var(--green)', 'fas fa-layer-group');
+        } else {
+          sel.innerHTML = '<option value="">— Error loading —</option>';
+          settingsAppendLog('outlook', '❌ Template reload failed.');
+        }
+      } catch (err) {
+        sel.innerHTML = '<option value="">— Error loading —</option>';
+        settingsAppendLog('outlook', `❌ Template reload error: ${err.message}`);
+      }
+    }
+
+    // ─── Modal-specific Outlook broadcast functions (use -modal ID suffix to avoid DOM conflicts) ───
+
+    async function settingsOutlookLoadTemplateModal() {
+      const sel = document.getElementById('settings-outlook-template-select-modal');
+      if (!sel || !sel.value) {
+        notify('Select a template first', '', 'var(--red)', 'fas fa-exclamation-circle');
+        return;
+      }
+      try {
+        const res = await fetch(`${API_BASE}/email-templates/${sel.value}`, { headers: getAuthHeaders() });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Failed');
+        // These share IDs with settings panel — use settings-outlook-subject / body (same element, shown in modal)
+        const subjectEl = document.getElementById('settings-outlook-subject');
+        const bodyEl = document.getElementById('settings-outlook-body-content');
+        if (subjectEl) subjectEl.value = data.subject || '';
+        if (bodyEl) bodyEl.value = data.html_body || data.body || '';
+        settingsAppendLog('outlook', `✅ [Modal] Template "${data.name}" applied — html_body: ${(data.html_body || '').length} chars`);
+        notify('Template Applied', data.name, 'var(--green)', 'fas fa-check');
+      } catch (e) {
+        settingsAppendLog('outlook', `❌ [Modal] Template load failed: ${e.message}`);
+        notify('Error', e.message, 'var(--red)', 'fas fa-exclamation-circle');
+      }
+    }
+
+    async function settingsOutlookPreviewTemplateModal() {
+      const sel = document.getElementById('settings-outlook-template-select-modal');
+      const bodyEl = document.getElementById('settings-outlook-body-content');
+      const previewDiv = document.getElementById('settings-outlook-tpl-preview-modal');
+      const iframe = document.getElementById('settings-outlook-tpl-iframe-modal');
+
+      let html = bodyEl ? bodyEl.value.trim() : '';
+
+      if (!html && sel && sel.value) {
+        try {
+          const res = await fetch(`${API_BASE}/email-templates/${sel.value}`, { headers: getAuthHeaders() });
+          const data = await res.json();
+          if (res.ok) html = data.html_body || data.body || '';
+        } catch (_) {}
+      }
+
+      if (!html) {
+        notify('No template content', 'Apply a template first or type body content.', 'var(--red)', 'fas fa-exclamation-circle');
+        return;
+      }
+
+      if (previewDiv) previewDiv.style.display = 'block';
+      if (iframe) {
+        const doc = iframe.contentDocument || iframe.contentWindow?.document;
+        if (doc) { doc.open(); doc.write(html); doc.close(); }
+      }
+      settingsAppendLog('outlook', `👁️ [Modal] Template preview rendered (${html.length} chars HTML).`);
+    }
+
+    async function settingsOutlookQuickFillTestModal() {
+      const toEl = document.getElementById('settings-outlook-to');
+      const ccEl = document.getElementById('settings-outlook-cc');
+      const bccEl = document.getElementById('settings-outlook-bcc');
+      const subjectEl = document.getElementById('settings-outlook-subject');
+      const bodyEl = document.getElementById('settings-outlook-body-content');
+      const tplSel = document.getElementById('settings-outlook-template-select-modal');
+
+      if (toEl) toEl.value = 'chinmaytriesharder7@gmail.com, sarkarchinmayhgworld7@gmail.com';
+      if (ccEl) ccEl.value = 'sarkarcn@rknec.edu';
+      if (bccEl) bccEl.value = 'biz.dev@unicircuites.com';
+
+      settingsAppendLog('outlook', '🪄 [Modal] Quick Fill: Pre-filling test recipients...');
+      settingsAppendLog('outlook', '  → TO: chinmaytriesharder7@gmail.com, sarkarchinmayhgworld7@gmail.com');
+      settingsAppendLog('outlook', '  → CC: sarkarcn@rknec.edu');
+      settingsAppendLog('outlook', '  → BCC: biz.dev@unicircuites.com');
+
+      try {
+        const res = await fetch(`${API_BASE}/email-templates`, { headers: getAuthHeaders() });
+        if (res.ok) {
+          const templates = await res.json();
+          const testTpl = templates.find(t => t.name && t.name.toLowerCase().includes('html render test'));
+          if (testTpl && tplSel) {
+            let found = false;
+            for (let i = 0; i < tplSel.options.length; i++) {
+              if (tplSel.options[i].value == testTpl.id) { tplSel.value = testTpl.id; found = true; break; }
+            }
+            if (!found) {
+              const opt = document.createElement('option');
+              opt.value = testTpl.id; opt.textContent = testTpl.name;
+              tplSel.appendChild(opt); tplSel.value = testTpl.id;
+            }
+            try {
+              const tplRes = await fetch(`${API_BASE}/email-templates/${testTpl.id}`, { headers: getAuthHeaders() });
+              const tplData = await tplRes.json();
+              if (tplRes.ok) {
+                if (subjectEl) subjectEl.value = tplData.subject || 'HTML Render Test';
+                if (bodyEl) bodyEl.value = tplData.html_body || tplData.body || '';
+                settingsAppendLog('outlook', `✅ [Modal] Template "${tplData.name}" loaded — html_body: ${(tplData.html_body || '').length} chars`);
+              }
+            } catch (_) {}
+            notify('Quick Fill Ready', 'Emails filled. Template applied. Click Send Broadcast to test.', 'var(--gold)', 'fas fa-magic');
+          } else {
+            if (subjectEl && !subjectEl.value) subjectEl.value = 'HTML Render Test — UniComm';
+            if (bodyEl && !bodyEl.value) bodyEl.value = '<h2 style="color:#0078d4;font-family:sans-serif;">HTML Render Test</h2><p>This is a <strong>test email</strong> sent from <em>UniComm CRM</em> to verify the Outlook HTML render pipeline.</p><p>&#9989; If you see this email with proper formatting, the system is working correctly.</p><hr/><small>Sent via UniComm CRM &mdash; Outlook MS Graph</small>';
+            settingsAppendLog('outlook', '⚠️ [Modal] Template not found in library — using default HTML body.');
+            notify('Quick Fill Ready', 'Recipients pre-filled. Default HTML body applied.', 'var(--gold)', 'fas fa-magic');
+          }
+        }
+      } catch (err) {
+        settingsAppendLog('outlook', `⚠️ [Modal] Template fetch failed: ${err.message}`);
+      }
+    }
+
+    async function settingsSendOutlookTestEmailModal() {
+      // Delegates to the main send function — both panels share the same To/CC/BCC/Subject/Body inputs
+      // (Modal duplicate IDs were removed; modal uses same form inputs as settings panel)
+      return settingsSendOutlookTestEmail();
     }
 
     async function settingsSendOutlookTestEmail() {
@@ -22942,6 +23408,44 @@ ${plainText}`;
         var toEl = document.getElementById('compose-to');
         if (toEl) toEl.value = emails.join(', ');
         notify('Loaded: ' + data.name, emails.length + ' recipients in To field', 'var(--green)', 'fas fa-users');
+      } catch (e) { notify('Error', e.message, 'var(--red)', 'fas fa-exclamation-circle'); }
+    }
+
+    async function composeLoadFromGroupCc() {
+      var sel = document.getElementById('compose-group-select');
+      if (!sel || !sel.value) { notify('Select a group first', '', 'var(--red)', 'fas fa-exclamation-circle'); return; }
+      try {
+        var res = await fetch(API_BASE + '/groups/' + sel.value, { headers: getAuthHeaders() });
+        var data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Failed');
+        var emails = (data.members || []).filter(function (m) { return m.email; }).map(function (m) {
+          var fname = (m.fname && m.fname !== 'null') ? m.fname : '';
+          var lname = (m.lname && m.lname !== 'null' && m.lname !== '-') ? m.lname : '';
+          var name = (fname + ' ' + lname).trim() || m.company || '';
+          return name ? name + ' <' + m.email + '>' : m.email;
+        });
+        var ccEl = document.getElementById('compose-cc');
+        if (ccEl) ccEl.value = emails.join(', ');
+        notify('Loaded: ' + data.name, emails.length + ' recipients in CC field', 'var(--green)', 'fas fa-users');
+      } catch (e) { notify('Error', e.message, 'var(--red)', 'fas fa-exclamation-circle'); }
+    }
+
+    async function composeLoadFromGroupBcc() {
+      var sel = document.getElementById('compose-group-select');
+      if (!sel || !sel.value) { notify('Select a group first', '', 'var(--red)', 'fas fa-exclamation-circle'); return; }
+      try {
+        var res = await fetch(API_BASE + '/groups/' + sel.value, { headers: getAuthHeaders() });
+        var data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Failed');
+        var emails = (data.members || []).filter(function (m) { return m.email; }).map(function (m) {
+          var fname = (m.fname && m.fname !== 'null') ? m.fname : '';
+          var lname = (m.lname && m.lname !== 'null' && m.lname !== '-') ? m.lname : '';
+          var name = (fname + ' ' + lname).trim() || m.company || '';
+          return name ? name + ' <' + m.email + '>' : m.email;
+        });
+        var bccEl = document.getElementById('compose-bcc');
+        if (bccEl) bccEl.value = emails.join(', ');
+        notify('Loaded: ' + data.name, emails.length + ' recipients in BCC field', 'var(--green)', 'fas fa-users');
       } catch (e) { notify('Error', e.message, 'var(--red)', 'fas fa-exclamation-circle'); }
     }
 
@@ -27587,14 +28091,20 @@ ${plainText}`;
 
     async function waForceLidResolution() {
       var btn = document.getElementById('wa-resolve-lids-btn');
-      if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Resetting...'; }
+      if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Resolving...'; }
       try {
-        // Wipe stale group contacts from DB + memory, fresh sync from live Baileys
-        await fetch(API_BASE + '/wa/reset-group-contacts', { method: 'POST', headers: getAuthHeaders() });
+        const res = await fetch(API_BASE + '/wa/resolve-lids?force=true&batch=150', { method: 'POST', headers: getAuthHeaders() });
+        const d = await res.json();
+        if (!res.ok) throw new Error(d.error || 'LID resolution failed');
         await waLoadLidMap();
         await waLoadChats({ force: true });
         waLoadResolutionStats(waAllChats.length);
-      } catch (_) { }
+        const resolved = d.resolved || 0;
+        const pending = d.pending || 0;
+        notify('LID Resolution Done', `Resolved: ${resolved} | Pending: ${pending}`, 'var(--green2)', 'fas fa-fingerprint');
+      } catch (err) {
+        notify('LID Resolution Error', err.message, 'var(--red)', 'fas fa-exclamation-circle');
+      }
       if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fas fa-fingerprint"></i> Resolve LIDs'; }
     }
 
@@ -37364,14 +37874,23 @@ Nagpur, Maharashtra, 440017, India<br>
                     <input class="inp" id="settings-outlook-bcc" placeholder="bcc1@email.com, bcc2@email.com" style="width:100%; box-sizing:border-box; font-size:12px; padding:6px 10px; height:36px; background:var(--bg2); border:1px solid var(--border2); color:var(--text); border-radius:6px;" autocomplete="off" />
                   </div>
 
-                  <!-- Template Picker -->
+                  <!-- Template Picker (modal version uses -modal suffix IDs to avoid conflicts) -->
                   <div>
                     <label class="form-label" style="font-size:11px; font-weight:600; color:var(--muted2); display:block; margin-bottom:4px; text-transform:uppercase;">Use HTML Template (Optional)</label>
-                    <div style="display:flex; gap:6px; align-items:center;">
-                      <select id="settings-outlook-template-select" class="inp" style="font-size:12px; padding:5px 8px; flex:1; background:transparent;">
+                    <div style="display:flex; gap:6px; align-items:center; margin-bottom:8px;">
+                      <select id="settings-outlook-template-select-modal" class="inp" style="font-size:12px; padding:5px 8px; flex:1; background:transparent;">
                         <option value="">— Select a template —</option>
                       </select>
-                      <button type="button" class="btn btn-blue btn-xs" onclick="settingsOutlookLoadTemplate()"><i class="fas fa-check"></i> Apply</button>
+                      <button type="button" class="btn btn-blue btn-xs" onclick="settingsOutlookLoadTemplateModal()"><i class="fas fa-check"></i> Apply</button>
+                      <button type="button" class="btn btn-ghost btn-xs" onclick="settingsOutlookPreviewTemplateModal()" title="Preview template HTML"><i class="fas fa-eye"></i></button>
+                    </div>
+                    <!-- Template Preview (modal) -->
+                    <div id="settings-outlook-tpl-preview-modal" style="display:none; border:1px solid var(--border2); border-radius:6px; overflow:hidden; background:#fff;">
+                      <div style="display:flex; justify-content:space-between; align-items:center; padding:6px 10px; background:var(--bg2); border-bottom:1px solid var(--border2);">
+                        <span style="font-size:11px; font-weight:600; color:var(--muted2); text-transform:uppercase;"><i class="fas fa-eye" style="margin-right:4px;"></i>Template Preview</span>
+                        <button class="btn btn-ghost btn-xs" onclick="document.getElementById('settings-outlook-tpl-preview-modal').style.display='none'"><i class="fas fa-times"></i></button>
+                      </div>
+                      <iframe id="settings-outlook-tpl-iframe-modal" style="width:100%; height:280px; border:none; display:block;" sandbox="allow-same-origin"></iframe>
                     </div>
                   </div>
 
@@ -37396,9 +37915,12 @@ Nagpur, Maharashtra, 440017, India<br>
                     </div>
                   </div>
 
-                  <!-- Submit Button -->
-                  <div style="display:flex; justify-content:flex-end; margin-top:6px;">
-                    <button class="btn btn-blue" id="settings-outlook-send-btn" onclick="settingsSendOutlookTestEmail()" style="background:#0078d4; border-color:#0078d4;"><i class="fas fa-paper-plane" style="margin-right:6px;"></i>Send Broadcast</button>
+                  <!-- Quick Fill + Submit Buttons (modal) -->
+                  <div style="display:flex; justify-content:space-between; align-items:center; margin-top:6px; flex-wrap:wrap; gap:8px;">
+                    <button class="btn btn-ghost btn-sm" id="settings-outlook-quickfill-btn-modal" onclick="settingsOutlookQuickFillTestModal()" style="color:var(--gold); border-color:var(--gold);">
+                      <i class="fas fa-magic" style="margin-right:5px;"></i>Quick Fill Test
+                    </button>
+                    <button class="btn btn-blue" id="settings-outlook-send-btn-modal" onclick="settingsSendOutlookTestEmailModal()" style="background:#0078d4; border-color:#0078d4;"><i class="fas fa-paper-plane" style="margin-right:6px;"></i>Send Broadcast</button>
                   </div>
 
                   <!-- Broadcast Progress / Status Table -->
