@@ -3780,14 +3780,19 @@ async function getGroupMetadata(jid, opts = {}) {
           ? resolvedRawPhone
           : '+' + resolvedRawPhone;
     }
-    // Priority: 1) Baileys live p.name  2) stored name (only if phone resolved, DB names for phoneless LIDs are unreliable)  3) phone display
+    // Priority: 1) Baileys live p.name  2) stored notify (their own WA display name — safe even without phone)
+    //           3) stored name (only if phone resolved — saved contact name can be corrupted for phoneless LIDs)  4) phone display
     let displayName = (p.name && !isInvalidContactLabel(p.name)) ? p.name : null;
     if (!displayName) {
-      const storedName = stored?.name || stored?.notify || null;
-      const storedDigits = storedName ? String(storedName).replace(/\D/g, '') : '';
-      const storedNameOk = storedName && !(storedDigits && !isAllowedWaNumber(storedDigits)) && !isInvalidContactLabel(storedName);
-      // Only trust DB-stored name for @lid if the phone is also resolved — prevents stale/wrong names
-      if (storedNameOk && (!pJid.endsWith('@lid') || phoneDisplay)) displayName = storedName;
+      // notify = name the contact set themselves on WA — always trustworthy regardless of LID/phone status
+      const storedNotify = stored?.notify || null;
+      if (storedNotify && !isInvalidContactLabel(storedNotify)) {
+        displayName = storedNotify;
+      } else if (!pJid.endsWith('@lid') || phoneDisplay) {
+        // saved contact name only trusted when phone is resolved (prevents stale DB names for unresolved LIDs)
+        const storedName = stored?.name || null;
+        if (storedName && !isInvalidContactLabel(storedName)) displayName = storedName;
+      }
     }
     displayName = displayName || phoneDisplay || null;
     return { jid: pJid, phone: phoneDisplay, name: displayName, admin: p.admin === 'admin' || p.admin === 'superadmin' };
