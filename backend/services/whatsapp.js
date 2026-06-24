@@ -1031,6 +1031,8 @@ async function handleProtocolMessageRevoke(msg) {
 // ── SYNC CHAT DELETIONS (polling + diff workaround) ───────────────────────────
 async function syncChatDeletions(chatJid) {
   if (!sock || !isConnected || !phoneNumber) return;
+  // sock.fetchMessagesFromWA does not exist in Baileys — skip silently
+  if (typeof sock.fetchMessagesFromWA !== 'function') return;
   const accPhone = phoneNumber;
   const formattedJid = formatJid(chatJid);
   const socketJid = getSocketJid(formattedJid);
