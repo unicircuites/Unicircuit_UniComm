@@ -86,7 +86,7 @@ node db/init.js
 ### 5. Install PM2 and start server
 ```powershell
 npm install -g pm2
-pm2 start server.js --name unicomm
+pm2 start server.js --name unicomm-backend
 pm2 save
 ```
 
@@ -187,10 +187,10 @@ Set-Location 'C:\setup0\Unicircuit_UniComm\backend'
 npm install
 
 Write-Host "Restarting server..." -ForegroundColor Cyan
-if (pm2 describe unicomm | Select-String "status") {
-  pm2 restart unicomm --update-env
+if (pm2 describe unicomm-backend | Select-String "status") {
+  pm2 restart unicomm-backend --update-env
 } else {
-  pm2 start server.js --name unicomm --update-env
+  pm2 start server.js --name unicomm-backend --update-env
   pm2 save
 }
 
@@ -222,7 +222,7 @@ cd backend
 npm install
 
 if (Test-Path .\certs\server.crt) {
-  pm2 restart unicomm --update-env
+  pm2 restart unicomm-backend --update-env
   pm2 status
 } else {
   Write-Host "ERROR: backend\certs\server.crt missing. Restore certs before restarting PM2." -ForegroundColor Red
@@ -242,7 +242,7 @@ git ls-tree -r --name-only "stash@{0}^3"
 git checkout "stash@{0}^3" -- backend/certs
 
 cd backend
-pm2 restart unicomm --update-env
+pm2 restart unicomm-backend --update-env
 pm2 status
 ```
 
@@ -252,10 +252,10 @@ pm2 status
 
 ```powershell
 pm2 status              # server running hai ya nahi
-pm2 logs unicomm        # live logs dekho
-pm2 restart unicomm     # restart karo
-pm2 stop unicomm        # band karo
-pm2 start unicomm       # start karo
+pm2 logs unicomm-backend        # live logs dekho
+pm2 restart unicomm-backend     # restart karo
+pm2 stop unicomm-backend        # band karo
+pm2 start unicomm-backend       # start karo
 ```
 
 ---
@@ -400,7 +400,7 @@ Yeh tab karna padta hai jab:
 
 Server logs dekho:
 ```powershell
-pm2 logs unicomm --lines 50
+pm2 logs unicomm-backend --lines 50
 ```
 
 Kya dikhe:
@@ -462,7 +462,7 @@ Get-Content C:\setup0\Unicircuit_UniComm\backend\.env | Select-String "MS_CLIENT
   | Set-Content C:\setup0\Unicircuit_UniComm\backend\.env -Encoding UTF8
 
 # Server restart karo
-pm2 restart unicomm
+pm2 restart unicomm-backend
 ```
 
 7. Phir **Step 2** (Dashboard se reconnect) karo.
@@ -514,10 +514,10 @@ Agar delegated login ke baad bhi emails nahi aa rahe, ya `Client credentials fai
 Agar yeh sab karne ke baad bhi kaam nahi kar raha:
 ```powershell
 # Full debug — server restart with fresh logs
-pm2 stop unicomm
-pm2 flush unicomm
-pm2 start unicomm
-pm2 logs unicomm --lines 100
+pm2 stop unicomm-backend
+pm2 flush unicomm-backend
+pm2 start unicomm-backend
+pm2 logs unicomm-backend --lines 100
 ```
 Logs mein `[Graph]` aur `[MSAL]` lines dekho — exact error wahan hoga.
 
@@ -610,7 +610,7 @@ Press `Ctrl + C` in the terminal where the server is running.
 
 ### Step 1 — Stop PM2 server & navigate to project folder
 ```powershell
-pm2 stop unicomm
+pm2 stop unicomm-backend
 cd C:\setup0\Unicircuit_UniComm
 ```
 
@@ -647,15 +647,15 @@ if (!(Test-Path ".\certs\server.key") -or !(Test-Path ".\certs\server.crt")) {
 
 ### Step 6 — Server restart karo
 ```powershell
-pm2 restart unicomm --update-env
+pm2 restart unicomm-backend --update-env
 pm2 save
 ```
 
 ### Step 7 — Logs flush karo aur verify karo
 ```powershell
-pm2 flush unicomm
+pm2 flush unicomm-backend
 pm2 status
-pm2 logs unicomm --lines 80
+pm2 logs unicomm-backend --lines 80
 ```
 
 ---
@@ -663,7 +663,7 @@ pm2 logs unicomm --lines 80
 ### ⚡ One-liner (sab ek saath — copy-paste ready)
 
 ```powershell
-pm2 stop unicomm; cd C:\setup0\Unicircuit_UniComm; git config core.askyesno false; git stash push -m "tower deploy stash"; git checkout main; git fetch origin; git reset --hard origin/main; cd backend; npm install --prefer-offline; pm2 restart unicomm --update-env; pm2 save; pm2 flush unicomm; pm2 status
+pm2 stop unicomm-backend; cd C:\setup0\Unicircuit_UniComm; git config core.askyesno false; git stash push -m "tower deploy stash"; git checkout main; git fetch origin; git reset --hard origin/main; cd backend; npm install --prefer-offline; pm2 restart unicomm-backend --update-env; pm2 save; pm2 flush unicomm-backend; pm2 status
 ```
 
 ---
@@ -671,7 +671,7 @@ pm2 stop unicomm; cd C:\setup0\Unicircuit_UniComm; git config core.askyesno fals
 ### ✅ Deploy Checklist
 
 ```
-[ ] pm2 stop unicomm
+[ ] pm2 stop unicomm-backend
 [ ] cd C:\setup0\Unicircuit_UniComm
 [ ] git config core.askyesno false
 [ ] git stash push -m "tower tracked changes before deploy"
@@ -679,9 +679,9 @@ pm2 stop unicomm; cd C:\setup0\Unicircuit_UniComm; git config core.askyesno fals
 [ ] git reset --hard origin/main
 [ ] cd backend && npm install --prefer-offline
 [ ] certs\ folder mein server.crt aur server.key exist karte hain
-[ ] pm2 restart unicomm --update-env
+[ ] pm2 restart unicomm-backend --update-env
 [ ] pm2 status → "online" dikha
-[ ] pm2 logs unicomm --lines 80 → koi crash nahi
+[ ] pm2 logs unicomm-backend --lines 80 → koi crash nahi
 [ ] Browser: https://192.168.0.200:8088 → dashboard load hua
 ```
 
@@ -696,7 +696,7 @@ cd C:\setup0\Unicircuit_UniComm\backend
 mkdir certs -ErrorAction SilentlyContinue
 & "C:\Program Files\Git\usr\bin\openssl.exe" req -x509 -nodes -days 3650 -newkey rsa:2048 `
   -keyout ".\certs\server.key" -out ".\certs\server.crt" -subj "/CN=192.168.0.200"
-pm2 restart unicomm --update-env
+pm2 restart unicomm-backend --update-env
 ```
 
 ---
