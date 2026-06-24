@@ -23773,7 +23773,7 @@ ${plainText}`;
         var jid = waNormalizeJid(data && data.jid);
         if (!jid) return;
         var unread = typeof data.unread === 'number' ? data.unread : 0;
-        var chat = waAllChats.find(function (c) { return waNormalizeJid(c.id) === jid; });
+        var chat = waAllChats.find(function (c) { return waLooksSameChat(c.id, jid); });
         if (chat) {
           chat.unread = unread;
           waPatchChatRow(chat);
@@ -25122,48 +25122,7 @@ ${plainText}`;
               return false;
             });
 
-            if (unresolved.length > 0) {
-              // Group has unresolved LIDs! Refuse to load the group chat at the frontend.
-              if (area) {
-                area.innerHTML = '<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;gap:15px;color:var(--muted);font-size:14px;padding:20px;text-align:center;">' +
-                  '<i class="fas fa-lock" style="font-size:28px;color:var(--gold2);margin-bottom:5px;"></i>' +
-                  '<div><strong>Group Chat Locked</strong><br>' +
-                  '<span style="font-size:12px;color:var(--muted2);margin-top:5px;display:inline-block;">' +
-                  'Waiting for WhatsApp to resolve all LID contacts to phone numbers...<br>' +
-                  '(' + unresolved.length + ' of ' + gData.participants.filter(function(p){return String(p.jid).endsWith('@lid')}).length + ' LIDs remaining)' +
-                  '</span></div>' +
-                  '<span class="spin-loader" style="width:20px;height:20px;"></span>' +
-                  '</div>';
-              }
-              if (phEl) phEl.textContent = 'Resolving group LIDs (' + unresolved.length + ' left)...';
-
-              // Lock the group info sidebar members section too
-              var giMembers = document.getElementById('wa-gi-members');
-              if (giMembers) {
-                giMembers.innerHTML = '<div style="padding:20px;color:var(--muted);font-size:12px;text-align:center;">' +
-                  '<i class="fas fa-sync-alt spin" style="margin-right:5px;"></i>' +
-                  'Waiting for LID resolution... (' + unresolved.length + ' left)' +
-                  '</div>';
-              }
-
-              // Update sidebar group counts if needed
-              var realGroupName = (gData.name && String(gData.name).trim() && !/^group$/i.test(String(gData.name).trim()))
-                ? String(gData.name).trim() : null;
-              if (realGroupName && titleEl) titleEl.textContent = realGroupName;
-
-              // Schedule retry in 5 seconds
-              setTimeout(function() {
-                if (waActiveJid === jid) waOpenChat(jid, name, isGroup);
-              }, 5000);
-              return;
-            }
-
-            var cnt = gData.total_participants || gData.participants.length;
-            var realGroupName = (gData.name && String(gData.name).trim() && !/^group$/i.test(String(gData.name).trim()))
-              ? String(gData.name).trim() : null;
-            if (realGroupName && titleEl) titleEl.textContent = realGroupName;
-            if (phEl) phEl.textContent = (realGroupName || name || 'Group') + ' \u00b7 ' + cnt + ' members';
-            // Populate waLidMap from group participants so bubble renders resolve correctly
+            // Populate waLidMap for ALL resolved participants (even if some remain unresolved)
             if (Array.isArray(gData.participants)) {
               gData.participants.forEach(function(p) {
                 if (p && p.jid && String(p.jid).endsWith('@lid') && p.phone) {
@@ -25175,6 +25134,18 @@ ${plainText}`;
                 }
               });
             }
+            // Soft warning in header if some LIDs still unresolved — do NOT block the chat
+            if (unresolved.length > 0 && phEl) {
+              var totalLids = gData.participants.filter(function(p){return String(p.jid||'').endsWith('@lid');}).length;
+              phEl.textContent = (gData.name || name || 'Group') + ' · ' + (gData.total_participants || gData.participants.length) + ' members (' + unresolved.length + '/' + totalLids + ' contacts still resolving)';
+            }
+
+            var cnt = gData.total_participants || gData.participants.length;
+            var realGroupName = (gData.name && String(gData.name).trim() && !/^group$/i.test(String(gData.name).trim()))
+              ? String(gData.name).trim() : null;
+            if (realGroupName && titleEl) titleEl.textContent = realGroupName;
+            // Only overwrite phEl if we didn't already set the unresolved warning above
+            if (unresolved.length === 0 && phEl) phEl.textContent = (realGroupName || name || 'Group') + ' \u00b7 ' + cnt + ' members';
             waPopulateGroupInfo(gData);
           } else {
             // Fetch failed, show retrying message
