@@ -850,6 +850,8 @@ router.get('/group/:jid', authenticate, async (req, res) => {
     if (blocked.rowCount) return res.status(404).json({ error: 'Chat is blocked for this WhatsApp account' });
     const participantsLimit = Math.max(1, parseInt(req.query.limit || '200', 10) || 200);
     const participantsOffset = Math.max(0, parseInt(req.query.offset || '0', 10) || 0);
+    // Always fetch fresh — stale cache can have wrong names for @lid members
+    wa.clearGroupMetadataCache();
     const gData = await wa.getGroupMetadata(jid, { participantsLimit, participantsOffset });
     // Group Info is the authoritative source — persist the confirmed subject to wa_chats
     // so the chat list always shows the real name, not a stale/empty fallback.

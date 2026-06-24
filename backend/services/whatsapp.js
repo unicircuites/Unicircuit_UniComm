@@ -3780,12 +3780,15 @@ async function getGroupMetadata(jid, opts = {}) {
           ? resolvedRawPhone
           : '+' + resolvedRawPhone;
     }
-    let displayName = stored?.name || stored?.notify || null;
-    const displayDigits = displayName ? String(displayName).replace(/\D/g, '') : '';
-    if (displayName && displayDigits && !isAllowedWaNumber(displayDigits)) displayName = null;
-    if (displayName && isInvalidContactLabel(displayName)) displayName = null;
-    // For unresolved @lid participants (no phone), stored name is unreliable — suppress it
-    if (pJid.endsWith('@lid') && !phoneDisplay) displayName = null;
+    // Priority: 1) Baileys live p.name  2) stored name (only if phone resolved, DB names for phoneless LIDs are unreliable)  3) phone display
+    let displayName = (p.name && !isInvalidContactLabel(p.name)) ? p.name : null;
+    if (!displayName) {
+      const storedName = stored?.name || stored?.notify || null;
+      const storedDigits = storedName ? String(storedName).replace(/\D/g, '') : '';
+      const storedNameOk = storedName && !(storedDigits && !isAllowedWaNumber(storedDigits)) && !isInvalidContactLabel(storedName);
+      // Only trust DB-stored name for @lid if the phone is also resolved — prevents stale/wrong names
+      if (storedNameOk && (!pJid.endsWith('@lid') || phoneDisplay)) displayName = storedName;
+    }
     displayName = displayName || phoneDisplay || null;
     return { jid: pJid, phone: phoneDisplay, name: displayName, admin: p.admin === 'admin' || p.admin === 'superadmin' };
   });
@@ -4733,6 +4736,6 @@ async function editWaMessage(chatJid, msgId, newText) {
   });
 }
 
-module.exports = { startWA, sendMessage, sendMediaMessage, logout, getStatus, getQR, requestQR, requestPhonePairingCode, setIO, getGroupMetadata, getGroupSubjectFromCache, refreshCurrentAccountGroupMetadata, resyncDirectoryFromSocket, processLidResolutionBatch, startLidResolutionWorker, stopLidResolutionWorker, downloadMedia, msgCache, importExportedChat, getConnectedPhone, getLiveChats, getLiveMessages, isLidResolutionExhausted, getLidResolutionCooldownMins, resetLidResolution, updateGroupName, flushCachedMediaToDisk, getProfilePicUrl, markChatRead, markChatUnread, markIncomingMessagesReadInDb, reconcileChatUnreadFromMessages, addChatLabel, removeChatLabel, deleteWaMessage, editWaMessage, emitEvent: emit };
+module.exports = { startWA, sendMessage, sendMediaMessage, logout, getStatus, getQR, requestQR, requestPhonePairingCode, setIO, getGroupMetadata, clearGroupMetadataCache: () => { groupMetadataCache.clear(); rawGroupMetadataCache.clear(); }, getGroupSubjectFromCache, refreshCurrentAccountGroupMetadata, resyncDirectoryFromSocket, processLidResolutionBatch, startLidResolutionWorker, stopLidResolutionWorker, downloadMedia, msgCache, importExportedChat, getConnectedPhone, getLiveChats, getLiveMessages, isLidResolutionExhausted, getLidResolutionCooldownMins, resetLidResolution, updateGroupName, flushCachedMediaToDisk, getProfilePicUrl, markChatRead, markChatUnread, markIncomingMessagesReadInDb, reconcileChatUnreadFromMessages, addChatLabel, removeChatLabel, deleteWaMessage, editWaMessage, emitEvent: emit };
 
 
