@@ -1315,6 +1315,8 @@ async function ensureTables(retries = 3) {
       await pool.query(`ALTER TABLE wa_contacts ADD COLUMN IF NOT EXISTS verified_name TEXT`).catch(() => { });
       await pool.query(`ALTER TABLE wa_contacts ADD COLUMN IF NOT EXISTS is_business BOOLEAN DEFAULT FALSE`).catch(() => { });
       await pool.query(`UPDATE wa_contacts SET is_business = true WHERE verified_name IS NOT NULL AND is_business = false`).catch(() => { });
+      // Clean up: LID contacts with no resolved phone should not carry stale names (wrong data from old syncs)
+      await pool.query(`UPDATE wa_contacts SET name = NULL WHERE jid LIKE '%@lid' AND (phone IS NULL OR phone = '')`).catch(() => { });
       await pool.query(`ALTER TABLE wa_chats ADD COLUMN IF NOT EXISTS account_phone VARCHAR(50) DEFAULT 'unknown'`).catch(() => { });
       await pool.query(`ALTER TABLE wa_chats ADD COLUMN IF NOT EXISTS profile_pic_url TEXT`).catch(() => { });
       await pool.query(`ALTER TABLE wa_messages ADD COLUMN IF NOT EXISTS account_phone VARCHAR(50) DEFAULT 'unknown'`).catch(() => { });
@@ -1836,6 +1838,44 @@ async function loadLidPhoneMapFromDB() {
   }
 }
 
+// ── VALIDATE & CLEAN LID MAPPINGS ON CONNECT ─────────────────────────────────────────
+// Wipes invalid phone values stored against LID JIDs so they re-enter the pending queue
+// and get properly resolved by the LID resolution worker.
+// Invalid = phone is blank, non-numeric, same as the LID number itself, or wrong length.
+async function validateAndCleanLidMappings() {
+  try {
+    const accPhone = phoneNumber;
+    if (!accPhone) return;
+    const result = await pool.query(`
+      UPDATE wa_contacts
+      SET phone = NULL, updated_at = NOW()
+      WHERE account_phone = $1
+        AND jid LIKE '%@lid'
+        AND phone IS NOT NULL
+        AND (
+          regexp_replace(phone, '[^0-9]', '', 'g') = split_part(jid, '@', 1)
+          OR NOT (regexp_replace(COALESCE(phone, ''), '[^0-9]', '', 'g') ~ '^[0-9]{7,14}$')
+        )
+      RETURNING jid
+    `, [accPhone]);
+    const cleaned = result.rowCount || 0;
+    if (cleaned > 0) {
+      console.log(`[WA] LID validation: cleared ${cleaned} invalid phone mapping(s) — will re-resolve`);
+      // Remove bad entries from in-memory store too
+      for (const row of result.rows) {
+        if (contactsStore[row.jid]) {
+          delete contactsStore[row.jid].phone;
+          delete contactsStore[row.jid].phoneJid;
+        }
+      }
+    } else {
+      console.log(`[WA] LID validation: all stored LID→phone mappings look valid`);
+    }
+  } catch (err) {
+    console.error('[WA] validateAndCleanLidMappings error:', err.message);
+  }
+}
+
 // ── START WHATSAPP ────────────────────────────────────────────────────────────────────
 async function startWA(options = {}) {
   await loadBaileys();
@@ -2032,6 +2072,8 @@ async function startWA(options = {}) {
 
       // Immediately refresh LID→phone map so group msg senders resolve on reconnect
       await loadLidPhoneMapFromDB();
+      // Validate stored LID→phone mappings — wipe invalid ones so they re-resolve cleanly
+      await validateAndCleanLidMappings();
 
       // After connect: scan ALL groups and populate LID→phone in wa_contacts
       // Delay 60s to let WhatsApp settle before making group metadata requests
@@ -3742,6 +3784,8 @@ async function getGroupMetadata(jid, opts = {}) {
     const displayDigits = displayName ? String(displayName).replace(/\D/g, '') : '';
     if (displayName && displayDigits && !isAllowedWaNumber(displayDigits)) displayName = null;
     if (displayName && isInvalidContactLabel(displayName)) displayName = null;
+    // For unresolved @lid participants (no phone), stored name is unreliable — suppress it
+    if (pJid.endsWith('@lid') && !phoneDisplay) displayName = null;
     displayName = displayName || phoneDisplay || null;
     return { jid: pJid, phone: phoneDisplay, name: displayName, admin: p.admin === 'admin' || p.admin === 'superadmin' };
   });
