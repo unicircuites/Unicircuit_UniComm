@@ -7309,13 +7309,46 @@
                       <div style="font-size: 15px; font-weight: 700; color: var(--text); display: flex; align-items: center; gap: 8px;">
                         <i class="fas fa-server" style="color: var(--blue2);"></i> System Status & Diagnostics
                       </div>
-                      <button class="btn btn-green btn-xs" onclick="settingsRunSystemTest()"><i class="fas fa-flask"></i> Run Health Test</button>
+                      <button class="btn btn-green btn-xs" onclick="settingsRunFullTest()"><i class="fas fa-flask"></i> Run Full System Test</button>
                     </div>
 
-                    <!-- Status Display Grid -->
+                    <!-- 6-Tile Status Grid -->
+                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; margin-bottom: 12px;">
+                      <!-- Tile 1: PostgreSQL -->
+                      <div style="background: var(--bg2); border: 1px solid var(--border2); padding: 14px; border-radius: 10px; display: flex; flex-direction: column; justify-content: space-between;">
+                        <div style="font-size: 11px; color: var(--muted2); text-transform: uppercase; font-weight: 600;">PostgreSQL</div>
+                        <div id="settings-tile-postgres" style="font-size: 18px; font-weight: 800; color: var(--text); margin-top: 8px;">Checking...</div>
+                      </div>
+                      <!-- Tile 2: WhatsApp -->
+                      <div style="background: var(--bg2); border: 1px solid var(--border2); padding: 14px; border-radius: 10px; display: flex; flex-direction: column; justify-content: space-between;">
+                        <div style="font-size: 11px; color: var(--muted2); text-transform: uppercase; font-weight: 600;">WhatsApp Biz</div>
+                        <div id="settings-tile-whatsapp" style="font-size: 18px; font-weight: 800; color: var(--text); margin-top: 8px;">Checking...</div>
+                      </div>
+                      <!-- Tile 3: Matrix PBX -->
+                      <div style="background: var(--bg2); border: 1px solid var(--border2); padding: 14px; border-radius: 10px; display: flex; flex-direction: column; justify-content: space-between;">
+                        <div style="font-size: 11px; color: var(--muted2); text-transform: uppercase; font-weight: 600;">Matrix PBX</div>
+                        <div id="settings-tile-pbx" style="font-size: 18px; font-weight: 800; color: var(--text); margin-top: 8px;">Checking...</div>
+                      </div>
+                      <!-- Tile 4: Outlook -->
+                      <div style="background: var(--bg2); border: 1px solid var(--border2); padding: 14px; border-radius: 10px; display: flex; flex-direction: column; justify-content: space-between;">
+                        <div style="font-size: 11px; color: var(--muted2); text-transform: uppercase; font-weight: 600;">Outlook Mail</div>
+                        <div id="settings-tile-outlook" style="font-size: 18px; font-weight: 800; color: var(--text); margin-top: 8px;">Checking...</div>
+                      </div>
+                      <!-- Tile 5: WA Chats count -->
+                      <div style="background: var(--bg2); border: 1px solid var(--border2); padding: 14px; border-radius: 10px; display: flex; flex-direction: column; justify-content: space-between;">
+                        <div style="font-size: 11px; color: var(--muted2); text-transform: uppercase; font-weight: 600;">WA Chats Count</div>
+                        <div id="settings-tile-chats" style="font-size: 18px; font-weight: 800; color: var(--text); margin-top: 8px;">0</div>
+                      </div>
+                      <!-- Tile 6: LID Resolution % -->
+                      <div style="background: var(--bg2); border: 1px solid var(--border2); padding: 14px; border-radius: 10px; display: flex; flex-direction: column; justify-content: space-between;">
+                        <div style="font-size: 11px; color: var(--muted2); text-transform: uppercase; font-weight: 600;">LID Resolution %</div>
+                        <div id="settings-tile-lid" style="font-size: 18px; font-weight: 800; color: var(--text); margin-top: 8px;">0%</div>
+                      </div>
+                    </div>
+
                     <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px;">
                       <div style="background: var(--bg2); border: 1px solid var(--border2); padding: 12px; border-radius: 8px;">
-                        <div style="font-size: 11px; color: var(--muted2); text-transform: uppercase; font-weight: 600; margin-bottom: 4px;">Database Health (PostgreSQL)</div>
+                        <div style="font-size: 11px; color: var(--muted2); text-transform: uppercase; font-weight: 600; margin-bottom: 4px;">Database Health Details</div>
                         <div id="settings-sys-db-status" style="font-size: 13px; font-weight: 700; color: var(--text);">Checking...</div>
                       </div>
                       <div style="background: var(--bg2); border: 1px solid var(--border2); padding: 12px; border-radius: 8px;">
