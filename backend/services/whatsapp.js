@@ -1316,7 +1316,19 @@ async function ensureTables(retries = 3) {
       await pool.query(`ALTER TABLE wa_contacts ADD COLUMN IF NOT EXISTS is_business BOOLEAN DEFAULT FALSE`).catch(() => { });
       await pool.query(`UPDATE wa_contacts SET is_business = true WHERE verified_name IS NOT NULL AND is_business = false`).catch(() => { });
       // Clean up: LID contacts with no resolved phone should not carry stale names (wrong data from old syncs)
-      await pool.query(`UPDATE wa_contacts SET name = NULL WHERE jid LIKE '%@lid' AND (phone IS NULL OR phone = '')`).catch(() => { });
+      await pool.query(`UPDATE wa_contacts SET name = NULL, notify = NULL WHERE jid LIKE '%@lid' AND (phone IS NULL OR phone = '')`).catch(() => { });
+      // Fix wa_messages: if a sender_name appears for 3+ distinct @lid senders in same group, it's a bleed — clear it
+      await pool.query(`
+        UPDATE wa_messages SET sender_name = NULL
+        WHERE sender LIKE '%@lid'
+          AND sender_name IS NOT NULL
+          AND sender_name IN (
+            SELECT sender_name FROM wa_messages
+            WHERE sender LIKE '%@lid' AND sender_name IS NOT NULL
+            GROUP BY chat_id, sender_name
+            HAVING COUNT(DISTINCT sender) >= 3
+          )
+      `).catch(() => { });
       await pool.query(`ALTER TABLE wa_chats ADD COLUMN IF NOT EXISTS account_phone VARCHAR(50) DEFAULT 'unknown'`).catch(() => { });
       await pool.query(`ALTER TABLE wa_chats ADD COLUMN IF NOT EXISTS profile_pic_url TEXT`).catch(() => { });
       await pool.query(`ALTER TABLE wa_messages ADD COLUMN IF NOT EXISTS account_phone VARCHAR(50) DEFAULT 'unknown'`).catch(() => { });

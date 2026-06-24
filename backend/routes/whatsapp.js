@@ -865,32 +865,6 @@ router.get('/group/:jid', authenticate, async (req, res) => {
     wa.clearGroupMetadataCache();
     const gData = await wa.getGroupMetadata(jid, { participantsLimit, participantsOffset });
 
-    // For @lid participants still missing a name, backfill from wa_messages sender_name
-    // (Baileys doesn't return pushName for privacy-protected or left-group members)
-    if (gData?.participants) {
-      const namelessLids = gData.participants
-        .filter(p => p.jid && p.jid.endsWith('@lid') && !p.name)
-        .map(p => p.jid);
-      if (namelessLids.length > 0) {
-        const rows = await pool.query(`
-          SELECT DISTINCT ON (sender)
-            sender AS jid, sender_name AS name
-          FROM wa_messages
-          WHERE chat_id = $1 AND account_phone = $2
-            AND sender = ANY($3)
-            AND sender_name IS NOT NULL AND sender_name != '' AND sender_name != 'Unknown'
-            AND sender_name !~ '^[+0-9 ()\\-]+$'
-          ORDER BY sender, timestamp DESC
-        `, [jid, accountPhone, namelessLids]);
-        if (rows.rowCount > 0) {
-          const nameMap = {};
-          for (const r of rows.rows) nameMap[r.jid] = r.name;
-          for (const p of gData.participants) {
-            if (!p.name && nameMap[p.jid]) p.name = nameMap[p.jid];
-          }
-        }
-      }
-    }
     // Group Info is the authoritative source — persist the confirmed subject to wa_chats
     // so the chat list always shows the real name, not a stale/empty fallback.
     if (gData?.name) setImmediate(() => wa.updateGroupName(jid, gData.name, accountPhone));
