@@ -5763,6 +5763,7 @@
                 <span id="wa-sync-status" style="font-size:12px;color:var(--text);font-weight:600;margin-left:8px;flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;"></span>
                 <button class="btn btn-green btn-xs" id="wa-sync-btn" onclick="waSync()" style="margin-left:auto;"><i class="fas fa-sync-alt"></i> Sync</button>
                 <button class="btn btn-ghost btn-xs" onclick="waRefreshChats()"><i class="fas fa-redo"></i> Reload</button>
+                <button class="btn btn-ghost btn-xs" id="wa-resolve-lids-btn" onclick="waForceLidResolution()" title="Force-resolve LID/JID contacts in all groups"><i class="fas fa-fingerprint"></i> Resolve LIDs</button>
                 <button class="btn btn-blue btn-xs" onclick="waOpenImport()" title="Import WhatsApp exported .txt chat"><i class="fas fa-file-import"></i> Import Chat</button>
                 <button class="btn btn-ghost btn-xs" onclick="waCreateBackup()" title="Create a safe backup for the currently linked WhatsApp account"><i class="fas fa-archive"></i> Backup</button>
                 <button class="btn btn-ghost btn-xs" onclick="waOpenBackupInventory()" title="Load chats from a saved backup for this same WhatsApp account"><i class="fas fa-database"></i> Load Backup</button>
@@ -26524,6 +26525,23 @@ ${plainText}`;
         waRunLidResolutionBatch(150).then(function() { waLoadResolutionStats(waAllChats.length); });
         waLoadLidMap();
       } catch (_) { }
+    }
+
+    async function waForceLidResolution() {
+      var btn = document.getElementById('wa-resolve-lids-btn');
+      if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Resolving...'; }
+      try {
+        // Run 3 batches back-to-back to maximise coverage across all groups
+        for (var i = 0; i < 3; i++) {
+          var r = await waRunLidResolutionBatch(200);
+          if (!r || r.skipped) break;
+          if (r.pending === 0) break;
+        }
+        await waLoadLidMap();
+        await waLoadChats({ force: true });
+        waLoadResolutionStats(waAllChats.length);
+      } catch (_) { }
+      if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fas fa-fingerprint"></i> Resolve LIDs'; }
     }
 
     async function waToggleGroupInfo() {
