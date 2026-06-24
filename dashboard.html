@@ -19166,6 +19166,400 @@ Best regards,<br>
       }
     }
 
+    // ── SETTINGS & SYNC STATE & IMPLEMENTATION ──
+    let _settingsStatusTimer = null;
+
+    function settingsShowTab(tab) {
+      // Hide all panels
+      document.querySelectorAll('.settings-panel-view').forEach(p => p.style.display = 'none');
+      // Show clicked panel
+      const pnl = document.getElementById('settings-panel-' + tab);
+      if (pnl) pnl.style.display = 'block';
+
+      // Highlight left nav item
+      document.querySelectorAll('.settings-sidebar .settings-nav-item').forEach(item => {
+        item.classList.remove('active');
+        item.style.color = 'var(--muted)';
+      });
+      const navItem = document.getElementById('settings-nav-' + tab);
+      if (navItem) {
+        navItem.classList.add('active');
+        navItem.style.color = 'var(--text)';
+      }
+
+      settingsAppendLog('system', `Switched to ${tab.toUpperCase()} panel`);
+
+      // Special initializations
+      if (tab === 'outlook') {
+        settingsOutlookLoadGroupsDropdown();
+      }
+
+      // Run status refresh
+      settingsRefreshStatus();
+
+      // Start periodic status checking if not running
+      if (!_settingsStatusTimer) {
+        _settingsStatusTimer = setInterval(settingsRefreshStatus, 5000);
+      }
+    }
+
+    function settingsAppendLog(service, msg) {
+      const consoleLog = document.getElementById('settings-console-log');
+      if (!consoleLog) return;
+      const timestamp = new Date().toLocaleTimeString();
+      const line = `[${timestamp}] [${service.toUpperCase()}] ${msg}\n`;
+      consoleLog.textContent += line;
+      consoleLog.scrollTop = consoleLog.scrollHeight;
+    }
+
+    function settingsClearLog() {
+      const consoleLog = document.getElementById('settings-console-log');
+      if (consoleLog) consoleLog.textContent = '';
+      settingsAppendLog('system', 'Console cleared.');
+    }
+
+    function settingsCopyLog() {
+      const consoleLog = document.getElementById('settings-console-log');
+      if (!consoleLog) return;
+      navigator.clipboard.writeText(consoleLog.textContent).then(() => {
+        notify('Copied to Clipboard', 'Action log copied successfully', 'var(--green)', 'fas fa-copy');
+      }).catch(err => {
+        notify('Copy Failed', err.message, 'var(--red)', 'fas fa-exclamation-circle');
+      });
+    }
+
+    async function settingsRefreshStatus() {
+      // 1. PostgreSQL Status
+      try {
+        const res = await fetch(`${API_BASE}/health`, { headers: getAuthHeaders() });
+        const d = await res.json();
+        const ok = d.status === 'ok';
+        const txt = ok ? 'Healthy (Connected)' : `Error: ${d.database}`;
+        const el = document.getElementById('settings-sys-db-status');
+        if (el) el.textContent = txt;
+        const tile = document.getElementById('settings-tile-postgres');
+        if (tile) {
+          tile.textContent = ok ? 'Connected' : 'Error';
+          tile.style.color = ok ? 'var(--green2)' : 'var(--red2)';
+        }
+        updateServiceIndicator('postgres', ok);
+      } catch (err) {
+        const el = document.getElementById('settings-sys-db-status');
+        if (el) el.textContent = 'Connection failed';
+        const tile = document.getElementById('settings-tile-postgres');
+        if (tile) {
+          tile.textContent = 'Error';
+          tile.style.color = 'var(--red2)';
+        }
+        updateServiceIndicator('postgres', false);
+      }
+
+      // 2. WhatsApp Status & Counts
+      try {
+        const res = await fetch(`${API_BASE}/wa/status`, { headers: getAuthHeaders() });
+        const d = await res.json();
+        const connected = d.connected === true;
+        const phone = d.phone || '-';
+
+        document.getElementById('settings-wa-status-text').textContent = connected ? 'Connected' : 'Disconnected';
+        document.getElementById('settings-wa-phone-text').textContent = phone;
+        document.getElementById('settings-wa-chat-count').textContent = d.savedCallCount || 0;
+        document.getElementById('settings-wa-contact-count').textContent = d.resolvedCallCount || 0;
+
+        const tileWa = document.getElementById('settings-tile-whatsapp');
+        if (tileWa) {
+          tileWa.textContent = connected ? 'Connected' : 'Disconnected';
+          tileWa.style.color = connected ? 'var(--green2)' : 'var(--red2)';
+        }
+
+        const tileChats = document.getElementById('settings-tile-chats');
+        if (tileChats) {
+          tileChats.textContent = d.savedCallCount || 0;
+        }
+
+        updateServiceIndicator('whatsapp', connected);
+      } catch (err) {
+        document.getElementById('settings-wa-status-text').textContent = 'Error';
+      }
+
+      // 3. WA LID stats
+      try {
+        const res = await fetch(`${API_BASE}/wa/resolution-stats`, { headers: getAuthHeaders() });
+        if (res.ok) {
+          const stats = await res.json();
+          const total = stats.totalChats || 0;
+          const pending = stats.pending || 0;
+          const resolved = stats.resolved || 0;
+          const percentage = total > 0 ? Math.round((resolved / total) * 100) : 0;
+
+          document.getElementById('settings-wa-lid-progress-percent').textContent = `${percentage}%`;
+          document.getElementById('settings-wa-lid-progress-bar').style.width = `${percentage}%`;
+          document.getElementById('settings-wa-lid-stats-text').textContent = `${resolved} resolved, ${pending} pending / ${total} total`;
+
+          const tileLid = document.getElementById('settings-tile-lid');
+          if (tileLid) {
+            tileLid.textContent = `${percentage}%`;
+          }
+        }
+      } catch (_) {}
+
+      // 4. PBX Status (Retrieve dot color and last calls count)
+      try {
+        // Fetch TCP state from status
+        const res = await fetch(`${API_BASE}/wa/status`, { headers: getAuthHeaders() });
+        const d = await res.json();
+        const smdr = d.smdr || {};
+        const connected = smdr.activeSocket === true;
+        const lastActivity = smdr.lastActivity ? new Date(smdr.lastActivity).toLocaleTimeString() : 'Never';
+
+        document.getElementById('settings-pbx-tcp-status').textContent = connected ? 'Connected (Listening)' : 'Disconnected';
+        document.getElementById('settings-pbx-tcp-dot').style.background = connected ? 'var(--green)' : 'var(--red)';
+        document.getElementById('settings-pbx-last-smdr').textContent = lastActivity;
+        document.getElementById('settings-pbx-total-logs').textContent = smdr.savedCallCount || 0;
+
+        const tilePbx = document.getElementById('settings-tile-pbx');
+        if (tilePbx) {
+          tilePbx.textContent = connected ? 'Active' : 'Offline';
+          tilePbx.style.color = connected ? 'var(--green2)' : 'var(--red2)';
+        }
+
+        updateServiceIndicator('pbx', connected);
+      } catch (_) {
+        document.getElementById('settings-pbx-tcp-status').textContent = 'Offline';
+        document.getElementById('settings-pbx-tcp-dot').style.background = 'var(--red)';
+      }
+
+      // 5. Outlook Status
+      try {
+        const res = await fetch(`${API_BASE}/outlook/status`, { headers: getAuthHeaders() });
+        const d = await res.json();
+        const connected = d.connected === true;
+        
+        document.getElementById('settings-outlook-status-text').textContent = connected ? `Connected (${d.email})` : 'Disconnected';
+        
+        const tileOutlook = document.getElementById('settings-tile-outlook');
+        if (tileOutlook) {
+          tileOutlook.textContent = connected ? 'Connected' : 'Disconnected';
+          tileOutlook.style.color = connected ? 'var(--green2)' : 'var(--red2)';
+        }
+        
+        updateServiceIndicator('outlook', connected);
+      } catch (_) {
+        document.getElementById('settings-outlook-status-text').textContent = 'Disconnected';
+        updateServiceIndicator('outlook', false);
+      }
+
+      // Sync time display if available
+      try {
+        const res = await fetch(`${API_BASE}/outlook/sync-status`, { headers: getAuthHeaders() });
+        if (res.ok) {
+          const d = await res.json();
+          if (d && d.synced_at) {
+            const t = new Date(d.synced_at).toLocaleString();
+            document.getElementById('settings-outlook-sync-text').textContent = `Last sync: ${t} (${d.message_count || 0} msgs)`;
+          } else {
+            document.getElementById('settings-outlook-sync-text').textContent = 'Not synced yet';
+          }
+        }
+      } catch (_) {}
+    }
+
+    // Double confirms and actions
+    function settingsConfirmResetGroupContacts() {
+      if (!confirm('Are you sure you want to reset group contacts? All locally cached group member data will be deleted.')) return;
+      if (!confirm('This action cannot be undone. Do you wish to proceed?')) return;
+      
+      settingsAppendLog('whatsapp', 'Reset Group Contacts initiated.');
+      resetAndResyncGroupContacts();
+    }
+
+    async function settingsConfirmResetWaData() {
+      if (!confirm('DANGER: This will delete all WhatsApp chats, contacts, messages and clear your active login session. Continue?')) return;
+      if (!confirm('Are you absolutely sure? All communication history on WhatsApp will be deleted from the server database.')) return;
+      
+      settingsAppendLog('whatsapp', 'Purging all WA data...');
+      try {
+        const res = await fetch(`${API_BASE}/wa/purge-all`, { method: 'POST', headers: getAuthHeaders() });
+        if (res.ok) {
+          notify('WA Data Purged', 'Session and database cleared.', 'var(--green)', 'fas fa-trash-alt');
+          settingsAppendLog('whatsapp', '✅ WA Data reset complete.');
+          settingsRefreshStatus();
+        } else {
+          throw new Error('Reset failed');
+        }
+      } catch (err) {
+        notify('Error', err.message, 'var(--red)', 'fas fa-exclamation-circle');
+        settingsAppendLog('whatsapp', `❌ Reset failed: ${err.message}`);
+      }
+    }
+
+    async function settingsReconnectPbxTcp() {
+      settingsAppendLog('pbx', 'Reconnecting PBX TCP Server...');
+      try {
+        const res = await fetch(`${API_BASE}/calls/reconnect-smdr`, { method: 'POST', headers: getAuthHeaders() });
+        const d = await res.json();
+        if (res.ok) {
+          notify('PBX Reconnecting', 'Port 5001 binding requested.', 'var(--gold)', 'fas fa-network-wired');
+          settingsAppendLog('pbx', '✅ Reconnect request successful.');
+        } else {
+          throw new Error(d.error || 'Request failed');
+        }
+      } catch (err) {
+        notify('Error', err.message, 'var(--red)', 'fas fa-exclamation-circle');
+        settingsAppendLog('pbx', `❌ Reconnect failed: ${err.message}`);
+      }
+    }
+
+    // ── DIAGNOSTIC TEST RUNNERS ──
+    async function settingsRunWaTest() {
+      settingsAppendLog('whatsapp', '🧪 Running WhatsApp end-to-end diagnostics...');
+      let passed = true;
+
+      try {
+        const res = await fetch(`${API_BASE}/wa/status`, { headers: getAuthHeaders() });
+        const d = await res.json();
+        if (d.connected === true) {
+          settingsAppendLog('whatsapp', `✅ Connection status check passed: Connected as ${d.phone || 'Unknown'}`);
+        } else {
+          settingsAppendLog('whatsapp', '❌ Connection status check failed: Disconnected or scanning required.');
+          passed = false;
+        }
+      } catch (err) {
+        settingsAppendLog('whatsapp', `❌ Status endpoint request failed: ${err.message}`);
+        passed = false;
+      }
+
+      try {
+        const res = await fetch(`${API_BASE}/wa/resolution-stats`, { headers: getAuthHeaders() });
+        if (res.ok) {
+          const stats = await res.json();
+          settingsAppendLog('whatsapp', `✅ Resolution stats active: ${stats.resolved || 0} resolved, ${stats.pending || 0} pending`);
+        } else {
+          settingsAppendLog('whatsapp', '⚠️ Resolution stats returned error code.');
+        }
+      } catch (err) {
+        settingsAppendLog('whatsapp', `⚠️ Resolution stats endpoint failed: ${err.message}`);
+      }
+
+      settingsAppendLog('whatsapp', passed ? '✅ WhatsApp diagnostic test PASSED.' : '❌ WhatsApp diagnostic test FAILED.');
+      return passed;
+    }
+
+    async function settingsRunPbxTest() {
+      settingsAppendLog('pbx', '🧪 Running PBX diagnostics...');
+      let passed = true;
+
+      try {
+        const res = await fetch(`${API_BASE}/calls?limit=1`, { headers: getAuthHeaders() });
+        const d = await res.json();
+        if (res.ok && Array.isArray(d)) {
+          settingsAppendLog('pbx', `✅ PBX call logs retrieved successfully. (Latest log timestamp: ${d[0]?.calldate || 'None'})`);
+        } else {
+          settingsAppendLog('pbx', '❌ No call records returned from database.');
+          passed = false;
+        }
+      } catch (err) {
+        settingsAppendLog('pbx', `❌ Call logs query failed: ${err.message}`);
+        passed = false;
+      }
+
+      // Check if TCP connection is active from status
+      try {
+        const res = await fetch(`${API_BASE}/wa/status`, { headers: getAuthHeaders() });
+        const d = await res.json();
+        if (d.smdr && d.smdr.activeSocket === true) {
+          settingsAppendLog('pbx', '✅ PBX TCP Server listener is actively bound on port 5001.');
+        } else {
+          settingsAppendLog('pbx', '⚠️ PBX TCP socket listener has no active connections.');
+        }
+      } catch (_) {}
+
+      settingsAppendLog('pbx', passed ? '✅ PBX diagnostic test PASSED.' : '❌ PBX diagnostic test FAILED.');
+      return passed;
+    }
+
+    async function settingsRunOutlookTest() {
+      settingsAppendLog('outlook', '🧪 Running Outlook end-to-end diagnostics...');
+      let passed = true;
+
+      try {
+        const res = await fetch(`${API_BASE}/outlook/status`, { headers: getAuthHeaders() });
+        const d = await res.json();
+        if (d.connected === true) {
+          settingsAppendLog('outlook', `✅ Outlook authenticated as: ${d.email}`);
+        } else {
+          settingsAppendLog('outlook', '❌ Outlook authentication check failed: Not connected.');
+          passed = false;
+        }
+      } catch (err) {
+        settingsAppendLog('outlook', `❌ Authentication check failed: ${err.message}`);
+        passed = false;
+      }
+
+      try {
+        const res = await fetch(`${API_BASE}/outlook/inbox?limit=1`, { headers: getAuthHeaders() });
+        const d = await res.json();
+        if (res.ok) {
+          settingsAppendLog('outlook', '✅ Mailbox connection test passed. Retrieved inbox items.');
+        } else {
+          settingsAppendLog('outlook', `❌ Mailbox retrieval test failed: ${d.error || 'Server error'}`);
+          passed = false;
+        }
+      } catch (err) {
+        settingsAppendLog('outlook', `❌ Mailbox query failed: ${err.message}`);
+        passed = false;
+      }
+
+      settingsAppendLog('outlook', passed ? '✅ Outlook diagnostic test PASSED.' : '❌ Outlook diagnostic test FAILED.');
+      return passed;
+    }
+
+    async function settingsRunSystemTest() {
+      settingsAppendLog('system', '🧪 Running System diagnostics...');
+      let passed = true;
+
+      try {
+        const res = await fetch(`${API_BASE}/health`, { headers: getAuthHeaders() });
+        const d = await res.json();
+        if (d.status === 'ok') {
+          settingsAppendLog('system', '✅ Database connection check passed. PostgreSQL is healthy.');
+        } else {
+          settingsAppendLog('system', `❌ Database health check failed: ${d.database}`);
+          passed = false;
+        }
+      } catch (err) {
+        settingsAppendLog('system', `❌ Health query failed: ${err.message}`);
+        passed = false;
+      }
+
+      settingsAppendLog('system', passed ? '✅ System diagnostic test PASSED.' : '❌ System diagnostic test FAILED.');
+      return passed;
+    }
+
+    async function settingsRunFullTest() {
+      settingsAppendLog('system', '🚀 Starting full end-to-end system diagnostic run...');
+      
+      const wa = await settingsRunWaTest();
+      const pbx = await settingsRunPbxTest();
+      const outlook = await settingsRunOutlookTest();
+      const sys = await settingsRunSystemTest();
+
+      const total = 4;
+      const passed = (wa ? 1 : 0) + (pbx ? 1 : 0) + (outlook ? 1 : 0) + (sys ? 1 : 0);
+
+      settingsAppendLog('system', `--- DIAGNOSTIC SUMMARY: ${passed}/${total} PASSED ---`);
+      settingsAppendLog('system', `- WhatsApp: ${wa ? '✅' : '❌'}`);
+      settingsAppendLog('system', `- PBX: ${pbx ? '✅' : '❌'}`);
+      settingsAppendLog('system', `- Outlook: ${outlook ? '✅' : '❌'}`);
+      settingsAppendLog('system', `- System / DB: ${sys ? '✅' : '❌'}`);
+
+      if (passed === total) {
+        notify('Full System Test Passed', 'All services healthy and online.', 'var(--green)', 'fas fa-check-circle');
+      } else {
+        notify('System Test Complete', `${passed}/${total} services connected. Review actions log.`, 'var(--red)', 'fas fa-exclamation-triangle');
+      }
+    }
+
     async function settingsOutlookLoadGroupsDropdown() {
       const selTo = document.getElementById('settings-outlook-group-select');
       const selCc = document.getElementById('settings-outlook-cc-group-select');
