@@ -26538,7 +26538,6 @@ ${plainText}`;
         await waLoadChats({ force: true });
         waLoadResolutionStats(waAllChats.length);
       } catch (_) { }
-      } catch (_) { }
       if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fas fa-fingerprint"></i> Resolve LIDs'; }
     }
 
