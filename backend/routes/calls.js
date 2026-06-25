@@ -758,36 +758,39 @@ router.get('/', async (req, res) => {
   let p = 1;
 
   if (type) { where.push(`call_type = $${p++}`); params.push(type); }
-  if (search) {
-    where.push(`(
-      caller ILIKE $${p}
-      OR destination ILIKE $${p}
-      OR extension ILIKE $${p}
-      OR EXISTS (
-        SELECT 1
-        FROM pbx_contacts pc
-        WHERE (
-          pc.name ILIKE $${p}
-          OR pc.company ILIKE $${p}
-          OR pc.notes ILIKE $${p}
+  if (search || (searchDigits && searchDigits.length >= 4)) {
+    const conditions = [];
+    if (search) {
+      conditions.push(`(
+        caller ILIKE $${p}
+        OR destination ILIKE $${p}
+        OR extension ILIKE $${p}
+        OR EXISTS (
+          SELECT 1
+          FROM pbx_contacts pc
+          WHERE (
+            pc.name ILIKE $${p}
+            OR pc.company ILIKE $${p}
+            OR pc.notes ILIKE $${p}
+          )
+          AND (
+            pc.phone = caller
+            OR pc.phone = destination
+            OR regexp_replace(pc.phone, '[^0-9]', '', 'g') = regexp_replace(caller, '[^0-9]', '', 'g')
+            OR regexp_replace(pc.phone, '[^0-9]', '', 'g') = regexp_replace(destination, '[^0-9]', '', 'g')
+          )
         )
-        AND (
-          pc.phone = caller
-          OR pc.phone = destination
-          OR regexp_replace(pc.phone, '[^0-9]', '', 'g') = regexp_replace(caller, '[^0-9]', '', 'g')
-          OR regexp_replace(pc.phone, '[^0-9]', '', 'g') = regexp_replace(destination, '[^0-9]', '', 'g')
-        )
-      )
-    )`);
-    params.push('%' + search + '%'); p++;
-  }
-  if (searchDigits && searchDigits.length >= 4) {
-    // Match caller/destination by trailing digits (handles +91XXX, 0XXX, spaces, etc.)
-    where.push(`(
-      regexp_replace(caller, '[^0-9]', '', 'g') LIKE $${p}
-      OR regexp_replace(destination, '[^0-9]', '', 'g') LIKE $${p}
-    )`);
-    params.push('%' + searchDigits); p++;
+      )`);
+      params.push('%' + search + '%'); p++;
+    }
+    if (searchDigits && searchDigits.length >= 4) {
+      conditions.push(`(
+        regexp_replace(caller, '[^0-9]', '', 'g') LIKE $${p}
+        OR regexp_replace(destination, '[^0-9]', '', 'g') LIKE $${p}
+      )`);
+      params.push('%' + searchDigits); p++;
+    }
+    where.push('(' + conditions.join(' OR ') + ')');
   }
   if (dateFrom) { where.push(`call_date >= $${p++}`); params.push(dateFrom); }
   if (dateTo) { where.push(`call_date <= $${p++}`); params.push(dateTo); }
