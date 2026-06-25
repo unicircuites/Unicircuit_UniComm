@@ -6054,10 +6054,11 @@
                   <button type="button" class="btn btn-ghost btn-sm" onclick="loadAllMergedContacts(true)"><i
                       class="fas fa-sync-alt"></i> Refresh All</button>
                   <span style="font-size:11px;color:var(--muted);padding:0 8px;">Merged view: Outlook · WhatsApp · PBX</span>
-                  <button type="button" class="btn btn-ghost btn-sm" id="cross-sync-toggle-btn" onclick="toggleCrossSyncSidebar()" style="color:var(--gold);border-color:rgba(245,158,11,0.35);"><i class="fas fa-robot"></i> AI Suggestions <span id="cross-sync-badge" style="display:none;background:var(--gold);color:#000;border-radius:10px;padding:1px 6px;font-size:10px;font-weight:700;margin-left:4px;"></span></button>
                 </div>
               </div>
             </div>
+            <!-- AI Suggestions button — visible to all roles -->
+            <button type="button" class="btn btn-ghost btn-sm" id="cross-sync-toggle-btn" onclick="toggleCrossSyncSidebar()" style="color:var(--gold);border-color:rgba(245,158,11,0.35);position:absolute;right:16px;top:12px;z-index:10;"><i class="fas fa-robot"></i> AI Suggestions <span id="cross-sync-badge" style="display:none;background:var(--gold);color:#000;border-radius:10px;padding:1px 6px;font-size:10px;font-weight:700;margin-left:4px;"></span></button>
           </div>
 
           <div class="contacts-directory-grid">
@@ -9946,6 +9947,7 @@ Always write in a professional yet warm Indian B2B communication style. Use form
           <div style="font-weight:700;font-size:13.5px;color:var(--text);">${escHtml(title)}</div>
           <div style="font-size:11.5px;color:var(--muted);margin-top:1px;">${escHtml(sub)}</div>
           ${noNameLabel}
+          ${oc.lastSubject ? `<div style="font-size:10.5px;color:var(--muted2);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:200px;">${escHtml(oc.lastSubject.length>40?oc.lastSubject.slice(0,40)+'…':oc.lastSubject)}${oc.lastSubjectAt?' · <span style="color:var(--muted);">'+new Date(oc.lastSubjectAt).toLocaleString('en-IN',{dateStyle:'short',timeStyle:'short'})+'</span>':''}</div>` : ''}
         </div>
         ${srcBadge}${providerBadge}
       </div>
@@ -10506,6 +10508,10 @@ Always write in a professional yet warm Indian B2B communication style. Use form
         }
         const _bizBadge = (c.is_business || c.verified_name) ? '<span style="font-size:10px;color:#4FC3F7;border:1px solid rgba(79,195,247,0.4);padding:1px 5px;border-radius:999px;font-weight:800;margin-left:4px;">BIZ</span>' : '';
         const subtitle = isGroup ? '<span style="font-size:10px;background:rgba(37,211,102,0.12);color:#25D366;border-radius:3px;padding:1px 5px;">Group</span>' + _bizBadge : (_subPhone ? (escHtml(_subPhone) + _bizBadge) : (String(c.id||'').endsWith('@lid') ? '<span style="font-size:10px;color:var(--muted2);font-style:italic;">Phone resolving...</span>' + _bizBadge : _bizBadge));
+        const lastMsg = c.last_message ? c.last_message.replace(/^\uD83D[\uDC00-\uDFFF]\s*/u, '').trim() : '';
+        const activityLabel = lastMsg
+          ? `<div style="font-size:10.5px;color:var(--muted2);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:200px;">${escHtml(lastMsg.length > 40 ? lastMsg.slice(0,40)+'…' : lastMsg)}${time ? ' · <span style="color:var(--muted);">'+escHtml(time)+'</span>' : ''}</div>`
+          : '';
         return `
     <div class="contact-card" onclick='showWaDirectoryDetail(${JSON.stringify(c.id)}, this)'>
       <div style="display:flex;align-items:center;gap:11px;">
@@ -10513,8 +10519,9 @@ Always write in a professional yet warm Indian B2B communication style. Use form
         <div style="flex:1;min-width:0;">
           <div style="font-weight:700;font-size:13.5px;color:var(--text);">${escHtml(name)}</div>
           <div style="font-size:11.5px;color:var(--muted);margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${subtitle}</div>
+          ${activityLabel}
         </div>
-        <div style="text-align:right;font-size:10px;color:var(--muted);">${escHtml(time)}${unread}</div>
+        <div style="text-align:right;font-size:10px;color:var(--muted);">${unread}</div>
       </div>
     </div>`;
       }).join('');
@@ -10637,6 +10644,9 @@ Always write in a professional yet warm Indian B2B communication style. Use form
 
         const displayTitle = name || phone;
         const subtitle = name ? `${phone}${company ? ' · ' + company : ''}` : `${n} calls · last ${lc}`;
+        const callTypeLabel = r.last_call_type || '';
+        const callTypeDisplay = callTypeLabel === 'incoming' ? '📲 Incoming' : callTypeLabel === 'outgoing' ? '📤 Outgoing' : callTypeLabel === 'internal' ? '🔁 Internal' : callTypeLabel || '';
+        const activityLabel = r.last_call ? `<div style="font-size:10.5px;color:var(--muted2);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${callTypeDisplay}${r.last_caller && r.last_caller !== phone ? ' · ' + escHtml(r.last_caller) : ''} · <span style="color:var(--muted);">${lc}</span></div>` : '';
 
         return `
     <div class="contact-card" onclick='showPbxDirectoryDetail(${JSON.stringify(phone)}, this)'>
@@ -10645,6 +10655,7 @@ Always write in a professional yet warm Indian B2B communication style. Use form
         <div style="flex:1;min-width:0;">
           <div style="font-weight:700;font-size:13.5px;color:var(--text);">${escHtml(displayTitle)}${notes ? ` <i class="fas fa-note-sticky" title="${escAttr(notes)}" style="font-size:10.5px;color:var(--gold);"></i>` : ''}</div>
           <div style="font-size:11.5px;color:var(--muted);margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escHtml(subtitle)}</div>
+          ${activityLabel}
         </div>
         <span class="badge b-green" style="font-size:9px;">PBX</span>
       </div>

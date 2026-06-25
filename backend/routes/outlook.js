@@ -3078,6 +3078,19 @@ router.get('/contacts', async (req, res) => {
         const statsMap = new Map();
         statsRes.rows.forEach(r => statsMap.set(r.email.toLowerCase(), r.last_email_at));
 
+        // Latest email subject per contact
+        const subjectRes = await pool.query(`
+          SELECT DISTINCT ON (addr) addr, subject, sent_at
+          FROM (
+            SELECT LOWER(TRIM(from_addr)) AS addr, subject, sent_at FROM outlook_messages WHERE LOWER(TRIM(from_addr)) = ANY($1)
+            UNION ALL
+            SELECT LOWER(TRIM(UNNEST(to_addrs))) AS addr, subject, sent_at FROM outlook_messages WHERE EXISTS (SELECT 1 FROM UNNEST(to_addrs) t WHERE LOWER(TRIM(t)) = ANY($1))
+          ) x
+          ORDER BY addr, sent_at DESC NULLS LAST
+        `, [allEmails]).catch(() => ({ rows: [] }));
+        const subjectMap = new Map();
+        subjectRes.rows.forEach(r => subjectMap.set(r.addr, { subject: r.subject, sent_at: r.sent_at }));
+
         const grpRes = await pool.query(`
           SELECT LOWER(TRIM(c.email)) as email, g.name
           FROM recipient_groups g
@@ -3097,6 +3110,9 @@ router.get('/contacts', async (req, res) => {
           if (e) {
             oc.lastEmailAt = statsMap.get(e) || null;
             oc.groups = grpMap.get(e) || [];
+            const sm = subjectMap.get(e);
+            oc.lastSubject = sm ? sm.subject : null;
+            oc.lastSubjectAt = sm ? sm.sent_at : null;
           } else {
             oc.groups = [];
           }

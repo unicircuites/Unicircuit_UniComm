@@ -271,9 +271,9 @@ router.get('/contacts', async (req, res) => {
     await syncPbxContactsFromCallLogs();
     const result = await pool.query(`
       WITH seen_numbers AS (
-        SELECT NULLIF(TRIM(destination), '') AS phone, created_at, id FROM call_logs WHERE destination IS NOT NULL AND destination <> ''
+        SELECT NULLIF(TRIM(destination), '') AS phone, created_at, id, caller, call_type FROM call_logs WHERE destination IS NOT NULL AND destination <> ''
         UNION ALL
-        SELECT NULLIF(TRIM(caller), '') AS phone, created_at, id FROM call_logs WHERE caller IS NOT NULL AND caller <> ''
+        SELECT NULLIF(TRIM(caller), '') AS phone, created_at, id, caller, call_type FROM call_logs WHERE caller IS NOT NULL AND caller <> ''
       ),
       grouped_numbers AS (
         SELECT
@@ -283,7 +283,9 @@ router.get('/contacts', async (req, res) => {
             MIN(phone)
           ) AS phone,
           MAX(created_at) AS last_call,
-          COUNT(DISTINCT id)::int AS call_count
+          COUNT(DISTINCT id)::int AS call_count,
+          (ARRAY_AGG(call_type ORDER BY created_at DESC NULLS LAST))[1] AS last_call_type,
+          (ARRAY_AGG(caller ORDER BY created_at DESC NULLS LAST))[1] AS last_caller
         FROM seen_numbers
         WHERE phone IS NOT NULL AND phone <> ''
         GROUP BY regexp_replace(phone, '[^0-9]', '', 'g')
@@ -303,6 +305,8 @@ router.get('/contacts', async (req, res) => {
         COALESCE(sc.phone, gn.phone) AS phone,
         gn.last_call,
         gn.call_count,
+        gn.last_call_type,
+        gn.last_caller,
         pc.name,
         pc.company,
         pc.notes,
