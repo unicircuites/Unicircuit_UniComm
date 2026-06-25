@@ -423,41 +423,65 @@ router.get('/cross-sync-suggestions', async (req, res) => {
         AND (mobile_phone IS NOT NULL OR phone IS NOT NULL)
     `);
 
-    // ── WA named contacts — real phones only, LID resolved ──────────
+    // ── WA named contacts — REAL phone JIDs only ────────────────────
+    // @lid (privacy) JIDs are EXCLUDED: WhatsApp does not give us a reliable
+    // phone for them, so their stored "phone" is a bogus/placeholder number
+    // (often a +1… value) — never a number we can match or save. We only trust
+    // @s.whatsapp.net / @c.us JIDs whose phone is the actual MSISDN.
+    // We also drop "number-as-name" rows (name is just a phone-like string),
+    // since there's no real name to propagate.
     const waRows = accountPhone ? await pool.query(`
       SELECT name, raw_phone,
              regexp_replace(raw_phone, '[^0-9]', '', 'g') AS norm_phone
       FROM (
         SELECT
-          COALESCE(name, notify) AS name,
+          name,
           phone AS raw_phone,
           row_number() OVER (
             PARTITION BY regexp_replace(phone, '[^0-9]', '', 'g')
             ORDER BY (name IS NOT NULL AND name <> '') DESC
           ) AS rn
         FROM (
-          SELECT COALESCE(name, '') AS name, ''::text AS notify, phone
+          SELECT NULLIF(name, '') AS name, phone
           FROM wa_chats
           WHERE account_phone = $1
             AND phone IS NOT NULL AND phone <> ''
+            AND id NOT LIKE '%@lid'
             AND id NOT LIKE '%@g.us'
             AND id NOT LIKE '%@newsletter'
+            AND id <> 'status@broadcast'
             AND regexp_replace(phone, '[^0-9]', '', 'g') ~ '^[0-9]{7,14}$'
           UNION ALL
-          SELECT COALESCE(name, '') AS name, COALESCE(notify, '') AS notify, phone
+          SELECT COALESCE(NULLIF(name, ''), NULLIF(notify, '')) AS name, phone
           FROM wa_contacts
           WHERE account_phone = $1
             AND phone IS NOT NULL AND phone <> ''
+            AND jid NOT LIKE '%@lid'
             AND jid NOT LIKE '%@g.us'
             AND jid NOT LIKE '%@newsletter'
             AND jid <> 'status@broadcast'
             AND regexp_replace(phone, '[^0-9]', '', 'g') ~ '^[0-9]{7,14}$'
-            AND NOT (
-              jid LIKE '%@lid'
-              AND regexp_replace(phone, '[^0-9]', '', 'g') = split_part(jid, '@', 1)
-            )
         ) src
-        WHERE name <> '' OR notify <> ''
+        WHERE name IS NOT NULL AND name <> ''
+          -- real name only: must contain a non-phone character (keeps Latin & Devanagari,
+          -- drops "name" that is just digits / +, spaces, (), - ). NOTE: use POSIX
+          -- [:space:] — Postgres bracket expressions do NOT interpret \\s as whitespace.
+          AND name ~ '[^0-9+()[:space:]-]'
+          -- exclude Meta/platform system accounts by name (case-insensitive)
+          AND name !~* '^(meta ai|instagram|facebook|whatsapp|telegram|google|youtube|twitter|linkedin|snapchat|tiktok|amazon|flipkart|paytm|phonepe|gpay|google pay|zomato|swiggy|uber|ola)$'
+          -- only numbers that could realistically call an Indian PBX:
+          -- Indian mobile (91XXXXXXXXXX or 0XXXXXXXXXX or plain 10-digit 6-9XXXXXXXXX)
+          -- or short local numbers (7-10 digits, no country code = local/extension range)
+          AND (
+            -- plain 10-digit Indian mobile starting with 6,7,8,9
+            regexp_replace(phone, '[^0-9]', '', 'g') ~ '^[6-9][0-9]{9}$'
+            -- with country code 91
+            OR regexp_replace(phone, '[^0-9]', '', 'g') ~ '^91[6-9][0-9]{9}$'
+            -- with leading 0 (STD)
+            OR regexp_replace(phone, '[^0-9]', '', 'g') ~ '^0[6-9][0-9]{9}$'
+            -- short local/extension numbers (PBX internal range)
+            OR regexp_replace(phone, '[^0-9]', '', 'g') ~ '^[0-9]{3,8}$'
+          )
       ) ranked
       WHERE rn = 1
     `, [accountPhone]) : { rows: [] };
@@ -507,6 +531,54 @@ router.get('/cross-sync-suggestions', async (req, res) => {
           phone: pbx.display_phone,
           norm_phone: phone,
           prefill: { phone: pbx.display_phone, name: pbx.name, company: pbx.company, email: pbx.email }
+        });
+      }
+    });
+
+    // ── Outlook named contacts (with phone) — live Graph, best-effort, cached ─────
+    // Adds Outlook as a third source so a contact saved in Outlook (now with a phone
+    // field) surfaces as a suggestion to add into PBX / WhatsApp. Matched on the same
+    // normalised last-10 phone, so all +91 variants unify.
+    const outlookByPhone = new Map();
+    try {
+      const getOutlook = require('./outlook').getOutlookContactsForSync;
+      if (typeof getOutlook === 'function') {
+        const ol = await getOutlook();
+        ol.forEach(c => {
+          const k = norm10(String(c.norm || '').replace(/\D/g, ''));
+          if (k && c.name) outlookByPhone.set(k, c);
+        });
+      }
+    } catch (e) {
+      console.warn('[Calls] Outlook sync source unavailable:', e.message);
+    }
+
+    // Outlook contact missing in PBX → suggest Save to PBX
+    outlookByPhone.forEach((o, phone) => {
+      if (!pbxByPhone.has(phone)) {
+        suggestions.push({
+          id: `ol-pbx-${phone}`,
+          from_source: 'outlook',
+          to_source: 'pbx',
+          name: o.name,
+          phone: o.phone,
+          norm_phone: phone,
+          prefill: { phone: o.phone, name: o.name, company: o.company, email: o.email }
+        });
+      }
+    });
+
+    // Outlook contact missing in WhatsApp → suggest Open WA
+    outlookByPhone.forEach((o, phone) => {
+      if (!waByPhone.has(phone)) {
+        suggestions.push({
+          id: `ol-wa-${phone}`,
+          from_source: 'outlook',
+          to_source: 'whatsapp',
+          name: o.name,
+          phone: o.phone,
+          norm_phone: phone,
+          prefill: { phone: o.phone, name: o.name }
         });
       }
     });
