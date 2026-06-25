@@ -33070,7 +33070,7 @@ ${plainText}`;
             } else if (isGroupCode && extStr && extStr !== destStr) {
               displayDest = `${escHtml(extStr)} <span style="font-size:10px;color:var(--muted2);">(via ${escHtml(destStr)})</span>`;
             } else if (isGroupCode && !extStr) {
-              displayDest = `${escHtml(destStr)} <span style="font-size:10px;color:var(--muted2);">(voicemail)</span>`;
+              displayDest = `${escHtml(destStr)} <span style="font-size:10px;color:var(--muted2);">(auto-attendant · no extension answered)</span>`;
             } else {
               displayDest = escHtml(destStr);
             }
@@ -33401,8 +33401,8 @@ ${plainText}`;
     }
 
     async function reconcilePbxCounts() {
-      if (!confirm('This will recount all calls in the database and update CRM contact statistics. Continue?')) return;
-      notify('Maintenance', 'Recalculating all call counts...', 'var(--gold)', 'fas fa-calculator');
+      if (!confirm('This will recount all calls, fix voicemail (390) call legs to show the real extension + recording, and update CRM contact statistics. Continue?')) return;
+      notify('Maintenance', 'Recalculating counts and refreshing call logs...', 'var(--gold)', 'fas fa-calculator');
       try {
         const res = await fetch(`${API_BASE}/system/maintenance/reconcile-calls`, { method: 'POST', headers: getAuthHeaders() });
         const data = await res.json();
@@ -33410,6 +33410,8 @@ ${plainText}`;
           notify('Success', data.message, 'var(--green)', 'fas fa-check-circle');
           await loadDashboardData();
           filterContacts();
+          // Reload the visible call-log table so the 390 → real-extension fix shows immediately
+          if (typeof loadCallLogs === 'function') await loadCallLogs(1);
         } else {
           throw new Error(data.error || 'Failed');
         }

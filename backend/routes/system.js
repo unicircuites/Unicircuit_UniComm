@@ -458,8 +458,17 @@ const maintenance = require('../services/maintenance');
 // ── POST /api/system/maintenance/reconcile-calls ─────────────────────────
 router.post('/maintenance/reconcile-calls', authenticate, async (req, res) => {
   try {
+    // 1. Strip VMS pilot (390) from extensions, rebuild real hop chains, attach recordings
+    const vms = await maintenance.normalizeVmsExtensions(pool);
+    // 2. Refresh the deduped view the dashboard reads from (so the UI reflects the changes)
+    await pool.query('REFRESH MATERIALIZED VIEW CONCURRENTLY call_logs_deduped')
+      .catch(async () => { await pool.query('REFRESH MATERIALIZED VIEW call_logs_deduped').catch(e => console.warn('[Maintenance] matview refresh failed:', e.message)); });
+    // 3. Reconcile CRM contact call counts
     const updated = await maintenance.reconcileCallCounts(pool);
-    return res.json({ success: true, message: `Reconciled counts for ${updated} contacts.` });
+    return res.json({
+      success: true,
+      message: `Reconciled ${updated} contacts · fixed ${vms.updated} call rows (390 → real extension)${vms.recCopied ? ` · ${vms.recCopied} recordings linked` : ''}.`
+    });
   } catch (err) {
     return res.status(500).json({ error: err.message });
   }

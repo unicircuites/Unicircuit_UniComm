@@ -50,10 +50,10 @@ function buildExtensionChain(...values) {
   const seen = new Set();
   const chain = [];
   for (const value of values) {
-    for (const piece of String(value || '').split('|')) {
+    // split on whitespace AND pipe so junk like "21 14" or "205 M001 99" yields clean tokens
+    for (const piece of String(value || '').split(/[\s|]+/)) {
       const ext = piece.trim();
-      // Only accept clean extension tokens (2–5 digits); excludes VMS pilots, phone
-      // numbers, and malformed fields like "205   M001 99".
+      // Only accept clean extension tokens (2–5 digits); excludes VMS pilots and phones.
       if (!/^\d{2,5}$/.test(ext) || isVmsExtension(ext)) continue;
       if (!seen.has(ext)) { seen.add(ext); chain.push(ext); }
     }
