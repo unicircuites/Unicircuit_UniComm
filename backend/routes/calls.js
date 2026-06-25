@@ -407,6 +407,12 @@ router.post('/contacts/save', async (req, res) => {
 // ═══════════════════════════════════════════════════════════════════
 router.get('/cross-sync-suggestions', async (req, res) => {
   try {
+    // Resolve the active WA account (most chats) — same approach as dashboard.js
+    const acctRes = await pool.query(
+      `SELECT account_phone FROM wa_chats GROUP BY account_phone ORDER BY COUNT(*) DESC LIMIT 1`
+    ).catch(() => ({ rows: [] }));
+    const accountPhone = acctRes.rows[0]?.account_phone || null;
+
     // ── PBX named contacts ──────────────────────────────────────────
     const pbxRows = await pool.query(`
       SELECT name, company, email,
@@ -417,12 +423,8 @@ router.get('/cross-sync-suggestions', async (req, res) => {
         AND (mobile_phone IS NOT NULL OR phone IS NOT NULL)
     `);
 
-    // ── WA named contacts — real phones only, LID resolved via phone field ──
-    // Rules (same as the chats API):
-    //   1. phone must be 7-14 digits (real number)
-    //   2. phone digits must NOT equal the LID local part (unresolved LID)
-    //   3. Skip groups (@g.us), newsletters, broadcasts
-    const waRows = await pool.query(`
+    // ── WA named contacts — real phones only, LID resolved ──────────
+    const waRows = accountPhone ? await pool.query(`
       SELECT name, raw_phone,
              regexp_replace(raw_phone, '[^0-9]', '', 'g') AS norm_phone
       FROM (
@@ -436,14 +438,16 @@ router.get('/cross-sync-suggestions', async (req, res) => {
         FROM (
           SELECT COALESCE(name, '') AS name, ''::text AS notify, phone
           FROM wa_chats
-          WHERE phone IS NOT NULL AND phone <> ''
+          WHERE account_phone = $1
+            AND phone IS NOT NULL AND phone <> ''
             AND id NOT LIKE '%@g.us'
             AND id NOT LIKE '%@newsletter'
             AND regexp_replace(phone, '[^0-9]', '', 'g') ~ '^[0-9]{7,14}$'
           UNION ALL
           SELECT COALESCE(name, '') AS name, COALESCE(notify, '') AS notify, phone
           FROM wa_contacts
-          WHERE phone IS NOT NULL AND phone <> ''
+          WHERE account_phone = $1
+            AND phone IS NOT NULL AND phone <> ''
             AND jid NOT LIKE '%@g.us'
             AND jid NOT LIKE '%@newsletter'
             AND jid <> 'status@broadcast'
@@ -456,7 +460,7 @@ router.get('/cross-sync-suggestions', async (req, res) => {
         WHERE name <> '' OR notify <> ''
       ) ranked
       WHERE rn = 1
-    `);
+    `, [accountPhone]) : { rows: [] };
 
     function norm10(digits) {
       if (!digits || digits.length < 7) return '';
