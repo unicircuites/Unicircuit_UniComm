@@ -503,11 +503,30 @@ router.get('/cross-sync-suggestions', async (req, res) => {
       if (k && r.name) waByPhone.set(k, r);
     });
 
+    // Only suggest WA→PBX for numbers that have actually appeared in PBX call logs
+    // (caller or destination). If a number never called your PBX, it's pointless to save.
+    const callLogPhones = new Set();
+    if (waByPhone.size > 0) {
+      const clRes = await pool.query(`
+        SELECT regexp_replace(p, '[^0-9]', '', 'g') AS digits
+        FROM (
+          SELECT caller AS p FROM call_logs WHERE caller IS NOT NULL AND caller <> ''
+          UNION
+          SELECT destination AS p FROM call_logs WHERE destination IS NOT NULL AND destination <> ''
+        ) t
+        WHERE LENGTH(regexp_replace(p, '[^0-9]', '', 'g')) BETWEEN 7 AND 14
+      `).catch(() => ({ rows: [] }));
+      clRes.rows.forEach(r => {
+        const k = norm10(r.digits);
+        if (k) callLogPhones.add(k);
+      });
+    }
+
     const suggestions = [];
 
-    // WA contact not in PBX → suggest save to PBX
+    // WA contact not in PBX → suggest ONLY if this number has called/been called on PBX
     waByPhone.forEach((wa, phone) => {
-      if (!pbxByPhone.has(phone)) {
+      if (!pbxByPhone.has(phone) && callLogPhones.has(phone)) {
         suggestions.push({
           id: `wa-pbx-${phone}`,
           from_source: 'whatsapp',
