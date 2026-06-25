@@ -419,8 +419,7 @@ router.get('/cross-sync-suggestions', async (req, res) => {
              COALESCE(mobile_phone, phone) AS display_phone,
              regexp_replace(COALESCE(mobile_phone, phone, ''), '[^0-9]', '', 'g') AS norm_phone
       FROM pbx_contacts
-      WHERE name IS NOT NULL AND name <> ''
-        AND (mobile_phone IS NOT NULL OR phone IS NOT NULL)
+      WHERE (mobile_phone IS NOT NULL OR phone IS NOT NULL)
     `);
 
     // ── WA named contacts — REAL phone JIDs only ────────────────────
