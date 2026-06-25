@@ -544,9 +544,10 @@ router.get('/cross-sync-suggestions', async (req, res) => {
       }
     });
 
-    // PBX contact not in WA → suggest save to WA
+    // PBX contact in WA → suggest open WA (only if number actually exists in WA direct chats)
     pbxByPhone.forEach((pbx, phone) => {
-      if (!waByPhone.has(phone) && pbx.display_phone) {
+      const wa = waByPhone.get(phone);
+      if (wa && pbx.display_phone) {
         suggestions.push({
           id: `pbx-wa-${phone}`,
           from_source: 'pbx',
