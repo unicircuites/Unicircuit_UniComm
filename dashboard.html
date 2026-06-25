@@ -11274,15 +11274,26 @@ Always write in a professional yet warm Indian B2B communication style. Use form
       const q = (document.getElementById('contact-search').value || '').toLowerCase().trim();
       const sortVal = document.getElementById('contact-sort') ? document.getElementById('contact-sort').value : 'recent';
 
+      // Normalise a phone string to last-10 digits for comparison (strips +91, 0, spaces etc.)
+      function normPhone(s) { const d = String(s || '').replace(/\D/g, ''); return d.length >= 10 ? d.slice(-10) : d; }
+      // True if query looks like a phone search (digits + allowed phone chars only)
+      const qIsPhone = /^[0-9+\s()-]+$/.test(q) && q.replace(/\D/g, '').length >= 4;
+      const qNorm = qIsPhone ? normPhone(q) : '';
+
+      function phoneMatch(stored) {
+        if (!qIsPhone || !qNorm) return false;
+        const sn = normPhone(stored);
+        return sn.includes(qNorm) || qNorm.includes(sn);
+      }
+
       if (contactsSource === 'outlook') {
         let list = !q ? [...outlookContactsCache] : outlookContactsCache.filter(oc => {
           const title = outlookDisplayTitle(oc).toLowerCase();
           const em = (outlookPrimaryEmail(oc) || '').toLowerCase();
           const co = ((oc.companyName || '') + '').toLowerCase();
           const grp = Array.isArray(oc.groups) ? oc.groups.join(' ').toLowerCase() : '';
-          let ph = ((oc.resolvedPhone || oc.mobilePhone || '') + '').toLowerCase();
-          if (Array.isArray(oc.businessPhones) && oc.businessPhones[0]) ph += String(oc.businessPhones[0]).toLowerCase();
-          return title.includes(q) || em.includes(q) || co.includes(q) || ph.includes(q) || grp.includes(q);
+          const ph = (oc.resolvedPhone || oc.mobilePhone || (Array.isArray(oc.businessPhones) ? oc.businessPhones[0] : '') || '');
+          return title.includes(q) || em.includes(q) || co.includes(q) || grp.includes(q) || phoneMatch(ph) || String(ph).toLowerCase().includes(q);
         });
 
         if (sortVal === 'recent') {
@@ -11309,6 +11320,7 @@ Always write in a professional yet warm Indian B2B communication style. Use form
         const base = waAllChats || [];
         let list = !q ? [...base] : base.filter(c =>
           (c.name || '').toLowerCase().includes(q) ||
+          phoneMatch(c.phone) ||
           (c.phone || '').toLowerCase().includes(q) ||
           (c.id || '').toLowerCase().includes(q)
         );
@@ -11320,7 +11332,9 @@ Always write in a professional yet warm Indian B2B communication style. Use form
         return;
       }
       if (contactsSource === 'pbx') {
-        let list = !q ? [...pbxContactsCache] : pbxContactsCache.filter(r => (r.phone || '').toLowerCase().includes(q) || (r.name || '').toLowerCase().includes(q));
+        let list = !q ? [...pbxContactsCache] : pbxContactsCache.filter(r =>
+          phoneMatch(r.phone) || (r.phone || '').toLowerCase().includes(q) || (r.name || '').toLowerCase().includes(q)
+        );
         if (sortVal === 'az') list.sort((a, b) => (a.name || a.phone || '').localeCompare(b.name || b.phone || ''));
         else if (sortVal === 'za') list.sort((a, b) => (b.name || b.phone || '').localeCompare(a.name || a.phone || ''));
         else if (sortVal === 'recent') list.sort((a, b) => (new Date(b.last_call || 0)) - (new Date(a.last_call || 0)));
@@ -11330,10 +11344,9 @@ Always write in a professional yet warm Indian B2B communication style. Use form
       if (contactsSource === 'all') {
         let list = !q ? [...allMergedContactsCache] : allMergedContactsCache.filter(r => {
           const name = (r.name || '').toLowerCase();
-          const phone = (r.phone || '').toLowerCase();
           const email = (r.email || '').toLowerCase();
           const company = (r.company || '').toLowerCase();
-          return name.includes(q) || phone.includes(q) || email.includes(q) || company.includes(q);
+          return name.includes(q) || email.includes(q) || company.includes(q) || phoneMatch(r.phone) || (r.phone || '').toLowerCase().includes(q);
         });
         // Apply sort
         if (sortVal === 'recent') {
@@ -26633,12 +26646,14 @@ ${plainText}`;
     function waFilterChats(q) {
       if (!q) { waRenderChats(waAllChats); return; }
       var ql = q.toLowerCase().trim();
-      var qd = ql.replace(/\D/g, ''); // digits only for phone matching
+      var qd = ql.replace(/\D/g, '');
+      var qNorm = qd.length >= 10 ? qd.slice(-10) : qd; // last-10 for country-code-agnostic match
       var filtered = waAllChats.filter(function (c) {
         if ((c.name || '').toLowerCase().includes(ql)) return true;
-        if (qd.length >= 3) {
+        if (qd.length >= 4) {
           var pd = (c.phone || c.id || '').replace(/\D/g, '');
-          if (pd.includes(qd)) return true;
+          var pNorm = pd.length >= 10 ? pd.slice(-10) : pd;
+          if (pNorm.includes(qNorm) || qNorm.includes(pNorm)) return true;
         }
         return false;
       });
@@ -27058,7 +27073,7 @@ ${plainText}`;
     function waMediaHTML(type, body, msgId, mediaPath, localUrl) {
       var token = localStorage.getItem('uc_token') || sessionStorage.getItem('uc_token') || localStorage.getItem('unicomm_token') || sessionStorage.getItem('unicomm_token') || '';
       var tokenParam = token ? '?token=' + encodeURIComponent(token) : '';
-      var dlUrl = msgId ? (API_BASE + '/wa/media/' + msgId + tokenParam) : null;
+      var dlUrl = msgId ? (API_BASE + '/wa/media/' + encodeURIComponent(msgId) + tokenParam) : null;
       var previewUrl = dlUrl || localUrl || null;
       var cleanBody = (body || '').replace(/^\uD83D\uDCF7\s*|^\uD83D\uDCC4\s*/, '').trim();
       var mediaFilename = mediaPath && mediaPath.includes('_') ? mediaPath.split('_').slice(1).join('_') : '';

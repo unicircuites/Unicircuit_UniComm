@@ -573,8 +573,10 @@ router.get('/cross-sync-suggestions', async (req, res) => {
     }
 
     // Outlook contact missing in PBX → suggest Save to PBX
+    // Only if the number has actually appeared in PBX call logs — same gate as WA→PBX.
+    // A number never seen on the PBX has no reason to be in PBX contacts.
     outlookByPhone.forEach((o, phone) => {
-      if (!pbxByPhone.has(phone)) {
+      if (!pbxByPhone.has(phone) && callLogPhones.has(phone)) {
         suggestions.push({
           id: `ol-pbx-${phone}`,
           from_source: 'outlook',
@@ -587,9 +589,12 @@ router.get('/cross-sync-suggestions', async (req, res) => {
       }
     });
 
-    // Outlook contact missing in WhatsApp → suggest Open WA
+    // Outlook contact IN WhatsApp but WA has no name → suggest enriching WA name from Outlook
+    // (Only suggest when the number actually exists in WA — no point opening WA for a number
+    //  that has no WhatsApp account; that was causing false "Open WA" suggestions like Ajit.)
     outlookByPhone.forEach((o, phone) => {
-      if (!waByPhone.has(phone)) {
+      const wa = waByPhone.get(phone);
+      if (wa && (!wa.name || wa.name === wa.raw_phone)) {
         suggestions.push({
           id: `ol-wa-${phone}`,
           from_source: 'outlook',

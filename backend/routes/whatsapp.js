@@ -1333,7 +1333,8 @@ router.get('/media/:msgId', async (req, res) => {
     req.headers.authorization = 'Bearer ' + req.query.token;
   }
   try {
-    const { buffer, mime, filename } = await wa.downloadMedia(req.params.msgId);
+    const msgId = decodeURIComponent(req.params.msgId);
+    const { buffer, mime, filename } = await wa.downloadMedia(msgId);
     res.setHeader('Content-Type', mime);
     res.setHeader('Content-Disposition', `inline; filename="${filename}"`);
     res.setHeader('Cache-Control', 'private, max-age=86400');
