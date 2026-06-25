@@ -1,0 +1,82 @@
+[
+  {
+    "extension": "207",
+    "name": "SUSHIL M(207)\nVIBHA B(221)\nDAX(208)\nSIP Extn-10\nPAWAN B(222)\nSIP Extn-12\nDIRECTOR ROOM(201)\nSANGHSHIL S(202)\nACHAL G(203)\nMANAGER ROOM(204)\nNIDHI(205)\nABHISHEK(206)\nSUSHIL M(207)\nVIBHA B(221)\nDAX(208)\nSIP Extn-10\nPAWAN B(222)\nSIP Extn-12\nDIRECTOR ROOM(201)\nSANGHSHIL S(202)\nACHAL G(203)\nMANAGER ROOM(204)\nNIDHI(205)\nABHISHEK(206)",
+    "callTaping": "Apply as per Call Taping profile 1"
+  },
+  {
+    "extension": "207",
+    "name": "SUSHIL M(207)",
+    "callTaping": "Apply as per Call Taping profile 1"
+  },
+  {
+    "extension": "221",
+    "name": "VIBHA B(221)",
+    "callTaping": "Apply as per Call Taping profile 1"
+  },
+  {
+    "extension": "208",
+    "name": "DAX(208)",
+    "callTaping": "Apply as per Call Taping profile 1"
+  },
+  {
+    "extension": "SIP Extn-10",
+    "name": "SIP Extn-10",
+    "callTaping": "Apply as per Call Taping profile 1"
+  },
+  {
+    "extension": "222",
+    "name": "PAWAN B(222)",
+    "callTaping": "Apply as per Call Taping profile 1"
+  },
+  {
+    "extension": "SIP Extn-12",
+    "name": "SIP Extn-12",
+    "callTaping": "Apply as per Call Taping profile 1"
+  },
+  {
+    "extension": "201",
+    "name": "DIRECTOR ROOM(201)",
+    "callTaping": "Apply as per Call Taping profile 1"
+  },
+  {
+    "extension": "202",
+    "name": "SANGHSHIL S(202)",
+    "callTaping": "Apply as per Call Taping profile 1"
+  },
+  {
+    "extension": "203",
+    "name": "ACHAL G(203)",
+    "callTaping": "Apply as per Call Taping profile 1"
+  },
+  {
+    "extension": "204",
+    "name": "MANAGER ROOM(204)",
+    "callTaping": "Apply as per Call Taping profile 1"
+  },
+  {
+    "extension": "205",
+    "name": "NIDHI(205)",
+    "callTaping": "Apply as per Call Taping profile 1"
+  },
+  {
+    "extension": "206",
+    "name": "ABHISHEK(206)",
+    "callTaping": "Apply as per Call Taping profile 1"
+  },
+  {
+    "extension": "21",
+    "name": "SALES TEAM(21)\nTECH TEAM(22)\nSALES TEAM(21)\nTECH TEAM(22)\nSALES TEAM(21)\nTECH TEAM(22)",
+    "callTaping": "Apply as per Call Taping profile 1"
+  },
+  {
+    "extension": "21",
+    "name": "SALES TEAM(21)",
+    "callTaping": "Apply as per Call Taping profile 1"
+  },
+  {
+    "extension": "22",
+    "name": "TECH TEAM(22)",
+    "callTaping": "Apply as per Call Taping profile 1"
+  }
+]

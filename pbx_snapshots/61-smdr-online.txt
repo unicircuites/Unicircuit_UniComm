@@ -1,0 +1,342 @@
+SELECT [0] "" = «Ethernet»  options: None / Ethernet
+TEXT [1] "" = "192.168.0.200"
+TEXT [2] "" = "05001"
+SELECT [3] "" = «Ethernet»  options: None / Ethernet
+TEXT [4] "" = "192.168.0.200"
+TEXT [5] "" = "05001"
+SELECT [6] "" = «Ethernet»  options: None / Ethernet
+TEXT [7] "" = "192.168.0.200"
+TEXT [8] "" = "05001"
+TEXT [9] "Serial Number" = "01"
+TEXT [10] "Serial Number" = "04"
+SELECT [11] "Serial Number" = «Right»  options: Left / Right
+TEXT [12] "Serial Number" = "032"
+TEXT [13] "Increment Counter" = "00"
+TEXT [14] "Property Code" = "00"
+TEXT [15] "Property Code" = "04"
+TEXT [16] "Connected Number" = "29"
+TEXT [17] "Connected Number" = "06"
+SELECT [18] "Connected Number" = «Right»  options: Left / Right
+TEXT [19] "Connected Number" = "032"
+TEXT [20] "Trunk Number" = "23"
+SELECT [21] "Trunk Number" = «Matrix Format»  options: Matrix Format / Check Inn Format
+TEXT [22] "Date" = "36"
+TEXT [23] "Date" = "08"
+SELECT [24] "Date" = «DD-MM-YY»  options: DD-MM-YY / DD/MM/YY / DD.MM.YY / DD MM YY / DDMMYY / DD-MM-YYYY / DD/MM/YYYY / DD.MM.YYYY / DD MM YYYY / DDMMYYYY / MM-DD-YY / MM/DD/YY / MM.DD.YY / MM DD YY / MMDDYY / YY-MM-DD / YY/MM/DD / YY.MM.DD / YY MM DD / YYMMDD / YYYY-MM-DD / YYYY/MM/DD / YYYY.MM.DD / YYYY MM DD / YYYYMMDD / MM-DD / MM/DD / MM.DD / MM DD / MMDD / DD-MM / DD/MM / DD.MM / DD MM / DDMM
+SELECT [25] "Date" = «Right»  options: Left / Right
+SELECT [26] "Date" = «Yes»  options: No / Yes
+TEXT [27] "Date" = "048"
+TEXT [28] "Time" = "47"
+TEXT [29] "Time" = "08"
+SELECT [30] "Time" = «HH:MM:SS»  options: HH:MM:SS / HH:MM
+SELECT [31] "Time" = «Right»  options: Left / Right
+SELECT [32] "Time" = «Yes»  options: No / Yes
+TEXT [33] "Time" = "048"
+TEXT [34] "Answer Duration" = "56"
+TEXT [35] "Answer Duration" = "03"
+SELECT [36] "Answer Duration" = «Seconds»  options: HH:MM:SS / HHMMSS / Minutes / Seconds
+SELECT [37] "Answer Duration" = «Right»  options: Left / Right
+SELECT [38] "Answer Duration" = «Yes»  options: No / Yes
+TEXT [39] "Answer Duration" = "032"
+TEXT [40] "Hold Duration" = "60"
+TEXT [41] "Hold Duration" = "03"
+SELECT [42] "Hold Duration" = «Seconds»  options: HH:MM:SS / HHMMSS / Minutes / Seconds
+SELECT [43] "Hold Duration" = «Right»  options: Left / Right
+SELECT [44] "Hold Duration" = «Yes»  options: No / Yes
+TEXT [45] "Hold Duration" = "032"
+TEXT [46] "Speech Duration" = "64"
+TEXT [47] "Speech Duration" = "05"
+SELECT [48] "Speech Duration" = «Seconds»  options: HH:MM:SS / HHMMSS / Minutes / Seconds
+SELECT [49] "Speech Duration" = «Right»  options: Left / Right
+SELECT [50] "Speech Duration" = «Yes»  options: No / Yes
+TEXT [51] "Speech Duration" = "032"
+TEXT [52] "Dialed Number" = "00"
+TEXT [53] "Dialed Number" = "16"
+SELECT [54] "Dialed Number" = «Continuous»  options: Continuous / Separated
+SELECT [55] "Dialed Number" = «Left»  options: Left / Right
+TEXT [56] "Calling Number" = "06"
+TEXT [57] "Calling Number" = "16"
+SELECT [58] "Calling Number" = «Continuous»  options: Continuous / Separated
+SELECT [59] "Calling Number" = «Left»  options: Left / Right
+TEXT [60] "Digits dialed in Built-In Auto Attendant" = "00"
+TEXT [61] "Digits dialed in Built-In Auto Attendant" = "00"
+SELECT [62] "Digits dialed in Built-In Auto Attendant" = «Right»  options: Left / Right
+TEXT [63] "Connected IP:Port" = "00"
+TEXT [64] "Connected IP:Port" = "48"
+SELECT [65] "Connected IP:Port" = «Right»  options: Left / Right
+TEXT [66] "Calling IP:Port" = "00"
+TEXT [67] "Calling IP:Port" = "48"
+SELECT [68] "Calling IP:Port" = «Right»  options: Left / Right
+TEXT [69] "Dialed IP:Port" = "00"
+TEXT [70] "Dialed IP:Port" = "48"
+SELECT [71] "Dialed IP:Port" = «Right»  options: Left / Right
+TEXT [72] "Remarks" = "70"
+TEXT [73] "Remarks" = "02"
+SELECT [74] "Remarks" = «Left»  options: Left / Right
+SELECT [75] "Reset Serial Number to 001" = «Every 24 Hrs (at 00:00 hrs)»  options: Do not Reset / Every 24 Hrs (at 00:00 hrs) / Every 6 Hrs (from 00:00 hrs)
+SELECT [76] "Reset Increment Counter" = «Every 24 Hrs (at 00:00 hrs)»  options: Do not Reset / Every 24 Hrs (at 00:00 hrs) / Every 6 Hrs (from 00:00 hrs)
+TEXT [77] "Property Code" = "AAA"
+--HEADERS--
+SMDR - Online
+SMDR - Online
+ SMDR - Incoming Online Record Format
+	
+Parameter
+	
+Start Column No.
+	
+Field Length
+	
+Format
+	
+Alignment
+	
+Filler Char.
+Required?
+	
+Filler Char.
+(Decimal Value)
+
+
+
+ Serial Number
+	
+	
+	  Fixed	
+Left
+Right
+	 Yes	
+
+
+ Increment Counter
+	
+	01	  Fixed	  N/A	 N/A	N/A
+
+ Property Code
+	
+	
+	  Fixed	  Left	 Yes	032
+
+ Connected Number
+	
+	
+	  Fixed	
+Left
+Right
+	 Yes	
+
+
+ Trunk Number
+	
+	05	
+Matrix Format
+Check Inn Format
+	  N/A	 Yes	032
+
+ Date
+	
+	
+	
+DD-MM-YY
+DD/MM/YY
+DD.MM.YY
+DD MM YY
+DDMMYY
+DD-MM-YYYY
+DD/MM/YYYY
+DD.MM.YYYY
+DD MM YYYY
+DDMMYYYY
+MM-DD-YY
+MM/DD/YY
+MM.DD.YY
+MM DD YY
+MMDDYY
+YY-MM-DD
+YY/MM/DD
+YY.MM.DD
+YY MM DD
+YYMMDD
+YYYY-MM-DD
+YYYY/MM/DD
+YYYY.MM.DD
+YYYY MM DD
+YYYYMMDD
+MM-DD
+MM/DD
+MM.DD
+MM DD
+MMDD
+DD-MM
+DD/MM
+DD.MM
+DD MM
+DDMM
+	
+Left
+Right
+	
+No
+Yes
+	
+
+
+ Time
+	
+	
+	
+HH:MM:SS
+HH:MM
+	
+Left
+Right
+	
+No
+Yes
+	
+
+
+ Answer Duration
+	
+	
+	
+HH:MM:SS
+HHMMSS
+Minutes
+Seconds
+	
+Left
+Right
+	
+No
+Yes
+	
+
+
+ Hold Duration
+	
+	
+	
+HH:MM:SS
+HHMMSS
+Minutes
+Seconds
+	
+Left
+Right
+	
+No
+Yes
+	
+
+
+ Speech Duration
+	
+	
+	
+HH:MM:SS
+HHMMSS
+Minutes
+Seconds
+	
+Left
+Right
+	
+No
+Yes
+	
+
+
+ Dialed Number
+	
+	
+	
+Continuous
+Separated
+	
+Left
+Right
+	 N/A	N/A
+
+ Calling Number
+	
+	
+	
+Continuous
+Separated
+	
+Left
+Right
+	 N/A	N/A
+
+ Digits dialed in Built-In Auto Attendant
+	
+	
+	  Fixed	
+Left
+Right
+	 N/A	N/A
+
+ Connected IP:Port
+	
+	
+	  Fixed	
+Left
+Right
+	 N/A	N/A
+
+ Calling IP:Port
+	
+	
+	  Fixed	
+Left
+Right
+	 N/A	N/A
+
+ Dialed IP:Port
+	
+	
+	  Fixed	
+Left
+Right
+	 N/A	N/A
+
+ Remarks
+	
+	
+	  Fixed	
+Left
+Right
+	 N/A	N/A
+
+ Reset Serial Number to 001
+	
+Do not Reset
+Every 24 Hrs (at 00:00 hrs)
+Every 6 Hrs (from 00:00 hrs)
+
+
+ Reset Increment Counter
+	
+Do not Reset
+Every 24 Hrs (at 00:00 hrs)
+Every 6 Hrs (from 00:00 hrs)
+
+
+ Property Code
+	  
+
+	
+ 
+Submit
+ 
+	
+ 
+Default
+Destination Port for SMDR - Outgoing Call Online
+LoadStringCombo('0',2,0,2,stdIOComboBx,"style='width:80px;' onChange='Debug_Ethernet_Select(this,SMDRONLINE_PARA,2);'")NoneEthernet
+Destination Port for SMDR - Incoming Call Online
+LoadStringCombo('3',2,0,2,stdIOComboBx,"style='width:80px;' onChange='Debug_Ethernet_Select(this,SMDRONLINE_PARA,2);'")NoneEthernet
+Destination Port for SMDR - Internal Call Online
+LoadStringCombo('6',2,0,2,stdIOComboBx,"style='width:80px;' onChange='Debug_Ethernet_Select(this,SMDRONLINE_PARA,2);'")NoneEthernet
+SMDR - Incoming Online Record Format

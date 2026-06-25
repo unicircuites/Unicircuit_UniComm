@@ -1,0 +1,435 @@
+SELECT [POST_PARA_0] "SMDR-OG Posting Protocol (Handshaking and OG Call Record Format)" = «Matrix»  options: Blind Send / Matrix / Holidex / HOBIS A / HOBIS B / HOBIC / BELL HOBIC / MICROS A / MICROS B / Hilton / Xiox / Comm One / Call-Inn / RSI-CMS / Customized / AST
+SELECT [POST_PARA_1] "Destination Port" = «Ethernet»  options: None / Ethernet
+TEXT [POST_PARA_2] "Destination IP Address" = "192.168.0.200"
+TEXT [POST_PARA_3] "Port" = "05001"
+SELECT [POST_PARA_4] "Process" = «Start»  options: Abort / Start
+TEXT [POST_HANDSHAK_PARA_0] "Response to ENQ Timeout (sec)" = "03"
+TEXT [POST_HANDSHAK_PARA_1] "ENQ Retry Count - on No Response" = "05"
+TEXT [POST_HANDSHAK_PARA_2] "ENQ Retry Timer (sec) - on No Response" = "03"
+TEXT [POST_HANDSHAK_PARA_3] "ENQ Retry Count - on Negative Response" = "05"
+TEXT [POST_HANDSHAK_PARA_4] "ENQ Retry Timer (sec) - on Negative Response" = "03"
+TEXT [POST_HANDSHAK_PARA_5] "Response to Data Timeout (sec)" = "03"
+TEXT [POST_HANDSHAK_PARA_6] "Data Transfer Retry Count - on No Response" = "05"
+TEXT [POST_HANDSHAK_PARA_7] "Data Transfer Retry Timer (sec) - on No Response" = "03"
+TEXT [POST_HANDSHAK_PARA_8] "Data Transfer Retry Count - on Negative Response" = "05"
+TEXT [POST_HANDSHAK_PARA_9] "Data Transfer Retry Timer (sec) - on Negative Response" = "03"
+SELECT [POST_HANDSHAK_PARA_10] "Use ENQ Character" = «Enable»  options: Disable / Enable
+TEXT [POST_HANDSHAK_PARA_11] "ENQ Character (Enter Decimal Value)" = "000"
+TEXT [POST_HANDSHAK_PARA_12] "Acknowledgement Character (Enter Decimal Value)" = "006"
+TEXT [POST_HANDSHAK_PARA_13] "No Acknowledgement Character (Enter Decimal Value)" = "021"
+TEXT [POST_HANDSHAK_PARA_14] "Start Of Packet Character (Enter Decimal Value)" = "002"
+TEXT [POST_HANDSHAK_PARA_15] "Start Of Packet Character (Enter Decimal Value)" = "000"
+TEXT [POST_HANDSHAK_PARA_16] "Start Of Packet Character (Enter Decimal Value)" = "000"
+TEXT [POST_HANDSHAK_PARA_17] "Start Of Packet Character (Enter Decimal Value)" = "000"
+TEXT [POST_HANDSHAK_PARA_18] "End Of Packet Character (Enter Decimal Value)" = "003"
+TEXT [POST_HANDSHAK_PARA_19] "End Of Packet Character (Enter Decimal Value)" = "000"
+TEXT [POST_HANDSHAK_PARA_20] "End Of Packet Character (Enter Decimal Value)" = "000"
+TEXT [POST_HANDSHAK_PARA_21] "End Of Packet Character (Enter Decimal Value)" = "000"
+SELECT [POST_HANDSHAK_PARA_22] "Use Byte Code Check (BCC)" = «Enable»  options: Disable / Enable
+TEXT [POST_OCRF_PARA_0] "Serial Number" = "001"
+TEXT [POST_OCRF_PARA_1] "Serial Number" = "004"
+SELECT [POST_OCRF_PARA_2] "Serial Number" = «Right»  options: Left / Right
+TEXT [POST_OCRF_PARA_3] "Serial Number" = "032"
+TEXT [POST_OCRF_PARA_4] "Increment Counter" = "000"
+TEXT [POST_OCRF_PARA_5] "Property Code" = "000"
+TEXT [POST_OCRF_PARA_6] "Property Code" = "004"
+TEXT [POST_OCRF_PARA_7] "Calling Number" = "006"
+TEXT [POST_OCRF_PARA_8] "Calling Number" = "006"
+SELECT [POST_OCRF_PARA_9] "Calling Number" = «Right»  options: Left / Right
+TEXT [POST_OCRF_PARA_10] "Calling Number" = "032"
+TEXT [POST_OCRF_PARA_11] "Trunk Number" = "017"
+SELECT [POST_OCRF_PARA_12] "Trunk Number" = «Matrix Format»  options: Matrix Format / Check Inn Format
+TEXT [POST_OCRF_PARA_13] "Date" = "041"
+TEXT [POST_OCRF_PARA_14] "Date" = "008"
+SELECT [POST_OCRF_PARA_15] "Date" = «DD-MM-YY»  options: DD-MM-YY / DD/MM/YY / DD.MM.YY / DD MM YY / DDMMYY / DD-MM-YYYY / DD/MM/YYYY / DD.MM.YYYY / DD MM YYYY / DDMMYYYY / MM-DD-YY / MM/DD/YY / MM.DD.YY / MM DD YY / MMDDYY / YY-MM-DD / YY/MM/DD / YY.MM.DD / YY MM DD / YYMMDD / YYYY-MM-DD / YYYY/MM/DD / YYYY.MM.DD / YYYY MM DD / YYYYMMDD / MM-DD / MM/DD / MM.DD / MM DD / MMDD / DD-MM / DD/MM / DD.MM / DD MM / DDMM
+SELECT [POST_OCRF_PARA_16] "Date" = «Right»  options: Left / Right
+SELECT [POST_OCRF_PARA_17] "Date" = «Yes»  options: No / Yes
+TEXT [POST_OCRF_PARA_18] "Date" = "032"
+TEXT [POST_OCRF_PARA_19] "Time" = "050"
+TEXT [POST_OCRF_PARA_20] "Time" = "008"
+SELECT [POST_OCRF_PARA_21] "Time" = «HH:MM:SS»  options: HH:MM:SS / HH:MM
+SELECT [POST_OCRF_PARA_22] "Time" = «Right»  options: Left / Right
+SELECT [POST_OCRF_PARA_23] "Time" = «Yes»  options: No / Yes
+TEXT [POST_OCRF_PARA_24] "Time" = "032"
+TEXT [POST_OCRF_PARA_25] "Duration" = "059"
+TEXT [POST_OCRF_PARA_26] "Duration" = "005"
+SELECT [POST_OCRF_PARA_27] "Duration" = «Seconds»  options: HH:MM:SS / HHMMSS / Minutes / Seconds
+SELECT [POST_OCRF_PARA_28] "Duration" = «Right»  options: Left / Right
+SELECT [POST_OCRF_PARA_29] "Duration" = «Yes»  options: No / Yes
+TEXT [POST_OCRF_PARA_30] "Duration" = "032"
+TEXT [POST_OCRF_PARA_31] "Units" = "065"
+TEXT [POST_OCRF_PARA_32] "Units" = "004"
+SELECT [POST_OCRF_PARA_33] "Units" = «Right»  options: Left / Right
+TEXT [POST_OCRF_PARA_34] "Units" = "032"
+TEXT [POST_OCRF_PARA_35] "Amount" = "070"
+TEXT [POST_OCRF_PARA_36] "Amount" = "007"
+SELECT [POST_OCRF_PARA_37] "Amount" = «Currency with Decimal Point»  options: Higher Currency / Lower Currency / Currency with Decimal Point / Currency without Decimal Point
+SELECT [POST_OCRF_PARA_38] "Amount" = «Yes»  options: No / Yes
+TEXT [POST_OCRF_PARA_39] "Amount" = "032"
+TEXT [POST_OCRF_PARA_40] "Currency" = "000"
+TEXT [POST_OCRF_PARA_41] "Currency" = "001"
+SELECT [POST_OCRF_PARA_42] "Currency" = «Right»  options: Left / Right
+TEXT [POST_OCRF_PARA_43] "Currency" = "032"
+TEXT [POST_OCRF_PARA_44] "Call Type Indicator" = "000"
+TEXT [POST_OCRF_PARA_45] "Call Type Indicator" = "001"
+SELECT [POST_OCRF_PARA_46] "Call Type Indicator" = «Right»  options: Left / Right
+TEXT [POST_OCRF_PARA_47] "Location" = "000"
+TEXT [POST_OCRF_PARA_48] "Location" = "005"
+SELECT [POST_OCRF_PARA_49] "Location" = «Right»  options: Left / Right
+TEXT [POST_OCRF_PARA_50] "Connected Number" = "022"
+TEXT [POST_OCRF_PARA_51] "Connected Number" = "018"
+SELECT [POST_OCRF_PARA_52] "Connected Number" = «Continuous»  options: Continuous / Separated
+SELECT [POST_OCRF_PARA_53] "Connected Number" = «Left»  options: Left / Right
+TEXT [POST_OCRF_PARA_54] "PIN" = "000"
+SELECT [POST_OCRF_PARA_55] "PIN" = «Right»  options: Left / Right
+TEXT [POST_OCRF_PARA_56] "PIN" = "032"
+TEXT [POST_OCRF_PARA_57] "Account Code" = "000"
+TEXT [POST_OCRF_PARA_58] "Account Code" = "004"
+SELECT [POST_OCRF_PARA_59] "Account Code" = «Right»  options: Left / Right
+TEXT [POST_OCRF_PARA_60] "Account Code" = "032"
+TEXT [POST_OCRF_PARA_61] "Dialed Number" = "000"
+TEXT [POST_OCRF_PARA_62] "Dialed Number" = "019"
+SELECT [POST_OCRF_PARA_63] "Dialed Number" = «Continuous»  options: Continuous / Separated
+SELECT [POST_OCRF_PARA_64] "Dialed Number" = «Left»  options: Left / Right
+TEXT [POST_OCRF_PARA_65] "Connected IP:Port" = "000"
+TEXT [POST_OCRF_PARA_66] "Connected IP:Port" = "048"
+SELECT [POST_OCRF_PARA_67] "Connected IP:Port" = «Right»  options: Left / Right
+TEXT [POST_OCRF_PARA_68] "Calling IP:Port" = "000"
+TEXT [POST_OCRF_PARA_69] "Calling IP:Port" = "048"
+SELECT [POST_OCRF_PARA_70] "Calling IP:Port" = «Right»  options: Left / Right
+TEXT [POST_OCRF_PARA_71] "Dialed IP:Port" = "000"
+TEXT [POST_OCRF_PARA_72] "Dialed IP:Port" = "048"
+SELECT [POST_OCRF_PARA_73] "Dialed IP:Port" = «Right»  options: Left / Right
+TEXT [POST_OCRF_PARA_74] "Remarks" = "078"
+TEXT [POST_OCRF_PARA_75] "Remarks" = "002"
+SELECT [POST_OCRF_PARA_76] "Remarks" = «Left»  options: Left / Right
+SELECT [POST_OCRF_PARA_77] "Reset Serial Number to 001" = «Do not Reset»  options: Do not Reset / Every 24 Hrs (at 00:00 hrs) / Every 6 Hrs (from 00:00 hrs)
+TEXT [POST_OCRF_PARA_78] "Starting Character - Increment Counter" = "A"
+SELECT [POST_OCRF_PARA_79] "Reset Increment Counter" = «Do not Reset»  options: Do not Reset / Every 24 Hrs (at 00:00 hrs) / Every 6 Hrs (from 00:00 hrs)
+SELECT [POST_OCRF_PARA_80] "Prefix String Required" = «No»  options: No / Yes
+TEXT [POST_OCRF_PARA_81] "Property Code" = "000"
+TEXT [POST_OCRF_PARA_82] "Currency Symbol (Enter Decimal Value)" = "000"
+TEXT [POST_OCRF_PARA_83] "Currency Symbol (Enter Decimal Value)" = "000"
+TEXT [POST_OCRF_PARA_84] "Currency Symbol (Enter Decimal Value)" = "000"
+TEXT [POST_OCRF_PARA_85] "Currency Symbol (Enter Decimal Value)" = "000"
+TEXT [POST_OCRF_PARA_86] "Currency Symbol (Enter Decimal Value)" = "000"
+TEXT [POST_OCRF_PARA_87] "Currency Symbol (Enter Decimal Value)" = "000"
+TEXT [POST_OCRF_PARA_88] "Currency Symbol (Enter Decimal Value)" = "000"
+TEXT [POST_OCRF_PARA_89] "Currency Symbol (Enter Decimal Value)" = "000"
+TEXT [CALL_TYPE_IND_PARA_0] "01" = ""
+TEXT [CALL_TYPE_IND_PARA_1] "01" = ""
+TEXT [CALL_TYPE_IND_PARA_2] "02" = ""
+TEXT [CALL_TYPE_IND_PARA_3] "02" = ""
+TEXT [CALL_TYPE_IND_PARA_4] "03" = ""
+TEXT [CALL_TYPE_IND_PARA_5] "03" = ""
+TEXT [CALL_TYPE_IND_PARA_6] "04" = ""
+TEXT [CALL_TYPE_IND_PARA_7] "04" = ""
+TEXT [CALL_TYPE_IND_PARA_8] "05" = ""
+TEXT [CALL_TYPE_IND_PARA_9] "05" = ""
+TEXT [CALL_TYPE_IND_PARA_10] "06" = ""
+TEXT [CALL_TYPE_IND_PARA_11] "06" = ""
+TEXT [CALL_TYPE_IND_PARA_12] "07" = ""
+TEXT [CALL_TYPE_IND_PARA_13] "07" = ""
+TEXT [CALL_TYPE_IND_PARA_14] "08" = ""
+TEXT [CALL_TYPE_IND_PARA_15] "08" = ""
+TEXT [CALL_TYPE_IND_PARA_16] "09" = ""
+TEXT [CALL_TYPE_IND_PARA_17] "09" = ""
+TEXT [CALL_TYPE_IND_PARA_18] "10" = ""
+TEXT [CALL_TYPE_IND_PARA_19] "10" = ""
+TEXT [CALL_TYPE_IND_PARA_20] "11" = ""
+TEXT [CALL_TYPE_IND_PARA_21] "11" = ""
+TEXT [CALL_TYPE_IND_PARA_22] "12" = ""
+TEXT [CALL_TYPE_IND_PARA_23] "12" = ""
+TEXT [CALL_TYPE_IND_PARA_24] "13" = ""
+TEXT [CALL_TYPE_IND_PARA_25] "13" = ""
+TEXT [CALL_TYPE_IND_PARA_26] "14" = ""
+TEXT [CALL_TYPE_IND_PARA_27] "14" = ""
+TEXT [CALL_TYPE_IND_PARA_28] "15" = ""
+TEXT [CALL_TYPE_IND_PARA_29] "15" = ""
+TEXT [CALL_TYPE_IND_PARA_30] "16" = ""
+TEXT [CALL_TYPE_IND_PARA_31] "16" = ""
+TEXT [CALL_TYPE_IND_PARA_32] "17" = ""
+TEXT [CALL_TYPE_IND_PARA_33] "17" = ""
+TEXT [CALL_TYPE_IND_PARA_34] "18" = ""
+TEXT [CALL_TYPE_IND_PARA_35] "18" = ""
+TEXT [CALL_TYPE_IND_PARA_36] "19" = ""
+TEXT [CALL_TYPE_IND_PARA_37] "19" = ""
+TEXT [CALL_TYPE_IND_PARA_38] "20" = ""
+TEXT [CALL_TYPE_IND_PARA_39] "20" = ""
+TEXT [CALL_TYPE_IND_PARA_40] "21" = ""
+TEXT [CALL_TYPE_IND_PARA_41] "21" = ""
+TEXT [CALL_TYPE_IND_PARA_42] "22" = ""
+TEXT [CALL_TYPE_IND_PARA_43] "22" = ""
+TEXT [CALL_TYPE_IND_PARA_44] "23" = ""
+TEXT [CALL_TYPE_IND_PARA_45] "23" = ""
+TEXT [CALL_TYPE_IND_PARA_46] "24" = ""
+TEXT [CALL_TYPE_IND_PARA_47] "24" = ""
+TEXT [CALL_TYPE_IND_PARA_48] "25" = ""
+TEXT [CALL_TYPE_IND_PARA_49] "25" = ""
+TEXT [CALL_TYPE_IND_PARA_50] "26" = ""
+TEXT [CALL_TYPE_IND_PARA_51] "26" = ""
+TEXT [CALL_TYPE_IND_PARA_52] "27" = ""
+TEXT [CALL_TYPE_IND_PARA_53] "27" = ""
+TEXT [CALL_TYPE_IND_PARA_54] "28" = ""
+TEXT [CALL_TYPE_IND_PARA_55] "28" = ""
+TEXT [CALL_TYPE_IND_PARA_56] "29" = ""
+TEXT [CALL_TYPE_IND_PARA_57] "29" = ""
+TEXT [CALL_TYPE_IND_PARA_58] "30" = ""
+TEXT [CALL_TYPE_IND_PARA_59] "30" = ""
+TEXT [CALL_TYPE_IND_PARA_60] "31" = ""
+TEXT [CALL_TYPE_IND_PARA_61] "31" = ""
+TEXT [CALL_TYPE_IND_PARA_62] "32" = ""
+TEXT [CALL_TYPE_IND_PARA_63] "32" = ""
+TEXT [CALL_TYPE_IND_PARA_64] "33" = ""
+TEXT [CALL_TYPE_IND_PARA_65] "33" = ""
+TEXT [CALL_TYPE_IND_PARA_66] "34" = ""
+TEXT [CALL_TYPE_IND_PARA_67] "34" = ""
+TEXT [CALL_TYPE_IND_PARA_68] "35" = ""
+TEXT [CALL_TYPE_IND_PARA_69] "35" = ""
+TEXT [CALL_TYPE_IND_PARA_70] "36" = ""
+TEXT [CALL_TYPE_IND_PARA_71] "36" = ""
+--HEADERS--
+SMDR - Posting
+SMDR - Posting
+ SMDR - Posting OG Handshaking Protocol
+
+	
+ Response to ENQ Timeout (sec)
+	
+
+
+ ENQ Retry Count - on No Response
+	
+
+
+ ENQ Retry Timer (sec) - on No Response
+	
+
+
+ ENQ Retry Count - on Negative Response
+	
+
+
+ ENQ Retry Timer (sec) - on Negative Response
+	
+
+
+ Response to Data Timeout (sec)
+	
+
+
+ Data Transfer Retry Count - on No Response
+	
+
+
+ Data Transfer Retry Timer (sec) - on No Response
+	
+
+
+ Data Transfer Retry Count - on Negative Response
+	
+
+
+ Data Transfer Retry Timer (sec) - on Negative Response
+	
+
+
+ Use ENQ Character
+	
+Disable
+Enable
+
+
+ ENQ Character (Enter Decimal Value)
+	
+
+
+ Acknowledgement Character (Enter Decimal Value)
+	
+
+
+ No Acknowledgement Character (Enter Decimal Value)
+	
+
+
+ Start Of Packet Character (Enter Decimal Value)
+	
+
+
+ End Of Packet Character (Enter Decimal Value)
+	
+
+
+ Use Byte Code Check (BCC)
+	
+Disable
+Enable
+
+
+	
+ 
+Submit
+ 
+		
+ 
+Default
+ 
+ SMDR - Posting OG Online Call Record Format
+ Call Type Indicator
+SMDR-OG Posting Protocol (Handshaking and OG Call Record Format)LoadStringCombo('POST_PARA_0',2,1,16,casTypeComboBx,"style='width:95px;'")Blind SendMatrixHolidexHOBIS AHOBIS BHOBICBELL HOBICMICROS AMICROS BHiltonXioxComm OneCall-InnRSI-CMSCustomizedAST  Destination PortLoadStringCombo('POST_PARA_1',2,0,2,stdIOComboBx,"style='width:95px;' onChange='Debug_Ethernet_Select(this,SMDRPOST_PARA,2);'")NoneEthernet  Destination IP Address  Port  ProcessLoadStringCombo('POST_PARA_4',1,0,1,startStopComboBx,"style='width:95px;'")AbortStart Submit  Default
+SMDR-OG Posting Protocol (Handshaking and OG Call Record Format)LoadStringCombo('POST_PARA_0',2,1,16,casTypeComboBx,"style='width:95px;'")Blind SendMatrixHolidexHOBIS AHOBIS BHOBICBELL HOBICMICROS AMICROS BHiltonXioxComm OneCall-InnRSI-CMSCustomizedAST  Destination PortLoadStringCombo('POST_PARA_1',2,0,2,stdIOComboBx,"style='width:95px;' onChange='Debug_Ethernet_Select(this,SMDRPOST_PARA,2);'")NoneEthernet  Destination IP Address  Port  ProcessLoadStringCombo('POST_PARA_4',1,0,1,startStopComboBx,"style='width:95px;'")AbortStart
+SMDR-OG Posting Protocol (Handshaking and OG Call Record Format)
+LoadStringCombo('POST_PARA_1',2,0,2,stdIOComboBx,"style='width:95px;' onChange='Debug_Ethernet_Select(this,SMDRPOST_PARA,2);'")NoneEthernet
+SMDR - Posting OG Handshaking Protocol
+Response to ENQ Timeout (sec)
+	
+
+
+ ENQ Retry Count - on No Response
+	
+
+
+ ENQ Retry Timer (sec) - on No Response
+	
+
+
+ ENQ Retry Count - on Negative Response
+	
+
+
+ ENQ Retry Timer (sec) - on Negative Response
+	
+
+
+ Response to Data Timeout (sec)
+	
+
+
+ Data Transfer Retry Count - on No Response
+	
+
+
+ Data Transfer Retry Timer (sec) - on No Response
+	
+
+
+ Data Transfer Retry Count - on Negative Response
+	
+
+
+ Data Transfer Retry Timer (sec) - on Negative Response
+	
+
+
+ Use ENQ Character
+	
+Disable
+Enable
+
+
+ ENQ Character (Enter Decimal Value)
+	
+
+
+ Acknowledgement Character (Enter Decimal Value)
+	
+
+
+ No Acknowledgement Character (Enter Decimal Value)
+	
+
+
+ Start Of Packet Character (Enter Decimal Value)
+	
+
+
+ End Of Packet Character (Enter Decimal Value)
+	
+
+
+ Use Byte Code Check (BCC)
+	
+Disable
+Enable
+
+
+	
+ 
+Submit
+ 
+		
+ 
+Default
+Response to ENQ Timeout (sec)
+	
+
+
+ ENQ Retry Count - on No Response
+	
+
+
+ ENQ Retry Timer (sec) - on No Response
+	
+
+
+ ENQ Retry Count - on Negative Response
+	
+
+
+ ENQ Retry Timer (sec) - on Negative Response
+	
+
+
+ Response to Data Timeout (sec)
+	
+
+
+ Data Transfer Retry Count - on No Response
+	
+
+
+ Data Transfer Retry Timer (sec) - on No Response
+	
+
+
+ Data Transfer Retry Count - on Negative Response
+	
+
+
+ Data Transfer Retry Timer (sec) - on Negative Response
+	
+
+
+ Use ENQ Character
+	
+Disable
+Enable
+
+
+ ENQ Character (Enter Decimal Value)
+	
+
+
+ Acknowledgement Character (Enter Decimal Value)
+	
+
+
+ No Acknowledgement Character (Enter Decimal Value)
+	
+
+
+ Start Of Packet Character (Enter Decimal Value)
+	
+
+
+ End Of Packet Character (Enter Decimal Value)
+	
+
+
+ Use Byte Code Check (BCC)
+	
+Disable
+Enable
+Data Transfer Retry Count - on No Response
+Data Transfer Retry Timer (sec) - on No Response
+Data Transfer Retry Count - on Negative Response
