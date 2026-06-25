@@ -11039,7 +11039,13 @@ Always write in a professional yet warm Indian B2B communication style. Use form
     }
 
     function crossSyncOpenWA(phone) {
-      showToast('Open WhatsApp and search for ' + phone, 'info');
+      // Build JID from phone — strip non-digits, ensure country code
+      var digits = String(phone).replace(/\D/g, '');
+      if (digits.length === 10) digits = '91' + digits;
+      var jid = digits + '@s.whatsapp.net';
+      // Navigate to WA tab then open the chat
+      nav('whatsapp', null);
+      setTimeout(function() { waOpenChat(jid, '', phone); }, 300);
     }
 
     function crossSyncManual(id) {
@@ -11060,8 +11066,9 @@ Always write in a professional yet warm Indian B2B communication style. Use form
         if (mCompany) { mCompany.value = pf.company || ''; }
         const modal = document.getElementById('pbx-save-modal');
         if (modal) modal.style.display = 'flex';
-      } else {
-        showToast('Save ' + pf.name + ' (' + pf.phone + ') in ' + s.to_source + ' manually', 'info');
+      } else if (s.to_source === 'whatsapp') {
+        // Navigate to WA and open chat
+        crossSyncOpenWA(pf.phone || '');
       }
     }
     // ── End Cross-sync AI suggestions ───────────────────────────────────────
