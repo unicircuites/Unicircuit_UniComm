@@ -442,18 +442,15 @@ router.get('/cross-sync-suggestions', async (req, res) => {
             ORDER BY (name IS NOT NULL AND name <> '') DESC
           ) AS rn
         FROM (
+          -- Only direct chats (@s.whatsapp.net) — excludes groups, newsletters,
+          -- and group-member contacts who never had a direct conversation with you.
+          -- wa_contacts is intentionally excluded: it includes all group participants
+          -- whose phones were never directly messaged, polluting suggestions.
           SELECT NULLIF(name, '') AS name, phone
           FROM wa_chats
           WHERE account_phone = $1
             AND phone IS NOT NULL AND phone <> ''
             AND id LIKE '%@s.whatsapp.net'
-            AND regexp_replace(phone, '[^0-9]', '', 'g') ~ '^[0-9]{7,14}$'
-          UNION ALL
-          SELECT COALESCE(NULLIF(name, ''), NULLIF(notify, '')) AS name, phone
-          FROM wa_contacts
-          WHERE account_phone = $1
-            AND phone IS NOT NULL AND phone <> ''
-            AND jid LIKE '%@s.whatsapp.net'
             AND regexp_replace(phone, '[^0-9]', '', 'g') ~ '^[0-9]{7,14}$'
         ) src
         WHERE name IS NOT NULL AND name <> ''
