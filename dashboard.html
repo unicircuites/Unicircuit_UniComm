@@ -6020,6 +6020,7 @@
                 <option value="za">Z-A</option>
                 <option value="mobile">Mobile Number</option>
               </select>
+              <button type="button" class="btn btn-ghost btn-sm" id="cross-sync-toggle-btn" onclick="toggleCrossSyncSidebar()" style="color:var(--gold);border-color:rgba(245,158,11,0.35);white-space:nowrap;"><i class="fas fa-robot"></i> AI Suggestions <span id="cross-sync-badge" style="display:none;background:var(--gold);color:#000;border-radius:10px;padding:1px 6px;font-size:10px;font-weight:700;margin-left:4px;"></span></button>
               <div style="display:flex;gap:8px;flex-wrap:wrap;margin-left:auto;align-items:center;"
                 id="contacts-toolbar-actions">
                 <button type="button" class="btn btn-gold btn-sm" onclick="openGroupsManager()"><i class="fas fa-users"></i> Manage Groups</button>
@@ -6057,8 +6058,7 @@
                 </div>
               </div>
             </div>
-            <!-- AI Suggestions button — visible to all roles -->
-            <button type="button" class="btn btn-ghost btn-sm" id="cross-sync-toggle-btn" onclick="toggleCrossSyncSidebar()" style="color:var(--gold);border-color:rgba(245,158,11,0.35);position:absolute;right:16px;top:12px;z-index:10;"><i class="fas fa-robot"></i> AI Suggestions <span id="cross-sync-badge" style="display:none;background:var(--gold);color:#000;border-radius:10px;padding:1px 6px;font-size:10px;font-weight:700;margin-left:4px;"></span></button>
+            <!-- AI Suggestions button moved to filter row -->
           </div>
 
           <div class="contacts-directory-grid">
