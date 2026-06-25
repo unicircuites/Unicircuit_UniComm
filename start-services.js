@@ -69,8 +69,13 @@ const shutdown = () => {
 // If either process exits, shut down the other one too
 n8nProcess.on('close', (code) => {
   if (!shuttingDown) {
-    console.log(`\n\x1b[31m[n8n] Process exited unexpectedly with code ${code}. Shutting down remaining services...\x1b[0m`);
-    shutdown();
+    if (code === 1) {
+      // n8n port likely already in use — another instance is running, CRM continues fine
+      console.log('\x1b[33m[n8n] Exited (port 5678 already in use?). CRM continues running.\x1b[0m');
+    } else {
+      console.log(`\n\x1b[31m[n8n] Process exited unexpectedly with code ${code}. Shutting down remaining services...\x1b[0m`);
+      shutdown();
+    }
   }
 });
 
