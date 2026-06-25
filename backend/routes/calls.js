@@ -413,13 +413,21 @@ router.get('/cross-sync-suggestions', async (req, res) => {
     ).catch(() => ({ rows: [] }));
     const accountPhone = acctRes.rows[0]?.account_phone || null;
 
-    // ── PBX named contacts ──────────────────────────────────────────
+    // ── PBX contacts WITH a name (for suggesting to WA) ─────────────
     const pbxRows = await pool.query(`
       SELECT name, company, email,
              COALESCE(mobile_phone, phone) AS display_phone,
              regexp_replace(COALESCE(mobile_phone, phone, ''), '[^0-9]', '', 'g') AS norm_phone
       FROM pbx_contacts
-      WHERE (mobile_phone IS NOT NULL OR phone IS NOT NULL)
+      WHERE name IS NOT NULL AND name <> ''
+        AND (mobile_phone IS NOT NULL OR phone IS NOT NULL)
+    `);
+
+    // ── All PBX phones (named or not) — used to suppress WA→PBX suggestions ──
+    const pbxAllPhonesRows = await pool.query(`
+      SELECT regexp_replace(COALESCE(mobile_phone, phone, ''), '[^0-9]', '', 'g') AS norm_phone
+      FROM pbx_contacts
+      WHERE mobile_phone IS NOT NULL OR phone IS NOT NULL
     `);
 
     // ── WA named contacts — REAL phone JIDs only ────────────────────
@@ -487,6 +495,13 @@ router.get('/cross-sync-suggestions', async (req, res) => {
       if (k) pbxByPhone.set(k, r);
     });
 
+    // All PBX phones (named or not) — blocks WA→PBX if number already exists
+    const pbxAllPhones = new Set();
+    pbxAllPhonesRows.rows.forEach(r => {
+      const k = norm10(r.norm_phone);
+      if (k) pbxAllPhones.add(k);
+    });
+
     const waByPhone = new Map();
     waRows.rows.forEach(r => {
       const k = norm10(r.norm_phone);
@@ -516,7 +531,7 @@ router.get('/cross-sync-suggestions', async (req, res) => {
 
     // WA contact not in PBX → suggest ONLY if this number has called/been called on PBX
     waByPhone.forEach((wa, phone) => {
-      if (!pbxByPhone.has(phone) && callLogPhones.has(phone)) {
+      if (!pbxAllPhones.has(phone) && callLogPhones.has(phone)) {
         suggestions.push({
           id: `wa-pbx-${phone}`,
           from_source: 'whatsapp',
