@@ -10936,7 +10936,7 @@ Always write in a professional yet warm Indian B2B communication style. Use form
       if (!sb) return;
       const open = sb.style.display === 'flex';
       sb.style.display = open ? 'none' : 'flex';
-      if (!open) loadCrossSyncSuggestions();
+      if (!open) loadCrossSyncSuggestions(true); // always fresh on open
     }
 
     async function loadCrossSyncSuggestions(force = false) {
@@ -10947,7 +10947,15 @@ Always write in a professional yet warm Indian B2B communication style. Use form
       try {
         const res = await fetch(`${API_BASE}/calls/cross-sync-suggestions`, { headers: getAuthHeaders() });
         if (!res.ok) return;
-        _crossSyncCache = await res.json();
+        const raw = await res.json();
+        // Deduplicate by norm_phone — keep first occurrence only
+        const seen = new Set();
+        _crossSyncCache = raw.filter(s => {
+          const key = s.norm_phone + '_' + s.to_source;
+          if (seen.has(key)) return false;
+          seen.add(key);
+          return true;
+        });
         renderCrossSyncSuggestions(_crossSyncCache);
       } catch (e) { console.warn('[CrossSync]', e.message); }
     }
