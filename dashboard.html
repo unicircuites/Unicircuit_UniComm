@@ -9815,29 +9815,20 @@ Always write in a professional yet warm Indian B2B communication style. Use form
     }
 
     function filterBackupContacts() {
+      const raw = document.getElementById('backup-contact-search').value.trim();
+      const query = raw.toLowerCase();
+      const qDigits = raw.replace(/\D/g, '');
+      const qIsPhone = /^[0-9+\s()\-]+$/.test(raw) && qDigits.length >= 4;
 
-      const query =
-        document.getElementById(
-          'backup-contact-search'
-        )
-          .value
-          .trim()
-          .toLowerCase();
-
-      const cards =
-        document.querySelectorAll(
-          '#saved-tab-content > div, #unsaved-tab-content > div'
-        );
-
+      const cards = document.querySelectorAll('#saved-tab-content > div, #unsaved-tab-content > div');
       cards.forEach(card => {
-
-        const text =
-          card.innerText.toLowerCase();
-
-        card.style.display =
-          text.includes(query)
-            ? 'flex'
-            : 'none';
+        const text = card.innerText.toLowerCase();
+        let show = !query || text.includes(query);
+        if (!show && qIsPhone) {
+          const cardDigits = card.innerText.replace(/\D/g, '');
+          show = cardDigits.includes(qDigits.slice(-10));
+        }
+        card.style.display = show ? 'flex' : 'none';
       });
     }
 
@@ -11063,18 +11054,7 @@ Always write in a professional yet warm Indian B2B communication style. Use form
       if (!s) return;
       const pf = s.prefill || {};
       if (s.to_source === 'pbx') {
-        const mPhone   = document.getElementById('pbx-save-phone');
-        const mMobile  = document.getElementById('pbx-save-mobile');
-        const mName    = document.getElementById('pbx-save-name');
-        const mEmail   = document.getElementById('pbx-save-email');
-        const mCompany = document.getElementById('pbx-save-company');
-        if (mPhone)   { mPhone.value   = pf.phone   || ''; mPhone.dispatchEvent(new Event('input')); }
-        if (mMobile)  { mMobile.value  = pf.phone   || ''; }
-        if (mName)    { mName.value    = pf.name    || ''; }
-        if (mEmail)   { mEmail.value   = pf.email   || ''; }
-        if (mCompany) { mCompany.value = pf.company || ''; }
-        const modal = document.getElementById('pbx-save-modal');
-        if (modal) modal.style.display = 'flex';
+        pbxSaveContactModal(pf.phone || '', pf.name || '', pf.company || '', '', pf.email || '', pf.phone || '');
       } else if (s.to_source === 'whatsapp') {
         // Navigate to WA and open chat
         crossSyncOpenWA(pf.phone || '');
@@ -33192,9 +33172,14 @@ ${plainText}`;
         const params = new URLSearchParams({
           offset: String((page - 1) * callsLimit),
           limit: String(callsLimit),
-          search,
+          search: search,
           type,
         });
+        // If query looks like a phone number, also pass normalized digits for backend matching
+        const searchDigits = search.replace(/\D/g, '');
+        if (searchDigits.length >= 4 && /^[0-9+\s()\-]+$/.test(search.trim())) {
+          params.set('searchDigits', searchDigits.length >= 10 ? searchDigits.slice(-10) : searchDigits);
+        }
         if (fromDate) { params.set('from', fromDate); params.set('to', fromDate); }
         if (recording) params.set('recording', recording);
         if (trunk) params.set('trunk', trunk);

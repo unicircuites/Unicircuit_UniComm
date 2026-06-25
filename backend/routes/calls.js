@@ -744,6 +744,7 @@ router.get('/', async (req, res) => {
   const skipCount = req.query.skipCount === '1';
   const type = req.query.type || '';
   const search = req.query.search || '';
+  const searchDigits = (req.query.searchDigits || '').replace(/\D/g, '');
   const dateFrom = normalizeDateParam(req.query.from || '');
   const dateTo = normalizeDateParam(req.query.to || '');
   const recording = req.query.recording || ''; // 'yes' | 'no'
@@ -779,6 +780,14 @@ router.get('/', async (req, res) => {
       )
     )`);
     params.push('%' + search + '%'); p++;
+  }
+  if (searchDigits && searchDigits.length >= 4) {
+    // Match caller/destination by trailing digits (handles +91XXX, 0XXX, spaces, etc.)
+    where.push(`(
+      regexp_replace(caller, '[^0-9]', '', 'g') LIKE $${p}
+      OR regexp_replace(destination, '[^0-9]', '', 'g') LIKE $${p}
+    )`);
+    params.push('%' + searchDigits); p++;
   }
   if (dateFrom) { where.push(`call_date >= $${p++}`); params.push(dateFrom); }
   if (dateTo) { where.push(`call_date <= $${p++}`); params.push(dateTo); }
