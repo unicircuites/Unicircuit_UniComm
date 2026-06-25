@@ -11039,13 +11039,16 @@ Always write in a professional yet warm Indian B2B communication style. Use form
     }
 
     function crossSyncOpenWA(phone) {
-      // Build JID from phone — strip non-digits, ensure country code
       var digits = String(phone).replace(/\D/g, '');
-      if (digits.length === 10) digits = '91' + digits;
-      var jid = digits + '@s.whatsapp.net';
-      // Navigate to WA tab then open the chat
+      var norm = digits.length >= 10 ? digits.slice(-10) : digits;
+      // Find existing chat by matching last-10 digits
+      var chat = waAllChats.find(function(c) {
+        var cd = (c.phone || c.id || '').replace(/\D/g, '');
+        return cd.length >= 10 ? cd.slice(-10) === norm : cd === norm;
+      });
+      if (!chat) { showToast('Chat not found for ' + phone, 'error'); return; }
       nav('whatsapp', null);
-      setTimeout(function() { waOpenChat(jid, '', phone); }, 300);
+      setTimeout(function() { waOpenChat(chat.id, chat.name || '', chat.phone || phone); }, 300);
     }
 
     function crossSyncManual(id) {
