@@ -446,20 +446,14 @@ router.get('/cross-sync-suggestions', async (req, res) => {
           FROM wa_chats
           WHERE account_phone = $1
             AND phone IS NOT NULL AND phone <> ''
-            AND id NOT LIKE '%@lid'
-            AND id NOT LIKE '%@g.us'
-            AND id NOT LIKE '%@newsletter'
-            AND id <> 'status@broadcast'
+            AND id LIKE '%@s.whatsapp.net'
             AND regexp_replace(phone, '[^0-9]', '', 'g') ~ '^[0-9]{7,14}$'
           UNION ALL
           SELECT COALESCE(NULLIF(name, ''), NULLIF(notify, '')) AS name, phone
           FROM wa_contacts
           WHERE account_phone = $1
             AND phone IS NOT NULL AND phone <> ''
-            AND jid NOT LIKE '%@lid'
-            AND jid NOT LIKE '%@g.us'
-            AND jid NOT LIKE '%@newsletter'
-            AND jid <> 'status@broadcast'
+            AND jid LIKE '%@s.whatsapp.net'
             AND regexp_replace(phone, '[^0-9]', '', 'g') ~ '^[0-9]{7,14}$'
         ) src
         WHERE name IS NOT NULL AND name <> ''
