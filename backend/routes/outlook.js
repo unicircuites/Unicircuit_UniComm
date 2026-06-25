@@ -4111,4 +4111,38 @@ router.post('/disconnect', async (req, res) => {
   }
 });
 
+// ── Reusable source for cross-platform sync suggestions ──────────────────────
+// Returns Outlook contacts that have BOTH a real name and a phone number, shaped for
+// phone-based matching. Cached 5 min and best-effort (never throws) so the contacts
+// suggestion endpoint stays fast and resilient if Graph is slow/unauthenticated.
+let _outlookSyncCache = { ts: 0, data: [] };
+async function getOutlookContactsForSync() {
+  const TTL = 5 * 60 * 1000;
+  if (Date.now() - _outlookSyncCache.ts < TTL && _outlookSyncCache.data.length) {
+    return _outlookSyncCache.data;
+  }
+  try {
+    const rows = await fetchAllOutlookContactsGraph(MS_EMAIL);
+    const out = [];
+    for (const c of (rows || [])) {
+      const name = String(c.displayName || [c.givenName, c.surname].filter(Boolean).join(' ') || '').trim();
+      if (!name) continue;
+      const phoneRaw = c.mobilePhone
+        || (Array.isArray(c.businessPhones) && c.businessPhones[0])
+        || (Array.isArray(c.homePhones) && c.homePhones[0])
+        || c.resolvedPhone || '';
+      const digits = String(phoneRaw).replace(/\D/g, '');
+      if (digits.length < 7) continue; // only contacts with a usable phone
+      const email = ((c.emailAddresses || []).map(e => e && e.address).filter(Boolean)[0] || '').trim();
+      out.push({ name, phone: String(phoneRaw).trim(), norm: digits, email, company: c.companyName || '' });
+    }
+    _outlookSyncCache = { ts: Date.now(), data: out };
+    return out;
+  } catch (e) {
+    console.warn('[Outlook] getOutlookContactsForSync failed:', e.message);
+    return _outlookSyncCache.data; // serve stale (or empty) rather than break callers
+  }
+}
+
 module.exports = router;
+module.exports.getOutlookContactsForSync = getOutlookContactsForSync;

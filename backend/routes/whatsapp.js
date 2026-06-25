@@ -1135,6 +1135,18 @@ pool.query(`
 pool.query(`ALTER TABLE wa_broadcast_history ADD COLUMN IF NOT EXISTS full_message TEXT`).catch(()=>{});
 pool.query(`ALTER TABLE wa_broadcast_history ADD COLUMN IF NOT EXISTS recipients JSONB`).catch(()=>{});
 
+// POST /api/whatsapp/resolve-lids — re-resolve @lid contacts to real phone numbers
+// using Baileys' authoritative LID↔PN signal store (fixes bogus "+1…" numbers).
+router.post('/resolve-lids', authenticate, async (req, res) => {
+  try {
+    if (typeof wa.reconcileLidPhonesViaSignal !== 'function') {
+      return res.status(501).json({ error: 'LID reconcile not available' });
+    }
+    const result = await wa.reconcileLidPhonesViaSignal();
+    res.json({ success: true, ...result });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
 router.get('/broadcast', authenticate, async (req, res) => {
   try {
     const rows = await pool.query(`SELECT id, message, full_message, recipients, total, sent, failed, status, sent_at FROM wa_broadcast_history ORDER BY sent_at DESC LIMIT 100`);

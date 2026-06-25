@@ -824,6 +824,14 @@ async function resolveJidToPhone(rawJid) {
     if (mapped?.phoneJid) {
       return mapped.phoneJid;
     }
+    // Authoritative Baileys mapping first — the correct LID→phone source.
+    const sigPn = await lidPnDigitsFromSignal(jid);
+    if (sigPn) {
+      const sigPhoneJid = `${sigPn}@s.whatsapp.net`;
+      if (!contactsStore[jid]) contactsStore[jid] = { id: jid };
+      contactsStore[jid].phoneJid = sigPhoneJid;
+      return sigPhoneJid;
+    }
     const accPhone = phoneNumber;
     if (accPhone) {
       try {
@@ -1971,6 +1979,62 @@ async function validateAndCleanLidMappings() {
   }
 }
 
+// ── AUTHORITATIVE LID → PHONE (Baileys signal store) ──────────────────────────────────
+// Baileys 7 exposes the real LID↔PN mapping the WhatsApp server delivers. This is the ONLY
+// trustworthy source of a phone number for an @lid (privacy) contact — anything else stored
+// on a LID row is a guess (and is where the bogus "+1…" numbers came from).
+async function lidPnDigitsFromSignal(lidJid) {
+  try {
+    const fn = sock && sock.signalRepository && sock.signalRepository.lidMapping
+      && sock.signalRepository.lidMapping.getPNForLID;
+    if (typeof fn !== 'function') return null;
+    const pn = await sock.signalRepository.lidMapping.getPNForLID(lidJid);
+    if (!pn) return null;
+    const digits = String(pn).split('@')[0].split(':')[0].replace(/\D/g, '');
+    return /^[0-9]{7,15}$/.test(digits) ? digits : null;
+  } catch (_) { return null; }
+}
+
+// Correct stored @lid → phone mappings using the authoritative signal store.
+// CORRECTS mismatches (e.g. wrong "+1…" → real phone) but never fabricates a number;
+// LIDs the server hasn't mapped yet are left untouched (resolved later as mappings arrive).
+async function reconcileLidPhonesViaSignal(limit = 5000) {
+  try {
+    if (typeof (sock && sock.signalRepository && sock.signalRepository.lidMapping
+        && sock.signalRepository.lidMapping.getPNForLID) !== 'function') {
+      console.log('[WA] LID signal reconcile: getPNForLID unavailable on this socket — skipping');
+      return { corrected: 0, checked: 0 };
+    }
+    const accPhone = phoneNumber;
+    if (!accPhone) return { corrected: 0, checked: 0 };
+    const { rows } = await pool.query(
+      `SELECT jid, phone FROM wa_contacts WHERE account_phone=$1 AND jid LIKE '%@lid' LIMIT $2`,
+      [accPhone, limit]
+    );
+    let corrected = 0, resolvedNew = 0;
+    for (const row of rows) {
+      const pn = await lidPnDigitsFromSignal(row.jid);
+      if (!pn) continue;
+      const cur = String(row.phone || '').replace(/\D/g, '');
+      if (pn === cur) continue;
+      await pool.query(
+        `UPDATE wa_contacts SET phone=$1, updated_at=NOW() WHERE jid=$2 AND account_phone=$3`,
+        [pn, row.jid, accPhone]
+      ).catch(() => {});
+      if (contactsStore[row.jid]) {
+        contactsStore[row.jid].phone = pn;
+        contactsStore[row.jid].phoneJid = `${pn}@s.whatsapp.net`;
+      }
+      if (!cur) resolvedNew++; else corrected++;
+    }
+    console.log(`[WA] LID signal reconcile: ${corrected} corrected, ${resolvedNew} newly resolved (of ${rows.length} @lid contacts)`);
+    return { corrected, resolvedNew, checked: rows.length };
+  } catch (err) {
+    console.error('[WA] reconcileLidPhonesViaSignal error:', err.message);
+    return { corrected: 0, checked: 0, error: err.message };
+  }
+}
+
 // ── START WHATSAPP ────────────────────────────────────────────────────────────────────
 async function startWA(options = {}) {
   await loadBaileys();
@@ -2175,6 +2239,9 @@ async function startWA(options = {}) {
       setTimeout(() => {
         if (generation !== socketGeneration || !isConnected) return;
         startLidResolutionWorker();
+        // Correct stored @lid phones from the authoritative signal store once the
+        // server-delivered LID↔PN mappings have had a chance to load.
+        reconcileLidPhonesViaSignal().catch(() => {});
       }, 4000);
 
       // After connect: fetch subjects for any groups with null name in DB
@@ -4959,6 +5026,6 @@ async function editWaMessage(chatJid, msgId, newText) {
   });
 }
 
-module.exports = { startWA, sendMessage, sendMediaMessage, logout, getStatus, getQR, requestQR, requestPhonePairingCode, setIO, getGroupMetadata, clearGroupMetadataCache: () => { groupMetadataCache.clear(); rawGroupMetadataCache.clear(); }, getGroupSubjectFromCache, refreshCurrentAccountGroupMetadata, resyncDirectoryFromSocket, processLidResolutionBatch, startLidResolutionWorker, stopLidResolutionWorker, downloadMedia, msgCache, importExportedChat, getConnectedPhone, getLiveChats, getLiveMessages, isLidResolutionExhausted, getLidResolutionCooldownMins, resetLidResolution, updateGroupName, flushCachedMediaToDisk, getProfilePicUrl, markChatRead, markChatUnread, markIncomingMessagesReadInDb, reconcileChatUnreadFromMessages, addChatLabel, removeChatLabel, deleteWaMessage, editWaMessage, resetAndResyncGroupContacts, emitEvent: emit };
+module.exports = { startWA, sendMessage, sendMediaMessage, logout, getStatus, getQR, requestQR, requestPhonePairingCode, setIO, getGroupMetadata, clearGroupMetadataCache: () => { groupMetadataCache.clear(); rawGroupMetadataCache.clear(); }, getGroupSubjectFromCache, refreshCurrentAccountGroupMetadata, resyncDirectoryFromSocket, processLidResolutionBatch, startLidResolutionWorker, stopLidResolutionWorker, reconcileLidPhonesViaSignal, downloadMedia, msgCache, importExportedChat, getConnectedPhone, getLiveChats, getLiveMessages, isLidResolutionExhausted, getLidResolutionCooldownMins, resetLidResolution, updateGroupName, flushCachedMediaToDisk, getProfilePicUrl, markChatRead, markChatUnread, markIncomingMessagesReadInDb, reconcileChatUnreadFromMessages, addChatLabel, removeChatLabel, deleteWaMessage, editWaMessage, resetAndResyncGroupContacts, emitEvent: emit };
 
 
