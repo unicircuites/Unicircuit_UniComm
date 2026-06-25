@@ -399,6 +399,90 @@ router.post('/contacts/save', async (req, res) => {
 });
 
 // ═══════════════════════════════════════════════════════════════════
+// GET /api/calls/cross-sync-suggestions
+// Returns contacts that exist (with a name) in one source but are
+// missing from another source, matched by normalised 10-digit phone.
+// Query params: sources[] (default: wa,pbx,outlook)
+// ═══════════════════════════════════════════════════════════════════
+router.get('/cross-sync-suggestions', async (req, res) => {
+  try {
+    // Fetch named PBX contacts (with a mobile_phone or phone)
+    const pbxRows = await pool.query(`
+      SELECT name, company, email,
+             COALESCE(mobile_phone, phone) AS display_phone,
+             regexp_replace(COALESCE(mobile_phone, phone,''), '[^0-9]', '', 'g') AS norm_phone
+      FROM pbx_contacts
+      WHERE name IS NOT NULL AND name <> ''
+        AND (mobile_phone IS NOT NULL OR phone IS NOT NULL)
+    `);
+
+    // Fetch named WA contacts from wa_contacts
+    const waRows = await pool.query(`
+      SELECT COALESCE(name, notify, verified_name) AS name,
+             regexp_replace(COALESCE(phone, split_part(jid,'@',1)), '[^0-9]', '', 'g') AS norm_phone,
+             COALESCE(phone, split_part(jid,'@',1)) AS raw_phone
+      FROM wa_contacts
+      WHERE (name IS NOT NULL AND name <> '' OR notify IS NOT NULL AND notify <> '')
+        AND jid NOT LIKE '%@g.us'
+    `);
+
+    const suggestions = [];
+
+    function norm10(digits) {
+      if (!digits || digits.length < 7) return '';
+      return digits.length >= 10 ? digits.slice(-10) : digits;
+    }
+
+    const pbxByPhone = new Map();
+    pbxRows.rows.forEach(r => {
+      const k = norm10(r.norm_phone);
+      if (k) pbxByPhone.set(k, r);
+    });
+
+    const waByPhone = new Map();
+    waRows.rows.forEach(r => {
+      const k = norm10(r.norm_phone);
+      if (k) waByPhone.set(k, r);
+    });
+
+    // WA contact exists but not in PBX → suggest save to PBX
+    waByPhone.forEach((wa, phone) => {
+      if (!pbxByPhone.has(phone)) {
+        suggestions.push({
+          id: `wa-pbx-${phone}`,
+          from_source: 'whatsapp',
+          to_source: 'pbx',
+          name: wa.name,
+          phone: wa.raw_phone,
+          norm_phone: phone,
+          prefill: { phone: wa.raw_phone, name: wa.name }
+        });
+      }
+    });
+
+    // PBX contact (mobile_phone set) exists but not in WA → suggest save to WA
+    pbxByPhone.forEach((pbx, phone) => {
+      if (!waByPhone.has(phone) && pbx.display_phone) {
+        suggestions.push({
+          id: `pbx-wa-${phone}`,
+          from_source: 'pbx',
+          to_source: 'whatsapp',
+          name: pbx.name,
+          phone: pbx.display_phone,
+          norm_phone: phone,
+          prefill: { phone: pbx.display_phone, name: pbx.name, company: pbx.company, email: pbx.email }
+        });
+      }
+    });
+
+    res.json(suggestions);
+  } catch (err) {
+    console.error('[Calls] cross-sync-suggestions error:', err.message);
+    res.status(500).json({ error: 'Failed to compute suggestions.' });
+  }
+});
+
+// ═══════════════════════════════════════════════════════════════════
 // GET /api/calls/contact/:phone  — all calls for one number
 // ═══════════════════════════════════════════════════════════════════
 router.get('/contact/:phone', async (req, res) => {
