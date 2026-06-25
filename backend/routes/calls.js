@@ -423,35 +423,39 @@ router.get('/cross-sync-suggestions', async (req, res) => {
     //   2. phone digits must NOT equal the LID local part (unresolved LID)
     //   3. Skip groups (@g.us), newsletters, broadcasts
     const waRows = await pool.query(`
-      SELECT DISTINCT ON (regexp_replace(COALESCE(phone, ''), '[^0-9]', '', 'g'))
-             COALESCE(name, notify) AS name,
-             phone AS raw_phone,
-             regexp_replace(phone, '[^0-9]', '', 'g') AS norm_phone
+      SELECT name, raw_phone,
+             regexp_replace(raw_phone, '[^0-9]', '', 'g') AS norm_phone
       FROM (
-        -- wa_chats: direct chat contacts (LID or phone JID)
-        SELECT COALESCE(name, '') AS name, COALESCE(notify, '') AS notify, phone
-        FROM wa_chats
-        WHERE phone IS NOT NULL AND phone <> ''
-          AND id NOT LIKE '%@g.us'
-          AND id NOT LIKE '%@newsletter'
-          AND regexp_replace(phone, '[^0-9]', '', 'g') ~ '^[0-9]{7,14}$'
-        UNION
-        -- wa_contacts: non-group, non-LID or LID-with-resolved-phone
-        SELECT COALESCE(name, '') AS name, COALESCE(notify, '') AS notify, phone
-        FROM wa_contacts
-        WHERE phone IS NOT NULL AND phone <> ''
-          AND jid NOT LIKE '%@g.us'
-          AND jid NOT LIKE '%@newsletter'
-          AND jid <> 'status@broadcast'
-          AND regexp_replace(phone, '[^0-9]', '', 'g') ~ '^[0-9]{7,14}$'
-          -- LID: only include when phone != the LID local part (i.e. actually resolved)
-          AND NOT (
-            jid LIKE '%@lid'
-            AND regexp_replace(phone, '[^0-9]', '', 'g') = split_part(jid, '@', 1)
-          )
-      ) combined
-      WHERE (name <> '' OR notify <> '')
-      ORDER BY regexp_replace(COALESCE(phone, ''), '[^0-9]', '', 'g'), name DESC
+        SELECT
+          COALESCE(name, notify) AS name,
+          phone AS raw_phone,
+          row_number() OVER (
+            PARTITION BY regexp_replace(phone, '[^0-9]', '', 'g')
+            ORDER BY (name IS NOT NULL AND name <> '') DESC
+          ) AS rn
+        FROM (
+          SELECT COALESCE(name, '') AS name, ''::text AS notify, phone
+          FROM wa_chats
+          WHERE phone IS NOT NULL AND phone <> ''
+            AND id NOT LIKE '%@g.us'
+            AND id NOT LIKE '%@newsletter'
+            AND regexp_replace(phone, '[^0-9]', '', 'g') ~ '^[0-9]{7,14}$'
+          UNION ALL
+          SELECT COALESCE(name, '') AS name, COALESCE(notify, '') AS notify, phone
+          FROM wa_contacts
+          WHERE phone IS NOT NULL AND phone <> ''
+            AND jid NOT LIKE '%@g.us'
+            AND jid NOT LIKE '%@newsletter'
+            AND jid <> 'status@broadcast'
+            AND regexp_replace(phone, '[^0-9]', '', 'g') ~ '^[0-9]{7,14}$'
+            AND NOT (
+              jid LIKE '%@lid'
+              AND regexp_replace(phone, '[^0-9]', '', 'g') = split_part(jid, '@', 1)
+            )
+        ) src
+        WHERE name <> '' OR notify <> ''
+      ) ranked
+      WHERE rn = 1
     `);
 
     function norm10(digits) {
