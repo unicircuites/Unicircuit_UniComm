@@ -10562,7 +10562,13 @@ Always write in a professional yet warm Indian B2B communication style. Use form
       ${isGroup ? `<div id="wa-group-members-section" style="padding:12px 20px;border-bottom:1px solid var(--border);"><div style="font-size:11px;color:var(--muted);"><span class="spin-loader" style="width:12px;height:12px;"></span> Loading members…</div></div>` : ''}
       <div style="padding:14px 20px;">
         <button type="button" class="btn btn-green btn-sm" onclick='openWhatsAppChatFromContacts(${JSON.stringify(jid)}, ${JSON.stringify(name)}, ${JSON.stringify(phone)})'><i class="fab fa-whatsapp"></i> Open in WhatsApp module</button>
-        ${!isGroup ? `<button type="button" class="btn btn-gold btn-sm" style="margin-left:6px;" onclick="waAddEditContactForJid(${jsArg(jid)}, ${jsArg(name !== phone ? name : '')}, ${jsArg(phone)})"><i class="fas fa-user-plus"></i> Save Contact</button>` : ''}
+        ${!isGroup ? (() => {
+          const normP = (phone || '').replace(/\D/g,'').slice(-10);
+          const existing = normP ? contacts.find(function(ct) {
+            return (ct.phone||ct.wa||'').replace(/\D/g,'').slice(-10) === normP;
+          }) : null;
+          return `<button type="button" class="btn btn-gold btn-sm" style="margin-left:6px;" onclick="waAddEditContactForJid(${jsArg(jid)}, ${jsArg(name !== phone ? name : '')}, ${jsArg(phone)})"><i class="fas fa-${existing?'user-edit':'user-plus'}"></i> ${existing?'Update Contact':'Save Contact'}</button>`;
+        })() : ''}
       </div>
     </div>`;
 
