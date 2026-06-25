@@ -7530,6 +7530,9 @@
                     </button>
                   </div>
                   <input class="inp" id="scrape-url" placeholder="https://example.com/leads" style="font-size: 12px; padding: 8px 12px;" value="https://example.com/leads" />
+                  <div style="font-size: 10px; color: var(--muted2); margin-top: 4px; line-height: 1.4;">
+                    Sites requiring login (e.g. Facebook) open Chrome for manual sign-in — up to <strong style="color: var(--gold2);">5 minutes</strong>. Timer shows in metrics while waiting.
+                  </div>
                 </div>
 
                 <!-- Start & End Points -->
@@ -7704,7 +7707,7 @@
                     <i class="fas fa-copy"></i>
                   </div>
                   <div>
-                    <div style="font-size: 10px; color: var(--muted); font-weight: 600; text-transform: uppercase;">Current Page</div>
+                    <div style="font-size: 10px; color: var(--muted); font-weight: 600; text-transform: uppercase;" id="scrape-metric-page-label">Current Page</div>
                     <div id="scrape-metric-page" style="font-size: 14px; font-weight: 700; color: var(--blue);">Page -</div>
                   </div>
                 </div>
@@ -14313,6 +14316,9 @@ Keep it concise and professional.`;
 
     // ── WEB SCRAPER TEST CONTROLLER ──────────────────────────────────────────────
     let scraperPollInterval = null;
+    let analyzeLoginPollInterval = null;
+    let lastLoginWaitLogSecond = -1;
+    let loginWaitAnnounced = false;
     let currentScraperSessionId = null;
     let cachedScrapedData = [];
     let cachedFields = [];
@@ -14336,6 +14342,66 @@ Keep it concise and professional.`;
       if (consoleEl) consoleEl.innerHTML = '';
     }
 
+    function resetAnalyzeMetricLabels() {
+      const pageLabel = document.getElementById('scrape-metric-page-label');
+      if (pageLabel) pageLabel.textContent = 'Current Page';
+    }
+
+    function stopAnalyzeLoginPolling() {
+      if (analyzeLoginPollInterval) {
+        clearInterval(analyzeLoginPollInterval);
+        analyzeLoginPollInterval = null;
+      }
+      lastLoginWaitLogSecond = -1;
+      loginWaitAnnounced = false;
+      resetAnalyzeMetricLabels();
+    }
+
+    function formatLoginWaitTime(ms) {
+      const totalSec = Math.max(0, Math.ceil(ms / 1000));
+      const min = Math.floor(totalSec / 60);
+      const sec = totalSec % 60;
+      return `${min}:${String(sec).padStart(2, '0')}`;
+    }
+
+    function startAnalyzeLoginPolling() {
+      stopAnalyzeLoginPolling();
+      analyzeLoginPollInterval = setInterval(async () => {
+        try {
+          const response = await fetch('/api/crm/scraper/analyze/login-status', {
+            headers: { 'Authorization': 'Bearer lm_123456' }
+          });
+          if (!response.ok) return;
+          const status = await response.json();
+          if (!status.active) return;
+
+          if (!loginWaitAnnounced) {
+            loginWaitAnnounced = true;
+            addScraperLog(status.message || 'Login required — please sign in using the Chrome window (up to 5 min).', 'warn');
+          }
+
+          const statusEl = document.getElementById('scrape-metric-status');
+          const pageEl = document.getElementById('scrape-metric-page');
+          const pageLabel = document.getElementById('scrape-metric-page-label');
+          if (pageLabel) pageLabel.textContent = 'Login Timer';
+          if (statusEl) {
+            statusEl.textContent = status.phase === 'verification' ? 'AWAITING 2FA' : 'AWAITING LOGIN';
+            statusEl.style.color = 'var(--gold)';
+          }
+          if (pageEl) {
+            pageEl.textContent = `${formatLoginWaitTime(status.remainingMs)} left`;
+            pageEl.style.color = 'var(--gold)';
+          }
+
+          const remainingSec = Math.ceil((status.remainingMs || 0) / 1000);
+          if (remainingSec !== lastLoginWaitLogSecond && remainingSec % 10 === 0) {
+            lastLoginWaitLogSecond = remainingSec;
+            addScraperLog(status.message || `Waiting for login (${formatLoginWaitTime(status.remainingMs)} remaining)...`, 'warn');
+          }
+        } catch (_) {}
+      }, 1000);
+    }
+
     async function analyzeTargetURL() {
       const url = document.getElementById('scrape-url').value.trim();
       if (!url) {
@@ -14353,6 +14419,12 @@ Keep it concise and professional.`;
         btn.innerHTML = `<i class="fas fa-spinner fa-spin"></i> Analyzing...`;
         
         addScraperLog(`Analyzing website structure for: ${url}...`, 'info');
+        addScraperLog(`If login is required, a Chrome window will open — you have up to 5 minutes to sign in.`, 'info');
+        document.getElementById('scrape-metric-status').textContent = 'ANALYZING';
+        document.getElementById('scrape-metric-status').style.color = 'var(--gold)';
+        document.getElementById('scrape-metric-page').textContent = 'Starting...';
+        document.getElementById('scrape-metric-page').style.color = 'var(--blue)';
+        startAnalyzeLoginPolling();
         
         const response = await fetch('/api/crm/scraper/analyze', {
           method: 'POST',
@@ -14364,16 +14436,34 @@ Keep it concise and professional.`;
         });
         
         const data = await response.json();
+        stopAnalyzeLoginPolling();
         if (!response.ok || !data.success) {
           addScraperLog(`Analysis failed: ${data.error || 'Server error'}`, 'error');
+          document.getElementById('scrape-metric-status').textContent = 'FAILED';
+          document.getElementById('scrape-metric-status').style.color = 'var(--red)';
+          document.getElementById('scrape-metric-page').textContent = 'Page -';
+          document.getElementById('scrape-metric-page').style.color = 'var(--blue)';
           alert(`Could not automatically analyze website: ${data.error || 'Check server logs'}`);
           return;
         }
         
         addScraperLog(`Website analyzed successfully!`, 'success');
+        document.getElementById('scrape-metric-status').textContent = 'ANALYZED';
+        document.getElementById('scrape-metric-status').style.color = 'var(--green)';
+        document.getElementById('scrape-metric-page').textContent = 'Complete';
+        document.getElementById('scrape-metric-page').style.color = 'var(--blue)';
         if (data.cookies) {
           document.getElementById('scrape-cookies').value = data.cookies;
-          addScraperLog(`- Captured active session cookies automatically!`, 'success');
+          addScraperLog(`- Saved session cookies for re-use (login auth — not lead data)`, 'success');
+        }
+        if (data.isProfilePage) {
+          addScraperLog(`- Detected single profile page (not a lead list)`, 'info');
+        }
+        if (data.sampleRecord && Object.keys(data.sampleRecord).length > 0) {
+          addScraperLog(`- Extracted profile fields: ${Object.keys(data.sampleRecord).join(', ')}`, 'success');
+          Object.entries(data.sampleRecord).forEach(([key, val]) => {
+            if (val) addScraperLog(`    • ${key}: ${String(val).substring(0, 120)}`, 'info');
+          });
         }
         addScraperLog(`- Discovered Container: "${data.itemSelector}"`, 'success');
         addScraperLog(`- Suggested Fields: ${data.suggestedFields.join(', ')}`, 'success');
@@ -14383,12 +14473,15 @@ Keep it concise and professional.`;
           addScraperLog(`- No standard pagination bar detected (likely infinite scroll/single page).`, 'info');
         }
         
-        // Ask user if they want to populate these selectors
+        const previewFields = data.sampleRecord
+          ? Object.entries(data.sampleRecord).map(([k, v]) => `${k}: ${String(v).substring(0, 60)}`).join('\n')
+          : '';
         const apply = confirm(`Auto-Detection completed successfully!\n\n` +
           `Discovered Container: ${data.itemSelector}\n` +
           `Suggested Fields: ${data.suggestedFields.join(', ')}\n` +
-          `Pagination Detected: ${data.pagination.enabled ? 'Yes (' + data.pagination.paramName + ')' : 'No'}\n\n` +
-          `Do you want to automatically apply these selectors to the configuration form?`);
+          `Pagination Detected: ${data.pagination.enabled ? 'Yes (' + data.pagination.paramName + ')' : 'No'}` +
+          (previewFields ? `\n\nExtracted preview:\n${previewFields}` : '') +
+          `\n\nDo you want to automatically apply these selectors to the configuration form?`);
           
         if (apply) {
           if (data.itemSelector) {
@@ -14413,9 +14506,15 @@ Keep it concise and professional.`;
         }
         
       } catch (err) {
+        stopAnalyzeLoginPolling();
         addScraperLog(`Analysis error: ${err.message}`, 'error');
+        document.getElementById('scrape-metric-status').textContent = 'ERROR';
+        document.getElementById('scrape-metric-status').style.color = 'var(--red)';
+        document.getElementById('scrape-metric-page').textContent = 'Page -';
+        document.getElementById('scrape-metric-page').style.color = 'var(--blue)';
         alert(`Analysis error: ${err.message}`);
       } finally {
+        stopAnalyzeLoginPolling();
         btn.disabled = false;
         btn.innerHTML = originalText;
       }
@@ -32958,10 +33057,23 @@ ${plainText}`;
                  </div>`
               : `<button class="btn btn-ghost btn-xs" disabled style="opacity:0.5;" title="Not Available"><i class="fas fa-microphone-slash"></i> N/A</button>`;
 
-            const isGroupCode = /^(390|398|VMS\d*|39\d)$/i.test(String(log.destination || ''));
-            const displayDest = isGroupCode && log.extension && log.extension !== log.destination
-              ? `${escHtml(log.extension)} <span style="font-size:10px;color:var(--muted2);">(via ${escHtml(log.destination)})</span>`
-              : escHtml(log.destination);
+            // Destination column: for incoming calls show the real answering extension /
+            // multi-hop chain ("21 | 202") — never the bare VMS pilot (390) when we know
+            // which extension(s) actually answered. Unanswered auto-attendant rows are labelled.
+            const destStr = String(log.destination || '');
+            const extStr = String(log.extension || '').trim();
+            const isGroupCode = /^(390|398|VMS\d*|39\d)$/i.test(destStr);
+            const isMultiHop = extStr.includes('|');
+            let displayDest;
+            if (isMultiHop) {
+              displayDest = `${escHtml(extStr)}${isGroupCode ? ` <span style="font-size:10px;color:var(--muted2);">(via ${escHtml(destStr)})</span>` : ''}`;
+            } else if (isGroupCode && extStr && extStr !== destStr) {
+              displayDest = `${escHtml(extStr)} <span style="font-size:10px;color:var(--muted2);">(via ${escHtml(destStr)})</span>`;
+            } else if (isGroupCode && !extStr) {
+              displayDest = `${escHtml(destStr)} <span style="font-size:10px;color:var(--muted2);">(voicemail)</span>`;
+            } else {
+              displayDest = escHtml(destStr);
+            }
             return `
           <tr onclick="selectCallRecord(this, ${log.id})">
             <td style="font-size:11.5px;">${date}</td>
@@ -33071,6 +33183,8 @@ ${plainText}`;
         ${pbxDetailRow('Raw SMDR Line', log.raw_line)}
 
         <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:14px;flex-wrap:wrap;">
+          ${/\.(wav|mp3|ogg|m4a)$/i.test(String(log.recording_file || '').trim())
+            ? `<button class="btn btn-green btn-sm" onclick="pbxPlayRecording('${escAttr(log.recording_file)}')"><i class="fas fa-play"></i> Play Recording</button>` : ''}
           ${caller ? (contactName
             ? `<button class="btn btn-gold btn-sm" onclick="pbxSaveContactModal(${jsArg(caller)},${jsArg(contactName)},${jsArg(savedCompany)},${jsArg(savedNotes)},${jsArg(log.email||'')},${jsArg(log.mobile_phone||'')});closeModal('pbx-call-details-modal')"><i class="fas fa-pen"></i> Edit Contact</button>`
             : `<button class="btn btn-ghost btn-sm" onclick="pbxSaveContactModal(${jsArg(caller)});closeModal('pbx-call-details-modal')"><i class="fas fa-user-plus"></i> Save Contact</button>`) : ''}

@@ -1,0 +1,42 @@
+ 	
+Day Hour
+Break Hour
+Night Hour
+Day Hour
+Break Hour
+Night Hour
+Day Hour
+Break Hour
+Night Hour
+	 
+Voice Mail Auto-Attendant (VMAA) Menu
+ Menu Name
+	
+ Access Code
+	
+ Greetings
+ Language Settings
+ Menu Language
+	
+English
+ Language Selection
+	
+Allowed
+ Auto-Attendant Settings
+ No Digit Dialed Settings
+ Invalid Digit Dialed Settings
+ Timers
+ Disconnect
+ 
+Submit
+ 
+	
+ 
+Default
+ 
+	
+ 
+Add New Menu
+ 
+
+TAPING:

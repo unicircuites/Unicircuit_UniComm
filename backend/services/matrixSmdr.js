@@ -31,10 +31,35 @@ function cleanNullableText(value) {
 const PBX_HOST = process.env.PBX_HOST || '192.168.0.81';
 const SMDR_PORT = parseInt(process.env.SMDR_PORT || '5000');
 const CTI_PORT = parseInt(process.env.CTI_PORT || '5001');
-// VMS (voicemail) extensions — last-hop only, never a real caller destination.
-// Comma-separated list, e.g. VMS_EXTENSIONS=390
+// VMS (voicemail / auto-attendant pilot) extensions — last-hop only, never a real
+// answering extension. Comma-separated list, e.g. VMS_EXTENSIONS=390
 const VMS_EXTENSIONS = (process.env.VMS_EXTENSIONS || '390')
   .split(',').map(e => e.trim()).filter(Boolean);
+const VMS_EXTENSION_SET = new Set(VMS_EXTENSIONS.map(e => String(e).trim()));
+
+function isVmsExtension(value) {
+  return VMS_EXTENSION_SET.has(String(value || '').trim());
+}
+
+/**
+ * Build an ordered, de-duplicated, pipe-joined chain of the REAL extensions a call
+ * hopped through, excluding VMS pilots (e.g. 390). Accepts values that may already be
+ * a chain ("21 | 202"). Returns an array, e.g. 390 → 21 → 202 yields ['21','202'].
+ */
+function buildExtensionChain(...values) {
+  const seen = new Set();
+  const chain = [];
+  for (const value of values) {
+    for (const piece of String(value || '').split('|')) {
+      const ext = piece.trim();
+      // Only accept clean extension tokens (2–5 digits); excludes VMS pilots, phone
+      // numbers, and malformed fields like "205   M001 99".
+      if (!/^\d{2,5}$/.test(ext) || isVmsExtension(ext)) continue;
+      if (!seen.has(ext)) { seen.add(ext); chain.push(ext); }
+    }
+  }
+  return chain;
+}
 
 // ── DEEP DEBUG: CONFIG VALIDATION ──────────────────────────────────────────
 console.log('\n[SMDR-DEBUG] ╔════════════════════════════════════════════════════════╗');
@@ -665,7 +690,7 @@ async function saveCallLog(record) {
     // We combine them into a single row to prevent dashboard duplicates.
     if (record.call_type === 'In' && record.caller) {
       const recentCall = await pool.query(`
-        SELECT id, destination, duration
+        SELECT id, destination, duration, extension
         FROM call_logs
         WHERE call_type = 'In'
           AND caller = $1
@@ -677,24 +702,38 @@ async function saveCallLog(record) {
       if (recentCall.rowCount > 0) {
         const oldId = recentCall.rows[0].id;
         const oldDest = recentCall.rows[0].destination;
-        console.log(`[SMDR] Multi-hop dedupe: Updating call ${oldId} (was dest ${oldDest}) with new dest ${record.destination}`);
-        
-        // Update the existing record with the final hop's details.
-        // Keep original destination + extension (first answering ext) — recording is filed under that.
-        // Only update duration and call_time to reflect total call length.
+        const oldExt = recentCall.rows[0].extension;
+
+        // Merge this hop into the existing call. Build the real-extension hop chain
+        // (e.g. 390 → 21 → 202 becomes "21 | 202") so the VMS pilot (390) is never the
+        // stored extension and the recording linker can match the extension(s) that
+        // actually answered. call_time/duration roll forward to cover the whole call.
+        const chain = buildExtensionChain(oldExt, record.extension, record.destination);
+        const chainStr = chain.length ? chain.join(' | ') : null;
+        // Display destination = the last real hop that answered; if none has answered yet
+        // keep the prior destination (may still be the VMS pilot for an unanswered call).
+        const newDest = chain.length ? chain[chain.length - 1] : oldDest;
+
+        console.log(`[SMDR] Multi-hop dedupe: call ${oldId} ext "${oldExt}" + hop "${record.extension}" → chain "${chainStr}" (dest ${newDest})`);
+
         const updateResult = await pool.query(`
           UPDATE call_logs
-          SET call_time = $1, duration = $2, raw_line = $3, recording_file = COALESCE($4, recording_file)
-          WHERE id = $5
+          SET call_time = $1, duration = $2, raw_line = $3,
+              recording_file = COALESCE($4, recording_file),
+              extension = COALESCE($5, extension),
+              destination = $6
+          WHERE id = $7
           RETURNING *
         `, [
           record.call_time,
           record.duration,
           cleanRawLine,
           cleanNullableText(record.recording_file),
+          chainStr,
+          cleanText(newDest),
           oldId
         ]);
-        
+
         const row = updateResult.rows[0];
         lastSavedCallTime = new Date();
         // Emit event to update UI without duplicating Contact calls count
@@ -703,6 +742,13 @@ async function saveCallLog(record) {
           .catch(err => console.warn('[SMDR] mat view refresh failed:', err.message));
         return row;
       }
+    }
+
+    // Standalone incoming row (no earlier hop to merge into): never store a VMS pilot
+    // (e.g. 390) as the extension — reduce it to the real-extension chain, or blank it.
+    if (record.call_type === 'In') {
+      const chain = buildExtensionChain(record.extension);
+      record.extension = chain.length ? chain.join(' | ') : null;
     }
 
     const result = await pool.query(`

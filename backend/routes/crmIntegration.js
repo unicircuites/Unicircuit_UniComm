@@ -603,4 +603,12 @@ router.post('/scraper/analyze', async (req, res, next) => {
   }
 });
 
+router.get('/scraper/analyze/login-status', async (req, res, next) => {
+  try {
+    return res.json(scraperService.getLoginWaitStatus());
+  } catch (err) {
+    next(err);
+  }
+});
+
 module.exports = router;

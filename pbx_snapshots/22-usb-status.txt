@@ -1,0 +1,7 @@
+[TABLE 0]
+USB Status
+[TABLE 1]
+Internal USB Status
+Used: 1.27 GB Free: 27.36 GB Total: 28.64 GB
+[TABLE 2]
+Used: 1.27 GB | Free: 27.36 GB | Total: 28.64 GB

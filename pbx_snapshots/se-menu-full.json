@@ -1,0 +1,614 @@
+[
+  {
+    "text": "Basic Settings",
+    "href": ""
+  },
+  {
+    "text": "Region",
+    "href": "InsWzRgnCode.html?SubPageIndex=1"
+  },
+  {
+    "text": "Pre-requisites",
+    "href": "SysPreReq.html?SubPageIndex=1"
+  },
+  {
+    "text": "Extn. & Feature Codes",
+    "href": "DefExtnNumPlan.html?SubPageIndex=1"
+  },
+  {
+    "text": "Trunks",
+    "href": "NamingTrk.html?SubPageIndex=1"
+  },
+  {
+    "text": "Time Table",
+    "href": "TimeTable.html?SubPageIndex=1"
+  },
+  {
+    "text": "Operator",
+    "href": "InsWzOperator.html?SubPageIndex=1"
+  },
+  {
+    "text": "SLT Extensions",
+    "href": "SLTPara.html?SubPageIndex=1"
+  },
+  {
+    "text": "SIP Extensions",
+    "href": "SIPPara.html?SubPageIndex=1"
+  },
+  {
+    "text": "Device Management",
+    "href": "DeviceManagement.html?SubPageIndex=1"
+  },
+  {
+    "text": "Call Pickup Group",
+    "href": "CallPickUpGrp.html?SubPageIndex=1"
+  },
+  {
+    "text": "CO Trunks",
+    "href": "COTrunk.html?SubPageIndex=1"
+  },
+  {
+    "text": "Mobile Trunks",
+    "href": "MobileTrunk.html?SubPageIndex=1"
+  },
+  {
+    "text": "VoIP Parameters",
+    "href": "VoipPara.html?SubPageIndex=1"
+  },
+  {
+    "text": "Emergency Numbers",
+    "href": "InsWzEmergencyTable.html?SubPageIndex=1"
+  },
+  {
+    "text": "Network Parameters",
+    "href": "CnfgNwPara.html?SubPageIndex=1"
+  },
+  {
+    "text": "Security Settings",
+    "href": "SecuritySettings.html?SubPageIndex=1"
+  },
+  {
+    "text": "Advanced Settings",
+    "href": ""
+  },
+  {
+    "text": "Abbreviated Dialing",
+    "href": ""
+  },
+  {
+    "text": "Global Directory",
+    "href": "GlobalDirectory.html?SubPageIndex=1"
+  },
+  {
+    "text": "Personal Directory",
+    "href": "PersonalDirectory.html?SubPageIndex=1"
+  },
+  {
+    "text": "Upload/Download",
+    "href": "UploadDownloadContact.html?SubPageIndex=1"
+  },
+  {
+    "text": "Account Name",
+    "href": "AccountName.html?SubPageIndex=1"
+  },
+  {
+    "text": "Automatic Number Translation",
+    "href": "ANT.html?SubPageIndex=1"
+  },
+  {
+    "text": "Call Cost Calculation",
+    "href": ""
+  },
+  {
+    "text": "General Parameters",
+    "href": "CCCGenPara.html?SubPageIndex=1"
+  },
+  {
+    "text": "Normal Pulse Rate",
+    "href": "NormalPulseRateTable.html?SubPageIndex=1"
+  },
+  {
+    "text": "Discounted Pulse Rate",
+    "href": "DiscPulseRateTable.html?SubPageIndex=1"
+  },
+  {
+    "text": "Area Code",
+    "href": "AreaCodeTable.html?SubPageIndex=1"
+  },
+  {
+    "text": "Discounted Pulse Rate Schedule",
+    "href": "DiscPulseRateSchedule.html?SubPageIndex=1"
+  },
+  {
+    "text": "Call Back",
+    "href": "CallBackPrfl.html?SubPageIndex=1"
+  },
+  {
+    "text": "Call Duration Control",
+    "href": "CDC.html?SubPageIndex=1"
+  },
+  {
+    "text": "Call Taping",
+    "href": "NECallTaping.html?SubPageIndex=1"
+  },
+  {
+    "text": "CLI Based Routing",
+    "href": "CLIBsRtg.html?SubPageIndex=1"
+  },
+  {
+    "text": "Closed User Group",
+    "href": "CUG.html?SubPageIndex=1"
+  },
+  {
+    "text": "COSEC Integration",
+    "href": "COSEC.html?SubPageIndex=1"
+  },
+  {
+    "text": "CTI",
+    "href": ""
+  },
+  {
+    "text": "CTI Parameters",
+    "href": "CTIPara.html?SubPageIndex=1"
+  },
+  {
+    "text": "Resource",
+    "href": "CTIResource.html?PortType=1&SubPageIndex=1"
+  },
+  {
+    "text": "Status",
+    "href": "CTIStatus.html?SubPageIndex=1"
+  },
+  {
+    "text": "Date & Time",
+    "href": "DateTime.html?SubPageIndex=1"
+  },
+  {
+    "text": "Default System",
+    "href": ""
+  },
+  {
+    "text": "Department Groups",
+    "href": "DeptGrp.html?SubPageIndex=1"
+  },
+  {
+    "text": "Dial Plan for SIP Extension",
+    "href": "DialPlan.html?SubPageIndex=1"
+  },
+  {
+    "text": "DISA - CLI Authentication",
+    "href": "DisaCLIBsLogin.html?SubPageIndex=1"
+  },
+  {
+    "text": "Emergency",
+    "href": ""
+  },
+  {
+    "text": "Emergency Reporting",
+    "href": "EmergencyReporting.html?SubPageIndex=1"
+  },
+  {
+    "text": "Key Template",
+    "href": ""
+  },
+  {
+    "text": "SPARSH VP110",
+    "href": "Vp110_KeyTemplate.html?EonType=11"
+  },
+  {
+    "text": "LDAP",
+    "href": "LDAP.html?SubPageIndex=1"
+  },
+  {
+    "text": "Least Cost Routing (LCR)",
+    "href": ""
+  },
+  {
+    "text": "Cost Factor",
+    "href": "LCRCostFactor.html?SubPageIndex=1"
+  },
+  {
+    "text": "Time based",
+    "href": "LCRTmZn.html?SubPageIndex=1"
+  },
+  {
+    "text": "Number based",
+    "href": "LCRNum.html?SubPageIndex=1"
+  },
+  {
+    "text": "Service Provider based",
+    "href": "LCRSP.html?SubPageIndex=1"
+  },
+  {
+    "text": "Time + Number based",
+    "href": "LCRMixNum.html?SubPageIndex=1"
+  },
+  {
+    "text": "License Management",
+    "href": "Licensing.html?SubPageIndex=1"
+  },
+  {
+    "text": "Logical Partition",
+    "href": "LogicalPartn.html?SubPageIndex=1"
+  },
+  {
+    "text": "Macros",
+    "href": "KybrdMcr.html?SubPageIndex=1"
+  },
+  {
+    "text": "Mobile Trunks",
+    "href": ""
+  },
+  {
+    "text": "BCCH Selection",
+    "href": "MobBCCHSel.html?SubPageIndex=1"
+  },
+  {
+    "text": "SIM Balance Recharge",
+    "href": "SIMBalRechrg.html?SubPageIndex=1"
+  },
+  {
+    "text": "Network Parameters",
+    "href": ""
+  },
+  {
+    "text": "Static Routing Table",
+    "href": "StaticRoutTable.html?SubPageIndex=1"
+  },
+  {
+    "text": "Toll Control - Allowed-Denied Numbers",
+    "href": "NumList.html?SubPageIndex=1&SUB_STRT=1&SUB_END=250"
+  },
+  {
+    "text": "Page Zones",
+    "href": "Paging.html?SubPageIndex=1"
+  },
+  {
+    "text": "Password",
+    "href": ""
+  },
+  {
+    "text": "Change FTP Password for Extended IP-Phones",
+    "href": "ChangeFTPPswdSIPExtn.html?SubPageIndex=1"
+  },
+  {
+    "text": "SA Password",
+    "href": "ChangeSAPassword.html?SubPageIndex=1"
+  },
+  {
+    "text": "SE Password",
+    "href": "ChangeSEPassword.html?SubPageIndex=1"
+  },
+  {
+    "text": "PIN Configuration",
+    "href": "PinDial.html?SubPageIndex=1"
+  },
+  {
+    "text": "Regional Settings",
+    "href": ""
+  },
+  {
+    "text": "Call Progress Tones",
+    "href": "Cptg.html?SubPageIndex=1"
+  },
+  {
+    "text": "Holiday Table",
+    "href": "HolidayTab.html?SubPageIndex=1"
+  },
+  {
+    "text": "Response Mapping",
+    "href": ""
+  },
+  {
+    "text": "System to SIP cause mapping",
+    "href": "SystemSIPCauseMapping.html?SubPageIndex=1"
+  },
+  {
+    "text": "SMDR",
+    "href": ""
+  },
+  {
+    "text": "Storage Filters",
+    "href": "SMDRStorage.html?SubPageIndex=1"
+  },
+  {
+    "text": "SMDR Reports",
+    "href": "SMDRRpt.html?SubPageIndex=1"
+  },
+  {
+    "text": "SMDR Online",
+    "href": "SMDROnline.html?SubPageIndex=1"
+  },
+  {
+    "text": "SMDR Posting",
+    "href": "SMDRPosting.html?SubPageIndex=1"
+  },
+  {
+    "text": "SMS Gateway",
+    "href": ""
+  },
+  {
+    "text": "General Parameters",
+    "href": "SMSGatewayPara.html?SubPageIndex=1"
+  },
+  {
+    "text": "Status",
+    "href": "SMSGatewayStatus.html?SubPageIndex=1"
+  },
+  {
+    "text": "SMS Routing",
+    "href": ""
+  },
+  {
+    "text": "Least Cost Routing (LCR)",
+    "href": "SmsSrvrLCR.html?SubPageIndex=1"
+  },
+  {
+    "text": "Allowed-Denied Numbers for sending SMS",
+    "href": "SendSMSAllowDeniedNumList.html?SubPageIndex=1"
+  },
+  {
+    "text": "Allowed-Denied Numbers for receiving SMS",
+    "href": "ReceiveSMSAllowDeniedNumList.html?SubPageIndex=1"
+  },
+  {
+    "text": "SMS Server",
+    "href": ""
+  },
+  {
+    "text": "General Parameters",
+    "href": "SmsSrvGenPara.html?SubPageIndex=1"
+  },
+  {
+    "text": "Mail Settings",
+    "href": "SmsSrvrMailSetting.html?SubPageIndex=1"
+  },
+  {
+    "text": "Report Settings",
+    "href": "SmsSrvrReportSetting.html?SubPageIndex=1"
+  },
+  {
+    "text": "Allowed Email IDs for sending Bulk SMS",
+    "href": "BulkSMSAllowEmailIdList.html?SubPageIndex=1"
+  },
+  {
+    "text": "Allowed-Denied Email ID List",
+    "href": "AllowDeniedEmailIdList.html?SubPageIndex=1"
+  },
+  {
+    "text": "SMS/Email Group",
+    "href": "SmsEmailGroup.html?SubPageIndex=1"
+  },
+  {
+    "text": "SMTP Settings",
+    "href": "SMTPSettings.html?SubPageIndex=1"
+  },
+  {
+    "text": "System Log",
+    "href": ""
+  },
+  {
+    "text": "System Activity Log",
+    "href": "SAL.html?SubPageIndex=1"
+  },
+  {
+    "text": "System Fault Log",
+    "href": "SFL.html?SubPageIndex=1"
+  },
+  {
+    "text": "System Log Notification",
+    "href": "SysLogNotification.html?SubPageIndex=1"
+  },
+  {
+    "text": "System Parameters",
+    "href": "SysGenPara.html?SubPageIndex=1"
+  },
+  {
+    "text": "System Timers and Counts",
+    "href": "SysTmrCnt.html?SubPageIndex=1"
+  },
+  {
+    "text": "Virtual Extensions",
+    "href": "VirtualExtension.html?SubPageIndex=1"
+  },
+  {
+    "text": "VMS Configuration",
+    "href": ""
+  },
+  {
+    "text": "Extension Voice Mail Settings",
+    "href": "ExtensionVoiceMailSettings.html?SubPageIndex=1"
+  },
+  {
+    "text": "Voice Mail Auto-Attendant Menu",
+    "href": "VoiceMailAutoAttendantMenu.html?SubPageIndex=1"
+  },
+  {
+    "text": "Message Profile",
+    "href": "MessageProfile.html?SubPageIndex=1"
+  },
+  {
+    "text": "Call Transfer Profile",
+    "href": "CallTransferProfile.html?SubPageIndex=1"
+  },
+  {
+    "text": "Language Selection Profile",
+    "href": "LanguageProfile.html?SubPageIndex=1"
+  },
+  {
+    "text": "Notification via Call - Profile",
+    "href": "MsgWaitNotifyProfile.html?SubPageIndex=1"
+  },
+  {
+    "text": "Mailbox Menu",
+    "href": "MailboxMenu.html?SubPageIndex=1&MenuNum=1"
+  },
+  {
+    "text": "VMS General Parameters",
+    "href": "GeneralParameters.html?SubPageIndex=1"
+  },
+  {
+    "text": "Distribution List",
+    "href": "DistributionList.html?SubPageIndex=1&ListNum=1"
+  },
+  {
+    "text": "General Mailbox Settings",
+    "href": "GeneralMailbox.html?SubPageIndex=1"
+  },
+  {
+    "text": "Debug",
+    "href": "VmsDebug.html?SubPageIndex=1"
+  },
+  {
+    "text": "Prompts Management",
+    "href": "PromptsManagement.html?SubPageIndex=1"
+  },
+  {
+    "text": "Mailbox Status",
+    "href": "MailboxStatus.html?SubPageIndex=1"
+  },
+  {
+    "text": "Voice Message Applications",
+    "href": "VoiceMsgAppl.html?SubPageIndex=1"
+  },
+  {
+    "text": "VoIP Configuration",
+    "href": ""
+  },
+  {
+    "text": "VARTA License Management",
+    "href": "VARTALicenseManagement.html?SubPageIndex=1"
+  },
+  {
+    "text": "Standard SIP Authorization Profile",
+    "href": "StndrdSipAuthProfile.html?SubPageIndex=1"
+  },
+  {
+    "text": "Auto Sign-In Parameters",
+    "href": "AutoSignInPara.html?SubPageIndex=1"
+  },
+  {
+    "text": "Digest Authentication Table",
+    "href": "DigestAuth.html?SubPageIndex=1"
+  },
+  {
+    "text": "Peer to Peer Table",
+    "href": "PeerTable.html?SubPageIndex=1"
+  },
+  {
+    "text": "Black List IP Address - SIP Extensions",
+    "href": "SipExtnBlackListIpAddr.html?SubPageIndex=1"
+  },
+  {
+    "text": "Third Party IP-Phone General Parameters",
+    "href": "ThirdPartyIpPhoneGenPara.html?SubPageIndex=1"
+  },
+  {
+    "text": "Maintenance",
+    "href": ""
+  },
+  {
+    "text": "Certificate Management",
+    "href": "CertificateManagement.html?SubPageIndex=1&IsPageOpenFistTime=1"
+  },
+  {
+    "text": "Configuration Backup/Restore",
+    "href": "ConfigBackupRestore.html?SubPageIndex=1"
+  },
+  {
+    "text": "Default System",
+    "href": ""
+  },
+  {
+    "text": "Firmware Management",
+    "href": "FirmwareManagement.html?SubPageIndex=1"
+  },
+  {
+    "text": "Logs",
+    "href": "Logs.html?SubPageIndex=1"
+  },
+  {
+    "text": "Network Diagnosis",
+    "href": "NetworkDiagnosis.html?SubPageIndex=1"
+  },
+  {
+    "text": "Network Drive",
+    "href": "NetworkDrive.html?SubPageIndex=1"
+  },
+  {
+    "text": "PCAP Trace",
+    "href": "PCAP.html?SubPageIndex=1"
+  },
+  {
+    "text": "Restart System",
+    "href": ""
+  },
+  {
+    "text": "SIP Extension",
+    "href": "SipExtnRedundancy.html?SubPageIndex=1"
+  },
+  {
+    "text": "System Debug",
+    "href": "Debug.html?SubPageIndex=1"
+  },
+  {
+    "text": "VMS Debug",
+    "href": "VmsDebug.html?SubPageIndex=1"
+  },
+  {
+    "text": "VoIP Debug",
+    "href": "VoIPDebug.html?SubPageIndex=1"
+  },
+  {
+    "text": "Status",
+    "href": ""
+  },
+  {
+    "text": "System Details",
+    "href": "SysDetail.html?SubPageIndex=1"
+  },
+  {
+    "text": "System Usage",
+    "href": "SysReport.html?SubPageIndex=1"
+  },
+  {
+    "text": "System Performance",
+    "href": "SysPerformance.html?SubPageIndex=1"
+  },
+  {
+    "text": "Mailbox Status",
+    "href": "MailboxStatus.html?SubPageIndex=1"
+  },
+  {
+    "text": "USB Status",
+    "href": "USBStatus.html?SubPageIndex=1"
+  },
+  {
+    "text": "CO",
+    "href": "COStatus.html?SubPageIndex=1"
+  },
+  {
+    "text": "Mobile",
+    "href": "MobileStatus.html?SubPageIndex=1"
+  },
+  {
+    "text": "SIP Extension",
+    "href": "SipExtnStatus.html?SubPageIndex=1"
+  },
+  {
+    "text": "SMS Gateway",
+    "href": "SMSGatewayStatus.html?SubPageIndex=1"
+  },
+  {
+    "text": "Network",
+    "href": "NetworkStatus.html?SubPageIndex=1"
+  },
+  {
+    "text": "DSS Status",
+    "href": "DSSStatus.html?SubPageIndex=1"
+  },
+  {
+    "text": "WebJeeves Users",
+    "href": "WebJeevesUserSts.html?SubPageIndex=1"
+  }
+]

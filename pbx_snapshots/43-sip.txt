@@ -1,0 +1,84 @@
+ 	
+SUSHIL M(207)
+VIBHA B(221)
+DAX(208)
+SIP Extn-10
+PAWAN B(222)
+SIP Extn-12
+DIRECTOR ROOM(201)
+SANGHSHIL S(202)
+ACHAL G(203)
+MANAGER ROOM(204)
+NIDHI(205)
+ABHISHEK(206)
+SUSHIL M(207)
+VIBHA B(221)
+DAX(208)
+SIP Extn-10
+PAWAN B(222)
+SIP Extn-12
+DIRECTOR ROOM(201)
+SANGHSHIL S(202)
+ACHAL G(203)
+MANAGER ROOM(204)
+NIDHI(205)
+ABHISHEK(206)
+	 
+	
+Enable SIP Extension
+	
+	
+	
+Authentication ID
+	
+	
+	
+Authentication Password
+	
+	
+ 
+Generate
+ 
+	
+HTTP Authentication Password (Third Party IP-Phone)
+	
+	
+ 
+Generate
+ 
+	Note :- Authentication Password and HTTP Authentication Password must follow following requirements:
+Minimum length must be 8 characters.
+Password must include atleast 1 uppercase, 1 lowercase, 1 number and 1 special character.
+Allowed characters are 0-9, a-z, A-Z, all special characters except %, =, #, +, &, \, <, >, ", ' and space.
+	
+Mobile Number
+	
+	
+Email Id
+	
+	
+Send Configuration Mail
+	
+Send
+ 
+	
+Mail Status
+	
+ Class of Service
+ Toll Control
+ Select Trunks for Outgoing Calls
+ .....
+ 
+Submit
+ 
+	
+ 
+Default
+ 
+	
+ 
+Copy
+ 
+
+TAPING:
+ | CALL_TAPING_COMBO = "Apply as per Call Taping profile 1"

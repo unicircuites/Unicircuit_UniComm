@@ -1,0 +1,210 @@
+  0 [select-one] = "Telephone Instrument"
+  VM_PART_RADIO_BTN [radio] = "CHECKED"
+  MODULE_SIZE_COMBO_1 [select-one] = "16"
+  MODULE_SIZE_COMBO_2 [select-one] = "16"
+  MODULE_SIZE_COMBO_3 [select-one] = "16"
+  MODULE_SIZE_COMBO_4 [select-one] = "16"
+  MODULE_SIZE_COMBO_5 [select-one] = "16"
+  MODULE_SIZE_COMBO_6 [select-one] = "16"
+  MODULE_SIZE_COMBO_7 [select-one] = "16"
+  MODULE_SIZE_COMBO_8 [select-one] = "16"
+  MODULE_SIZE_COMBO_9 [select-one] = "16"
+  MODULE_SIZE_COMBO_10 [select-one] = "16"
+  MODULE_SIZE_COMBO_11 [select-one] = "16"
+  MODULE_SIZE_COMBO_12 [select-one] = "16"
+  MODULE_SIZE_COMBO_13 [select-one] = "16"
+  MODULE_SIZE_COMBO_14 [select-one] = "16"
+  MODULE_SIZE_COMBO_15 [select-one] = "16"
+  MODULE_SIZE_COMBO_16 [select-one] = "16"
+  UPLD_VM_COMBO [select-one] = "01"
+  DWNLD_VM_COMBO [select-one] = "01"
+  VOICE_MOD_NUM_1 [text] = "02"
+  1 [text] = "002"
+  VOICE_MOD_NUM_2 [text] = "02"
+  2 [text] = "002"
+  VOICE_MOD_NUM_3 [text] = "02"
+  3 [text] = "002"
+  VOICE_MOD_NUM_4 [text] = "02"
+  4 [text] = "002"
+  VOICE_MOD_NUM_5 [text] = "06"
+  5 [text] = "002"
+  VOICE_MOD_NUM_6 [text] = "06"
+  6 [text] = "002"
+  VOICE_MOD_NUM_7 [text] = "07"
+  7 [text] = "016"
+  VOICE_MOD_NUM_8 [text] = "11"
+  8 [text] = "002"
+  VOICE_MOD_NUM_9 [text] = "09"
+  9 [text] = "002"
+  VOICE_MOD_NUM_10 [text] = "10"
+  10 [text] = "002"
+  VOICE_MOD_NUM_11 [text] = "12"
+  11 [text] = "016"
+  VOICE_MOD_NUM_12 [text] = "08"
+  12 [text] = "016"
+  VOICE_MOD_NUM_13 [text] = "00"
+  13 [text] = "000"
+  VOICE_MOD_NUM_14 [text] = "00"
+  14 [text] = "000"
+  VOICE_MOD_NUM_15 [text] = "13"
+  15 [text] = "016"
+  VOICE_MOD_NUM_16 [text] = "00"
+  16 [text] = "000"
+  VOICE_MOD_NUM_17 [text] = "01"
+  17 [text] = "002"
+  VOICE_MOD_NUM_18 [text] = "00"
+  18 [text] = "000"
+  VOICE_MOD_NUM_19 [text] = "00"
+  19 [text] = "000"
+  VOICE_MOD_NUM_20 [text] = "00"
+  20 [text] = "000"
+  VOICE_MOD_NUM_21 [text] = "00"
+  21 [text] = "000"
+  VOICE_MOD_NUM_22 [text] = "00"
+  22 [text] = "000"
+  VOICE_MOD_NUM_23 [text] = "00"
+  23 [text] = "000"
+  VOICE_MOD_NUM_24 [text] = "00"
+  24 [text] = "000"
+  VOICE_MOD_NUM_25 [text] = "00"
+  25 [text] = "000"
+  VOICE_MOD_NUM_26 [text] = "00"
+  26 [text] = "000"
+  VOICE_MOD_NUM_27 [text] = "00"
+  27 [text] = "000"
+  VOICE_MOD_NUM_28 [text] = "00"
+  28 [text] = "000"
+  VOICE_MOD_NUM_29 [text] = "00"
+  29 [text] = "000"
+  VOICE_MOD_NUM_30 [text] = "00"
+  30 [text] = "000"
+  VOICE_MOD_NUM_31 [text] = "00"
+  31 [text] = "000"
+  VOICE_MOD_NUM_32 [text] = "00"
+  32 [text] = "000"
+  VOICE_MOD_NUM_35 [text] = "00"
+  35 [text] = "000"
+  VOICE_MOD_NUM_36 [text] = "00"
+  36 [text] = "000"
+  VOICE_MOD_NUM_37 [text] = "00"
+  37 [text] = "000"
+  VOICE_MOD_NUM_38 [text] = "00"
+  38 [text] = "000"
+  VOICE_MOD_NUM_39 [text] = "00"
+  39 [text] = "000"
+  VOICE_MOD_NUM_40 [text] = "00"
+  40 [text] = "000"
+  VOICE_MOD_NUM_41 [text] = "00"
+  41 [text] = "000"
+  VOICE_MOD_NUM_42 [text] = "00"
+  42 [text] = "000"
+  VOICE_MOD_NUM_43 [text] = "00"
+  43 [text] = "000"
+  VOICE_MOD_NUM_44 [text] = "00"
+  44 [text] = "000"
+  VOICE_MOD_NUM_45 [text] = "00"
+  45 [text] = "000"
+  VOICE_MOD_NUM_46 [text] = "00"
+  46 [text] = "000"
+[TABLE 0]
+Voice Message Applications
+[TABLE 1]
+Recording Parameters
+Voice Module Partitions 16 Voice Modules, 16 seconds each Customize the Voice Module partitions as per my requirement Module Number Module Size (Sec) 1 (MoH) 16 32 48 64 80 96 112 128 144 160 176 192 208 224 240 2 16 32 48 64 80 96 112 128 144 160 176 192 208 224 240 3 16 32 48 64 80 96 112 128 144 160 176 192 208 224 240 4 16 32 48 64 80 96 112 128 144 160 176 192 208 224 240 5 16 32 48 64 80 96 112 128 144 160 176 192 208 224 240 6 16 32 48 64 80 96 112 128 144 160 176 192 208 224 240 7 16 32 48 64 80 96 112 128 144 160 176 192 208 224 240 8 16 32 48 64 80 96 112 128 144 160 176 192 208 224 240 9 16 32 48 64 80 96 112 128 144 160 176 192 208 224 240 10 16 32 48 64 80 96 112 128 144 160 176 192 208 224 240 11 16 32 48 64 80 96 112 128 144 160 176 192 208 224 240 12 16 32 48 64 80 96 112 128 144 160 176 192 208 224 240 13 16 32 48 64 80 96 112 128 144 160 176 192 208 224 240 14 16 32 48 64 80 96 112 128 144 160 176 192 208 224 240 15 16 32 48 64 80 96 112 128 144 160 176 192 208 224 240 16 16 32 48 64 80 96 112 128 144 160 176 192 208 224 240 Submit
+Upload the Voice Message
+Download the Voice Message
+Voice Module Assignment
+[TABLE 2]
+Recording Source | LoadStringCombo('0',1,1,1,vmRecSrcComboBx,"style='width:165px;' DISABLED")Telephone Instrument
+[TABLE 3]
+ | 16 Voice Modules, 16 seconds each
+ | Customize the Voice Module partitions as per my requirement
+Module Number Module Size (Sec)
+1 (MoH) 16 32 48 64 80 96 112 128 144 160 176 192 208 224 240 2 16 32 48 64 80 96 112 128 144 160 176 192 208 224 240 3 16 32 48 64 80 96 112 128 144 160 176 192 208 224 240 4 16 32 48 64 80 96 112 128 144 160 176 192 208 224 240 5 16 32 48 64 80 96 112 128 144 160 176 192 208 224 240 6 16 32 48 64 80 96 112 128 144 160 176 192 208 224 240 7 16 32 48 64 80 96 112 128 144 160 176 192 208 224 240 8 16 32 48 64 80 96 112 128 144 160 176 192 208 224 240 9 16 32 48 64 80 96 112 128 144 160 176 192 208 224 240 10 16 32 48 64 80 96 112 128 144 160 176 192 208 224 240 11 16 32 48 64 80 96 112 128 144 160 176 192 208 224 240 12 16 32 48 64 80 96 112 128 144 160 176 192 208 224 240 13 16 32 48 64 80 96 112 128 144 160 176 192 208 224 240 14 16 32 48 64 80 96 112 128 144 160 176 192 208 224 240 15 16 32 48 64 80 96 112 128 144 160 176 192 208 224 240 16 16 32 48 64 80 96 112 128 144 160 176 192 208 224 240
+Note: Changing the parameter to '16 Voice Modules, 16 seconds each' will delete all the existing voice module files which should be uploaded again to work properly.
+Submit | 
+[TABLE 4]
+Module Number | Module Size (Sec)
+[TABLE 5]
+1 (MoH) | 16 32 48 64 80 96 112 128 144 160 176 192 208 224 240
+2 | 16 32 48 64 80 96 112 128 144 160 176 192 208 224 240
+3 | 16 32 48 64 80 96 112 128 144 160 176 192 208 224 240
+4 | 16 32 48 64 80 96 112 128 144 160 176 192 208 224 240
+5 | 16 32 48 64 80 96 112 128 144 160 176 192 208 224 240
+6 | 16 32 48 64 80 96 112 128 144 160 176 192 208 224 240
+7 | 16 32 48 64 80 96 112 128 144 160 176 192 208 224 240
+8 | 16 32 48 64 80 96 112 128 144 160 176 192 208 224 240
+9 | 16 32 48 64 80 96 112 128 144 160 176 192 208 224 240
+10 | 16 32 48 64 80 96 112 128 144 160 176 192 208 224 240
+11 | 16 32 48 64 80 96 112 128 144 160 176 192 208 224 240
+12 | 16 32 48 64 80 96 112 128 144 160 176 192 208 224 240
+13 | 16 32 48 64 80 96 112 128 144 160 176 192 208 224 240
+14 | 16 32 48 64 80 96 112 128 144 160 176 192 208 224 240
+15 | 16 32 48 64 80 96 112 128 144 160 176 192 208 224 240
+16 | 16 32 48 64 80 96 112 128 144 160 176 192 208 224 240
+[TABLE 6]
+Note: Changing the parameter to '16 Voice Modules, 16 seconds each' will delete all the existing voice module files which should be uploaded again to work properly.
+[TABLE 7]
+Voice Module Number | LoadTwoDigCombo('UPLD_VM_COMBO',1,1,16,"style='width:50px;' onChange='VmNum=this.value; SetVsblInvsbMoHInfoStr();'")01020304050607080910111213141516 Voice module 01 is used for MoH only
+Select the .WAV file to be uploaded | 
+Upload
+[TABLE 8]
+Upload
+[TABLE 9]
+Select the Voice Module | LoadTwoDigCombo('DWNLD_VM_COMBO',1,1,16,"style='width:50px;'")01020304050607080910111213141516
+Download
+[TABLE 10]
+Download
+[TABLE 11]
+Voice Message Application Voice Module Duration (sec)
+Morning Greeting (Built-In Auto Attendant) Afternoon Greeting (Built-In Auto Attendant) Evening Greeting (Built-In Auto Attendant) Built-In Auto Attendant - Welcome Greeting for Day Built-In Auto Attendant - Welcome Greeting for Break Built-In Auto Attendant - Welcome Greeting for Night Built-In Auto Attendant - Dial Prompt Built-In Auto Attendant - Destination Ringing Message Built-In Auto Attendant - Wrong Dial Message Built-In Auto Attendant - Destination Busy Message Built-In Auto Attendant - Destination No Reply Message Built-In Auto Attendant - No Dial Message Built-In Auto Attendant - Conference Number Built-In Auto Attendant - Conference Password Built-In Auto Attendant - Call Transfer to Operator Toll - Control & CoS Violation Trunk Auto Answer Greeting 1 Trunk Auto Answer Greeting 2 Trunk Auto Answer Greeting 3 Trunk Auto Answer Greeting 4 Trunk Auto Answer RBT Message 1 Trunk Auto Answer RBT Message 2 Trunk Auto Answer RBT Message 3 Trunk Auto Answer RBT Message 4 Trunk Auto Answer Bye Message 1 Trunk Auto Answer Bye Message 2 Trunk Auto Answer Bye Message 3 Trunk Auto Answer Bye Message 4 DDI - Destination No Reply Message DDI - Destination Busy Message DDI - Call Transfer to TLG Message Alarm Message Wait Notification Message Wait - No message DND Notification Security/Emergency Message Dial Tone Ring Back Tone Busy Tone Error Tone Confirmation Tone Voice Help OG Call - Called Party is Busy PIN Dialling
+Submit
+[TABLE 12]
+Voice Message Application | Voice Module | Duration (sec)
+[TABLE 13]
+Morning Greeting (Built-In Auto Attendant) |  | 
+Afternoon Greeting (Built-In Auto Attendant) |  | 
+Evening Greeting (Built-In Auto Attendant) |  | 
+Built-In Auto Attendant - Welcome Greeting for Day |  | 
+Built-In Auto Attendant - Welcome Greeting for Break |  | 
+Built-In Auto Attendant - Welcome Greeting for Night |  | 
+Built-In Auto Attendant - Dial Prompt |  | 
+Built-In Auto Attendant - Destination Ringing Message |  | 
+Built-In Auto Attendant - Wrong Dial Message |  | 
+Built-In Auto Attendant - Destination Busy Message |  | 
+Built-In Auto Attendant - Destination No Reply Message |  | 
+Built-In Auto Attendant - No Dial Message |  | 
+Built-In Auto Attendant - Conference Number |  | 
+Built-In Auto Attendant - Conference Password |  | 
+Built-In Auto Attendant - Call Transfer to Operator |  | 
+Toll - Control & CoS Violation |  | 
+Trunk Auto Answer Greeting 1 |  | 
+Trunk Auto Answer Greeting 2 |  | 
+Trunk Auto Answer Greeting 3 |  | 
+Trunk Auto Answer Greeting 4 |  | 
+Trunk Auto Answer RBT Message 1 |  | 
+Trunk Auto Answer RBT Message 2 |  | 
+Trunk Auto Answer RBT Message 3 |  | 
+Trunk Auto Answer RBT Message 4 |  | 
+Trunk Auto Answer Bye Message 1 |  | 
+Trunk Auto Answer Bye Message 2 |  | 
+Trunk Auto Answer Bye Message 3 |  | 
+Trunk Auto Answer Bye Message 4 |  | 
+DDI - Destination No Reply Message |  | 
+DDI - Destination Busy Message |  | 
+DDI - Call Transfer to TLG Message |  | 
+Alarm |  | 
+Message Wait Notification |  | 
+Message Wait - No message |  | 
+DND Notification |  | 
+Security/Emergency Message |  | 
+Dial Tone |  | 
+Ring Back Tone |  | 
+Busy Tone |  | 
+Error Tone |  | 
+Confirmation Tone |  | 
+Voice Help |  | 
+OG Call - Called Party is Busy |  | 
+PIN Dialling |  | 
+[TABLE 14]
+Submit

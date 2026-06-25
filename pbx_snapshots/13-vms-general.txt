@@ -1,0 +1,116 @@
+
+=== frame "MainWindow" https://192.168.0.81:1026/GeneralParameters.html?SubPageIndex=1 ===
+FIELD 0 [INPUT/checkbox] = "CHECKED" 
+FIELD USE_SMTP_ACC_COMBO_BOX [SELECT/select-one] = "UniPBX" 
+FIELD 1 [INPUT/checkbox] = "CHECKED" 
+FIELD 2 [INPUT/text] = "pbaronde@outlook.com" 
+FIELD SAVE_CAL_TAPING_IN_CMBX [SELECT/select-one] = "Common Mailbox" 
+FIELD 3 [INPUT/text] = "221" 
+FIELD 4 [SELECT/select-one] = "Single File before and after call transfer" 
+FIELD 5 [SELECT/select-one] = "0" 
+FIELD 6 [SELECT/select-one] = "02" 
+FIELD 7 [SELECT/select-one] = "DDMMYYYY" 
+FIELD 8 [SELECT/select-one] = "24 Hour" 
+FIELD 9 [SELECT/select-one] = "Hash" 
+FIELD 10 [SELECT/select-one] = "Star" 
+FIELD 11 [SELECT/select-one] = "after each Option" 
+FIELD 12 [SELECT/select-one] = "Press" 
+FIELD MB_FILE_FRMT_CMB_BOX_1 [SELECT/select-one] = "Date" 
+FIELD MB_FILE_FRMT_CMB_BOX_2 [SELECT/select-one] = "Time" 
+FIELD MB_FILE_FRMT_CMB_BOX_3 [SELECT/select-one] = "Message Type" 
+FIELD MB_FILE_FRMT_CMB_BOX_4 [SELECT/select-one] = "Calling Number" 
+FIELD MB_FILE_FRMT_CMB_BOX_5 [SELECT/select-one] = "Called Number" 
+FIELD GMB_FILE_FRMT_CMB_BOX_1 [SELECT/select-one] = "Mailbox Extension Number" 
+FIELD GMB_FILE_FRMT_CMB_BOX_2 [SELECT/select-one] = "Date" 
+FIELD GMB_FILE_FRMT_CMB_BOX_3 [SELECT/select-one] = "Time" 
+FIELD GMB_FILE_FRMT_CMB_BOX_4 [SELECT/select-one] = "Message Type" 
+FIELD GMB_FILE_FRMT_CMB_BOX_5 [SELECT/select-one] = "Calling Number" 
+FIELD GMB_FILE_FRMT_CMB_BOX_6 [SELECT/select-one] = "Called Number" 
+FIELD 13 [INPUT/text] = "[VMS] Warning! VMS USB memory usage is 80% consumed " 
+FIELD 14 [INPUT/text] = "[VMS] Alert! VMS USB memory usage is completely consumed" 
+FIELD 15 [INPUT/text] = "[VMS] VMS USB memory usage is in limit" 
+FIELD 16 [INPUT/text] = "[VMS] Warning! Mailbox <ext> is 80% consumed" 
+FIELD 17 [INPUT/text] = "[VMS] Alert! Mailbox <ext> is completely consumed" 
+FIELD 18 [INPUT/text] = "[VMS] Warning! Mailbox <ext> is 80% consumed" 
+FIELD 19 [INPUT/text] = "[VMS] Alert! Mailbox <ext> is completely consumed, please delete old messages to allow storing of new messages" 
+FIELD 20 [INPUT/text] = "[VMS] Warning! General Mailbox <ext> is 80% consumed" 
+FIELD 21 [INPUT/text] = "[VMS] Alert! General Mailbox <ext> is completely consumed, please delete old messages to allow storing of new messages" 
+FIELD 22 [INPUT/text] = "[VMS] <msg_type> Message received from <cli>" 
+FIELD 23 [INPUT/text] = "[VMS] Message received for conversation with <num1>" 
+FIELD 24 [INPUT/text] = "[VMS] Message received for call recording between <num1> and <num2>" 
+FIELD 25 [INPUT/text] = "[VMS] <msg_type> Message received for <ext> from <cli>" 
+FIELD 26 [INPUT/text] = "[VMS] Message received for <ext> and conversation was with <num1>" 
+
+[TABLE 0]
+VMS General Parameters
+
+[TABLE 1]
+General Settings Enable Extension Number Validation Use SMTP Account None UniPBX Account 2 Add New Memory Usage Notification to SE SE Email ID Save Call Taping Files in Common Mailbox Personal Mailbox Common Mailbox for Call Taping (Enter Extension Number) Save Call Tapping Files as Single File before and after call transfer Individual File before and after call transfer Make Message Notification call using TAC 0 5 Channel Reserved for Voice Mail Auto Attendant None 01 02 03 04 Date Format DDMMYYYY MMDDYYYY Time Format 24 Hour 12 Hour
+Supported VMS Language
+Play Settings
+Filename Format (.wav)
+VMS E-mail Notification
+Submit Default
+
+[TABLE 2]
+Enable Extension Number Validation | 
+Use SMTP Account | None UniPBX Account 2 Add New | 
+Memory Usage Notification to SE | 
+SE Email ID | 
+Save Call Taping Files in | Common Mailbox Personal Mailbox
+Common Mailbox for Call Taping (Enter Extension Number) | 
+Save Call Tapping Files as | Single File before and after call transfer Individual File before and after call transfer
+Make Message Notification call using TAC | 0 5
+Channel Reserved for Voice Mail Auto Attendant | None 01 02 03 04
+Date Format | DDMMYYYY MMDDYYYY
+Time Format | 24 Hour 12 Hour
+
+[TABLE 3]
+EnglishtLangStr[1] = "English"; VmsLanguageArray[1] = "English";VmsLanguageArray[2] = "";VmsLanguageArray[3] = "";VmsLanguageArray[4] = "";VmsLanguageArray[5] = "";VmsLanguageArray[6] = ""; Add Language
+
+[TABLE 4]
+English | 
+Add Language
+
+[TABLE 5]
+Play '#' as | LoadStringCombo('9',0,0,1,VmsGenParaPlayHashAsComboBx,"style='width:120px;'")HashPound | 
+Play '*' as | LoadStringCombo('10',0,0,1,VmsGenParaPlayStarAsComboBx,"style='width:120px;'")StarAsterisk | 
+For all Options Menu, play digit | LoadStringCombo('11',0,0,1,VmsGenParaPlayDigitComboBx,"style='width:120px;'")after each Optionbefore each Option | 
+For all Options Menu, for digit dialing play | LoadStringCombo('12',0,0,1,VmsGenParaDigitDialingPlayComboBx,"style='width:120px;'")PressDial | 
+
+[TABLE 6]
+Mailbox | LoadStringCombo('MB_FILE_FRMT_CMB_BOX_1',1,0,5,VmsGenParaMbFileNameFormatComboBx,"style='width:155px;' onchange=OnChangeFileFormat('MB_FILE_FRMT_CMB_BOX_',1,5);")NoneDateTimeMessage TypeCalling NumberCalled Number | LoadStringCombo('MB_FILE_FRMT_CMB_BOX_2',2,0,5,VmsGenParaMbFileNameFormatComboBx,"style='width:155px;' onchange=OnChangeFileFormat('MB_FILE_FRMT_CMB_BOX_',2,5);")NoneDateTimeMessage TypeCalling NumberCalled Number | LoadStringCombo('MB_FILE_FRMT_CMB_BOX_3',3,0,5,VmsGenParaMbFileNameFormatComboBx,"style='width:155px;' onchange=OnChangeFileFormat('MB_FILE_FRMT_CMB_BOX_',3,5);")NoneDateTimeMessage TypeCalling NumberCalled Number | LoadStringCombo('MB_FILE_FRMT_CMB_BOX_4',4,0,5,VmsGenParaMbFileNameFormatComboBx,"style='width:155px;' onchange=OnChangeFileFormat('MB_FILE_FRMT_CMB_BOX_',4,5);")NoneDateTimeMessage TypeCalling NumberCalled Number | LoadStringCombo('MB_FILE_FRMT_CMB_BOX_5',5,0,5,VmsGenParaMbFileNameFormatComboBx,"style='width:155px;' onchange=OnChangeFileFormat('MB_FILE_FRMT_CMB_BOX_',5,5);")NoneDateTimeMessage TypeCalling NumberCalled Number
+General Mailbox | LoadStringCombo('GMB_FILE_FRMT_CMB_BOX_1',1,0,6,VmsGenParaGenMbFileNameFormatComboBx,"style='width:155px;' onchange=OnChangeFileFormat('GMB_FILE_FRMT_CMB_BOX_',1,6);")NoneMailbox Extension NumberDateTimeMessage TypeCalling NumberCalled Number | LoadStringCombo('GMB_FILE_FRMT_CMB_BOX_2',2,0,6,VmsGenParaGenMbFileNameFormatComboBx,"style='width:155px;' onchange=OnChangeFileFormat('GMB_FILE_FRMT_CMB_BOX_',2,6);")NoneMailbox Extension NumberDateTimeMessage TypeCalling NumberCalled Number | LoadStringCombo('GMB_FILE_FRMT_CMB_BOX_3',3,0,6,VmsGenParaGenMbFileNameFormatComboBx,"style='width:155px;' onchange=OnChangeFileFormat('GMB_FILE_FRMT_CMB_BOX_',3,6);")NoneMailbox Extension NumberDateTimeMessage TypeCalling NumberCalled Number | LoadStringCombo('GMB_FILE_FRMT_CMB_BOX_4',4,0,6,VmsGenParaGenMbFileNameFormatComboBx,"style='width:155px;' onchange=OnChangeFileFormat('GMB_FILE_FRMT_CMB_BOX_',4,6);")NoneMailbox Extension NumberDateTimeMessage TypeCalling NumberCalled Number | LoadStringCombo('GMB_FILE_FRMT_CMB_BOX_5',5,0,6,VmsGenParaGenMbFileNameFormatComboBx,"style='width:155px;' onchange=OnChangeFileFormat('GMB_FILE_FRMT_CMB_BOX_',5,6);")NoneMailbox Extension NumberDateTimeMessage TypeCalling NumberCalled Number | LoadStringCombo('GMB_FILE_FRMT_CMB_BOX_6',6,0,6,VmsGenParaGenMbFileNameFormatComboBx,"style='width:155px;' onchange=OnChangeFileFormat('GMB_FILE_FRMT_CMB_BOX_',6,6);")NoneMailbox Extension NumberDateTimeMessage TypeCalling NumberCalled Number
+
+[TABLE 7]
+Notification for Memory Usage
+VMS Memory consumption alert to SE
+USB is 80% consumed | 
+USB is 100% consumed | 
+USB consumption is below 75% | 
+Mailbox consumption alert to SE
+Mailbox of user is 80% consumed | 
+Mailbox of user is 100% consumed | 
+Mailbox consumption alert to User
+Mailbox is 80% consumed | 
+Mailbox is 100% consumed | 
+General Mailbox is 80% consumed | 
+General Mailbox is 100% consumed | 
+Notification for New Message in Mailbox
+Normal Message | 
+Conversation Recording Message | 
+Call Tapping Message | 
+Notification for New Message in General Mailbox
+New Message | 
+Conversation Recording Message | 
+Note:
+<ext> = Extension Number (Extension Name)
+<cli> = Caller Number (Caller Name)
+<msg_type> = Message Type i.e. Urgent
+<num1>, <num2> = Call Tapping done between numbers (name)
+<date> = Date stored for message received
+<time> = Time stored for message received
+<filename> = Filename stored for message received
+
+[TABLE 8]
+Submit | Default

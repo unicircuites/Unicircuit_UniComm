@@ -3,7 +3,7 @@ const path = require('path');
 const pool = require('../db/pool');
 
 const LOCAL_STORED_DIR = process.env.PBX_LOCAL_RECORDINGS_DIR || 'D:\\Unicomm_Storage';
-const TIMESTAMP_TOLERANCE_MS = parseInt(process.env.PBX_RECORDING_MATCH_TOLERANCE_MS || '600000', 10); // 10 min default
+const TIMESTAMP_TOLERANCE_MS = parseInt(process.env.PBX_RECORDING_MATCH_TOLERANCE_MS || '1200000', 10); // 20 min default (date must still match exactly)
 const AUDIO_EXT_RE = /\.(wav|mp3|ogg|m4a)$/i;
 
 /**
@@ -195,19 +195,35 @@ function getCallMatchKeys(call) {
   const extensions = new Set();
 
   for (const field of [call.caller, call.destination, call.extension]) {
-    const digits = String(field || '').replace(/\D/g, '');
-    if (digits.length >= 10) {
-      phones.add(normalizePhone(field));
-    } else {
-      const short = normalizePhone(field);
-      if (short) extensions.add(short);
+    // extension may be a multi-hop chain like "21 | 202" — split and consider each hop
+    for (const piece of String(field || '').split('|')) {
+      const raw = piece.trim();
+      if (!raw) continue;
+      const digits = raw.replace(/\D/g, '');
+      if (digits.length >= 10) {
+        phones.add(normalizePhone(raw));
+      } else {
+        const short = normalizePhone(raw);
+        if (short) extensions.add(short);
+      }
     }
   }
 
   return { phones: [...phones], extensions: [...extensions] };
 }
 
-function timestampMatches(recMs, callStartMs, callEndMs) {
+// Local (not UTC) YYYY-MM-DD for a timestamp — recording timestamps and call times are
+// both built as local Date objects, so date comparison must use local components too.
+function localDateStr(ms) {
+  const d = new Date(ms);
+  if (Number.isNaN(d.getTime())) return '';
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+
+function timestampMatches(recMs, callStartMs, callEndMs, callDateStr) {
   const POSSIBLE_SKEWS_MS = [
     0,
     7 * 24 * 60 * 60 * 1000,  // 7 days slow (PBX clock is 7 days behind)
@@ -216,9 +232,11 @@ function timestampMatches(recMs, callStartMs, callEndMs) {
 
   for (const skew of POSSIBLE_SKEWS_MS) {
     const adjustedRecMs = recMs + skew;
-    if (adjustedRecMs >= callStartMs && adjustedRecMs <= callEndMs) {
-      return { inWindow: true, skew, adjustedRecMs };
-    }
+    if (adjustedRecMs < callStartMs || adjustedRecMs > callEndMs) continue;
+    // Date must match EXACTLY — a recording on a different calendar day is never the same
+    // call, even if it falls inside the time tolerance window (e.g. just after midnight).
+    if (callDateStr && localDateStr(adjustedRecMs) !== callDateStr) continue;
+    return { inWindow: true, skew, adjustedRecMs };
   }
   return null;
 }
@@ -232,6 +250,9 @@ function findBestMatch(call, index, usedPaths) {
 
   // Reconstruct the bare call window (without tolerance) for proximity scoring
   const callDateValue = call.call_date_value || call.call_date;
+  // Exact calendar date the call happened on — recordings must share this date.
+  const callDateStr = formatCallDateValue(callDateValue)
+    || (call.created_at ? localDateStr(new Date(call.created_at).getTime()) : '');
   let bareCallEndMs = 0;
   if (callDateValue && call.call_time) {
     const d = formatCallDateValue(callDateValue);
@@ -258,7 +279,7 @@ function findBestMatch(call, index, usedPaths) {
       for (const rec of candidates) {
         if (usedPaths.has(rec.playbackPath)) continue;
 
-        const matchInfo = timestampMatches(rec.timestampMs, times.callStartMs, times.callEndMs);
+        const matchInfo = timestampMatches(rec.timestampMs, times.callStartMs, times.callEndMs, callDateStr);
         if (matchInfo === null) continue;
 
         // Use proximity to bare call start as tiebreaker (closer = better)

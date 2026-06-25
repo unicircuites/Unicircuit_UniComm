@@ -1,0 +1,15 @@
+
+=== frame "MainWindow" https://192.168.0.81:1026/ExtensionVoiceMailSettings.html?SubPageIndex=1 ===
+FIELD EXTN_TYPE_COMBO_BOX [SELECT/select-one] = "Extension" 
+FIELD EXTN_NAME [INPUT/text] = "" 
+FIELD 0 [SELECT/select-one] = "391" 
+
+[TABLE 0]
+Extension Voice Mail Settings
+
+[TABLE 1]
+Select Number | Extension Department Group Operator General Mailbox |  | LoadStringCombo('0',0,0,5,VmsDeptGrpListDynamicComboBx,"style='width:95%;'")391392393394395
+OK
+
+[TABLE 2]
+OK

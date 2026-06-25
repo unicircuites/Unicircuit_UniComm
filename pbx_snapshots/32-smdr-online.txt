@@ -1,0 +1,20 @@
+[TABLE 0]
+SMDR - Online
+[TABLE 1]
+Outgoing Calls Abort On - 192.168.0.200 : 5001 Incoming Calls Abort On - 192.168.0.200 : 5001 Internal Calls Abort On - 192.168.0.200 : 5001
+[TABLE 2]
+Outgoing Calls
+Abort
+On - 192.168.0.200 : 5001
+Incoming Calls
+Abort
+On - 192.168.0.200 : 5001
+Internal Calls
+Abort
+On - 192.168.0.200 : 5001
+[TABLE 3]
+Abort
+[TABLE 4]
+Abort
+[TABLE 5]
+Abort

@@ -1,0 +1,213 @@
+  Special0 [text] = "21"
+  0 [text] = "SALES TEAM"
+  Special1 [text] = "22"
+  1 [text] = "TECH TEAM"
+  Special2 [text] = "201"
+  2 [text] = "DIRECTOR ROOM"
+  Special3 [text] = "202"
+  3 [text] = "SANGHSHIL S"
+  Special4 [text] = "203"
+  4 [text] = "ACHAL G"
+  Special5 [text] = "204"
+  5 [text] = "MANAGER ROOM"
+  Special6 [text] = "205"
+  6 [text] = "NIDHI"
+  Special7 [text] = "206"
+  7 [text] = "ABHISHEK"
+  Special8 [text] = "207"
+  8 [text] = "SUSHIL M"
+  Special9 [text] = "221"
+  9 [text] = "VIBHA B"
+  Special10 [text] = "208"
+  10 [text] = "DAX"
+  Special12 [text] = "222"
+  12 [text] = "PAWAN B"
+  ENTER_SE_PGM_CMB_BX [select-one] = "1#91"
+  ENTER_SA_PGM_CMB_BX [select-one] = "1#92"
+  Special14 [text] = "8"
+  Special15 [text] = "1059"
+  Special16 [text] = "1058"
+  Special17 [text] = "161"
+  Special18 [text] = "163"
+  Special19 [text] = "2"
+  Special20 [text] = "102"
+  Special21 [text] = "17"
+  Special22 [text] = "1070"
+  Special23 [text] = "4"
+  Special24 [text] = "1078"
+  Special25 [text] = "1050"
+  Special26 [text] = "1075"
+  Special27 [text] = "13"
+  Special28 [text] = "*13"
+  Special29 [text] = "115"
+  Special30 [text] = "116"
+  Special31 [text] = "4"
+  Special32 [text] = "12"
+  Special33 [text] = "1"
+  Special34 [text] = "1051"
+  Special35 [text] = "114"
+  Special36 [text] = "103"
+  Special37 [text] = "*3"
+  Special38 [text] = "1095"
+  Special39 [text] = "*7"
+  Special40 [text] = "1179"
+  Special41 [text] = "*19"
+  Special42 [text] = "1079"
+  Special43 [text] = "18"
+  Special44 [text] = "4"
+  Special45 [text] = "14"
+  Special46 [text] = "1177"
+  Special47 [text] = "*"
+  Special48 [text] = "5"
+  Special49 [text] = "#*"
+  Special50 [text] = "*1"
+  Special51 [text] = "1091"
+  Special52 [text] = "15"
+  Special53 [text] = "*5"
+  Special54 [text] = "3"
+  Special55 [text] = "**"
+  Special57 [text] = "1092"
+  Special58 [text] = "191"
+  Special59 [text] = "1098"
+  Special60 [text] = "1093"
+  Special61 [text] = "1076"
+  Special62 [text] = "1097"
+  Special63 [text] = "1052"
+  Special64 [text] = "9"
+  Special65 [text] = "1074"
+  Special66 [text] = "1071"
+  Special67 [text] = "*2"
+  Special68 [text] = "5"
+  Special69 [text] = "7"
+  Special70 [text] = "162"
+  Special71 [text] = "164"
+  Special72 [text] = "1077"
+  Special73 [text] = "1073"
+  Special74 [text] = "1072"
+  Special75 [text] = "69"
+  Special76 [text] = "1057"
+  Special77 [text] = "1175"
+  Special78 [text] = "190"
+  Special79 [text] = "6"
+  Special80 [text] = "##"
+  Special81 [text] = "104"
+  Special82 [text] = "1090"
+  Special83 [text] = "390"
+  Special84 [text] = "111"
+  Special85 [text] = "0"
+  Special86 [text] = "5"
+  Special91 [text] = "391"
+  Special92 [text] = "392"
+  Special93 [text] = "393"
+  Special94 [text] = "394"
+  Special95 [text] = "395"
+[TABLE 0]
+Extension Numbering Plan
+[TABLE 1]
+Port Extension Extension Name SLT 01 SLT 02 SIP 01 SIP 02 SIP 03 SIP 04 SIP 05 SIP 06 SIP 07 SIP 08 SIP 09 SIP 10 SIP 11 SIP 12 | Feature Code Enter SE Programming Mode 1#91 *1#91 Enter SA Programming Mode 1#92 *1#92 Abbreviated Dialing Account Code by Name Account Code by Number Alarm Alarm-Voice Guided Auto-Callback Set Auto-Callback Cancel Auto-Redial Set Auto-Redial Cancel Barge-In Blind Transfer to VM Call Chaining Call Cost Display Call Forward Call Forward When Not Registered Call Park Call Park Retrieve Call PickUp- Group Call PickUp- Selective Call Toggle Cancel all Feature Settings Change User P/w CLI Restriction Conference Conversation Recording COSEC Door Open Department Group Call Forward Dial-In Conference DISA Login DND DND Override Dynamic Lock Emergency Conference Flashing on Trunk Forced Answer Forced Release Transfer Hot Desk Hotline Intercom Interrupt Request Invoke RCOC Keypad Lock Last Caller Recall Leave Temp./Rejoin Conf. Live Call Supervision Meet Me Paging Message Wait-Set/Cancel Presence Mute Operator Paging Personal Directory Prog. PIN Dialling Raid Redial Reminder Reminder-Voice Guided Retrieve New Message Room Monitor SA Mode Selective Port Access Self-Ring Test Schedule Call Forward Terminate Conference Trunk Reserve Trunk to Trunk Call Release User Absent/Present Voice Help Voice Mail Walk In CoS Trunk Access Code-1 Trunk Access Code-2 Trunk Access Code-3 Trunk Access Code-4 Trunk Access Code-5 Trunk Access Code-6 Department Group 1 Department Group 2 Department Group 3 Department Group 4 Department Group 5
+[TABLE 2]
+Port | Extension | Extension Name
+[TABLE 3]
+SLT 01 |  | 
+SLT 02 |  | 
+SIP 01 |  | 
+SIP 02 |  | 
+SIP 03 |  | 
+SIP 04 |  | 
+SIP 05 |  | 
+SIP 06 |  | 
+SIP 07 |  | 
+SIP 08 |  | 
+SIP 09 |  | 
+SIP 10 |  | 
+SIP 11 |  | 
+SIP 12 |  | 
+[TABLE 4]
+Feature | Code
+[TABLE 5]
+Enter SE Programming Mode | 1#91 *1#91
+Enter SA Programming Mode | 1#92 *1#92
+Abbreviated Dialing | 
+Account Code by Name | 
+Account Code by Number | 
+Alarm | 
+Alarm-Voice Guided | 
+Auto-Callback Set | 
+Auto-Callback Cancel | 
+Auto-Redial Set | 
+Auto-Redial Cancel | 
+Barge-In | 
+Blind Transfer to VM | 
+Call Chaining | 
+Call Cost Display | 
+Call Forward | 
+Call Forward When Not Registered | 
+Call Park | 
+Call Park Retrieve | 
+Call PickUp- Group | 
+Call PickUp- Selective | 
+Call Toggle | 
+Cancel all Feature Settings | 
+Change User P/w | 
+CLI Restriction | 
+Conference | 
+Conversation Recording | 
+COSEC Door Open | 
+Department Group Call Forward | 
+Dial-In Conference | 
+DISA Login | 
+DND | 
+DND Override | 
+Dynamic Lock | 
+Emergency Conference | 
+Flashing on Trunk | 
+Forced Answer | 
+Forced Release | 
+Transfer | 
+Hot Desk | 
+Hotline | 
+Intercom | 
+Interrupt Request | 
+Invoke RCOC | 
+Keypad Lock | 
+Last Caller Recall | 
+Leave Temp./Rejoin Conf. | 
+Live Call Supervision | 
+Meet Me Paging | 
+Message Wait-Set/Cancel | 
+Presence | 
+Mute | 
+Operator | 
+Paging | 
+Personal Directory Prog. | 
+PIN Dialling | 
+Raid | 
+Redial | 
+Reminder | 
+Reminder-Voice Guided | 
+Retrieve New Message | 
+Room Monitor | 
+SA Mode | 
+Selective Port Access | 
+Self-Ring Test | 
+Schedule Call Forward | 
+Terminate Conference | 
+Trunk Reserve | 
+Trunk to Trunk Call Release | 
+User Absent/Present | 
+Voice Help | 
+Voice Mail | 
+Walk In CoS | 
+Trunk Access Code-1 | 
+Trunk Access Code-2 | 
+Trunk Access Code-3 | 
+Trunk Access Code-4 | 
+Trunk Access Code-5 | 
+Trunk Access Code-6 | 
+Department Group 1 | 
+Department Group 2 | 
+Department Group 3 | 
+Department Group 4 | 
+Department Group 5 | 
+[TABLE 6]
+Submit | Default | Clear Extn. No.

@@ -1,0 +1,32 @@
+ 	
+SALES TEAM(21)
+TECH TEAM(22)
+SALES TEAM(21)
+TECH TEAM(22)
+SALES TEAM(21)
+TECH TEAM(22)
+	 
+	
+Mobile Number
+	
+	
+Email Id
+	
+ Class of Service
+ Toll Control
+ Select Trunks for Outgoing Calls
+ .....
+ 
+Submit
+ 
+	
+ 
+Default
+ 
+	
+ 
+Copy
+ 
+
+TAPING:
+ | CALL_TAPING_COMBO = "Apply as per Call Taping profile 1"

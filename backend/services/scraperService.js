@@ -4,6 +4,42 @@ const { chromium } = require('playwright');
 
 const activeSessions = new Map();
 
+const MANUAL_LOGIN_TIMEOUT_MS = 300000; // 5 minutes for user to complete login
+
+let loginWaitStatus = {
+  active: false,
+  phase: 'idle',
+  message: '',
+  remainingMs: 0,
+  totalMs: MANUAL_LOGIN_TIMEOUT_MS,
+  currentUrl: '',
+  startedAt: null
+};
+
+function updateLoginWaitStatus(updates) {
+  Object.assign(loginWaitStatus, updates);
+}
+
+function clearLoginWaitStatus() {
+  loginWaitStatus = {
+    active: false,
+    phase: 'idle',
+    message: '',
+    remainingMs: 0,
+    totalMs: MANUAL_LOGIN_TIMEOUT_MS,
+    currentUrl: '',
+    startedAt: null
+  };
+}
+
+function getLoginWaitStatus() {
+  const elapsed = loginWaitStatus.startedAt ? Date.now() - loginWaitStatus.startedAt : 0;
+  const remainingMs = loginWaitStatus.active
+    ? Math.max(0, loginWaitStatus.totalMs - elapsed)
+    : loginWaitStatus.remainingMs;
+  return { ...loginWaitStatus, remainingMs, elapsedMs: elapsed };
+}
+
 // Helper to detect 2-step verification, CAPTCHAs, robot challenge pages,
 // OR any generic post-login popup/modal/overlay (start challenge, accept terms, surveys, etc.)
 async function isVerificationOrRobotPage(page) {
@@ -70,6 +106,216 @@ async function isVerificationOrRobotPage(page) {
   }
 }
 
+// Stricter check used during login polling — avoids false positives from site UI (e.g. Facebook dialogs).
+async function isStrictVerificationPage(page) {
+  try {
+    const url = page.url().toLowerCase();
+    const strictUrlPatterns = [
+      '/checkpoint', '/two_step', '/two-factor', '/captcha', '/recaptcha',
+      '/hcaptcha', '/security-check', '/mfa', '/otp', 'challenges.cloudflare.com'
+    ];
+    if (strictUrlPatterns.some((pattern) => url.includes(pattern))) {
+      return true;
+    }
+
+    const bodyText = (await page.textContent('body') || '').toLowerCase();
+    const strictTexts = [
+      'verification code', 'verify your identity', 'two-step verification',
+      'enter the code', 'sent a code', 'one-time password', 'security code',
+      'i am not a robot', 'check your phone', 'confirm your phone', 'authenticator',
+      'prove you are human', 'verify you are human', 'additional verification'
+    ];
+    if (strictTexts.some((text) => bodyText.includes(text))) {
+      return true;
+    }
+
+    const hasOtpInput = await page.$(
+      'input[name*="otp" i], input[id*="otp" i], input[name*="token" i], ' +
+      'input[autocomplete="one-time-code"], input[inputmode="numeric"][maxlength="6"]'
+    );
+    const hasCaptchaElements = await page.$(
+      'iframe[src*="recaptcha" i], iframe[src*="hcaptcha" i], div.cf-turnstile, ' +
+      'div.g-recaptcha, iframe[src*="cloudflare" i]'
+    );
+    return !!(hasOtpInput || hasCaptchaElements);
+  } catch (_) {
+    return false;
+  }
+}
+
+async function isVisiblePasswordField(page) {
+  try {
+    return page.evaluate(() => {
+      const inputs = document.querySelectorAll('input[type="password"]');
+      for (const input of inputs) {
+        const style = window.getComputedStyle(input);
+        const rect = input.getBoundingClientRect();
+        if (
+          style.display !== 'none' &&
+          style.visibility !== 'hidden' &&
+          parseFloat(style.opacity || '1') > 0 &&
+          rect.width > 0 &&
+          rect.height > 0
+        ) {
+          return true;
+        }
+      }
+      return false;
+    });
+  } catch (_) {
+    return false;
+  }
+}
+
+function isLoginUrl(urlStr) {
+  try {
+    const parsed = new URL(urlStr);
+    const path = parsed.pathname.toLowerCase();
+    const host = parsed.hostname.toLowerCase();
+
+    if (host.includes('facebook.com') || host.includes('fb.com')) {
+      return path.includes('/login') || path.includes('/checkpoint') || path.includes('/recover');
+    }
+
+    const loginPaths = ['/login', '/signin', '/sign-in', '/auth/login', '/account/login', '/oauth/authorize'];
+    return loginPaths.some((segment) => path === segment || path.startsWith(`${segment}/`) || path.startsWith(`${segment}?`));
+  } catch (_) {
+    return false;
+  }
+}
+
+async function hasSessionAuthCookies(context, hostname) {
+  try {
+    const cookies = await context.cookies();
+    const host = (hostname || '').toLowerCase();
+
+    if (host.includes('facebook.com') || host.includes('fb.com')) {
+      const cUser = cookies.find((c) => c.name === 'c_user');
+      const xs = cookies.find((c) => c.name === 'xs');
+      return !!(cUser?.value && xs?.value);
+    }
+
+    const sessionHints = ['session', 'sessionid', 'sid', 'auth', 'token', 'logged_in', 'user_id'];
+    return cookies.some((cookie) => {
+      const name = cookie.name.toLowerCase();
+      return cookie.value && sessionHints.some((hint) => name.includes(hint));
+    });
+  } catch (_) {
+    return false;
+  }
+}
+
+async function isManualLoginComplete(page, context, targetHostname) {
+  const currentUrl = page.url();
+  const visiblePassword = await isVisiblePasswordField(page);
+  const onLoginPage = isLoginUrl(currentUrl);
+  const hasAuthCookies = await hasSessionAuthCookies(context, targetHostname);
+  const host = (targetHostname || '').toLowerCase();
+  const isFacebook = host.includes('facebook.com') || host.includes('fb.com');
+
+  if (isFacebook && hasAuthCookies && !onLoginPage) {
+    console.log(`[SCRAPER] Facebook session cookies detected (c_user + xs). Login complete.`);
+    return true;
+  }
+
+  if (hasAuthCookies && !visiblePassword && !onLoginPage) {
+    console.log(`[SCRAPER] Auth cookies present and login form gone. Login complete.`);
+    return true;
+  }
+
+  if (!visiblePassword && !onLoginPage) {
+    const strictVerification = await isStrictVerificationPage(page);
+    if (!strictVerification) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+async function waitForManualLogin(page, context, targetUrl, targetHostname) {
+  const startTime = Date.now();
+  let timeoutMs = MANUAL_LOGIN_TIMEOUT_MS;
+  let verificationDetected = false;
+  let consecutiveErrors = 0;
+
+  updateLoginWaitStatus({
+    active: true,
+    phase: 'waiting_login',
+    message: 'Please log in using the browser window. Waiting up to 5 minutes...',
+    totalMs: timeoutMs,
+    remainingMs: timeoutMs,
+    currentUrl: page.url(),
+    startedAt: startTime
+  });
+
+  while (Date.now() - startTime < timeoutMs) {
+    const elapsed = Date.now() - startTime;
+    const remainingMs = Math.max(0, timeoutMs - elapsed);
+    updateLoginWaitStatus({
+      phase: verificationDetected ? 'verification' : 'waiting_login',
+      remainingMs,
+      currentUrl: page.url(),
+      message: verificationDetected
+        ? `2-step verification detected — complete it in the browser (${Math.ceil(remainingMs / 1000)}s remaining)`
+        : `Waiting for login in browser window (${Math.ceil(remainingMs / 1000)}s remaining)`
+    });
+
+    await sleep(1500);
+
+    try {
+      consecutiveErrors = 0;
+      const currentUrl = page.url();
+      const isVerification = await isStrictVerificationPage(page);
+
+      if (isVerification && !verificationDetected) {
+        console.log(`[SCRAPER] 2-step verification or CAPTCHA detected on: ${currentUrl}`);
+        console.log(`[SCRAPER] Extending manual login window by 3 minutes...`);
+        timeoutMs = Math.max(timeoutMs, elapsed + 180000);
+        verificationDetected = true;
+        updateLoginWaitStatus({
+          phase: 'verification',
+          totalMs: timeoutMs,
+          message: '2-step verification detected — complete it in the browser (extended wait)'
+        });
+      }
+
+      if (await isManualLoginComplete(page, context, targetHostname)) {
+        updateLoginWaitStatus({
+          phase: 'confirming',
+          message: 'Login detected — confirming session...',
+          remainingMs: Math.max(0, timeoutMs - (Date.now() - startTime))
+        });
+        console.log(`[SCRAPER] Login signal detected at: ${currentUrl}. Confirming in 2.5s...`);
+        await sleep(2500);
+
+        if (await isManualLoginComplete(page, context, targetHostname)) {
+          const finalUrl = page.url();
+          console.log(`[SCRAPER] Login confirmed! Landed on: ${finalUrl}`);
+          updateLoginWaitStatus({
+            phase: 'confirmed',
+            message: 'Login successful — capturing session...',
+            currentUrl: finalUrl,
+            remainingMs: Math.max(0, timeoutMs - (Date.now() - startTime))
+          });
+          return true;
+        }
+      }
+    } catch (pageErr) {
+      consecutiveErrors++;
+      const browserGone = !page.context().browser()?.isConnected();
+      if (browserGone || consecutiveErrors >= 8) {
+        console.warn(`[SCRAPER WARNING] ${browserGone ? 'Browser closed by user' : '8 consecutive poll errors'}. Stopping login poll.`);
+        break;
+      }
+      console.warn(`[SCRAPER] Transient navigation error #${consecutiveErrors} (retrying in 2s): ${pageErr.message}`);
+      await sleep(2000);
+    }
+  }
+
+  return false;
+}
+
 // Helper to simulate buffer/reload delays
 const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
@@ -85,6 +331,214 @@ function parseCookies(cookiesInput) {
     } catch (_) {}
   }
   return [];
+}
+
+function isFacebookHost(hostname) {
+  const host = (hostname || '').toLowerCase();
+  return host.includes('facebook.com') || host.includes('fb.com');
+}
+
+function getFacebookAboutUrl(url) {
+  try {
+    const parsed = new URL(url);
+    const path = parsed.pathname.replace(/\/$/, '');
+    if (path.endsWith('/about')) return parsed.toString();
+    return `${parsed.origin}${path}/about`;
+  } catch (_) {
+    return url;
+  }
+}
+
+async function waitForDynamicContent(page, hostname) {
+  await page.waitForLoadState('networkidle', { timeout: 12000 }).catch(() => {});
+  await sleep(2000);
+
+  await page.evaluate(async () => {
+    await new Promise((resolve) => {
+      let scrolled = 0;
+      const step = 500;
+      const timer = setInterval(() => {
+        window.scrollBy(0, step);
+        scrolled += step;
+        if (scrolled >= 3000) {
+          clearInterval(timer);
+          window.scrollTo(0, 0);
+          resolve();
+        }
+      }, 250);
+    });
+  }).catch(() => {});
+
+  await sleep(1500);
+
+  if (isFacebookHost(hostname)) {
+    await page.waitForSelector('[role="main"], meta[property="og:title"]', { timeout: 15000 }).catch(() => {});
+    await sleep(1000);
+  }
+}
+
+async function extractFacebookProfileFields(page) {
+  return page.evaluate(() => {
+    const data = {};
+    const clean = (value) => (value || '').replace(/\s+/g, ' ').trim();
+
+    const ogTitle = document.querySelector('meta[property="og:title"]');
+    const ogDesc = document.querySelector('meta[property="og:description"]');
+    const ogUrl = document.querySelector('meta[property="og:url"]');
+    if (ogTitle) data.name = clean((ogTitle.getAttribute('content') || '').split('|')[0]);
+    if (ogDesc) data.description = clean(ogDesc.getAttribute('content') || '');
+    if (ogUrl) data.page_url = clean(ogUrl.getAttribute('content') || '');
+
+    if (!data.name && document.title) {
+      data.name = clean(document.title.split('|')[0].split('-')[0]);
+    }
+
+    const main = document.querySelector('[role="main"]') || document.body;
+    const bodyText = clean(main.innerText || '');
+    const emailRegex = /[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/;
+    const phoneRegex = /(?:\+?\d{1,3}[-.\s]?)?\(?\d{3}\)?[-.\s]?\d{3,4}[-.\s]?\d{4,}/;
+
+    const followerMatch = bodyText.match(/([\d,.]+[KMB]?)\s+followers?/i);
+    if (followerMatch) data.followers = followerMatch[1];
+    const likeMatch = bodyText.match(/([\d,.]+[KMB]?)\s+likes?/i);
+    if (likeMatch) data.likes = likeMatch[1];
+    const ratingMatch = bodyText.match(/(\d+(?:\.\d+)?)\s*(?:out of 5|stars?)/i);
+    if (ratingMatch) data.rating = ratingMatch[1];
+
+    const links = Array.from(document.querySelectorAll('a[href]'));
+    for (const link of links) {
+      const href = link.getAttribute('href') || '';
+      if (!data.email && href.startsWith('mailto:')) {
+        data.email = href.replace('mailto:', '').split('?')[0];
+      }
+      if (!data.phone && href.startsWith('tel:')) {
+        data.phone = href.replace('tel:', '').trim();
+      }
+      if (
+        !data.website &&
+        /^https?:\/\//i.test(href) &&
+        !href.includes('facebook.com') &&
+        !href.includes('fb.com') &&
+        !href.includes('l.facebook.com')
+      ) {
+        data.website = href;
+      }
+    }
+
+    const listItems = Array.from(main.querySelectorAll('[role="listitem"], li, div[data-pagelet]'));
+  const seenValues = new Set();
+
+    for (const item of listItems) {
+      const text = clean(item.innerText || '');
+      if (!text || text.length > 600 || seenValues.has(text)) continue;
+      seenValues.add(text);
+
+      const lower = text.toLowerCase();
+      if (!data.email && emailRegex.test(text)) {
+        const match = text.match(emailRegex);
+        if (match) data.email = match[0];
+      }
+      if (!data.phone && phoneRegex.test(text)) {
+        const match = text.match(phoneRegex);
+        if (match) {
+          const digits = match[0].replace(/\D/g, '');
+          if (digits.length >= 7 && digits.length <= 15) data.phone = match[0];
+        }
+      }
+      if (
+        !data.website &&
+        (text.includes('.com') || text.includes('.in') || text.includes('.org') || text.includes('.net')) &&
+        !text.includes('facebook.com')
+      ) {
+        const urlMatch = text.match(/https?:\/\/[^\s]+|www\.[^\s]+/i);
+        if (urlMatch) data.website = urlMatch[0];
+      }
+      if (!data.address && (lower.startsWith('address') || /\b(?:street|road|nagar|maharashtra|india|pincode|pin code)\b/i.test(text))) {
+        data.address = text.replace(/^address[:\s]*/i, '').trim();
+      }
+      if (!data.hours && (lower.includes('hours') || lower.includes('open') || lower.includes('closed'))) {
+        data.hours = text;
+      }
+      if (!data.category && (lower.includes('category') || lower.includes('business service') || lower.includes('company'))) {
+        if (text.length < 120) data.category = text.replace(/^category[:\s]*/i, '').trim();
+      }
+      if (!data.founded && lower.includes('founded')) {
+        data.founded = text.replace(/^founded[:\s]*/i, '').trim();
+      }
+      if (!data.products && lower.includes('products')) {
+        data.products = text.replace(/^products[:\s]*/i, '').trim();
+      }
+      if (!data.mission && lower.includes('mission')) {
+        data.mission = text.replace(/^mission[:\s]*/i, '').trim();
+      }
+      if (!data.price_range && lower.includes('price range')) {
+        data.price_range = text.replace(/^price range[:\s]*/i, '').trim();
+      }
+    }
+
+  if (!data.description && bodyText.length > 40) {
+      const introMatch = bodyText.match(/(?:About|Intro|Overview)\s*[:\n]\s*([^\n]{20,400})/i);
+      if (introMatch) data.description = introMatch[1].trim();
+    }
+
+    Object.keys(data).forEach((key) => {
+      if (!data[key]) delete data[key];
+    });
+
+    return data;
+  });
+}
+
+function extractFacebookProfileFromHTML(html) {
+  const dom = new JSDOM(html);
+  const doc = dom.window.document;
+  const data = {};
+  const clean = (value) => (value || '').replace(/\s+/g, ' ').trim();
+
+  const ogTitle = doc.querySelector('meta[property="og:title"]');
+  const ogDesc = doc.querySelector('meta[property="og:description"]');
+  const ogUrl = doc.querySelector('meta[property="og:url"]');
+  if (ogTitle) data.name = clean((ogTitle.getAttribute('content') || '').split('|')[0]);
+  if (ogDesc) data.description = clean(ogDesc.getAttribute('content') || '');
+  if (ogUrl) data.page_url = clean(ogUrl.getAttribute('content') || '');
+
+  const bodyText = clean(getCleanText(doc.body));
+  const emailRegex = /[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/;
+  const phoneRegex = /(?:\+?\d{1,3}[-.\s]?)?\(?\d{3}\)?[-.\s]?\d{3,4}[-.\s]?\d{4,}/;
+
+  const emailMatch = bodyText.match(emailRegex);
+  if (emailMatch) data.email = emailMatch[0];
+  const phoneMatch = bodyText.match(phoneRegex);
+  if (phoneMatch) data.phone = phoneMatch[0];
+
+  const followerMatch = bodyText.match(/([\d,.]+[KMB]?)\s+followers?/i);
+  if (followerMatch) data.followers = followerMatch[1];
+  const likeMatch = bodyText.match(/([\d,.]+[KMB]?)\s+likes?/i);
+  if (likeMatch) data.likes = likeMatch[1];
+
+  return data;
+}
+
+async function capturePageForAnalysis(page, url, hostname) {
+  const targetUrl = isFacebookHost(hostname) ? getFacebookAboutUrl(url) : url;
+  if (isFacebookHost(hostname)) {
+    console.log(`[SCRAPER] Facebook page detected — loading About tab: ${targetUrl}`);
+  }
+
+  await page.goto(targetUrl, { timeout: 30000, waitUntil: 'domcontentloaded' });
+  await waitForDynamicContent(page, hostname);
+
+  let profileData = null;
+  if (isFacebookHost(hostname)) {
+    profileData = await extractFacebookProfileFields(page);
+    const fieldCount = Object.keys(profileData).length;
+    console.log(`[SCRAPER] Facebook profile extraction found ${fieldCount} field(s): ${Object.keys(profileData).join(', ') || '(none)'}`);
+  }
+
+  return {
+    html: await page.content(),
+    profileData
+  };
 }
 
 // Helper to safely get the className of any element, handling SVGs and standard elements
@@ -303,6 +757,68 @@ function extractDataFromHTML(html, fields, options = {}) {
     }
     return { original: field, name, selector, attr };
   });
+
+  // Single profile pages (Facebook, etc.) — use pre-extracted structured data
+  if (options.profileData && typeof options.profileData === 'object') {
+    const record = {};
+    const profile = options.profileData;
+
+    fieldConfigs.forEach((config) => {
+      let val = profile[config.name] || profile[config.name.toLowerCase()] || '';
+
+      if (!val && config.selector) {
+        try {
+          const el = doc.querySelector(config.selector);
+          if (el) {
+            if (config.attr) {
+              const aLower = config.attr.toLowerCase();
+              if (aLower === 'text') val = el.textContent.trim();
+              else if (aLower === 'html' || aLower === 'innerhtml') val = el.innerHTML.trim();
+              else val = (el.getAttribute(config.attr) || '').trim();
+            } else {
+              val = el.textContent.trim();
+            }
+          }
+        } catch (_) {}
+      }
+
+      if (!val) {
+        val = findValueDeep(doc.body, config.name);
+      }
+
+      if (val) {
+        collectedFields.add(config.original);
+        if (options.translate) val = translateToEnglish(val);
+        if (options.formatters?.date) val = formatDate(val);
+        if (options.formatters?.number) val = formatNumber(val);
+        if (options.formatters?.text) val = formatText(val);
+      }
+
+      record[config.name] = val || 'N/A';
+    });
+
+    Object.keys(profile).forEach((key) => {
+      if (!record[key] || record[key] === 'N/A') {
+        record[key] = profile[key];
+        collectedFields.add(key);
+      }
+    });
+
+    if (Object.values(record).some((v) => v !== 'N/A' && v !== '')) {
+      results.push(record);
+    }
+
+    fields.forEach((field) => {
+      const fieldName = field.includes('|') ? field.split('|')[0].trim() : field;
+      if (collectedFields.has(field) || collectedFields.has(fieldName) || (record[fieldName] && record[fieldName] !== 'N/A')) {
+        report.collected.push(field);
+      } else {
+        report.notCollected.push(field);
+      }
+    });
+
+    return { results, report };
+  }
 
   boundedItems.forEach(item => {
     const record = {};
@@ -572,6 +1088,7 @@ async function startScrape(sessionId, params) {
         console.log(`[SCRAPER] Scraping URL (${pagesTraversed}/${maxPages}): ${targetUrl}`);
         
         let html = '';
+        let profileData = null;
         try {
           // Verify URL protocol
           const parsed = new URL(targetUrl);
@@ -581,10 +1098,15 @@ async function startScrape(sessionId, params) {
 
           if (browserInstance && browserPage) {
             console.log(`[SCRAPER] Session ${sessionId}: Fetching URL via visible browser: ${targetUrl}`);
-            await browserPage.goto(targetUrl, { timeout: 15000, waitUntil: 'domcontentloaded' });
-            // Wait briefly for dynamic content to settle
-            await sleep(1500);
-            html = await browserPage.content();
+            if (isFacebookHost(parsed.hostname)) {
+              const captured = await capturePageForAnalysis(browserPage, targetUrl, parsed.hostname);
+              html = captured.html;
+              profileData = captured.profileData;
+            } else {
+              await browserPage.goto(targetUrl, { timeout: 20000, waitUntil: 'domcontentloaded' });
+              await waitForDynamicContent(browserPage, parsed.hostname);
+              html = await browserPage.content();
+            }
           } else {
             // Fallback to Axios only if browser failed to start
             console.log(`[SCRAPER] Session ${sessionId}: Browser unavailable, falling back to Axios: ${targetUrl}`);
@@ -655,9 +1177,10 @@ async function startScrape(sessionId, params) {
           translate,
           formatters,
           expandReadMore,
-          itemSelector,
+          itemSelector: profileData ? 'body' : itemSelector,
           startSelector,
-          endSelector
+          endSelector,
+          profileData
         });
 
         if (results && results.length) {
@@ -778,6 +1301,7 @@ async function analyzeURL(url, cookies = null, showBrowser = false) {
     let usedPlaywright = false;
     let playwrightBrowser = null;
     let extractedCookies = null;
+    let profileData = null;
     const parsedCookies = parseCookies(cookies);
 
     // 2. Always use a visible Playwright browser for analysis regardless of showBrowser flag
@@ -818,127 +1342,43 @@ async function analyzeURL(url, cookies = null, showBrowser = false) {
       await sleep(1500);
       
       const currentUrl = page.url();
+      const targetHostname = parsed.hostname;
       
-      // 1. Detect Login Wall in dynamic DOM
-      const hasPasswordInput = await page.$('input[type="password"]');
-      const isLoginWall = hasPasswordInput || currentUrl.includes('login') || currentUrl.includes('signin') || currentUrl.includes('auth');
+      // Detect login wall using visible password fields and login URLs (not broad "auth" matches)
+      const hasPasswordInput = await isVisiblePasswordField(page);
+      const isLoginWall = hasPasswordInput || isLoginUrl(currentUrl);
       
       if (isLoginWall) {
         console.log(`[SCRAPER] Login wall detected on ${url}. Browser already visible — waiting for manual login...`);
-        // Close current context and relaunch fresh visible browser for clean login
-        await playwrightBrowser.close();
         
-        playwrightBrowser = await chromium.launch({ headless: false });
-        const headedContext = await playwrightBrowser.newContext({
-          userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
-        });
-        const headedPage = await headedContext.newPage();
-        
-        // Go to original target URL to let user log in
-        await headedPage.goto(url, { timeout: 15000, waitUntil: 'domcontentloaded' });
-        
-        // Poll and wait for login completion (up to 120 seconds)
-        let loggedIn = false;
-        const startTime = Date.now();
-        let timeoutMs = 120000;
-        let verificationDetected = false;
-        let consecutiveErrors = 0;
-
-        while (Date.now() - startTime < timeoutMs) {
-          await sleep(1500);
-          try {
-            consecutiveErrors = 0; // reset on any successful poll
-            const currentHeadedUrl = headedPage.url();
-            const hasHeadedPassword = await headedPage.$('input[type="password"]');
-            const isVerification = await isVerificationOrRobotPage(headedPage);
-            
-            if (isVerification && !verificationDetected) {
-              console.log(`[SCRAPER] 2-step verification, CAPTCHA, or robot challenge detected on: ${currentHeadedUrl}`);
-              console.log(`[SCRAPER] Extending manual bypass window to 3 minutes...`);
-              timeoutMs = 180000; // Extend to 3 minutes
-              verificationDetected = true;
-            }
-            
-            // Primary signal: no password input visible = login likely complete.
-            // We do NOT rely on URL patterns (login/auth/signin) because many sites
-            // briefly redirect through /auth/callback or /oauth/redirect after login,
-            // which would cause false negatives. Wait 2.5s and recheck to confirm.
-            if (!hasHeadedPassword && !isVerification) {
-              console.log(`[SCRAPER] No password field detected at: ${currentHeadedUrl}. Confirming login in 2.5s...`);
-              await sleep(2500);
-              // Double-check: confirm we're still not on a login/verification screen
-              const recheckPassword = await headedPage.$('input[type="password"]');
-              const recheckVerification = await isVerificationOrRobotPage(headedPage);
-              const finalUrl = headedPage.url();
-              if (!recheckPassword && !recheckVerification) {
-                console.log(`[SCRAPER] Login confirmed! Landed on: ${finalUrl}`);
-                // --- POST-LOGIN BLOCKER: Wait for any challenge/popup/modal to be dismissed ---
-                // Some sites show "Start New Challenge", "Accept Terms", survey popups, etc.
-                // after login. We keep polling until the page looks clean.
-                let postLoginBlocker = await isVerificationOrRobotPage(headedPage);
-                if (postLoginBlocker) {
-                  console.log(`[SCRAPER] Post-login popup/challenge detected at: ${headedPage.url()}`);
-                  console.log(`[SCRAPER] Waiting for user to dismiss the popup/challenge (extended to 3 min)...`);
-                  timeoutMs = Math.max(timeoutMs, startTime + 180000 - Date.now() + 180000); // ensure 3 more min
-                  let popupWaitStart = Date.now();
-                  while (Date.now() - popupWaitStart < 180000) {
-                    await sleep(1500);
-                    try {
-                      const stillBlocked = await isVerificationOrRobotPage(headedPage);
-                      const stillHasPassword = await headedPage.$('input[type="password"]');
-                      if (!stillBlocked && !stillHasPassword) {
-                        console.log(`[SCRAPER] Post-login popup dismissed. Page clear at: ${headedPage.url()}`);
-                        break;
-                      }
-                      console.log(`[SCRAPER] Still waiting for popup dismissal at: ${headedPage.url()}`);
-                    } catch (popupErr) {
-                      console.warn(`[SCRAPER] Transient error during popup wait: ${popupErr.message}`);
-                    }
-                  }
-                }
-                // --- END POST-LOGIN BLOCKER ---
-                loggedIn = true;
-                break;
-              }
-            }
-          } catch (pageErr) {
-            consecutiveErrors++;
-            // Transient navigation errors (SPA redirects, Facebook/Google internal routing,
-            // Playwright page briefly detaching during navigation) should NOT kill the poll.
-            // Only bail if the browser process itself is gone OR we've had 8 consecutive errors.
-            const browserGone = !playwrightBrowser.isConnected();
-            if (browserGone || consecutiveErrors >= 8) {
-              console.warn(`[SCRAPER WARNING] ${browserGone ? 'Browser closed by user' : '8 consecutive poll errors'}. Stopping login poll.`);
-              break;
-            }
-            console.warn(`[SCRAPER] Transient navigation error #${consecutiveErrors} (retrying in 2s): ${pageErr.message}`);
-            await sleep(2000);
-          }
-        }
+        const loggedIn = await waitForManualLogin(page, context, url, targetHostname);
         
         if (!loggedIn) {
+          clearLoginWaitStatus();
           await playwrightBrowser.close();
           return {
             success: false,
             url,
-            error: 'Website requires login. The manual login window timed out (2 min) or was closed before login completed.'
+            error: 'Website requires login. The manual login window timed out (5 min) or was closed before login completed.'
           };
         }
         
-        // Bypassed! Navigate back to the original target URL under the logged-in session state
+        // Bypassed! Load target page and extract profile/content under logged-in session
         console.log(`[SCRAPER] Reloading target URL under logged-in session: ${url}`);
-        try {
-          await headedPage.goto(url, { timeout: 25000, waitUntil: 'domcontentloaded' });
-          await sleep(1500); // Let dynamic content settle
-        } catch (reloadErr) {
-          console.warn(`[SCRAPER] Reload timed out, using current page content: ${reloadErr.message}`);
-        }
-        html = await headedPage.content();
-        extractedCookies = await headedContext.cookies();
+        updateLoginWaitStatus({
+          phase: 'analyzing',
+          message: 'Login complete — analyzing page structure...',
+          remainingMs: 0
+        });
+        const captured = await capturePageForAnalysis(page, url, targetHostname);
+        html = captured.html;
+        profileData = captured.profileData;
+        extractedCookies = await context.cookies();
         usedPlaywright = true;
+        clearLoginWaitStatus();
         await playwrightBrowser.close();
       } else {
-        // 2. Detect Placeholder/Blank Content in dynamic DOM (only if it wasn't a login wall)
+        // Detect Placeholder/Blank Content in dynamic DOM (only if it wasn't a login wall)
         const visibleText = await page.textContent('body');
         const wordCount = visibleText ? visibleText.split(/\s+/).filter(Boolean).length : 0;
         
@@ -951,12 +1391,16 @@ async function analyzeURL(url, cookies = null, showBrowser = false) {
           };
         }
         
-        html = await page.content();
+        const captured = await capturePageForAnalysis(page, url, targetHostname);
+        html = captured.html;
+        profileData = captured.profileData;
+        extractedCookies = await context.cookies();
         usedPlaywright = true;
         await playwrightBrowser.close();
         console.log(`[SCRAPER] Playwright analysis successful. Loaded HTML content size: ${html.length} bytes.`);
       }
     } catch (pwErr) {
+      clearLoginWaitStatus();
       console.warn(`[SCRAPER WARNING] Playwright analyzer failed or timed out: ${pwErr.message}. Falling back to Axios...`);
       if (playwrightBrowser) {
         try {
@@ -1067,8 +1511,30 @@ async function analyzeURL(url, cookies = null, showBrowser = false) {
       } catch (_) {}
     }
 
-    // B. Detect repeating Item Containers
+    // B. Detect repeating Item Containers (or single profile pages like Facebook)
     let detectedItemSelector = '';
+    const suggestedFields = [];
+    const fieldMappingHelp = {};
+
+    if (profileData && Object.keys(profileData).length > 0) {
+      detectedItemSelector = 'body';
+      Object.keys(profileData).forEach((field) => {
+        suggestedFields.push(field);
+        fieldMappingHelp[field] = field;
+      });
+      console.log(`[SCRAPER] Profile page mode — using ${suggestedFields.length} extracted field(s)`);
+    } else if (isFacebookHost(parsed.hostname)) {
+      profileData = extractFacebookProfileFromHTML(html);
+      if (Object.keys(profileData).length > 0) {
+        detectedItemSelector = 'body';
+        Object.keys(profileData).forEach((field) => {
+          suggestedFields.push(field);
+          fieldMappingHelp[field] = field;
+        });
+      }
+    }
+
+    if (!detectedItemSelector) {
     const classFrequencies = {};
 
     // Collect all elements that might act as item containers
@@ -1117,8 +1583,6 @@ async function analyzeURL(url, cookies = null, showBrowser = false) {
 
     // C. Detect Fields within that container
     const sampleItems = doc.querySelectorAll(detectedItemSelector);
-    const suggestedFields = [];
-    const fieldMappingHelp = {};
 
     const emailRegex = /[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/;
     const phoneRegex = /(?:\+?\d{1,3}[-.\s]?)?\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}/;
@@ -1211,6 +1675,7 @@ async function analyzeURL(url, cookies = null, showBrowser = false) {
       fieldMappingHelp['email'] = 'email';
       fieldMappingHelp['phone'] = 'phone';
     }
+    }
 
     // ── FIELD DETECTION LOGS ──────────────────────────────────────────────────
     const uniqueFields = suggestedFields.filter((v, i, self) => self.indexOf(v) === i);
@@ -1249,6 +1714,8 @@ async function analyzeURL(url, cookies = null, showBrowser = false) {
       pagination: detectedPagination,
       suggestedFields: uniqueFields,
       fieldMappingHelp,
+      sampleRecord: profileData || undefined,
+      isProfilePage: !!(profileData && Object.keys(profileData).length > 0),
       cookies: extractedCookies ? JSON.stringify(extractedCookies) : undefined
     };
 
@@ -1276,5 +1743,6 @@ module.exports = {
   stopScrape,
   getScrapeStatus,
   parseLocalHTML,
-  analyzeURL
+  analyzeURL,
+  getLoginWaitStatus
 };
