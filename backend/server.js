@@ -68,6 +68,17 @@ const httpsAgent = new https.Agent({
 async function ensureSchema() {
   console.log('[DB] Starting schema check...');
   try {
+    // 0. Canonical phone normaliser — collapses every format to the last 10 digits so
+    //    +91XXXXXXXXXX, 91XXXXXXXXXX, 0XXXXXXXXXX, +XXXXXXXXXX, XXXXXXXXXX (and any with
+    //    spaces) all match the SAME contact everywhere (search, matching, dedupe, saves).
+    //    Short numbers (extensions) are returned unchanged.
+    console.log('[DB] 0. Creating phone_norm() function...');
+    await pool.query(`
+      CREATE OR REPLACE FUNCTION phone_norm(p text) RETURNS text AS $$
+        SELECT NULLIF(RIGHT(regexp_replace(COALESCE(p, ''), '[^0-9]', '', 'g'), 10), '');
+      $$ LANGUAGE sql IMMUTABLE;
+    `).catch((e) => console.warn('[DB] phone_norm create failed:', e.message));
+
     // 1. Ensure pbx_recordings table and indexes exist
     console.log('[DB] 1. Creating pbx_recordings table...');
     await pool.query(`

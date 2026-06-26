@@ -525,7 +525,7 @@ router.get('/chats', authenticate, async (req, res) => {
                   regexp_replace(COALESCE(ec.phone, ''), '[^0-9]', '', 'g') <> ''
                   AND (
                     c.id = regexp_replace(ec.phone, '[^0-9]', '', 'g') || '@s.whatsapp.net'
-                    OR regexp_replace(COALESCE(c.phone, ''), '[^0-9]', '', 'g') = regexp_replace(ec.phone, '[^0-9]', '', 'g')
+                    OR phone_norm(c.phone) = phone_norm(ec.phone)
                   )
                 )
               )

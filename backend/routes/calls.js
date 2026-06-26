@@ -226,7 +226,7 @@ async function syncPbxContactsFromCallLogs() {
       AND NOT EXISTS (
         SELECT 1
         FROM pbx_contacts pc
-        WHERE regexp_replace(pc.phone, '[^0-9]', '', 'g') = regexp_replace(phones.phone, '[^0-9]', '', 'g')
+        WHERE phone_norm(pc.phone) = phone_norm(phones.phone)
       )
     ON CONFLICT (phone) DO NOTHING
   `);
@@ -277,7 +277,7 @@ router.get('/contacts', async (req, res) => {
       ),
       grouped_numbers AS (
         SELECT
-          regexp_replace(phone, '[^0-9]', '', 'g') AS phone_digits,
+          phone_norm(phone) AS phone_digits,
           COALESCE(
             (ARRAY_AGG(phone ORDER BY created_at DESC NULLS LAST))[1],
             MIN(phone)
@@ -288,18 +288,18 @@ router.get('/contacts', async (req, res) => {
           (ARRAY_AGG(caller ORDER BY created_at DESC NULLS LAST))[1] AS last_caller
         FROM seen_numbers
         WHERE phone IS NOT NULL AND phone <> ''
-        GROUP BY regexp_replace(phone, '[^0-9]', '', 'g')
+        GROUP BY phone_norm(phone)
       ),
       saved_contacts AS (
-        SELECT DISTINCT ON (regexp_replace(phone, '[^0-9]', '', 'g'))
-          regexp_replace(phone, '[^0-9]', '', 'g') AS phone_digits,
+        SELECT DISTINCT ON (phone_norm(phone))
+          phone_norm(phone) AS phone_digits,
           id,
           phone,
           name,
           company,
           notes
         FROM pbx_contacts
-        ORDER BY regexp_replace(phone, '[^0-9]', '', 'g'), (name IS NULL), updated_at DESC NULLS LAST, id DESC
+        ORDER BY phone_norm(phone), (name IS NULL), updated_at DESC NULLS LAST, id DESC
       )
       SELECT
         COALESCE(sc.phone, gn.phone) AS phone,
@@ -335,8 +335,8 @@ router.get('/contacts/list', async (req, res) => {
       LEFT JOIN call_logs cl ON (
         cl.caller = pc.phone
         OR cl.destination = pc.phone
-        OR regexp_replace(cl.caller, '[^0-9]', '', 'g') = regexp_replace(pc.phone, '[^0-9]', '', 'g')
-        OR regexp_replace(cl.destination, '[^0-9]', '', 'g') = regexp_replace(pc.phone, '[^0-9]', '', 'g')
+        OR phone_norm(cl.caller) = phone_norm(pc.phone)
+        OR phone_norm(cl.destination) = phone_norm(pc.phone)
       )
       GROUP BY pc.id
       ORDER BY pc.name ASC
@@ -363,7 +363,7 @@ router.post('/contacts/save', async (req, res) => {
       const dupCheck = await pool.query(`
         SELECT id, phone FROM pbx_contacts
         WHERE LOWER(TRIM(name)) = LOWER(TRIM($1))
-          AND regexp_replace(phone, '[^0-9]', '', 'g') != regexp_replace($2, '[^0-9]', '', 'g')
+          AND phone_norm(phone) != phone_norm($2)
         LIMIT 1
       `, [name.trim(), cleanPhone]);
       if (dupCheck.rowCount > 0) {
@@ -374,7 +374,7 @@ router.post('/contacts/save', async (req, res) => {
     const existing = await pool.query(`
       SELECT id
       FROM pbx_contacts
-      WHERE regexp_replace(phone, '[^0-9]', '', 'g') = regexp_replace($1, '[^0-9]', '', 'g')
+      WHERE phone_norm(phone) = phone_norm($1)
       ORDER BY (name IS NULL), updated_at DESC NULLS LAST, id DESC
       LIMIT 1
     `, [cleanPhone]);
@@ -673,29 +673,29 @@ router.get('/contact/:phone', async (req, res) => {
              COALESCE(pc1.notes, pc2.notes) AS saved_notes
       FROM (${dedupedCallsSql}) cl
       LEFT JOIN (
-        SELECT DISTINCT ON (regexp_replace(phone, '[^0-9]', '', 'g'))
-          regexp_replace(phone, '[^0-9]', '', 'g') AS phone_digits, phone, name, company, notes
+        SELECT DISTINCT ON (phone_norm(phone))
+          phone_norm(phone) AS phone_digits, phone, name, company, notes
         FROM pbx_contacts
         WHERE name IS NOT NULL
-        ORDER BY regexp_replace(phone, '[^0-9]', '', 'g'), (name IS NULL), updated_at DESC NULLS LAST, id DESC
+        ORDER BY phone_norm(phone), (name IS NULL), updated_at DESC NULLS LAST, id DESC
       ) pc1 ON (
         pc1.phone = cl.caller
-        OR pc1.phone_digits = regexp_replace(cl.caller, '[^0-9]', '', 'g')
+        OR pc1.phone_digits = phone_norm(cl.caller)
       )
       LEFT JOIN (
-        SELECT DISTINCT ON (regexp_replace(phone, '[^0-9]', '', 'g'))
-          regexp_replace(phone, '[^0-9]', '', 'g') AS phone_digits, phone, name, company, notes
+        SELECT DISTINCT ON (phone_norm(phone))
+          phone_norm(phone) AS phone_digits, phone, name, company, notes
         FROM pbx_contacts
         WHERE name IS NOT NULL
-        ORDER BY regexp_replace(phone, '[^0-9]', '', 'g'), (name IS NULL), updated_at DESC NULLS LAST, id DESC
+        ORDER BY phone_norm(phone), (name IS NULL), updated_at DESC NULLS LAST, id DESC
       ) pc2 ON (
         pc2.phone = cl.destination
-        OR pc2.phone_digits = regexp_replace(cl.destination, '[^0-9]', '', 'g')
+        OR pc2.phone_digits = phone_norm(cl.destination)
       ) AND cl.call_type = 'Out'
       WHERE cl.caller = $1
          OR cl.destination = $1
-         OR regexp_replace(cl.caller, '[^0-9]', '', 'g') = regexp_replace($1, '[^0-9]', '', 'g')
-         OR regexp_replace(cl.destination, '[^0-9]', '', 'g') = regexp_replace($1, '[^0-9]', '', 'g')
+         OR phone_norm(cl.caller) = phone_norm($1)
+         OR phone_norm(cl.destination) = phone_norm($1)
       ORDER BY COALESCE(cl.call_date::timestamp + COALESCE(cl.call_time, TIME '00:00:00'), cl.created_at) DESC,
                cl.created_at DESC,
                cl.id DESC
@@ -712,8 +712,8 @@ router.get('/contact/:phone', async (req, res) => {
       SELECT COUNT(*) FROM (${dedupedCallsSql}) cl
       WHERE caller = $1
          OR destination = $1
-         OR regexp_replace(caller, '[^0-9]', '', 'g') = regexp_replace($1, '[^0-9]', '', 'g')
-         OR regexp_replace(destination, '[^0-9]', '', 'g') = regexp_replace($1, '[^0-9]', '', 'g')
+         OR phone_norm(caller) = phone_norm($1)
+         OR phone_norm(destination) = phone_norm($1)
     `, [phone]);
     return res.json({
       calls: result.rows,
@@ -776,8 +776,8 @@ router.get('/', async (req, res) => {
           AND (
             pc.phone = caller
             OR pc.phone = destination
-            OR regexp_replace(pc.phone, '[^0-9]', '', 'g') = regexp_replace(caller, '[^0-9]', '', 'g')
-            OR regexp_replace(pc.phone, '[^0-9]', '', 'g') = regexp_replace(destination, '[^0-9]', '', 'g')
+            OR phone_norm(pc.phone) = phone_norm(caller)
+            OR phone_norm(pc.phone) = phone_norm(destination)
           )
         )
       )`);
@@ -787,6 +787,8 @@ router.get('/', async (req, res) => {
       conditions.push(`(
         regexp_replace(caller, '[^0-9]', '', 'g') LIKE $${p}
         OR regexp_replace(destination, '[^0-9]', '', 'g') LIKE $${p}
+        OR phone_norm(caller) = phone_norm($${p})
+        OR phone_norm(destination) = phone_norm($${p})
       )`);
       params.push('%' + searchDigits); p++;
     }
@@ -816,19 +818,19 @@ router.get('/', async (req, res) => {
               COALESCE(pc1.notes, pc2.notes) AS saved_notes
        FROM call_logs_deduped cl
        LEFT JOIN (
-         SELECT DISTINCT ON (regexp_replace(phone, '[^0-9]', '', 'g'))
-           regexp_replace(phone, '[^0-9]', '', 'g') AS phone_digits, phone, name, company, notes
+         SELECT DISTINCT ON (phone_norm(phone))
+           phone_norm(phone) AS phone_digits, phone, name, company, notes
          FROM pbx_contacts
          WHERE name IS NOT NULL
-         ORDER BY regexp_replace(phone, '[^0-9]', '', 'g'), (name IS NULL), updated_at DESC NULLS LAST, id DESC
-       ) pc1 ON pc1.phone_digits = regexp_replace(cl.caller, '[^0-9]', '', 'g')
+         ORDER BY phone_norm(phone), (name IS NULL), updated_at DESC NULLS LAST, id DESC
+       ) pc1 ON pc1.phone_digits = phone_norm(cl.caller)
        LEFT JOIN (
-         SELECT DISTINCT ON (regexp_replace(phone, '[^0-9]', '', 'g'))
-           regexp_replace(phone, '[^0-9]', '', 'g') AS phone_digits, phone, name, company, notes
+         SELECT DISTINCT ON (phone_norm(phone))
+           phone_norm(phone) AS phone_digits, phone, name, company, notes
          FROM pbx_contacts
          WHERE name IS NOT NULL
-         ORDER BY regexp_replace(phone, '[^0-9]', '', 'g'), (name IS NULL), updated_at DESC NULLS LAST, id DESC
-       ) pc2 ON pc2.phone_digits = regexp_replace(cl.destination, '[^0-9]', '', 'g')
+         ORDER BY phone_norm(phone), (name IS NULL), updated_at DESC NULLS LAST, id DESC
+       ) pc2 ON pc2.phone_digits = phone_norm(cl.destination)
               AND cl.call_type = 'Out'
        WHERE ${whereStr}
        ORDER BY cl.call_date DESC NULLS LAST, cl.call_time DESC NULLS LAST, cl.created_at DESC, cl.id DESC
@@ -973,8 +975,8 @@ router.post('/:id/summarize', async (req, res) => {
       LEFT JOIN pbx_contacts pc ON (
         pc.phone = cl.caller
         OR pc.phone = cl.destination
-        OR regexp_replace(pc.phone, '[^0-9]', '', 'g') = regexp_replace(cl.caller, '[^0-9]', '', 'g')
-        OR regexp_replace(pc.phone, '[^0-9]', '', 'g') = regexp_replace(cl.destination, '[^0-9]', '', 'g')
+        OR phone_norm(pc.phone) = phone_norm(cl.caller)
+        OR phone_norm(pc.phone) = phone_norm(cl.destination)
       )
       WHERE cl.id = $1
     `, [req.params.id]);
@@ -1527,17 +1529,17 @@ router.get('/section-summary', async (req, res) => {
              COALESCE(pc1.name, pc2.name) AS contact_name
       FROM call_logs cl
       LEFT JOIN (
-        SELECT DISTINCT ON (regexp_replace(phone,'[^0-9]','','g'))
-          regexp_replace(phone,'[^0-9]','','g') AS pd, name FROM pbx_contacts
+        SELECT DISTINCT ON (phone_norm(phone))
+          phone_norm(phone) AS pd, name FROM pbx_contacts
         WHERE name IS NOT NULL
-        ORDER BY regexp_replace(phone,'[^0-9]','','g'), id DESC
-      ) pc1 ON pc1.pd = regexp_replace(cl.caller,'[^0-9]','','g')
+        ORDER BY phone_norm(phone), id DESC
+      ) pc1 ON pc1.pd = phone_norm(cl.caller)
       LEFT JOIN (
-        SELECT DISTINCT ON (regexp_replace(phone,'[^0-9]','','g'))
-          regexp_replace(phone,'[^0-9]','','g') AS pd, name FROM pbx_contacts
+        SELECT DISTINCT ON (phone_norm(phone))
+          phone_norm(phone) AS pd, name FROM pbx_contacts
         WHERE name IS NOT NULL
-        ORDER BY regexp_replace(phone,'[^0-9]','','g'), id DESC
-      ) pc2 ON pc2.pd = regexp_replace(cl.destination,'[^0-9]','','g')
+        ORDER BY phone_norm(phone), id DESC
+      ) pc2 ON pc2.pd = phone_norm(cl.destination)
              AND cl.call_type = 'Out'
       WHERE NOT (cl.duration IS NULL OR cl.duration = '' OR cl.duration = '00:00:00')
         AND NOT (cl.destination ~ '^\\d{2}-\\d{2}-\\d{2,4}$')
