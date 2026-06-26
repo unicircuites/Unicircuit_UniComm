@@ -26562,7 +26562,7 @@ ${plainText}`;
     function waAvatarHtml(url, initials, fontPx) {
       var src = waProfilePicSrc(url);
       if (!src) return escHtml(initials || '?');
-      return '<img src="' + escAttr(src) + '" loading="lazy" alt="" style="width:100%;height:100%;object-fit:cover;border-radius:50%;display:block;" onerror="this.parentNode.innerHTML=\'' + escAttr(initials || '?') + '\';this.parentNode.style.fontSize=\'' + (fontPx || 14) + 'px\'" />';
+      return '<img src="' + escAttr(src) + '" loading="lazy" alt="" style="width:100%;height:100%;object-fit:cover;border-radius:50%;display:block;" onerror="var p=this.parentNode;if(p){p.style.fontSize=\'' + (fontPx || 14) + 'px\';p.innerHTML=\'' + escAttr(initials || '?') + '\'}" />';
     }
 
     function waRenderChatLabels(chat) {

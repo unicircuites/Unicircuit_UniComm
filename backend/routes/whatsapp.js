@@ -1385,20 +1385,38 @@ router.get('/profile-pic/:jid', (req, res, next) => {
     const accountPhone = connectedAccount(res);
     if (!accountPhone) return;
     const jid = normalizeWaRouteJid(decodeURIComponent(req.params.jid));
-    const url = await wa.getProfilePicUrl(jid, accountPhone);
-    if (!url) return res.status(404).json({ error: 'Profile picture unavailable' });
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), 6000);
-    const picRes = await fetch(url, { signal: controller.signal });
-    clearTimeout(timer);
-    if (!picRes.ok) return res.status(404).json({ error: 'Profile picture fetch failed' });
+    let url = await wa.getProfilePicUrl(jid, accountPhone);
+    if (!url) return res.status(200).json({ error: 'Profile picture unavailable' });
+
+    let picRes;
+    try {
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), 6000);
+      picRes = await fetch(url, { signal: controller.signal });
+      clearTimeout(timer);
+    } catch (fetchErr) {
+      picRes = { ok: false };
+    }
+
+    if (!picRes.ok) {
+      // The cached URL is invalid/expired. Let's force a refetch from socket!
+      url = await wa.getProfilePicUrl(jid, accountPhone, true);
+      if (!url) return res.status(200).json({ error: 'Profile picture unavailable' });
+
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), 6000);
+      picRes = await fetch(url, { signal: controller.signal });
+      clearTimeout(timer);
+      if (!picRes.ok) return res.status(200).json({ error: 'Profile picture fetch failed after refresh' });
+    }
+
     const contentType = picRes.headers.get('content-type') || 'image/jpeg';
     const buffer = Buffer.from(await picRes.arrayBuffer());
     res.setHeader('Content-Type', contentType);
     res.setHeader('Cache-Control', 'private, max-age=86400');
     res.send(buffer);
   } catch (err) {
-    res.status(404).json({ error: err.message });
+    res.status(200).json({ error: err.message });
   }
 });
 

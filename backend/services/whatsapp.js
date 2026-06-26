@@ -4754,18 +4754,20 @@ function getGroupSubjectFromCache(jid) {
 const profilePicCache = new Map(); // jid → { url, ts }
 const PROFILE_PIC_TTL = 24 * 60 * 60 * 1000; // 24h
 
-async function getProfilePicUrl(jid, accPhone) {
-  const cached = profilePicCache.get(jid);
-  if (cached && Date.now() - cached.ts < PROFILE_PIC_TTL) return cached.url;
+async function getProfilePicUrl(jid, accPhone, forceRefresh = false) {
+  if (!forceRefresh) {
+    const cached = profilePicCache.get(jid);
+    if (cached && Date.now() - cached.ts < PROFILE_PIC_TTL) return cached.url;
 
-  // Try DB first
-  const dbRow = await pool.query(
-    `SELECT profile_pic_url FROM wa_chats WHERE id=$1 AND account_phone=$2 LIMIT 1`,
-    [jid, accPhone]
-  );
-  if (dbRow.rows[0]?.profile_pic_url) {
-    profilePicCache.set(jid, { url: dbRow.rows[0].profile_pic_url, ts: Date.now() });
-    return dbRow.rows[0].profile_pic_url;
+    // Try DB first
+    const dbRow = await pool.query(
+      `SELECT profile_pic_url FROM wa_chats WHERE id=$1 AND account_phone=$2 LIMIT 1`,
+      [jid, accPhone]
+    );
+    if (dbRow.rows[0]?.profile_pic_url) {
+      profilePicCache.set(jid, { url: dbRow.rows[0].profile_pic_url, ts: Date.now() });
+      return dbRow.rows[0].profile_pic_url;
+    }
   }
 
   if (!sock || !isConnected) return null;
@@ -4774,10 +4776,14 @@ async function getProfilePicUrl(jid, accPhone) {
     if (url) {
       profilePicCache.set(jid, { url, ts: Date.now() });
       pool.query(`UPDATE wa_chats SET profile_pic_url=$1 WHERE id=$2 AND account_phone=$3`, [url, jid, accPhone]).catch(() => {});
+    } else {
+      profilePicCache.set(jid, { url: null, ts: Date.now() });
+      pool.query(`UPDATE wa_chats SET profile_pic_url=NULL WHERE id=$2 AND account_phone=$3`, [jid, accPhone]).catch(() => {});
     }
     return url || null;
   } catch {
     profilePicCache.set(jid, { url: null, ts: Date.now() }); // cache miss to avoid re-hitting
+    pool.query(`UPDATE wa_chats SET profile_pic_url=NULL WHERE id=$2 AND account_phone=$3`, [jid, accPhone]).catch(() => {});
     return null;
   }
 }

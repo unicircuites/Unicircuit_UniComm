@@ -754,8 +754,11 @@ const apiLimiter = rateLimit({
   max: 600,                   // raised — dashboard makes ~8 calls on load
   message: { error: 'Rate limit exceeded.' },
   skip: (req) => {
-    // never rate-limit the sync endpoint — it's a long-running manual action
-    return req.path.includes('sync-messages') || req.path.includes('sync-stats');
+    // never rate-limit the sync endpoint, profile pictures, or media files
+    return req.path.includes('sync-messages') || 
+           req.path.includes('sync-stats') || 
+           req.path.includes('profile-pic') || 
+           req.path.includes('media');
   },
 });
 
