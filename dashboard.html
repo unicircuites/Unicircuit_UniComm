@@ -27567,7 +27567,8 @@ ${plainText}`;
         mediaUrl = '/api/wa/media/' + (msg.mediaPath || msg.media_path);
       }
       // Media block
-      var mediaBlock = waMediaHTML(type, body, msgId, msg.mediaPath || msg.media_path || '', msg.localUrl || '');
+      var mediaMsgId = String(msgId || '').startsWith('temp-') ? '' : msgId;
+      var mediaBlock = waMediaHTML(type, body, mediaMsgId, msg.mediaPath || msg.media_path || '', msg.localUrl || '');
 
       // Message body — preserve newlines
       var bodyHtml = body.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\n/g, '<br>');
