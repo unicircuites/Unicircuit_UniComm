@@ -7451,8 +7451,27 @@
           <div style="display: grid; grid-template-columns: 1fr 400px; gap: 16px; height: calc(100vh - 120px);">
             <!-- Left: n8n Editor Panel -->
             <div class="card" style="padding: 0; overflow: hidden; border: 1px solid var(--border); border-radius: 12px; height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; background: var(--bg2); position: relative;">
-              <!-- n8n Status + Launch Panel -->
-              <div id="n8n-launch-panel" style="display:flex; flex-direction:column; align-items:center; justify-content:center; gap:24px; width:100%; height:100%; padding:40px;">
+
+              <!-- ── DEV-ONLY NOTICE (shown on Tower / non-localhost) ── -->
+              <div id="n8n-tower-notice" style="display:none; flex-direction:column; align-items:center; justify-content:center; gap:20px; width:100%; height:100%; padding:40px; text-align:center;">
+                <div style="width:80px; height:80px; border-radius:20px; background:linear-gradient(135deg,#334155,#1e293b); display:flex; align-items:center; justify-content:center; box-shadow:0 8px 32px rgba(0,0,0,0.4); border:2px solid var(--border2);">
+                  <i class="fas fa-laptop-code" style="font-size:36px; color:var(--muted);"></i>
+                </div>
+                <div>
+                  <div style="font-size:20px; font-weight:700; color:var(--text); margin-bottom:8px;">n8n — Dev Machine Only</div>
+                  <div style="font-size:13px; color:var(--muted); max-width:420px; line-height:1.7;">
+                    n8n is a local workflow engine that runs only on the <strong style="color:var(--text2);">developer's machine</strong> (<code style="background:var(--bg3);padding:1px 7px;border-radius:5px;color:var(--gold);">localhost:5678</code>).<br>
+                    It is <strong style="color:var(--text2);">not installed on the Tower server</strong> and does not need to be — workflows are triggered via webhooks from the CRM backend.
+                  </div>
+                </div>
+                <div style="display:flex; align-items:center; gap:10px; padding:10px 20px; border-radius:10px; background:var(--bg3); border:1px solid var(--border2); font-size:12px; color:var(--muted);">
+                  <i class="fas fa-info-circle" style="color:var(--gold);"></i>
+                  To use n8n, open the dashboard from your <strong style="color:var(--text2);">dev machine</strong> at <code style="color:var(--gold);">http://localhost:8088</code>
+                </div>
+              </div>
+
+              <!-- ── LOCALHOST LAUNCH PANEL (shown on dev machine) ── -->
+              <div id="n8n-launch-panel" style="display:none; flex-direction:column; align-items:center; justify-content:center; gap:24px; width:100%; height:100%; padding:40px;">
                 <!-- Logo / Icon -->
                 <div style="width:80px; height:80px; border-radius:20px; background:linear-gradient(135deg,#ff6d5a,#ff3a2a); display:flex; align-items:center; justify-content:center; box-shadow:0 8px 32px rgba(255,60,40,0.35);">
                   <i class="fas fa-network-wired" style="font-size:36px; color:#fff;"></i>
@@ -7481,6 +7500,7 @@
                   <i class="fas fa-sync-alt" style="margin-right:5px;"></i>Refresh Status
                 </button>
               </div>
+
             </div>
             
             <!-- Right: Workflow Tester Console -->
@@ -15166,28 +15186,45 @@ Keep it concise and professional.`;
 
     // Check n8n status and update the launch panel badge
     async function n8nCheckStatus() {
+      const isLocalhost = ['localhost', '127.0.0.1'].includes(window.location.hostname);
+      const launchPanel  = document.getElementById('n8n-launch-panel');
+      const towerNotice  = document.getElementById('n8n-tower-notice');
+
+      // On Tower / non-localhost — show "Dev only" notice, hide launch panel
+      if (!isLocalhost) {
+        if (towerNotice)  towerNotice.style.display  = 'flex';
+        if (launchPanel)  launchPanel.style.display   = 'none';
+        return;
+      }
+
+      // On localhost — show launch panel, hide tower notice
+      if (towerNotice) towerNotice.style.display = 'none';
+      if (launchPanel) launchPanel.style.display  = 'flex';
+
       const dot  = document.getElementById('n8n-status-dot');
       const text = document.getElementById('n8n-status-text');
       const btn  = document.getElementById('n8n-open-btn');
       if (!dot || !text) return;
-      dot.style.background = '#888';
+      dot.style.background  = '#888';
+      dot.style.boxShadow   = 'none';
+      text.style.color      = '';
       text.textContent = 'Checking n8n status…';
       try {
         const controller = new AbortController();
         const timer = setTimeout(() => controller.abort(), 4000);
-        const res = await fetch('http://localhost:5678/', { signal: controller.signal, mode: 'no-cors' });
+        await fetch('http://localhost:5678/', { signal: controller.signal, mode: 'no-cors' });
         clearTimeout(timer);
-        // no-cors fetch resolves with opaque response if server is up
+        // no-cors fetch resolves with opaque response when server is up
         dot.style.background = '#22c55e';
-        dot.style.boxShadow = '0 0 8px #22c55e';
-        text.textContent = 'n8n is Online ✓';
-        text.style.color = '#22c55e';
+        dot.style.boxShadow  = '0 0 8px #22c55e';
+        text.textContent     = 'n8n is Online ✓';
+        text.style.color     = '#22c55e';
         if (btn) btn.style.opacity = '1';
       } catch (e) {
         dot.style.background = '#ef4444';
-        dot.style.boxShadow = '0 0 8px #ef4444';
-        text.textContent = 'n8n is Offline — start with npm start';
-        text.style.color = '#ef4444';
+        dot.style.boxShadow  = '0 0 8px #ef4444';
+        text.textContent     = 'n8n is Offline — run npm start to launch';
+        text.style.color     = '#ef4444';
         if (btn) btn.style.opacity = '0.5';
       }
     }
