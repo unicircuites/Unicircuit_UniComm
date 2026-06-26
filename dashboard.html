@@ -28329,12 +28329,14 @@ ${plainText}`;
       var fname = parts[0] || '';
       var lname = parts.slice(1).join(' ') || '';
       var isEdit = !!currentName;
+      var activeChatForAvatar = waAllChats.find(function(x) { return waLooksSameChat(x.id, jid); }) || {};
+      var wcfAvatarHtml = waAvatarHtml(activeChatForAvatar.profile_pic_url, (fname[0]||'?').toUpperCase(), 18);
       var modal = document.createElement('div');
       modal.id = 'wa-contact-form-modal';
       modal.style.cssText = 'position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,0.6);display:flex;align-items:center;justify-content:center;padding:16px;';
       modal.innerHTML = `<div style="background:var(--card);border:1px solid var(--border);border-radius:14px;padding:28px;width:100%;max-width:480px;max-height:90vh;overflow-y:auto;">
         <div style="display:flex;align-items:center;gap:12px;margin-bottom:20px;">
-          <div id="wcf-avatar" style="width:44px;height:44px;border-radius:50%;background:rgba(37,211,102,0.15);display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:800;color:#25D366;flex-shrink:0;">${escHtml((fname[0]||'?').toUpperCase())}</div>
+          <div id="wcf-avatar" style="width:44px;height:44px;border-radius:50%;background:rgba(37,211,102,0.15);display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:800;color:#25D366;flex-shrink:0;overflow:hidden;">${wcfAvatarHtml}</div>
           <div><div style="font-weight:700;font-size:15px;">${isEdit?'Edit Contact':'Add Contact'}</div><div style="font-size:12px;color:var(--muted);">${escHtml(phone||jid)}</div></div>
         </div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px;">
@@ -28358,7 +28360,7 @@ ${plainText}`;
       </div>`;
       modal.querySelector('#wcf-fname').addEventListener('input', function() {
         var av = document.getElementById('wcf-avatar');
-        if (av) av.textContent = (this.value[0]||'?').toUpperCase();
+        if (av && !activeChatForAvatar.profile_pic_url) av.textContent = (this.value[0]||'?').toUpperCase();
       });
       modal.querySelector('#wcf-save-btn').addEventListener('click', function() { waSaveFullContact(jid); });
       modal.addEventListener('mousedown', function(e) { if (e.target === modal) modal.remove(); });
@@ -28628,7 +28630,11 @@ ${plainText}`;
       var realName = (gData.name && String(gData.name).trim() && !/^group$/i.test(String(gData.name).trim()))
         ? String(gData.name).trim() : null;
 
-      if (giAv) giAv.textContent = (realName || 'G').charAt(0).toUpperCase();
+      if (giAv) {
+        var activeChatForAvatar = waAllChats.find(function(x) { return waLooksSameChat(x.id, gData.id || waActiveJid); }) || {};
+        giAv.innerHTML = waAvatarHtml(activeChatForAvatar.profile_pic_url, (realName || 'G').charAt(0).toUpperCase(), 24);
+        giAv.style.overflow = 'hidden';
+      }
       if (giName) giName.textContent = realName || 'Group';
       var totalCnt = (gData && (gData.total_participants !== undefined && gData.total_participants !== null))
         ? gData.total_participants
@@ -28762,8 +28768,11 @@ ${plainText}`;
         var lidHint = (isPendingLid && !phoneSafe && p._lidNum)
           ? '<div style="font-size:9.5px;color:var(--muted2);opacity:0.55;margin-top:1px;font-family:monospace;">' + p._lidNum.slice(-8) + '@lid</div>'
           : '';
+        var memberChat = waAllChats.find(function(x) { return waLooksSameChat(x.id, p.jid); }) || {};
+        var avatarUrl = memberChat.profile_pic_url || '';
+        var avatarContent = waAvatarHtml(avatarUrl, initials, 13);
         return '<div style="display:flex;align-items:center;gap:10px;padding:7px 6px;border-radius:8px;cursor:default;">' +
-          '<div style="width:34px;height:34px;border-radius:50%;background:' + (isPendingLid && !phoneSafe ? 'rgba(120,120,120,0.12)' : 'rgba(37,211,102,0.15)') + ';display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;color:' + (isPendingLid && !phoneSafe ? 'var(--muted)' : '#25D366') + ';flex-shrink:0;">' + initials + '</div>' +
+          '<div style="width:34px;height:34px;border-radius:50%;background:' + (isPendingLid && !phoneSafe ? 'rgba(120,120,120,0.12)' : 'rgba(37,211,102,0.15)') + ';display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;color:' + (isPendingLid && !phoneSafe ? 'var(--muted)' : '#25D366') + ';flex-shrink:0;overflow:hidden;">' + avatarContent + '</div>' +
           '<div style="flex:1;min-width:0;"><div style="display:flex;align-items:center;gap:5px;flex-wrap:wrap;">' +
           '<span style="font-size:12.5px;color:' + (isPendingLid && !phoneSafe ? 'var(--muted)' : 'var(--text)') + ';font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:140px;">' + (displayName || (isPendingLid ? '' : '—')) + '</span>' +
           pendingBadge + adminBadge + '</div>' + phoneHtml + lidHint + '</div></div>';
