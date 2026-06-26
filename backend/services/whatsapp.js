@@ -830,6 +830,14 @@ async function resolveJidToPhone(rawJid) {
       const sigPhoneJid = `${sigPn}@s.whatsapp.net`;
       if (!contactsStore[jid]) contactsStore[jid] = { id: jid };
       contactsStore[jid].phoneJid = sigPhoneJid;
+      contactsStore[jid].phone = sigPn;
+      const accPhone = phoneNumber;
+      if (accPhone) {
+        pool.query(
+          `UPDATE wa_contacts SET phone=$1, updated_at=NOW() WHERE jid=$2 AND account_phone=$3`,
+          [sigPn, jid, accPhone]
+        ).catch(() => {});
+      }
       return sigPhoneJid;
     }
     const accPhone = phoneNumber;
@@ -847,6 +855,7 @@ async function resolveJidToPhone(rawJid) {
           const resolvedPhoneJid = `${resolvedPhone}@s.whatsapp.net`;
           if (!contactsStore[jid]) contactsStore[jid] = { id: jid };
           contactsStore[jid].phoneJid = resolvedPhoneJid;
+          contactsStore[jid].phone = resolvedPhone;
           return resolvedPhoneJid;
         }
       } catch (_) { }
@@ -1706,29 +1715,9 @@ async function saveMessage(msg) {
     // Normalize JID: remove device suffixes and resolve LID to phone if possible
     let jid = rawJid.split(':')[0].split('@')[0] + '@' + rawJid.split('@')[1];
 
-    // LID to Phone resolution (from in-memory map first, DB fallback)
+    // LID to Phone resolution
     if (jid.endsWith('@lid')) {
-      const mapped = contactsStore[jid];
-      if (mapped?.phoneJid) {
-        jid = mapped.phoneJid;
-      } else if (phoneNumber) {
-        try {
-          const lidLookup = await pool.query(
-            `SELECT phone FROM wa_contacts
-             WHERE jid=$1 AND account_phone=$2
-               AND phone IS NOT NULL AND phone != ''
-             LIMIT 1`,
-            [jid, phoneNumber]
-          );
-          const resolvedPhone = resolvedPhoneForLid(jid, lidLookup.rows?.[0]?.phone);
-          if (resolvedPhone) {
-            const resolvedPhoneJid = `${resolvedPhone}@s.whatsapp.net`;
-            if (!contactsStore[jid]) contactsStore[jid] = { id: jid };
-            contactsStore[jid].phoneJid = resolvedPhoneJid;
-            jid = resolvedPhoneJid;
-          }
-        } catch (_) { }
-      }
+      jid = await resolveJidToPhone(jid);
     }
 
     const ts = toDate(msg.messageTimestamp);
@@ -1744,7 +1733,7 @@ async function saveMessage(msg) {
     const participant = msg.key.participant || msg.participant || null;
     // Accept @lid participants too — we store pushName for them
     const isValidSender = participant && !participant.endsWith('@g.us');
-    const senderJid = fromMe ? null : (isValidSender ? participant : null);
+    const senderJid = fromMe ? null : (isValidSender ? await resolveJidToPhone(participant) : null);
     const isGroupMsg = jid.endsWith('@g.us');
 
     // Format sender name/number
@@ -4771,8 +4760,61 @@ async function getProfilePicUrl(jid, accPhone, forceRefresh = false) {
   }
 
   if (!sock || !isConnected) return null;
+
+  // Resolve @lid JID to standard phone JID before querying WhatsApp socket
+  let queryJid = jid;
+  if (jid.endsWith('@lid')) {
+    const resolved = await resolveStatusChatJid(jid);
+    if (resolved && resolved !== jid) {
+      queryJid = resolved;
+    } else {
+      // Fallback: If unresolved, try to match the chat name to a CRM contact
+      let chatName = null;
+      try {
+        const chatRow = await pool.query(
+          `SELECT name FROM wa_chats WHERE id=$1 AND account_phone=$2 LIMIT 1`,
+          [jid, accPhone]
+        );
+        chatName = chatRow.rows[0]?.name;
+        if (!chatName) {
+          const contactRow = await pool.query(
+            `SELECT name, notify FROM wa_contacts WHERE jid=$1 AND account_phone=$2 LIMIT 1`,
+            [jid, accPhone]
+          );
+          chatName = contactRow.rows[0]?.name || contactRow.rows[0]?.notify;
+        }
+      } catch (_) {}
+
+      if (chatName) {
+        const cleanedName = String(chatName).trim();
+        if (cleanedName) {
+          try {
+            const crmRow = await pool.query(
+              `SELECT phone, wa FROM contacts 
+               WHERE (TRIM(COALESCE(fname, '')) || ' ' || TRIM(COALESCE(lname, ''))) ILIKE $1
+                  OR fname ILIKE $1
+                  OR lname ILIKE $1
+               LIMIT 1`,
+              [cleanedName]
+            );
+            if (crmRow.rows[0]) {
+              const num = crmRow.rows[0].wa || crmRow.rows[0].phone;
+              if (num) {
+                const digits = num.replace(/[^0-9]/g, '');
+                if (digits && digits.length >= 7 && digits.length <= 15) {
+                  queryJid = `${digits}@s.whatsapp.net`;
+                  console.log(`[WA-DP] Resolved JID via CRM name match for ${chatName}: ${queryJid}`);
+                }
+              }
+            }
+          } catch (_) {}
+        }
+      }
+    }
+  }
+
   try {
-    const url = await sock.profilePictureUrl(jid, 'image');
+    const url = await sock.profilePictureUrl(queryJid, 'image');
     if (url) {
       profilePicCache.set(jid, { url, ts: Date.now() });
       pool.query(`UPDATE wa_chats SET profile_pic_url=$1 WHERE id=$2 AND account_phone=$3`, [url, jid, accPhone]).catch(() => {});
