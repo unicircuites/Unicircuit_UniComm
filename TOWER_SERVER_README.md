@@ -1,6 +1,9 @@
-# th🚀 UniComm Pro — Tower Server Quick Start & Setup Guide
+# 🚀 UniComm Pro — Tower Server Quick Start & Setup Guide
 
-This guide describes how to deploy the UniComm Pro CRM and n8n services on your freshly formatted **Tower Server (IP: 192.168.0.200)** from scratch.
+This guide describes how to deploy the UniComm Pro CRM service on your freshly formatted **Tower Server (IP: 192.168.0.200)** from scratch.
+
+> [!NOTE]
+> n8n is a developer-machine-only workflow editor for this project. It runs locally at `http://localhost:5678` when you run `npm start` on your dev machine. It is not installed or started on the Tower server.
 
 ---
 
@@ -47,7 +50,7 @@ Once the setup script finishes, verify the services are running correctly:
 
 ### 1. Check Service Status
 
-Run this in PowerShell to see if PM2 is running the CRM backend and n8n:
+Run this in PowerShell to see if PM2 is running the CRM backend:
 
 ```powershell
 pm2 status
@@ -56,14 +59,14 @@ pm2 status
 *Expected Output:*
 
 * `unicomm-backend` — **online**
-* `n8n` — **online**
 
 ### 2. Verify Client Browser Access
 
 Open your web browser (on the server or any PC on the same network) and go to:
 
 * **UniComm CRM Portal**: `https://192.168.0.200:8088`
-* **n8n Automation Console**: `http://localhost:5678`
+
+The n8n automation console is only available on a dev machine at `http://localhost:5678` after running `npm start` locally.
 
 > [!NOTE]
 > Since we use a self-signed SSL certificate for network security, your browser will show an **"Unsafe Connection / Certificate Invalid"** warning the first time you load the page. Click **Advanced** ⮕ **Proceed to 192.168.0.200 (unsafe)** to open the dashboard. This is normal and expected for local servers.
@@ -74,14 +77,13 @@ Open your web browser (on the server or any PC on the same network) and go to:
 
 Run these commands inside `C:\setup0\Unicircuit_UniComm` to manage the server:
 
-| Command                         | Action                                                               |
-| :------------------------------ | :------------------------------------------------------------------- |
-| `pm2 status`                  | View running backend and n8n processes                               |
-| `pm2 logs`                    | View real-time console logs for debugging                            |
-| `pm2 restart all`             | Restart both n8n and the CRM backend                                 |
-| `pm2 stop all`                | Stop both services                                                   |
-| `pm2 restart unicomm-backend` | Restart only the CRM backend (applies changes in`.env`)            |
-| `node db/init.js`             | Reset/Initialize the database tables (Run inside`backend/` folder) |
+| Command                       | Action                                                              |
+| :---------------------------- | :------------------------------------------------------------------ |
+| `pm2 status`                  | View the running backend process                                    |
+| `pm2 logs`                    | View real-time console logs for debugging                           |
+| `pm2 restart unicomm-backend` | Restart the CRM backend (applies changes in `.env`)                 |
+| `pm2 stop unicomm-backend`    | Stop the CRM backend                                                |
+| `node db/init.js`             | Reset/initialize the database tables (run inside `backend/` folder) |
 
 ---
 

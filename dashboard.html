@@ -7494,35 +7494,33 @@
                 </div>
               </div>
 
-              <!-- ── LOCALHOST LAUNCH PANEL (shown on dev machine) ── -->
-              <div id="n8n-launch-panel" style="display:none; flex-direction:column; align-items:center; justify-content:center; gap:24px; width:100%; height:100%; padding:40px;">
-                <!-- Logo / Icon -->
-                <div style="width:80px; height:80px; border-radius:20px; background:linear-gradient(135deg,#ff6d5a,#ff3a2a); display:flex; align-items:center; justify-content:center; box-shadow:0 8px 32px rgba(255,60,40,0.35);">
-                  <i class="fas fa-network-wired" style="font-size:36px; color:#fff;"></i>
+              <!-- ── LOCALHOST N8N EDITOR (shown on dev machine) ── -->
+              <div id="n8n-launch-panel" style="display:none; flex-direction:column; width:100%; height:100%; background:var(--bg2);">
+                <div style="display:flex; align-items:center; justify-content:space-between; gap:12px; padding:10px 12px; border-bottom:1px solid var(--border); background:var(--bg3);">
+                  <div id="n8n-status-badge" style="display:flex; align-items:center; gap:8px; padding:7px 14px; border-radius:999px; background:var(--bg2); border:1px solid var(--border2); font-size:12px; font-weight:500; color:var(--muted);">
+                    <span id="n8n-status-dot" style="width:10px;height:10px;border-radius:50%;background:#555;display:inline-block;"></span>
+                    <span id="n8n-status-text">Checking n8n status…</span>
+                  </div>
+                  <div style="display:flex; align-items:center; gap:8px;">
+                    <button onclick="n8nCheckStatus()" style="background:transparent;border:1px solid var(--border2);color:var(--muted);padding:6px 12px;border-radius:8px;cursor:pointer;font-size:12px;" onmouseover="this.style.color='';" onmouseout="this.style.color='var(--muted)';">
+                      <i class="fas fa-sync-alt" style="margin-right:5px;"></i>Refresh
+                    </button>
+                    <a id="n8n-open-btn" href="http://localhost:5678" target="_blank" rel="noopener"
+                      style="display:inline-flex; align-items:center; gap:8px; padding:7px 12px; border-radius:8px; background:linear-gradient(135deg,#ff6d5a,#ff3a2a); color:#fff; font-size:12px; font-weight:600; text-decoration:none; box-shadow:0 4px 14px rgba(255,60,40,0.28);">
+                      <i class="fas fa-external-link-alt"></i> Open Tab
+                    </a>
+                  </div>
                 </div>
-                <div style="text-align:center;">
-                  <div style="font-size:22px; font-weight:700; color:var(--text); margin-bottom:6px;">n8n Workflow Editor</div>
-                  <div style="font-size:13px; color:var(--muted);">Visual automation engine running at <code style="background:var(--bg3);padding:2px 8px;border-radius:6px;color:var(--gold);">localhost:5678</code></div>
+                <iframe id="n8n-editor-frame" src="about:blank" title="n8n Workflow Editor" referrerpolicy="no-referrer" allow="clipboard-read; clipboard-write" style="display:none; width:100%; height:100%; border:0; background:#0f172a;"></iframe>
+                <div id="n8n-offline-panel" style="display:flex; flex:1; flex-direction:column; align-items:center; justify-content:center; gap:24px; padding:40px;">
+                  <div style="width:80px; height:80px; border-radius:20px; background:linear-gradient(135deg,#ff6d5a,#ff3a2a); display:flex; align-items:center; justify-content:center; box-shadow:0 8px 32px rgba(255,60,40,0.35);">
+                    <i class="fas fa-network-wired" style="font-size:36px; color:#fff;"></i>
+                  </div>
+                  <div style="text-align:center;">
+                    <div style="font-size:22px; font-weight:700; color:var(--text); margin-bottom:6px;">n8n Workflow Editor</div>
+                    <div style="font-size:13px; color:var(--muted);">Visual automation engine running at <code style="background:var(--bg3);padding:2px 8px;border-radius:6px;color:var(--gold);">localhost:5678</code></div>
+                  </div>
                 </div>
-                <!-- Status indicator -->
-                <div id="n8n-status-badge" style="display:flex; align-items:center; gap:8px; padding:8px 20px; border-radius:999px; background:var(--bg3); border:1px solid var(--border2); font-size:13px; font-weight:500; color:var(--muted);">
-                  <span id="n8n-status-dot" style="width:10px;height:10px;border-radius:50%;background:#555;display:inline-block;"></span>
-                  <span id="n8n-status-text">Checking n8n status…</span>
-                </div>
-                <!-- Open button -->
-                <a id="n8n-open-btn" href="http://localhost:5678" target="_blank" rel="noopener"
-                  style="display:inline-flex; align-items:center; gap:10px; padding:14px 32px; border-radius:12px; background:linear-gradient(135deg,#ff6d5a,#ff3a2a); color:#fff; font-size:15px; font-weight:600; text-decoration:none; box-shadow:0 4px 18px rgba(255,60,40,0.4); transition:transform 0.15s,box-shadow 0.15s;"
-                  onmouseover="this.style.transform='translateY(-2px)';this.style.boxShadow='0 8px 28px rgba(255,60,40,0.55)';"
-                  onmouseout="this.style.transform='';this.style.boxShadow='0 4px 18px rgba(255,60,40,0.4)';">
-                  <i class="fas fa-external-link-alt"></i> Open n8n Editor
-                </a>
-                <div style="font-size:11px; color:var(--muted); text-align:center; max-width:380px; line-height:1.6;">
-                  n8n opens in a new browser tab. Browser security prevents cross-port embedding, so direct tab access gives you the full editor experience.
-                </div>
-                <!-- Refresh status -->
-                <button onclick="n8nCheckStatus()" style="background:transparent;border:1px solid var(--border2);color:var(--muted);padding:6px 16px;border-radius:8px;cursor:pointer;font-size:12px;" onmouseover="this.style.color='';" onmouseout="this.style.color='var(--muted)';">
-                  <i class="fas fa-sync-alt" style="margin-right:5px;"></i>Refresh Status
-                </button>
               </div>
 
             </div>
@@ -15234,6 +15232,8 @@ Keep it concise and professional.`;
       const dot  = document.getElementById('n8n-status-dot');
       const text = document.getElementById('n8n-status-text');
       const btn  = document.getElementById('n8n-open-btn');
+      const frame = document.getElementById('n8n-editor-frame');
+      const offlinePanel = document.getElementById('n8n-offline-panel');
       if (!dot || !text) return;
       dot.style.background  = '#888';
       dot.style.boxShadow   = 'none';
@@ -15242,20 +15242,38 @@ Keep it concise and professional.`;
       try {
         const controller = new AbortController();
         const timer = setTimeout(() => controller.abort(), 4000);
-        await fetch('http://localhost:5678/', { signal: controller.signal, mode: 'no-cors' });
+        const response = await fetch('/api/n8n/status', { signal: controller.signal, cache: 'no-store' });
         clearTimeout(timer);
-        // no-cors fetch resolves with opaque response when server is up
-        dot.style.background = '#22c55e';
-        dot.style.boxShadow  = '0 0 8px #22c55e';
-        text.textContent     = 'n8n is Online ✓';
-        text.style.color     = '#22c55e';
-        if (btn) btn.style.opacity = '1';
+        const status = await response.json();
+
+        if (status.online) {
+          dot.style.background = '#22c55e';
+          dot.style.boxShadow  = '0 0 8px #22c55e';
+          text.textContent     = 'n8n is Online ✓';
+          text.style.color     = '#22c55e';
+          if (btn) btn.style.opacity = '1';
+          if (offlinePanel) offlinePanel.style.display = 'none';
+          if (frame) {
+            frame.style.display = 'block';
+            if (frame.src === 'about:blank') frame.src = 'http://localhost:5678';
+          }
+        } else {
+          dot.style.background = '#ef4444';
+          dot.style.boxShadow  = '0 0 8px #ef4444';
+          text.textContent     = status.devOnly ? 'n8n is dev-machine only' : 'n8n is Offline — run npm start to launch';
+          text.style.color     = '#ef4444';
+          if (btn) btn.style.opacity = '0.5';
+          if (frame) frame.style.display = 'none';
+          if (offlinePanel) offlinePanel.style.display = 'flex';
+        }
       } catch (e) {
         dot.style.background = '#ef4444';
         dot.style.boxShadow  = '0 0 8px #ef4444';
-        text.textContent     = 'n8n is Offline — run npm start to launch';
+        text.textContent     = 'n8n status check failed — run npm start to launch';
         text.style.color     = '#ef4444';
         if (btn) btn.style.opacity = '0.5';
+        if (frame) frame.style.display = 'none';
+        if (offlinePanel) offlinePanel.style.display = 'flex';
       }
     }
 
@@ -27211,8 +27229,9 @@ ${plainText}`;
     function waMediaHTML(type, body, msgId, mediaPath, localUrl) {
       var token = localStorage.getItem('uc_token') || sessionStorage.getItem('uc_token') || localStorage.getItem('unicomm_token') || sessionStorage.getItem('unicomm_token') || '';
       var tokenParam = token ? '?token=' + encodeURIComponent(token) : '';
-      var dlUrl = msgId ? (API_BASE + '/wa/media/' + encodeURIComponent(msgId) + tokenParam) : null;
-      var previewUrl = dlUrl || localUrl || null;
+      var isTempMsg = String(msgId || '').startsWith('temp-');
+      var dlUrl = (msgId && !isTempMsg) ? (API_BASE + '/wa/media/' + encodeURIComponent(msgId) + tokenParam) : null;
+      var previewUrl = localUrl || dlUrl || null;
       var cleanBody = (body || '').replace(/^\uD83D\uDCF7\s*|^\uD83D\uDCC4\s*/, '').trim();
       var mediaFilename = mediaPath && mediaPath.includes('_') ? mediaPath.split('_').slice(1).join('_') : '';
       if ((type === 'imageMessage' || type === 'videoMessage') && mediaFilename && cleanBody === mediaFilename) cleanBody = '';
@@ -27233,11 +27252,11 @@ ${plainText}`;
       }
 
       if (type === 'videoMessage') {
-        if (dlUrl) {
+        if (previewUrl) {
           return '<div style="margin-bottom:4px;background:rgba(0,0,0,0.3);border-radius:8px;overflow:hidden;max-width:260px;">' +
             '<video controls preload="metadata" style="width:100%;max-height:180px;display:block;border-radius:8px;">' +
-            '<source src="' + dlUrl + '">' +
-            'Your browser does not support video. <a href="' + dlUrl + '" target="_blank">Download Video</a>' +
+            '<source src="' + previewUrl + '">' +
+            'Your browser does not support video.' + (dlUrl ? ' <a href="' + dlUrl + '" target="_blank">Download Video</a>' : '') +
             '</video>' +
             (cleanBody ? '<div style="font-size:11.5px;color:var(--muted);padding:4px 8px 6px;">' + cleanBody + '</div>' : '') +
             '</div>';
@@ -28391,7 +28410,7 @@ ${plainText}`;
         // Show a temp bubble for each file
         waSelectedMedia.forEach(function(file) {
           var isStickerMedia = file.type === 'image/webp' || file.type === 'image/gif' || /\.(webp|gif)$/i.test(file.name);
-          var tempLocalUrl = (file.type.startsWith('image/') || isStickerMedia) ? URL.createObjectURL(file) : '';
+          var tempLocalUrl = URL.createObjectURL(file);
           waAppendMessage({
             id: 'temp-' + Date.now() + '-' + Math.random(),
             fromMe: true,

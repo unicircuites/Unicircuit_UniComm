@@ -318,6 +318,38 @@ app.get('/api/health', async (_req, res) => {
     timestamp: new Date().toISOString()
   });
 });
+
+app.get('/api/n8n/status', async (req, res) => {
+  const requestHost = (req.hostname || '').toLowerCase();
+  const isLocalRequest = requestHost === 'localhost' || requestHost === '127.0.0.1' || requestHost === '::1';
+
+  if (!isLocalRequest) {
+    return res.json({
+      online: false,
+      devOnly: true,
+      url: 'http://localhost:5678',
+      message: 'n8n is available only on the developer machine.'
+    });
+  }
+
+  try {
+    const response = await axios.get('http://127.0.0.1:5678/', {
+      timeout: 2500,
+      validateStatus: () => true
+    });
+    res.json({
+      online: response.status >= 200 && response.status < 500,
+      status: response.status,
+      url: 'http://localhost:5678'
+    });
+  } catch (err) {
+    res.json({
+      online: false,
+      url: 'http://localhost:5678',
+      error: err.code || err.message
+    });
+  }
+});
 const io = new Server(server, {
   cors: { origin: '*', methods: ['GET', 'POST'] },
   path: '/socket.io'
