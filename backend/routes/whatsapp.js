@@ -152,7 +152,7 @@ function isNonChatJid(jid) {
 }
 
 function waProfilePicRouteUrl(jid) {
-  return '/api/wa/profile-pic/' + encodeURIComponent(jid);
+  return null; // Disabled profile picture proxy to prevent connection pool exhaustion and lag
 }
 
 function attachProfilePicRoutes(rows) {
