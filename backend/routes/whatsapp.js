@@ -2,6 +2,8 @@
  * WhatsApp Routes
  */
 const express = require('express');
+const fs      = require('fs');
+const path    = require('path');
 const pool    = require('../db/pool');
 const wa      = require('../services/whatsapp');
 const waInventory = require('../services/whatsappInventory');
@@ -1295,6 +1297,42 @@ router.post('/broadcast', authenticate, async (req, res) => {
       [sent, failed, failed === normalized.length ? 'failed' : 'sent', histId]
     ).catch(e => console.error('[WA Broadcast] history update:', e.message));
   })().catch(err => console.error('[WA Broadcast] Worker error:', err.message));
+});
+
+router.get('/media-health', authenticate, async (_req, res) => {
+  const mediaDir = process.env.WA_MEDIA_DIR || path.join(__dirname, '../wa_media');
+  const result = {
+    configured: process.env.WA_MEDIA_DIR || null,
+    resolved: mediaDir,
+    exists: false,
+    writable: false,
+    fileCount: 0,
+    recentFiles: [],
+    error: null
+  };
+
+  try {
+    if (!fs.existsSync(mediaDir)) fs.mkdirSync(mediaDir, { recursive: true });
+    result.exists = fs.existsSync(mediaDir);
+    const testPath = path.join(mediaDir, '.unicomm-wa-test-' + Date.now() + '.tmp');
+    fs.writeFileSync(testPath, 'ok');
+    fs.unlinkSync(testPath);
+    result.writable = true;
+    const files = fs.readdirSync(mediaDir);
+    result.fileCount = files.length;
+    result.recentFiles = files
+      .map(name => {
+        const full = path.join(mediaDir, name);
+        const stat = fs.statSync(full);
+        return { name, size: stat.size, modified: stat.mtime.toISOString() };
+      })
+      .sort((a, b) => new Date(b.modified) - new Date(a.modified))
+      .slice(0, 10);
+  } catch (err) {
+    result.error = err.message;
+  }
+
+  res.status(result.exists && result.writable ? 200 : 500).json(result);
 });
 
 router.post('/send-media', authenticate, async (req, res) => {

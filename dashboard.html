@@ -27231,7 +27231,8 @@ ${plainText}`;
       var tokenParam = token ? '?token=' + encodeURIComponent(token) : '';
       var isTempMsg = String(msgId || '').startsWith('temp-');
       var dlUrl = (msgId && !isTempMsg) ? (API_BASE + '/wa/media/' + encodeURIComponent(msgId) + tokenParam) : null;
-      var previewUrl = localUrl || dlUrl || null;
+      var previewUrl = (localUrl && !String(localUrl).includes('/api/wa/media/temp-')) ? localUrl : dlUrl;
+      if (isTempMsg && previewUrl && String(previewUrl).includes('/api/wa/media/temp-')) previewUrl = null;
       var cleanBody = (body || '').replace(/^\uD83D\uDCF7\s*|^\uD83D\uDCC4\s*/, '').trim();
       var mediaFilename = mediaPath && mediaPath.includes('_') ? mediaPath.split('_').slice(1).join('_') : '';
       if ((type === 'imageMessage' || type === 'videoMessage') && mediaFilename && cleanBody === mediaFilename) cleanBody = '';
@@ -28411,8 +28412,10 @@ ${plainText}`;
         waSelectedMedia.forEach(function(file) {
           var isStickerMedia = file.type === 'image/webp' || file.type === 'image/gif' || /\.(webp|gif)$/i.test(file.name);
           var tempLocalUrl = URL.createObjectURL(file);
+          file._waTempId = 'temp-' + Date.now() + '-' + Math.random();
+          file._waTempLocalUrl = tempLocalUrl;
           waAppendMessage({
-            id: 'temp-' + Date.now() + '-' + Math.random(),
+            id: file._waTempId,
             fromMe: true,
             body: (waSelectedMedia.length === 1 ? text : '') || file.name,
             mediaPath: null,
@@ -28475,9 +28478,15 @@ ${plainText}`;
                 quotedMsgId: idx === 0 ? quotedId : null
               };
               const res = await fetch(API_BASE + '/wa/send-media', { method: 'POST', headers: getAuthHeaders(), body: JSON.stringify(payload) });
+              const d = await res.json().catch(function(){ return {}; });
               if (!res.ok) {
-                const d = await res.json();
                 notify('Send failed: ' + fileToUpload.name, d.error || 'Unknown error', 'var(--red)', 'fas fa-exclamation-circle');
+              } else if (d && d.message) {
+                var tempEl = document.getElementById('msg-' + fileToUpload._waTempId);
+                if (tempEl) tempEl.remove();
+                waAppendMessage(d.message);
+                var area = document.getElementById('wa-chat-area');
+                if (area) area.scrollTop = area.scrollHeight;
               }
               await sendNextFile(idx + 1);
             };
