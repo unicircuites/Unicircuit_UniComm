@@ -5431,6 +5431,30 @@
           </div>
         </div>
 
+        <!-- ══ WA CONTACT SAVE MODAL ══ -->
+        <div class="modal-overlay" id="wa-save-contact-modal">
+          <div class="modal" style="max-width:440px;">
+            <div class="modal-title">
+              <span><i class="fab fa-whatsapp" style="color:#25d366;margin-right:8px;"></i><span id="wa-save-modal-title">Save WhatsApp Contact</span></span>
+              <span class="modal-close" onclick="closeModal('wa-save-contact-modal')"><i
+                  class="fas fa-times"></i></span>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Phone Number / JID</label>
+              <input class="inp" id="wa-save-phone" readonly style="opacity:0.7;">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Name *</label>
+              <input class="inp" id="wa-save-name" placeholder="e.g. Suresh Kumar">
+            </div>
+            <div style="display:flex;gap:8px;margin-top:4px;">
+              <button class="btn btn-gold" id="wa-save-submit-btn" style="flex:1;justify-content:center;" onclick="waSaveContactSubmit()"><i
+                  class="fas fa-save"></i> Save Contact</button>
+              <button class="btn btn-ghost" onclick="closeModal('wa-save-contact-modal')">Cancel</button>
+            </div>
+          </div>
+        </div>
+
         <!-- ██████ EMAIL ██████ -->
         <div class="section-view fu" id="sec-email">
 
@@ -11066,6 +11090,13 @@ Always write in a professional yet warm Indian B2B communication style. Use form
         const list = document.getElementById('cross-sync-list');
         if (list) list.innerHTML = '<div style="padding:24px;text-align:center;color:var(--muted);font-size:12px;"><i class="fas fa-check-circle" style="font-size:24px;display:block;margin-bottom:8px;color:var(--green2);opacity:0.6;"></i>All contacts are in sync!</div>';
       }
+
+      // Persist rejection to backend DB
+      fetch(`${API_BASE}/calls/cross-sync-suggestions/reject`, {
+        method: 'POST',
+        headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id })
+      }).catch(e => console.warn('Failed to persist suggestion rejection:', e.message));
     }
 
     async function crossSyncAutoSave(id, name, phone) {
@@ -11102,8 +11133,7 @@ Always write in a professional yet warm Indian B2B communication style. Use form
       if (s.to_source === 'pbx') {
         pbxSaveContactModal(pf.phone || '', pf.name || '', pf.company || '', '', pf.email || '', pf.phone || '');
       } else if (s.to_source === 'whatsapp') {
-        // Navigate to WA and open chat
-        crossSyncOpenWA(pf.phone || '');
+        waSaveContactModal(pf.phone || '', pf.name || '');
       }
     }
     // ── End Cross-sync AI suggestions ───────────────────────────────────────
@@ -15636,6 +15666,7 @@ Keep it concise and professional.`;
         );
         await loadDashboardData();
         filterContacts();
+        loadCrossSyncSuggestions(true);
       } catch (e) {
         console.error('❌ [Outlook Sync] error:', e);
         notify('Sync error', e.message, 'var(--red)', 'fas fa-exclamation-circle');
@@ -25593,6 +25624,7 @@ ${plainText}`;
           var sub = waCleanMessagePreview(msg.body || '');
           notify("New WhatsApp from " + sender, sub, "var(--green)", "fab fa-whatsapp");
         }
+        loadCrossSyncSuggestions(true);
       });
       waSocket.on('wa:message_edited', function (data) {
         if (data.accountPhone && waConnectedPhone && data.accountPhone !== waConnectedPhone) {
@@ -25889,6 +25921,7 @@ ${plainText}`;
         }
 
         notify('New Call: ' + (call.call_type || '') + ' ' + (call.caller || '') + ' → ' + (call.destination || ''), call.duration || '', 'var(--gold)', 'fas fa-phone-alt');
+        loadCrossSyncSuggestions(true);
         pbxConsoleEnd(traceId, 'socket pbx:call finished');
       });
 
@@ -25924,6 +25957,7 @@ ${plainText}`;
         if (record && record.caller) {
           console.log(`[SMDR] Call: ${record.caller} → ${record.destination} (${record.duration}s)`);
         }
+        loadCrossSyncSuggestions(true);
       });
 
       waSocket.on('smdr:error', (data) => {
@@ -25954,6 +25988,11 @@ ${plainText}`;
 
       // Generic activity events (WA messages, PBX calls, etc.)
       waSocket.on('system:activity', e => prependLogEvent(e));
+
+      // Reload suggestions event
+      waSocket.on('suggestions:update', function () {
+        loadCrossSyncSuggestions(true);
+      });
 
       // Marketing 6 PM reminder
       waSocket.on('marketing:sync_reminder', function (data) {
@@ -33810,6 +33849,45 @@ ${plainText}`;
           closeModal('pbx-save-contact-modal');
           loadCallLogs(callsCurrentPage);
           if (contactsSource === 'pbx') loadPbxContactsDirectory();
+        } else {
+          const d = await res.json();
+          throw new Error(d.error);
+        }
+      } catch (err) {
+        notify('Error', err.message, 'var(--red2)', 'fas fa-exclamation-circle');
+      }
+    }
+
+    function waSaveContactModal(phone, name) {
+      document.getElementById('wa-save-phone').value = phone;
+      document.getElementById('wa-save-name').value = name || '';
+      openModal('wa-save-contact-modal');
+      setTimeout(() => document.getElementById('wa-save-name').focus(), 100);
+    }
+
+    async function waSaveContactSubmit() {
+      const phone = document.getElementById('wa-save-phone').value;
+      const name = document.getElementById('wa-save-name').value.trim();
+
+      if (!name) return notify('Required', 'Please enter a name', 'var(--red2)', 'fas fa-exclamation');
+
+      let digits = phone.replace(/\D/g, '');
+      if (digits.length === 10) {
+        digits = '91' + digits;
+      }
+      const jid = digits + '@s.whatsapp.net';
+
+      try {
+        const res = await fetch(`${API_BASE}/wa/contacts/${encodeURIComponent(jid)}`, {
+          method: 'PUT',
+          headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name })
+        });
+        if (res.ok) {
+          notify('Contact Saved', name, 'var(--green2)', 'fas fa-user-check');
+          closeModal('wa-save-contact-modal');
+          loadCrossSyncSuggestions(true);
+          if (typeof waLoadChats === 'function') waLoadChats();
         } else {
           const d = await res.json();
           throw new Error(d.error);

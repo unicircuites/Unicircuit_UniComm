@@ -395,6 +395,8 @@ router.post('/contacts/save', async (req, res) => {
                 mobile_phone = EXCLUDED.mobile_phone, updated_at = NOW()
           RETURNING *
         `, [cleanPhone, name || null, company || null, notes || null, cleanEmail, cleanMobile]);
+    const io = req.app.get('io');
+    if (io) io.emit('suggestions:update');
     return res.json(result.rows[0]);
   } catch (err) {
     console.error('[Calls] save contact error:', err.message);
@@ -435,12 +437,6 @@ router.get('/cross-sync-suggestions', async (req, res) => {
     `);
 
     // ── WA named contacts — REAL phone JIDs only ────────────────────
-    // @lid (privacy) JIDs are EXCLUDED: WhatsApp does not give us a reliable
-    // phone for them, so their stored "phone" is a bogus/placeholder number
-    // (often a +1… value) — never a number we can match or save. We only trust
-    // @s.whatsapp.net / @c.us JIDs whose phone is the actual MSISDN.
-    // We also drop "number-as-name" rows (name is just a phone-like string),
-    // since there's no real name to propagate.
     const waRows = accountPhone ? await pool.query(`
       SELECT name, raw_phone,
              regexp_replace(raw_phone, '[^0-9]', '', 'g') AS norm_phone
@@ -453,10 +449,6 @@ router.get('/cross-sync-suggestions', async (req, res) => {
             ORDER BY (name IS NOT NULL AND name <> '') DESC
           ) AS rn
         FROM (
-          -- Only direct chats (@s.whatsapp.net) — excludes groups, newsletters,
-          -- and group-member contacts who never had a direct conversation with you.
-          -- wa_contacts is intentionally excluded: it includes all group participants
-          -- whose phones were never directly messaged, polluting suggestions.
           SELECT NULLIF(name, '') AS name, phone
           FROM wa_chats
           WHERE account_phone = $1
@@ -465,55 +457,52 @@ router.get('/cross-sync-suggestions', async (req, res) => {
             AND regexp_replace(phone, '[^0-9]', '', 'g') ~ '^[0-9]{7,14}$'
         ) src
         WHERE name IS NOT NULL AND name <> ''
-          -- real name only: must contain a non-phone character (keeps Latin & Devanagari,
-          -- drops "name" that is just digits / +, spaces, (), - ). NOTE: use POSIX
-          -- [:space:] — Postgres bracket expressions do NOT interpret \\s as whitespace.
           AND name ~ '[^0-9+()[:space:]-]'
-          -- exclude Meta/platform system accounts by name (case-insensitive)
           AND name !~* '^(meta ai|instagram|facebook|whatsapp|telegram|google|youtube|twitter|linkedin|snapchat|tiktok|amazon|flipkart|paytm|phonepe|gpay|google pay|zomato|swiggy|uber|ola)$'
-          -- only numbers that could realistically call an Indian PBX:
-          -- Indian mobile (91XXXXXXXXXX or 0XXXXXXXXXX or plain 10-digit 6-9XXXXXXXXX)
-          -- or short local numbers (7-10 digits, no country code = local/extension range)
           AND (
-            -- plain 10-digit Indian mobile starting with 6,7,8,9
             regexp_replace(phone, '[^0-9]', '', 'g') ~ '^[6-9][0-9]{9}$'
-            -- with country code 91
             OR regexp_replace(phone, '[^0-9]', '', 'g') ~ '^91[6-9][0-9]{9}$'
-            -- with leading 0 (STD)
             OR regexp_replace(phone, '[^0-9]', '', 'g') ~ '^0[6-9][0-9]{9}$'
-            -- short local/extension numbers (PBX internal range)
             OR regexp_replace(phone, '[^0-9]', '', 'g') ~ '^[0-9]{3,8}$'
           )
       ) ranked
       WHERE rn = 1
     `, [accountPhone]) : { rows: [] };
-
-    function norm10(digits) {
-      if (!digits || digits.length < 7) return '';
-      return digits.length >= 10 ? digits.slice(-10) : digits;
+ 
+    function getCoreNumber(phone) {
+      if (!phone) return '';
+      let digits = String(phone).replace(/\D/g, '');
+      if (!digits) return '';
+      if (digits.length >= 10) {
+        return digits.slice(-10);
+      }
+      if (digits.startsWith('91') && digits.length > 3) {
+        digits = digits.slice(2);
+      }
+      if (digits.startsWith('0') && digits.length > 1) {
+        digits = digits.slice(1);
+      }
+      return digits;
     }
 
     const pbxByPhone = new Map();
     pbxRows.rows.forEach(r => {
-      const k = norm10(r.norm_phone);
+      const k = getCoreNumber(r.norm_phone);
       if (k) pbxByPhone.set(k, r);
     });
 
-    // All PBX phones (named or not) — blocks WA→PBX if number already exists
     const pbxAllPhones = new Set();
     pbxAllPhonesRows.rows.forEach(r => {
-      const k = norm10(r.norm_phone);
+      const k = getCoreNumber(r.norm_phone);
       if (k) pbxAllPhones.add(k);
     });
 
     const waByPhone = new Map();
     waRows.rows.forEach(r => {
-      const k = norm10(r.norm_phone);
+      const k = getCoreNumber(r.norm_phone);
       if (k && r.name) waByPhone.set(k, r);
     });
 
-    // Only suggest WA→PBX for numbers that have actually appeared in PBX call logs
-    // (caller or destination). If a number never called your PBX, it's pointless to save.
     const callLogPhones = new Set();
     if (waByPhone.size > 0) {
       const clRes = await pool.query(`
@@ -526,14 +515,14 @@ router.get('/cross-sync-suggestions', async (req, res) => {
         WHERE LENGTH(regexp_replace(p, '[^0-9]', '', 'g')) BETWEEN 7 AND 14
       `).catch(() => ({ rows: [] }));
       clRes.rows.forEach(r => {
-        const k = norm10(r.digits);
+        const k = getCoreNumber(r.digits);
         if (k) callLogPhones.add(k);
       });
     }
 
     const suggestions = [];
 
-    // WA contact not in PBX → suggest ONLY if this number has called/been called on PBX
+    // WA contact not in PBX
     waByPhone.forEach((wa, phone) => {
       if (!pbxAllPhones.has(phone) && callLogPhones.has(phone)) {
         suggestions.push({
@@ -548,7 +537,7 @@ router.get('/cross-sync-suggestions', async (req, res) => {
       }
     });
 
-    // PBX contact in WA → suggest open WA (only if number actually exists in WA direct chats)
+    // PBX contact in WA
     pbxByPhone.forEach((pbx, phone) => {
       const wa = waByPhone.get(phone);
       if (wa && pbx.display_phone) {
@@ -564,17 +553,14 @@ router.get('/cross-sync-suggestions', async (req, res) => {
       }
     });
 
-    // ── Outlook named contacts (with phone) — live Graph, best-effort, cached ─────
-    // Adds Outlook as a third source so a contact saved in Outlook (now with a phone
-    // field) surfaces as a suggestion to add into PBX / WhatsApp. Matched on the same
-    // normalised last-10 phone, so all +91 variants unify.
+    // Outlook
     const outlookByPhone = new Map();
     try {
       const getOutlook = require('./outlook').getOutlookContactsForSync;
       if (typeof getOutlook === 'function') {
         const ol = await getOutlook();
         ol.forEach(c => {
-          const k = norm10(String(c.norm || '').replace(/\D/g, ''));
+          const k = getCoreNumber(String(c.norm || '').replace(/\D/g, ''));
           if (k && c.name) outlookByPhone.set(k, c);
         });
       }
@@ -582,9 +568,7 @@ router.get('/cross-sync-suggestions', async (req, res) => {
       console.warn('[Calls] Outlook sync source unavailable:', e.message);
     }
 
-    // Outlook contact missing in PBX → suggest Save to PBX
-    // Only if the number has actually appeared in PBX call logs — same gate as WA→PBX.
-    // A number never seen on the PBX has no reason to be in PBX contacts.
+    // Outlook contact missing in PBX
     outlookByPhone.forEach((o, phone) => {
       if (!pbxByPhone.has(phone) && callLogPhones.has(phone)) {
         suggestions.push({
@@ -599,9 +583,7 @@ router.get('/cross-sync-suggestions', async (req, res) => {
       }
     });
 
-    // Outlook contact IN WhatsApp but WA has no name → suggest enriching WA name from Outlook
-    // (Only suggest when the number actually exists in WA — no point opening WA for a number
-    //  that has no WhatsApp account; that was causing false "Open WA" suggestions like Ajit.)
+    // Outlook contact IN WhatsApp but WA has no name
     outlookByPhone.forEach((o, phone) => {
       const wa = waByPhone.get(phone);
       if (wa && (!wa.name || wa.name === wa.raw_phone)) {
@@ -617,10 +599,34 @@ router.get('/cross-sync-suggestions', async (req, res) => {
       }
     });
 
-    res.json(suggestions);
+    // Filter out rejected suggestions from database
+    const rejectedRes = await pool.query(`SELECT suggestion_id FROM rejected_suggestions`).catch(() => ({ rows: [] }));
+    const rejectedSet = new Set(rejectedRes.rows.map(r => r.suggestion_id));
+    const filteredSuggestions = suggestions.filter(s => !rejectedSet.has(s.id));
+
+    res.json(filteredSuggestions);
   } catch (err) {
     console.error('[Calls] cross-sync-suggestions error:', err.message);
     res.status(500).json({ error: 'Failed to compute suggestions.' });
+  }
+});
+
+// POST /api/calls/cross-sync-suggestions/reject
+router.post('/cross-sync-suggestions/reject', async (req, res) => {
+  const { id } = req.body;
+  if (!id) return res.status(400).json({ error: 'id required' });
+  try {
+    await pool.query(
+      `INSERT INTO rejected_suggestions (suggestion_id) VALUES ($1) ON CONFLICT (suggestion_id) DO NOTHING`,
+      [id]
+    );
+    // Emit reload event
+    const io = req.app.get('io');
+    if (io) io.emit('suggestions:update');
+    res.json({ ok: true });
+  } catch (err) {
+    console.error('[Calls] Reject suggestion error:', err.message);
+    res.status(500).json({ error: 'Failed to reject suggestion' });
   }
 });
 

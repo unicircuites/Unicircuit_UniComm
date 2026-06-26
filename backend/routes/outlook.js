@@ -3418,9 +3418,8 @@ router.post('/contacts/sync', async (req, res) => {
       );
     } catch (_) {}
 
-    try {
-      activityLog.append({ type: 'info', service: 'outlook', message: `Outlook contacts synced — added ${imported}, updated ${updated}, deleted ${deleted}`, timestamp: new Date().toISOString() });
-    } catch (_) {}
+    const io = req.app.get('io');
+    if (io) io.emit('suggestions:update');
 
     return res.json({ ok: true, imported, updated, deleted, skipped, total: outlookContacts.length });
   } catch (err) {

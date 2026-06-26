@@ -1,0 +1,44 @@
+Phase 1 — Data Acquisition & Unification
+Definition of done: every platform in the workbook lands its defined fields into the CRM, de-duplicated by the canonical phone (the phone_norm we just built) + email + company, and visible in Contacts / Lead Web Scraper.
+
+Tools involved
+n8n (you have it) — orchestration: scheduled scrape → transform → POST to CRM ingest endpoint.
+Lead Web Scraper (you have it) + Playwright/Puppeteer (already in the repo) — for JS/auth-walled sites.
+PostgreSQL — storage (the field keys map cleanly to a JSONB-backed schema).
+Existing CRM services — Outlook (Graph), WhatsApp (Baileys), PBX (SMDR) already populate 3 sources.
+For blocked platforms: authenticated sessions / cookies, rotating proxy or official API (Meta Graph, LinkedIn) where scraping is blocked.
+Checklist (6 workstreams)
+A. Storage schema
+
+ Create media_entities (one row per company/profile per platform) + media_records (posts/products/reviews/messages/leads) with a fields JSONB column keyed by the spec's CRM Field Keys — avoids 497 physical columns.
+ Add normalized dedup columns on both: phone_norm (use the new phone_norm() fn), email_norm, company_norm, platform, source_url, scraped_at.
+ Seed the Data-Type Legend as validation rules (enum/url/datetime…) in the transform step.
+B. Local sources (already built — just verify mapping)
+
+ PBX/SMDR (21 fields): map call_logs columns → PBX_____* keys (most exist; add call_cost, agent_department, call_account_code if missing).
+ WhatsApp CRM (19 fields): map wa_contacts/wa_chats → WHATSA__* (lead_status, lead_value, assigned_to, tags, follow_up).
+ Outlook CRM (37 fields): map outlook_messages/contacts → OUTLOO__*.
+C. External scrapers (n8n + webscraper), prioritized by current status
+
+ Tier 1 – already scraping (IndiaMART, MSME, YouTube, Facebook public, X, WhatsApp wa.me/catalog): finalize field extraction to match the per-platform sheets; push to ingest endpoint.
+ Tier 2 – blocked, need a method:
+Instagram (auth wall) → logged-in session/cookies or Graph API
+LinkedIn (HTTP 999) → official API / authenticated Playwright session
+Website unicircuites.com (HTTP 406) → set a real User-Agent/headers (often fixes 406)
+Telegram (auth) → Telegram API/bot
+Pinterest → resolve the profile URL first
+D. Normalization & dedup
+
+ Run all phones through phone_norm (done at DB level) → unify across platforms.
+ Dedup/merge entities by phone_norm ∨ email_norm ∨ company_norm; feed into the existing AI Sync Suggestions.
+E. CRM ingestion endpoint
+
+ Add POST /api/media/ingest that accepts {platform, type, fields{}}, validates against the legend, upserts into media_entities/media_records, and links to a CRM contact.
+ Point n8n + Lead Web Scraper at this single endpoint.
+F. Validation (acceptance test = the Coverage Matrix)
+
+ For each platform, confirm the field categories marked Y in the Coverage Matrix are actually populated.
+ Spot-check company_name, phone_number, email, lead/enquiry land correctly and dedup across sources.
+ (Optional Phase-1 prep for Phase 2) seed the 20 sectors as a sector segment taxonomy on contacts.
+Process / order
+Schema (A) → 2. Ingest endpoint (E) → 3. Wire the 3 local sources (B, fastest win) → 4. Tier-1 scrapers via n8n (C) → 5. Normalize + dedup (D) → 6. Tackle blocked Tier-2 sources → 7. Validate against Coverage Matrix (F).

@@ -1668,6 +1668,8 @@ router.put('/contacts/:jid', authenticate, async (req, res) => {
       `INSERT INTO audit_log (user_id, action, entity, entity_id, detail) VALUES ($1,'wa_contact_save','whatsapp_contact',$2,$3)`,
       [req.user?.id, jid, `Saved WA contact name "${name}" for ${jid}`]
     ).catch(() => {});
+    const io = req.app.get('io');
+    if (io) io.emit('suggestions:update');
     res.json({ ok: true });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });

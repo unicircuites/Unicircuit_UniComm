@@ -177,6 +177,15 @@ async function ensureSchema() {
     await pool.query(`ALTER TABLE pbx_contacts ADD COLUMN IF NOT EXISTS mobile_phone VARCHAR(50)`).catch(() => {});
     console.log('[DB] pbx_contacts table ensured.');
 
+    // Ensure rejected_suggestions table exists
+    console.log('[DB] 6a. Creating rejected_suggestions table...');
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS rejected_suggestions (
+        suggestion_id VARCHAR(100) PRIMARY KEY,
+        created_at TIMESTAMPTZ DEFAULT NOW()
+      )
+    `).catch((err) => console.warn('[DB] rejected_suggestions table creation failed:', err.message));
+
     // 4. Alter call_logs.call_time to TIME if it is VARCHAR/character varying
     console.log('[DB] 7. Checking call_logs.call_time column type...');
     const callTimeTypeRes = await pool.query(`
@@ -313,6 +322,7 @@ const io = new Server(server, {
   cors: { origin: '*', methods: ['GET', 'POST'] },
   path: '/socket.io'
 });
+app.set('io', io);
 
 // Inject Socket.IO into WhatsApp service for real-time push
 wa.setIO(io);
