@@ -151,6 +151,17 @@ function isNonChatJid(jid) {
   return id === 'status@broadcast' || id.endsWith('@newsletter') || id.endsWith('@broadcast');
 }
 
+function waProfilePicRouteUrl(jid) {
+  return '/api/wa/profile-pic/' + encodeURIComponent(jid);
+}
+
+function attachProfilePicRoutes(rows) {
+  return rows.map(row => ({
+    ...row,
+    profile_pic_url: waProfilePicRouteUrl(row.id)
+  }));
+}
+
 function canonicalizeChats(rows) {
   const map = new Map();
   for (const row of Array.isArray(rows) ? rows : []) {
@@ -582,10 +593,18 @@ router.get('/chats', authenticate, async (req, res) => {
       for (const row of result.rows) row.labels = labelMap[row.id] || [];
     } catch (_) {}
 
-    res.json(canonicalizeChats(result.rows));
+    const chats = attachProfilePicRoutes(canonicalizeChats(result.rows));
+    res.json(chats);
+
+    // Background: warm DP cache for the first visible rows. Images still lazy-load via /profile-pic.
+    setImmediate(() => {
+      chats.slice(0, 40).forEach(row => {
+        wa.getProfilePicUrl(row.id, accountPhone).catch(() => {});
+      });
+    });
 
     // Background: fetch group subjects from WA for groups still with null name, patch DB
-    const nullNameGroups = result.rows.filter(r => r.is_group && !r.name);
+    const nullNameGroups = chats.filter(r => r.is_group && !r.name);
     if (nullNameGroups.length > 0) {
       setImmediate(() => {
         wa.refreshCurrentAccountGroupMetadata(Math.min(nullNameGroups.length + 10, 200)).catch(() => {});
@@ -598,7 +617,7 @@ router.get('/chats-live', authenticate, async (req, res) => {
   try {
     const accountPhone = connectedAccount(res);
     if (!accountPhone) return;
-    res.json(canonicalizeChats(wa.getLiveChats()));
+    res.json(attachProfilePicRoutes(canonicalizeChats(wa.getLiveChats())));
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
@@ -881,15 +900,6 @@ router.post('/block-chat', authenticate, async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-router.get('/profile-pic/:jid', authenticate, async (req, res) => {
-  try {
-    const accountPhone = connectedAccount(res);
-    if (!accountPhone) return;
-    const jid = normalizeWaRouteJid(decodeURIComponent(req.params.jid));
-    const url = await wa.getProfilePicUrl(jid, accountPhone);
-    res.json({ url: url || null });
-  } catch (err) { res.json({ url: null }); }
-});
 
 router.get('/group/:jid', authenticate, async (req, res) => {
   try {
@@ -1362,6 +1372,33 @@ router.post('/send-media', authenticate, async (req, res) => {
     res.json({ success: true, message: result });
   } catch (err) {
     res.status(500).json({ error: err.message });
+  }
+});
+
+router.get('/profile-pic/:jid', (req, res, next) => {
+  if (req.query.token && !req.headers.authorization) {
+    req.headers.authorization = 'Bearer ' + req.query.token;
+  }
+  authenticate(req, res, next);
+}, async (req, res) => {
+  try {
+    const accountPhone = connectedAccount(res);
+    if (!accountPhone) return;
+    const jid = normalizeWaRouteJid(decodeURIComponent(req.params.jid));
+    const url = await wa.getProfilePicUrl(jid, accountPhone);
+    if (!url) return res.status(404).json({ error: 'Profile picture unavailable' });
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 6000);
+    const picRes = await fetch(url, { signal: controller.signal });
+    clearTimeout(timer);
+    if (!picRes.ok) return res.status(404).json({ error: 'Profile picture fetch failed' });
+    const contentType = picRes.headers.get('content-type') || 'image/jpeg';
+    const buffer = Buffer.from(await picRes.arrayBuffer());
+    res.setHeader('Content-Type', contentType);
+    res.setHeader('Cache-Control', 'private, max-age=86400');
+    res.send(buffer);
+  } catch (err) {
+    res.status(404).json({ error: err.message });
   }
 });
 
