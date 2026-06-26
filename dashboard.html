@@ -7449,9 +7449,38 @@
         <!-- ─── AUTOMATION (n8n) SECTION ─────────────────────────────────────────── -->
         <div class="section-view fu" id="sec-n8n">
           <div style="display: grid; grid-template-columns: 1fr 400px; gap: 16px; height: calc(100vh - 120px);">
-            <!-- Left: n8n Editor Iframe -->
-            <div class="card" style="padding: 0; overflow: hidden; border: 1px solid var(--border); border-radius: 12px; height: 100%;">
-              <iframe id="n8n-iframe" src="" style="width: 100%; height: 100%; border: none;"></iframe>
+            <!-- Left: n8n Editor Panel -->
+            <div class="card" style="padding: 0; overflow: hidden; border: 1px solid var(--border); border-radius: 12px; height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; background: var(--bg2); position: relative;">
+              <!-- n8n Status + Launch Panel -->
+              <div id="n8n-launch-panel" style="display:flex; flex-direction:column; align-items:center; justify-content:center; gap:24px; width:100%; height:100%; padding:40px;">
+                <!-- Logo / Icon -->
+                <div style="width:80px; height:80px; border-radius:20px; background:linear-gradient(135deg,#ff6d5a,#ff3a2a); display:flex; align-items:center; justify-content:center; box-shadow:0 8px 32px rgba(255,60,40,0.35);">
+                  <i class="fas fa-network-wired" style="font-size:36px; color:#fff;"></i>
+                </div>
+                <div style="text-align:center;">
+                  <div style="font-size:22px; font-weight:700; color:var(--text); margin-bottom:6px;">n8n Workflow Editor</div>
+                  <div style="font-size:13px; color:var(--muted);">Visual automation engine running at <code style="background:var(--bg3);padding:2px 8px;border-radius:6px;color:var(--gold);">localhost:5678</code></div>
+                </div>
+                <!-- Status indicator -->
+                <div id="n8n-status-badge" style="display:flex; align-items:center; gap:8px; padding:8px 20px; border-radius:999px; background:var(--bg3); border:1px solid var(--border2); font-size:13px; font-weight:500; color:var(--muted);">
+                  <span id="n8n-status-dot" style="width:10px;height:10px;border-radius:50%;background:#555;display:inline-block;"></span>
+                  <span id="n8n-status-text">Checking n8n status…</span>
+                </div>
+                <!-- Open button -->
+                <a id="n8n-open-btn" href="http://localhost:5678" target="_blank" rel="noopener"
+                  style="display:inline-flex; align-items:center; gap:10px; padding:14px 32px; border-radius:12px; background:linear-gradient(135deg,#ff6d5a,#ff3a2a); color:#fff; font-size:15px; font-weight:600; text-decoration:none; box-shadow:0 4px 18px rgba(255,60,40,0.4); transition:transform 0.15s,box-shadow 0.15s;"
+                  onmouseover="this.style.transform='translateY(-2px)';this.style.boxShadow='0 8px 28px rgba(255,60,40,0.55)';"
+                  onmouseout="this.style.transform='';this.style.boxShadow='0 4px 18px rgba(255,60,40,0.4)';">
+                  <i class="fas fa-external-link-alt"></i> Open n8n Editor
+                </a>
+                <div style="font-size:11px; color:var(--muted); text-align:center; max-width:380px; line-height:1.6;">
+                  n8n opens in a new browser tab. Browser security prevents cross-port embedding, so direct tab access gives you the full editor experience.
+                </div>
+                <!-- Refresh status -->
+                <button onclick="n8nCheckStatus()" style="background:transparent;border:1px solid var(--border2);color:var(--muted);padding:6px 16px;border-radius:8px;cursor:pointer;font-size:12px;" onmouseover="this.style.color='';" onmouseout="this.style.color='var(--muted)';">
+                  <i class="fas fa-sync-alt" style="margin-right:5px;"></i>Refresh Status
+                </button>
+              </div>
             </div>
             
             <!-- Right: Workflow Tester Console -->
@@ -8661,10 +8690,7 @@ Always write in a professional yet warm Indian B2B communication style. Use form
       if (id === 'usermgmt') { umCancelEdit(); umLoadUsers(); }
       if (id === 'n8n') {
         loadTesterLeads();
-        const iframe = document.getElementById('n8n-iframe');
-        if (iframe && !iframe.src) {
-          iframe.src = `${window.location.protocol}//${window.location.hostname}:5678`;
-        }
+        n8nCheckStatus();
       }
       const topCompose = document.getElementById('topbar-compose-email');
       if (topCompose) topCompose.style.display = id === 'email' ? '' : 'none';
@@ -15137,6 +15163,35 @@ Keep it concise and professional.`;
     }
 
     // ── n8n WORKFLOW TESTER ──────────────────────────────────────────────────────
+
+    // Check n8n status and update the launch panel badge
+    async function n8nCheckStatus() {
+      const dot  = document.getElementById('n8n-status-dot');
+      const text = document.getElementById('n8n-status-text');
+      const btn  = document.getElementById('n8n-open-btn');
+      if (!dot || !text) return;
+      dot.style.background = '#888';
+      text.textContent = 'Checking n8n status…';
+      try {
+        const controller = new AbortController();
+        const timer = setTimeout(() => controller.abort(), 4000);
+        const res = await fetch('http://localhost:5678/', { signal: controller.signal, mode: 'no-cors' });
+        clearTimeout(timer);
+        // no-cors fetch resolves with opaque response if server is up
+        dot.style.background = '#22c55e';
+        dot.style.boxShadow = '0 0 8px #22c55e';
+        text.textContent = 'n8n is Online ✓';
+        text.style.color = '#22c55e';
+        if (btn) btn.style.opacity = '1';
+      } catch (e) {
+        dot.style.background = '#ef4444';
+        dot.style.boxShadow = '0 0 8px #ef4444';
+        text.textContent = 'n8n is Offline — start with npm start';
+        text.style.color = '#ef4444';
+        if (btn) btn.style.opacity = '0.5';
+      }
+    }
+
     function addTestLog(msg, type = 'info') {
       const consoleEl = document.getElementById('test-console-logs');
       if (!consoleEl) return;
