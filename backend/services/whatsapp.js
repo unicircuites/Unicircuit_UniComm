@@ -998,13 +998,17 @@ async function handleProtocolMessageEdit(msg) {
 // ── HANDLE PROTOCOL MESSAGE REVOKE (delete for everyone) ────────────────────────
 async function handleProtocolMessageRevoke(msg) {
   const protocolMsg = msg.message?.protocolMessage;
-  const isRevoke = (protocolMsg && (protocolMsg.type === 0 || protocolMsg.type === 'REVOKE'))
-    || msg.messageStubType === 0
-    || msg.messageStubType === 'REVOKE';
+  const hasProtocolRevoke = !!(protocolMsg && protocolMsg.key && (protocolMsg.type === 0 || protocolMsg.type === 'REVOKE'));
+  const hasStubRevoke = !!(!protocolMsg && (msg.messageStubType === 'REVOKE' || msg.messageStubType === 0));
+  const isRevoke = hasProtocolRevoke || hasStubRevoke;
 
   if (!isRevoke) return false;
 
   const targetKey = protocolMsg ? protocolMsg.key : msg.key;
+  if (!hasProtocolRevoke && targetKey?.fromMe) {
+    console.log(`[WA] Ignoring non-protocol revoke-like update for own message ${targetKey.id}`);
+    return false;
+  }
   if (targetKey && targetKey.id) {
     const targetChatJid = formatJid(targetKey.remoteJid || msg.key?.remoteJid);
     const accPhone = phoneNumber;
