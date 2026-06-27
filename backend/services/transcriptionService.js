@@ -124,6 +124,7 @@ async function transcribeViaGroq(filePath) {
     formData.append('model', GROQ_MODEL);
     formData.append('response_format', 'verbose_json');
     formData.append('temperature', '0.0');
+    formData.append('language', 'hi'); // Force Hindi detection to ensure no speech segment is skipped
     formData.append('prompt', 'Hello, welcome to Unicircuit. Haan, main check karke batata hoon. Yes sir, quotation ready hai, please check. OK, please wait. Adani, lead active, lead closed, WhatsApp broadcast, extension, caller, recording, details, talk, connect, discuss.');
 
     const response = await fetch('https://api.groq.com/openai/v1/audio/transcriptions', {
@@ -185,13 +186,16 @@ async function transliterateToHinglish(segments) {
         messages: [
           {
             role: 'system',
-            content: `You are a professional Hindi-to-Hinglish transliterator. Your job is to convert any Devanagari Hindi text in the segments list to Romanized Hinglish (Hindi written in English/Latin script) or English.
-Guidelines:
-1. Transliterate Devanagari text to phonetic Romanized Hinglish (e.g. "एक मिनिट सर होल्ड कीजिए" -> "Ek minute sir hold kijiye", "हाँ" -> "Haan", "कोटेशन रेडी हो गया है" -> "Quotation ready ho gaya hai").
-2. Do NOT write Devanagari Hindi characters in the output. All output text MUST be in Latin/English alphabet.
-3. Keep all technical terms and proper names in proper English spelling (e.g. TV, CCTV, voltage, motherboard, team, holiday, Kaushal Gupta). Do NOT translate English words to Hindi.
-4. Output must be a valid JSON object matching the input structure: { "segments": [ { "start": "HH:MM:SS.mmm", "end": "HH:MM:SS.mmm", "text": "transliterated text" } ] }
-5. Do not include any explanations, notes, markdown formatting, or conversational text. Return only the valid JSON object.`
+            content: `You are a strict Devanagari-to-Roman phonetic transliterator. Convert Devanagari Hindi text to Romanized Hinglish (Hindi written phonetically using the Latin/English alphabet).
+
+CRITICAL RULES:
+1. Do NOT translate Hindi words into English words (e.g. do NOT convert "बात" to "talk" or "conversation"; it must be transliterated as "baat". Do NOT convert "नंबर बता सकते हैं" to "can you tell me the number"; it must be transliterated as "number bata sakte hain"). Every single Hindi word must keep its original Hindi meaning and sound, just written in English alphabet.
+2. Transliterate every single Hindi word phonetically word-for-word (e.g. "एक" -> "ek", "कीजिए" -> "kijiye", "हाँ" -> "haan", "मेरा" -> "mera", "देख" -> "dekh", "सकते" -> "sakte", "हैं" -> "hain", "थी" -> "thi", "अपने" -> "apne", "वगैरह" -> "vagera", "उड़" -> "ud", "गया" -> "gaya").
+3. Convert "वाटसप" or "व्हाट्सएप" directly to "whatsapp".
+4. Keep English words (e.g. TV, CCTV, voltage, motherboard, team, holiday, Kaushal Gupta, sir) exactly as they are in their correct English spelling.
+5. Ensure 100% accuracy and precision. The output must have the exact same meaning, flow, and words as the input, just converted to the Roman alphabet. Do not summarize, translate, rephrase, add, or skip any words.
+6. Output must be a valid JSON object matching the input structure: { "segments": [ { "start": "HH:MM:SS.mmm", "end": "HH:MM:SS.mmm", "text": "transliterated text" } ] }
+7. Do not include any explanations, notes, markdown formatting, or conversational text. Return only the valid JSON object.`
           },
           {
             role: 'user',
