@@ -27,6 +27,111 @@ const WHISPER_MODEL = process.env.WHISPER_MODEL_PATH || ''; // Path to ggml mode
 const GROQ_API_KEY = process.env.AI_API_KEY || '';
 const GROQ_MODEL = process.env.WHISPER_API_MODEL || 'whisper-large-v3';
 
+// G.711 Mu-law decoding table
+const MuLawTable = new Int16Array(256);
+for (let i = 0; i < 256; i++) {
+  let sign = (i & 0x80) ? -1 : 1;
+  let exponent = (~i >> 4) & 0x07;
+  let mantissa = ~i & 0x0f;
+  let sample = (mantissa << 3) + 132;
+  sample <<= exponent;
+  sample -= 132;
+  MuLawTable[i] = sign * sample;
+}
+
+function parseWav(buffer) {
+  let fmtOffset = -1;
+  let dataOffset = -1;
+  let dataSize = 0;
+  
+  let offset = 12;
+  while (offset < buffer.length - 8) {
+    const chunkId = buffer.slice(offset, offset + 4).toString('ascii');
+    const chunkSize = buffer.readUInt32LE(offset + 4);
+    if (chunkId === 'fmt ') {
+      fmtOffset = offset + 8;
+    } else if (chunkId === 'data') {
+      dataOffset = offset + 8;
+      dataSize = chunkSize;
+    }
+    offset += 8 + chunkSize;
+  }
+  
+  if (fmtOffset === -1 || dataOffset === -1) {
+    throw new Error('Invalid WAV file structure');
+  }
+  
+  const formatCode = buffer.readUInt16LE(fmtOffset);
+  const channels = buffer.readUInt16LE(fmtOffset + 2);
+  const sampleRate = buffer.readUInt32LE(fmtOffset + 4);
+  const bitsPerSample = buffer.readUInt16LE(fmtOffset + 14);
+  
+  return {
+    formatCode,
+    channels,
+    sampleRate,
+    bitsPerSample,
+    dataOffset,
+    dataSize
+  };
+}
+
+function decodeAndUpsampleWav(inputPath, outputPath) {
+  const inputBuffer = fs.readFileSync(inputPath);
+  const info = parseWav(inputBuffer);
+  
+  const rawAudio = inputBuffer.slice(info.dataOffset, info.dataOffset + info.dataSize);
+  let pcm16Samples;
+  
+  if (info.formatCode === 7) {
+    // 8-bit Mu-law
+    pcm16Samples = new Int16Array(rawAudio.length);
+    for (let i = 0; i < rawAudio.length; i++) {
+      pcm16Samples[i] = MuLawTable[rawAudio[i]];
+    }
+  } else if (info.formatCode === 1 && info.bitsPerSample === 16) {
+    // 16-bit PCM
+    pcm16Samples = new Int16Array(rawAudio.buffer, rawAudio.byteOffset, rawAudio.length / 2);
+  } else {
+    throw new Error('Unsupported format code: ' + info.formatCode);
+  }
+  
+  // Upsample from 8000 to 16000
+  let upsampledSamples;
+  if (info.sampleRate === 8000) {
+    upsampledSamples = new Int16Array(pcm16Samples.length * 2);
+    for (let i = 0; i < pcm16Samples.length; i++) {
+      const s = pcm16Samples[i];
+      upsampledSamples[i * 2] = s;
+      upsampledSamples[i * 2 + 1] = s;
+    }
+  } else {
+    upsampledSamples = pcm16Samples;
+  }
+  
+  // Create output buffer
+  const outDataLength = upsampledSamples.length * 2;
+  const header = Buffer.alloc(44);
+  header.write('RIFF', 0);
+  header.writeUInt32LE(36 + outDataLength, 4);
+  header.write('WAVE', 8);
+  header.write('fmt ', 12);
+  header.writeUInt32LE(16, 16);
+  header.writeUInt16LE(1, 20); // PCM
+  header.writeUInt16LE(1, 22); // Mono
+  header.writeUInt32LE(16000, 24); // 16kHz
+  header.writeUInt32LE(32000, 28); // 32000 bytes/sec
+  header.writeUInt16LE(2, 32); // BlockAlign
+  header.writeUInt16LE(16, 34); // 16-bit
+  header.write('data', 36);
+  header.writeUInt32LE(outDataLength, 40);
+  
+  const outAudioBuffer = Buffer.from(upsampledSamples.buffer, upsampledSamples.byteOffset, outDataLength);
+  const outBuffer = Buffer.concat([header, outAudioBuffer]);
+  
+  fs.writeFileSync(outputPath, outBuffer);
+}
+
 // Helper: Convert seconds to HH:MM:SS.mmm format
 function formatSecondsToTimeline(seconds) {
   const h = Math.floor(seconds / 3600);
@@ -112,7 +217,14 @@ async function transcribeViaGroq(filePath) {
     uploadPath = tempWavPath;
     hasTempFile = true;
   } catch (err) {
-    console.warn(`[Transcription] ffmpeg pre-conversion failed, uploading raw file: ${err.message}`);
+    console.warn(`[Transcription] ffmpeg pre-conversion failed: ${err.message}. Falling back to pure JS WAV decoder...`);
+    try {
+      decodeAndUpsampleWav(filePath, tempWavPath);
+      uploadPath = tempWavPath;
+      hasTempFile = true;
+    } catch (jsDecErr) {
+      console.warn(`[Transcription] Pure JS WAV decoder failed: ${jsDecErr.message}. Uploading raw file.`);
+    }
   }
 
   try {
