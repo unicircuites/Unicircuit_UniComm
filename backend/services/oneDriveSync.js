@@ -590,4 +590,5 @@ module.exports = {
   ensureLocalRecording,
   listOneDriveRecordings,
   getSyncStatus,
+  getTargetFolder,
 };
