@@ -1,9 +1,9 @@
 /**
- * Standalone OneDrive Folder-wise Migration Test Script (Database-free)
+ * Standalone OneDrive Folder-wise Migration Test Script (Database-free & Interactive)
  * ─────────────────────────────────────────────────────────────────────────────
- * This script runs independently of the database. It authenticates using the 
- * credentials in `.env`, scans the configured local folder, resolves your OneDrive 
- * sharing link, and uploads files preserving the folder structure.
+ * This script runs independently of the database. It asks you for the OneDrive link 
+ * and local path interactively in the terminal, then scans the local folder and 
+ * uploads all files preserving the directory structure.
  */
 
 // Load environment variables from backend/.env
@@ -13,24 +13,27 @@ const fetch = require('node-fetch');
 const fs = require('fs');
 const fsp = fs.promises;
 const path = require('path');
+const readline = require('readline');
 
-// ── CONFIGURATION (Edit these or let them read from .env) ────────────────────
+// MS Graph configuration (reads from .env)
 const CONFIG = {
-  // Microsoft App Credentials
   clientId:     process.env.MS_CLIENT_ID,
   tenantId:     process.env.MS_TENANT_ID,
   clientSecret: process.env.MS_CLIENT_SECRET,
   userEmail:    process.env.MS_USER_EMAIL || 'sales@unicircuites.com',
-
-  // OneDrive Target Sharing Link
-  oneDriveLink: process.env.ONEDRIVE_FOLDER_LINK || 'https://unicircuites-my.sharepoint.com/:f:/r/personal/sales_unicircuites_com/Documents/Call_Recordings?csf=1&web=1&e=e9ep1N',
-
-  // Local Folder containing recordings to test with
-  localSourceDir: 'D:\\Unicomm_Storage' // Change to a local folder with some files to test
+  oneDriveLink: '',
+  localSourceDir: ''
 };
 
 const GRAPH = 'https://graph.microsoft.com/v1.0';
 const folderIdCache = new Map(); // path string -> folder item ID
+
+// Create interactive terminal prompt interface
+const rl = readline.createInterface({
+  input: process.stdin,
+  output: process.stdout
+});
+const question = (query) => new Promise((resolve) => rl.question(query, resolve));
 
 // ── Helper: Get App Access Token ─────────────────────────────────────────────
 async function getAppToken() {
@@ -194,7 +197,7 @@ async function uploadFileToFolder(token, driveId, folderId, localFilePath, remot
   const { uploadUrl: sessionUrl } = await sessionRes.json();
 
   const CHUNK = 4 * 1024 * 1024;
-  const fileBuffer = await fsp.readFile(localFilePath);
+  const fileBuffer = await fsp.promises.readFile(localFilePath);
   let offset = 0;
 
   while (offset < stat.size) {
@@ -220,8 +223,31 @@ async function main() {
   console.log('========================================================');
   console.log('    OneDrive Folder-wise Standalone Migration Test      ');
   console.log('========================================================');
+
+  // Load defaults from .env
+  const defaultLink = process.env.ONEDRIVE_FOLDER_LINK || '';
+  const defaultDir = process.env.PBX_LOCAL_RECORDINGS_DIR || 'D:\\Unicomm_Storage';
+
+  console.log('\nPlease enter your testing parameters (press ENTER to use defaults):');
+
+  let oneDriveLinkInput = await question(`1. OneDrive Folder Link:\n   [Default: ${defaultLink || 'None'}]: `);
+  CONFIG.oneDriveLink = oneDriveLinkInput.trim() || defaultLink;
+
+  if (!CONFIG.oneDriveLink) {
+    console.error('❌ Error: OneDrive Folder Link is required.');
+    rl.close();
+    process.exit(1);
+  }
+
+  let localSourceDirInput = await question(`\n2. Local Source Directory:\n   [Default: ${defaultDir}]: `);
+  CONFIG.localSourceDir = localSourceDirInput.trim() || defaultDir;
+
+  rl.close(); // Close readline stream
+
+  console.log('\n--------------------------------------------------------');
   console.log('Local folder to scan:', CONFIG.localSourceDir);
   console.log('OneDrive link:', CONFIG.oneDriveLink);
+  console.log('--------------------------------------------------------');
 
   try {
     // 1. Authenticate
