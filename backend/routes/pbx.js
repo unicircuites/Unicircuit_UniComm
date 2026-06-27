@@ -891,4 +891,57 @@ router.get('/transcript-db/:id', async (req, res) => {
   }
 });
 
+// Get transcription script by file name/path (used by Call Logs list table)
+router.get('/transcript-file', async (req, res) => {
+  try {
+    const { file } = req.query;
+    if (!file) {
+      return res.status(400).json({ success: false, error: 'No file specified' });
+    }
+
+    const filename = path.basename(file);
+    // Find the record in the database by filename to get the local path
+    const result = await pool.query(
+      `SELECT id, original_filename, local_path FROM pbx_recordings WHERE original_filename = $1 OR local_path LIKE $2 LIMIT 1`,
+      [filename, `%${filename}`]
+    );
+
+    let filePath;
+    if (result.rows.length > 0) {
+      filePath = result.rows[0].local_path;
+    } else {
+      // If not in database, construct local path from cache dir
+      let LOCAL_CACHE_DIR = process.env.PBX_LOCAL_RECORDINGS_DIR || 'D:\\Unicomm_Storage';
+      if (process.platform === 'win32' && !fs.existsSync('D:\\') && LOCAL_CACHE_DIR.startsWith('D:')) {
+        LOCAL_CACHE_DIR = path.join(__dirname, '..', 'pbx_recordings');
+      }
+      filePath = path.join(LOCAL_CACHE_DIR, filename);
+    }
+
+    // Check if file is missing locally, try OneDrive restore
+    if (!fs.existsSync(filePath)) {
+      console.log(`[Transcript] Local file missing: ${filePath}. Restoring from OneDrive: ${filename}`);
+      try {
+        const restoredPath = await ensureLocalRecording(filename);
+        if (restoredPath && fs.existsSync(restoredPath)) {
+          filePath = restoredPath;
+        } else {
+          return res.status(404).json({ success: false, error: 'Recording file missing locally and on OneDrive' });
+        }
+      } catch (err) {
+        console.error('[Transcript] OneDrive download error:', err.message);
+        return res.status(404).json({ success: false, error: 'Recording file missing and OneDrive download failed' });
+      }
+    }
+
+    // Perform transcription (returns timeline segments + text)
+    const { transcribeRecording } = require('../services/transcriptionService');
+    const segments = await transcribeRecording(filePath);
+    res.json({ success: true, segments });
+  } catch (err) {
+    console.error('[API] Error transcribing recording by file name:', err.message);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 module.exports = router;

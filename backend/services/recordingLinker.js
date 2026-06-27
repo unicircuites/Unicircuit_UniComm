@@ -2,7 +2,10 @@ const fs = require('fs');
 const path = require('path');
 const pool = require('../db/pool');
 
-const LOCAL_STORED_DIR = process.env.PBX_LOCAL_RECORDINGS_DIR || 'D:\\Unicomm_Storage';
+let LOCAL_STORED_DIR = process.env.PBX_LOCAL_RECORDINGS_DIR || 'D:\\Unicomm_Storage';
+if (process.platform === 'win32' && !fs.existsSync('D:\\') && LOCAL_STORED_DIR.startsWith('D:')) {
+  LOCAL_STORED_DIR = path.join(__dirname, '..', 'pbx_recordings');
+}
 const TIMESTAMP_TOLERANCE_MS = parseInt(process.env.PBX_RECORDING_MATCH_TOLERANCE_MS || '1200000', 10); // 20 min default (date must still match exactly)
 const AUDIO_EXT_RE = /\.(wav|mp3|ogg|m4a)$/i;
 

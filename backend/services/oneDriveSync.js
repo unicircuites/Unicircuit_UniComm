@@ -35,7 +35,11 @@ const { getAccessToken, getClientCredentialsToken } = require('./msGraph');
 // PBX source: network share where the PBX deposits voice-mail/recording files
 const PBX_SOURCE_DIR  = process.env.PBX_RECORDINGS_DIR       || '\\\\UNISERVER\\MatrixVMS\\Voicemail_Backup';
 // Local FS cache on tower server (D:\Unicomm_Storage) — primary working store
-const LOCAL_CACHE_DIR = process.env.PBX_LOCAL_RECORDINGS_DIR || 'D:\\Unicomm_Storage';
+let LOCAL_CACHE_DIR = process.env.PBX_LOCAL_RECORDINGS_DIR || 'D:\\Unicomm_Storage';
+// Fallback for localhost developers who don't have a D: drive partition
+if (process.platform === 'win32' && !fs.existsSync('D:\\') && LOCAL_CACHE_DIR.startsWith('D:')) {
+  LOCAL_CACHE_DIR = path.join(__dirname, '..', 'pbx_recordings');
+}
 const CACHE_DAYS      = parseInt(process.env.ONEDRIVE_CACHE_DAYS || '30', 10);
 // OneDrive target folder name (used only when ONEDRIVE_FOLDER_LINK is NOT set)
 const OD_FOLDER       = process.env.ONEDRIVE_FOLDER           || 'Call_Recordings';

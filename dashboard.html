@@ -8961,6 +8961,67 @@ Always write in a professional yet warm Indian B2B communication style. Use form
       }
     };
 
+    window.showRecordingTranscriptByFile = async function(filePath) {
+      const filename = filePath.split(/[/\\]/).pop();
+      document.getElementById('pbx-trans-title').innerText = 'Transcript: ' + filename;
+      const audio = document.getElementById('pbx-trans-audio');
+      audio.src = '/api/calls/recordings/play?file=' + encodeURIComponent(filePath.replace(/\\/g, '/'));
+      audio.load();
+
+      openModal('pbx-transcript-modal');
+
+      const body = document.getElementById('pbx-trans-body');
+      body.innerHTML = `
+        <div style="text-align:center;color:var(--muted);padding:40px;font-style:italic;">
+          <i class="fas fa-spinner fa-spin" style="margin-right:8px;color:var(--gold);"></i>
+          Transcribing recording / loading script... (Hindi, Marathi, English, and Hinglish are all supported)
+        </div>
+      `;
+
+      try {
+        const res = await fetch('/api/pbx/transcript-file?file=' + encodeURIComponent(filePath));
+        const data = await res.json();
+        
+        if (!data.success) {
+          throw new Error(data.error || 'Failed to fetch transcript');
+        }
+
+        const segments = data.segments || [];
+        if (segments.length === 0) {
+          body.innerHTML = `
+            <div style="text-align:center;color:var(--muted);padding:40px;font-style:italic;">
+              No speech detected in this recording.
+            </div>
+          `;
+          return;
+        }
+
+        body.innerHTML = segments.map(function(seg) {
+          const displayStart = seg.start.split('.')[0];
+          const seconds = parseTimelineToSeconds(seg.start);
+
+          return `
+            <div style="display:flex;gap:14px;align-items:flex-start;border-bottom:1px solid rgba(255,255,255,0.03);padding-bottom:8px;margin-bottom:4px;">
+              <button class="btn btn-ghost btn-sm" onclick="seekPbxAudio(${seconds})" style="padding:2px 8px;font-size:11px;font-family:monospace;color:var(--gold);border:1px solid rgba(212,175,55,0.3);border-radius:6px;flex-shrink:0;height:24px;">
+                <i class="fas fa-play" style="font-size:8px;margin-right:4px;"></i> ${displayStart}
+              </button>
+              <div style="color:var(--text);font-size:13px;line-height:1.5;padding-top:2px;text-align:left;">
+                ${escHtml(seg.text)}
+              </div>
+            </div>
+          `;
+        }).join('');
+
+      } catch (err) {
+        body.innerHTML = `
+          <div style="text-align:center;color:var(--red2);padding:40px;font-style:italic;">
+            <i class="fas fa-exclamation-triangle" style="margin-right:8px;"></i>
+            Error loading transcript: ${err.message}
+          </div>
+        `;
+      }
+    };
+
     // ──────────────────────────────────
     // CONTACTS MODULE
     // ──────────────────────────────────
@@ -33741,7 +33802,8 @@ ${plainText}`;
             const recordingCell = hasRecording
               ? `<div style="display:flex;gap:4px;">
                    <button class="btn btn-green btn-xs" onclick="event.stopPropagation();pbxPlayRecording('${escAttr(log.recording_file)}')" title="Play Recording"><i class="fas fa-play"></i> Play</button>
-                   <a href="${API_BASE}/calls/recordings/play?file=${encodeURIComponent(log.recording_file.replace(/\\\\/g, '/'))}" download class="btn btn-ghost btn-xs" onclick="event.stopPropagation();" title="Download"><i class="fas fa-download"></i></a>
+                   <button class="btn btn-ghost btn-xs" onclick="event.stopPropagation();showRecordingTranscriptByFile('${escAttr(log.recording_file)}')" title="View Script" style="display:flex;align-items:center;gap:4px;"><i class="fas fa-file-alt" style="color:var(--gold);"></i> Script</button>
+                   <a href="${API_BASE}/calls/recordings/play?file=${encodeURIComponent(log.recording_file.replace(/\\/g, '/'))}" download class="btn btn-ghost btn-xs" onclick="event.stopPropagation();" title="Download"><i class="fas fa-download"></i></a>
                  </div>`
               : `<button class="btn btn-ghost btn-xs" disabled style="opacity:0.5;" title="Not Available"><i class="fas fa-microphone-slash"></i> N/A</button>`;
 
@@ -33872,7 +33934,8 @@ ${plainText}`;
 
         <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:14px;flex-wrap:wrap;">
           ${/\.(wav|mp3|ogg|m4a)$/i.test(String(log.recording_file || '').trim())
-            ? `<button class="btn btn-green btn-sm" onclick="pbxPlayRecording('${escAttr(log.recording_file)}')"><i class="fas fa-play"></i> Play Recording</button>` : ''}
+            ? `<button class="btn btn-green btn-sm" onclick="pbxPlayRecording('${escAttr(log.recording_file)}')"><i class="fas fa-play"></i> Play Recording</button>
+               <button class="btn btn-ghost btn-sm" onclick="closeModal('pbx-call-details-modal');showRecordingTranscriptByFile('${escAttr(log.recording_file)}')"><i class="fas fa-file-alt" style="color:var(--gold);"></i> View Script</button>` : ''}
           ${caller ? (contactName
             ? `<button class="btn btn-gold btn-sm" onclick="pbxSaveContactModal(${jsArg(caller)},${jsArg(contactName)},${jsArg(savedCompany)},${jsArg(savedNotes)},${jsArg(log.email||'')},${jsArg(log.mobile_phone||'')});closeModal('pbx-call-details-modal')"><i class="fas fa-pen"></i> Edit Contact</button>`
             : `<button class="btn btn-ghost btn-sm" onclick="pbxSaveContactModal(${jsArg(caller)});closeModal('pbx-call-details-modal')"><i class="fas fa-user-plus"></i> Save Contact</button>`) : ''}
