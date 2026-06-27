@@ -109,6 +109,32 @@ function decodeAndUpsampleWav(inputPath, outputPath) {
     upsampledSamples = pcm16Samples;
   }
   
+  // Apply block-based Automatic Gain Control (AGC) to boost quiet voices
+  const blockSize = 8000; // 0.5 seconds at 16kHz
+  const targetPeak = 24000;
+  const noiseFloor = 300;
+  
+  for (let i = 0; i < upsampledSamples.length; i += blockSize) {
+    const blockEnd = Math.min(i + blockSize, upsampledSamples.length);
+    let blockPeak = 0;
+    
+    for (let j = i; j < blockEnd; j++) {
+      const absVal = Math.abs(upsampledSamples[j]);
+      if (absVal > blockPeak) blockPeak = absVal;
+    }
+    
+    if (blockPeak > noiseFloor) {
+      const gain = targetPeak / blockPeak;
+      const appliedGain = Math.min(gain, 5.0); // max 5x gain boost
+      for (let j = i; j < blockEnd; j++) {
+        let sample = upsampledSamples[j] * appliedGain;
+        if (sample > 32767) sample = 32767;
+        else if (sample < -32768) sample = -32768;
+        upsampledSamples[j] = sample;
+      }
+    }
+  }
+  
   // Create output buffer
   const outDataLength = upsampledSamples.length * 2;
   const header = Buffer.alloc(44);
