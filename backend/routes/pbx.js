@@ -849,4 +849,46 @@ router.post('/onedrive-sync', async (req, res) => {
   }
 });
 
+// Get transcription script for a specific recording (timeline + text)
+router.get('/transcript-db/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const result = await pool.query(
+      `SELECT original_filename, local_path FROM pbx_recordings WHERE id = $1 LIMIT 1`,
+      [id]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ success: false, error: 'Recording not found in database' });
+    }
+
+    let filePath = result.rows[0].local_path;
+
+    // Check if file is missing locally, try OneDrive restore
+    if (!fs.existsSync(filePath)) {
+      const filename = result.rows[0].original_filename || path.basename(filePath);
+      console.log(`[Transcript] Local file missing: ${filePath}. Restoring from OneDrive: ${filename}`);
+      try {
+        const restoredPath = await ensureLocalRecording(filename);
+        if (restoredPath && fs.existsSync(restoredPath)) {
+          filePath = restoredPath;
+        } else {
+          return res.status(404).json({ success: false, error: 'Recording file missing locally and on OneDrive' });
+        }
+      } catch (err) {
+        console.error('[Transcript] OneDrive download error:', err.message);
+        return res.status(404).json({ success: false, error: 'Recording file missing and OneDrive download failed' });
+      }
+    }
+
+    // Perform transcription (returns timeline segments + text)
+    const { transcribeRecording } = require('../services/transcriptionService');
+    const segments = await transcribeRecording(filePath);
+    res.json({ success: true, segments });
+  } catch (err) {
+    console.error('[API] Error transcribing recording:', err.message);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 module.exports = router;
