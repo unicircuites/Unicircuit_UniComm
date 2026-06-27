@@ -8901,24 +8901,32 @@ Always write in a professional yet warm Indian B2B communication style. Use form
       }
     };
 
-    window.showRecordingTranscript = async function(recordingId, filename) {
+    window.showRecordingTranscript = async function(recordingId, filename, force = false) {
       document.getElementById('pbx-trans-title').innerText = 'Transcript: ' + filename;
       const audio = document.getElementById('pbx-trans-audio');
-      audio.src = '/api/pbx/play-db/' + recordingId;
-      audio.load();
+      if (!force) {
+        audio.src = '/api/pbx/play-db/' + recordingId;
+        audio.load();
+      }
 
       openModal('pbx-transcript-modal');
+
+      const refreshBtn = document.getElementById('pbx-trans-refresh-btn');
+      refreshBtn.onclick = function() {
+        showRecordingTranscript(recordingId, filename, true);
+      };
 
       const body = document.getElementById('pbx-trans-body');
       body.innerHTML = `
         <div style="text-align:center;color:var(--muted);padding:40px;font-style:italic;">
           <i class="fas fa-spinner fa-spin" style="margin-right:8px;color:var(--gold);"></i>
-          Transcribing recording / loading script... (Hindi, Marathi, English, and Hinglish are all supported)
+          ${force ? 'Regenerating script with high-accuracy prompts...' : 'Transcribing recording / loading script... (Hindi, Marathi, English, and Hinglish are all supported)'}
         </div>
       `;
 
       try {
-        const res = await fetch('/api/pbx/transcript-db/' + recordingId);
+        const url = '/api/pbx/transcript-db/' + recordingId + (force ? '?nocache=true' : '');
+        const res = await fetch(url);
         const data = await res.json();
         
         if (!data.success) {
@@ -8961,25 +8969,33 @@ Always write in a professional yet warm Indian B2B communication style. Use form
       }
     };
 
-    window.showRecordingTranscriptByFile = async function(filePath) {
+    window.showRecordingTranscriptByFile = async function(filePath, force = false) {
       const filename = filePath.split(/[/\\]/).pop();
       document.getElementById('pbx-trans-title').innerText = 'Transcript: ' + filename;
       const audio = document.getElementById('pbx-trans-audio');
-      audio.src = '/api/calls/recordings/play?file=' + encodeURIComponent(filePath.replace(/\\/g, '/'));
-      audio.load();
+      if (!force) {
+        audio.src = '/api/calls/recordings/play?file=' + encodeURIComponent(filePath.replace(/\\/g, '/'));
+        audio.load();
+      }
 
       openModal('pbx-transcript-modal');
+
+      const refreshBtn = document.getElementById('pbx-trans-refresh-btn');
+      refreshBtn.onclick = function() {
+        showRecordingTranscriptByFile(filePath, true);
+      };
 
       const body = document.getElementById('pbx-trans-body');
       body.innerHTML = `
         <div style="text-align:center;color:var(--muted);padding:40px;font-style:italic;">
           <i class="fas fa-spinner fa-spin" style="margin-right:8px;color:var(--gold);"></i>
-          Transcribing recording / loading script... (Hindi, Marathi, English, and Hinglish are all supported)
+          ${force ? 'Regenerating script with high-accuracy prompts...' : 'Transcribing recording / loading script... (Hindi, Marathi, English, and Hinglish are all supported)'}
         </div>
       `;
 
       try {
-        const res = await fetch('/api/pbx/transcript-file?file=' + encodeURIComponent(filePath));
+        const url = '/api/pbx/transcript-file?file=' + encodeURIComponent(filePath) + (force ? '&nocache=true' : '');
+        const res = await fetch(url);
         const data = await res.json();
         
         if (!data.success) {
@@ -37439,11 +37455,16 @@ Provide insight in a numbered list. Highlight risks and positives.`;
   <div class="modal-overlay" id="pbx-transcript-modal">
     <div class="modal" style="max-width:760px;width:94vw;max-height:86vh;display:flex;flex-direction:column;padding:18px;">
       <div class="modal-title" style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-shrink:0;">
-        <span style="font-weight:700;font-size:16px;color:var(--text);display:flex;align-items:center;gap:8px;">
+        <span style="font-weight:700;font-size:16px;color:var(--text);display:flex;align-items:center;gap:8px;max-width:70%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">
           <i class="fas fa-file-alt" style="color:var(--gold);"></i>
           <span id="pbx-trans-title">Recording Transcript</span>
         </span>
-        <span class="modal-close" onclick="closeModal('pbx-transcript-modal')" style="cursor:pointer;color:var(--muted);"><i class="fas fa-times"></i></span>
+        <div style="display:flex;align-items:center;gap:12px;">
+          <button id="pbx-trans-refresh-btn" class="btn btn-ghost btn-xs" title="Regenerate Script (Bypass Cache)" style="padding:4px 8px;font-size:11px;color:var(--muted);display:flex;align-items:center;gap:4px;border:1px solid rgba(255,255,255,0.07);border-radius:6px;">
+            <i class="fas fa-sync-alt"></i> Regenerate
+          </button>
+          <span class="modal-close" onclick="closeModal('pbx-transcript-modal')" style="cursor:pointer;color:var(--muted);"><i class="fas fa-times"></i></span>
+        </div>
       </div>
       
       <!-- Modal Player -->

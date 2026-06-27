@@ -853,6 +853,7 @@ router.post('/onedrive-sync', async (req, res) => {
 router.get('/transcript-db/:id', async (req, res) => {
   try {
     const { id } = req.params;
+    const nocache = req.query.nocache === 'true';
     const result = await pool.query(
       `SELECT original_filename, local_path FROM pbx_recordings WHERE id = $1 LIMIT 1`,
       [id]
@@ -883,7 +884,7 @@ router.get('/transcript-db/:id', async (req, res) => {
 
     // Perform transcription (returns timeline segments + text)
     const { transcribeRecording } = require('../services/transcriptionService');
-    const segments = await transcribeRecording(filePath);
+    const segments = await transcribeRecording(filePath, nocache);
     res.json({ success: true, segments });
   } catch (err) {
     console.error('[API] Error transcribing recording:', err.message);
@@ -894,7 +895,7 @@ router.get('/transcript-db/:id', async (req, res) => {
 // Get transcription script by file name/path (used by Call Logs list table)
 router.get('/transcript-file', async (req, res) => {
   try {
-    const { file } = req.query;
+    const { file, nocache } = req.query;
     if (!file) {
       return res.status(400).json({ success: false, error: 'No file specified' });
     }
@@ -936,7 +937,7 @@ router.get('/transcript-file', async (req, res) => {
 
     // Perform transcription (returns timeline segments + text)
     const { transcribeRecording } = require('../services/transcriptionService');
-    const segments = await transcribeRecording(filePath);
+    const segments = await transcribeRecording(filePath, nocache === 'true');
     res.json({ success: true, segments });
   } catch (err) {
     console.error('[API] Error transcribing recording by file name:', err.message);

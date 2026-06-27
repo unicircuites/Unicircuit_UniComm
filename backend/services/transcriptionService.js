@@ -107,6 +107,8 @@ async function transcribeViaGroq(filePath) {
   formData.append('file', fileBlob, path.basename(filePath));
   formData.append('model', GROQ_MODEL);
   formData.append('response_format', 'verbose_json');
+  formData.append('temperature', '0.0');
+  formData.append('prompt', 'Hello, welcome to Unicircuit. Haan, main check karke batata hoon. Yes sir, quotation ready hai, please check. OK, please wait. Adani, lead active, lead closed, WhatsApp broadcast, extension, caller, recording, details, talk, connect, discuss.');
 
   const response = await fetch('https://api.groq.com/openai/v1/audio/transcriptions', {
     method: 'POST',
@@ -132,7 +134,7 @@ async function transcribeViaGroq(filePath) {
 }
 
 // ── Main Transcription Function ──────────────────────────────────────────────
-async function transcribeRecording(filePath) {
+async function transcribeRecording(filePath, forceRefresh = false) {
   if (!fs.existsSync(filePath)) {
     throw new Error(`Recording file not found: ${filePath}`);
   }
@@ -140,13 +142,15 @@ async function transcribeRecording(filePath) {
   const transcriptPath = filePath.replace(/\.(wav|mp3|ogg|m4a)$/i, '_transcript.json');
 
   // Check if transcript file already exists
-  try {
-    await fsp.access(transcriptPath);
-    console.log(`[Transcription] Cache hit! Reading existing transcript: ${transcriptPath}`);
-    const raw = await fsp.readFile(transcriptPath, 'utf8');
-    return JSON.parse(raw);
-  } catch (err) {
-    // File doesn't exist, proceed to transcribe
+  if (!forceRefresh) {
+    try {
+      await fsp.access(transcriptPath);
+      console.log(`[Transcription] Cache hit! Reading existing transcript: ${transcriptPath}`);
+      const raw = await fsp.readFile(transcriptPath, 'utf8');
+      return JSON.parse(raw);
+    } catch (err) {
+      // File doesn't exist, proceed to transcribe
+    }
   }
 
   let segments = [];
