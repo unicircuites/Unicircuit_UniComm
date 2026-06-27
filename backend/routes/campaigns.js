@@ -223,19 +223,27 @@ router.post('/:id/launch', async (req, res) => {
 
   // Send in background
   const delayMs = parseInt(campaign.send_interval_ms || 180000);
+  let lastDeliverySnapshotAt = 0;
+  const deliverySnapshotEvery = Math.max(1, parseInt(process.env.BROADCAST_DELIVERY_SNAPSHOT_EVERY || '10', 10) || 10);
+
   eb.sendBroadcast(recipients, subject, html, async (sent, failed, _current, results) => {
-    const doneByEmail = new Map(results.deliveries.map((d) => [String(d.email || '').toLowerCase(), d]));
-    const mergedDeliveries = pendingDeliveries.map((d) => doneByEmail.get(String(d.email || '').toLowerCase()) || d);
+    const progress = parseFloat((((sent + failed) / recipients.length) * 100).toFixed(2));
+    const bounceRate = failed > 0 ? parseFloat(((failed / recipients.length) * 100).toFixed(2)) : 0;
     await pool.query(`
-      UPDATE campaigns SET progress=$1,
-        bounce_rate=$2, deliveries=$3
-      WHERE id=$4
-    `, [
-      parseFloat((((sent + failed) / recipients.length) * 100).toFixed(2)),
-      failed > 0 ? parseFloat(((failed / recipients.length) * 100).toFixed(2)) : 0,
-      JSON.stringify(mergedDeliveries),
-      req.params.id,
-    ]);
+      UPDATE campaigns SET progress=$1, bounce_rate=$2
+      WHERE id=$3
+    `, [progress, bounceRate, req.params.id]);
+
+    const done = sent + failed;
+    if (done - lastDeliverySnapshotAt >= deliverySnapshotEvery || done === recipients.length) {
+      lastDeliverySnapshotAt = done;
+      const doneByEmail = new Map(results.deliveries.map((d) => [String(d.email || '').toLowerCase(), d]));
+      const mergedDeliveries = pendingDeliveries.map((d) => doneByEmail.get(String(d.email || '').toLowerCase()) || d);
+      await pool.query(`
+        UPDATE campaigns SET deliveries=$1
+        WHERE id=$2
+      `, [JSON.stringify(mergedDeliveries), req.params.id]);
+    }
   }, delayMs, safeAttachments)
     .then(async (results) => {
       try {

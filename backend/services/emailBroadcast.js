@@ -116,14 +116,14 @@ function appendUnsubscribeFooter(html, recipientEmail) {
   return html + footer;
 }
 
-function buildMailOptions(to, subject, html, text, attachments) {
+function buildMailOptions(to, subject, html, text, preparedAttachments) {
   return {
     from: `"${process.env.SMTP_FROM_NAME || 'Unicircuit'}" <${process.env.SMTP_FROM || process.env.SMTP_USER}>`,
     to,
     subject,
     html,
     text: text || html.replace(/<[^>]+>/g, ''),
-    attachments: normalizeAttachments(attachments),
+    attachments: preparedAttachments,
   };
 }
 
@@ -153,20 +153,12 @@ async function sendMailWithRetry(transporter, mailOptions) {
 }
 
 async function sendOne(to, subject, html, text, attachments) {
+  const preparedAttachments = normalizeAttachments(attachments);
   const t = getTransporter();
   try {
-    return await sendMailWithRetry(t, buildMailOptions(to, subject, html, text, attachments));
+    return await sendMailWithRetry(t, buildMailOptions(to, subject, html, text, preparedAttachments));
   } finally {
     await closeTransporter();
-  }
-}
-
-async function reportProgress(onProgress, results, email) {
-  if (!onProgress) return;
-  try {
-    await onProgress(results.sent, results.failed, email, results);
-  } catch (err) {
-    console.error(`[Broadcast] Progress log update failed for ${email}:`, err.message);
   }
 }
 
@@ -178,7 +170,17 @@ async function sendBroadcast(recipients, subject, html, onProgress, delayMs = 20
   const results = { sent: 0, failed: 0, errors: [], deliveries: [] };
   const safeBatchSize = Math.max(1, parseInt(batchSize || 1, 10) || 1);
   const safeDelayMs = Math.max(0, parseInt(delayMs || 0, 10) || 0);
+  const preparedAttachments = normalizeAttachments(attachments);
   const transporter = getTransporter();
+  let progressChain = Promise.resolve();
+  const queueProgress = (email) => {
+    if (!onProgress) return;
+    progressChain = progressChain
+      .then(() => onProgress(results.sent, results.failed, email, results))
+      .catch((err) => {
+        console.error(`[Broadcast] Progress log update failed for ${email}:`, err.message);
+      });
+  };
 
   try {
     for (let i = 0; i < recipients.length; i++) {
@@ -190,7 +192,10 @@ async function sendBroadcast(recipients, subject, html, onProgress, delayMs = 20
         results.failed++;
         results.errors.push({ email, error: 'Invalid email' });
         results.deliveries.push({ email, name, status: 'failed', error: 'Invalid email', sent_at: new Date().toISOString() });
-        await reportProgress(onProgress, results, email);
+        queueProgress(email);
+        if (i < recipients.length - 1 && shouldApplySendDelay(i, safeBatchSize, safeDelayMs)) {
+          await new Promise((resolve) => setTimeout(resolve, safeDelayMs));
+        }
         continue;
       }
 
@@ -203,7 +208,7 @@ async function sendBroadcast(recipients, subject, html, onProgress, delayMs = 20
 
       const sentAt = new Date().toISOString();
       try {
-        const info = await sendMailWithRetry(transporter, buildMailOptions(email, personalSubject, personalHtml, null, attachments));
+        const info = await sendMailWithRetry(transporter, buildMailOptions(email, personalSubject, personalHtml, null, preparedAttachments));
         const accepted = Array.isArray(info.accepted) ? info.accepted.map((v) => String(v).toLowerCase()) : [];
         const rejected = Array.isArray(info.rejected) ? info.rejected.map((v) => String(v).toLowerCase()) : [];
         const lowerEmail = String(email).toLowerCase();
@@ -220,18 +225,25 @@ async function sendBroadcast(recipients, subject, html, onProgress, delayMs = 20
         console.error(`[Broadcast] Failed → ${email}:`, err.message);
       }
 
-      await reportProgress(onProgress, results, email);
-
-      // Delay after each batch to avoid rate limiting.
-      if (i < recipients.length - 1 && (i + 1) % safeBatchSize === 0 && safeDelayMs > 0) {
+      // Fixed delay between recipients — not inflated by DB/progress work.
+      if (i < recipients.length - 1 && shouldApplySendDelay(i, safeBatchSize, safeDelayMs)) {
         await new Promise((resolve) => setTimeout(resolve, safeDelayMs));
       }
+
+      queueProgress(email);
     }
   } finally {
+    await progressChain;
     await closeTransporter();
   }
 
   return results;
+}
+
+function shouldApplySendDelay(index, batchSize, delayMs) {
+  if (delayMs <= 0) return false;
+  if (batchSize <= 1) return true;
+  return (index + 1) % batchSize === 0;
 }
 
 module.exports = { sendOne, sendBroadcast, verifyConnection, normalizeAttachments, closeTransporter };

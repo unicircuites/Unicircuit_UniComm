@@ -12395,29 +12395,57 @@ Keep it concise and professional.`;
       } catch (err) { console.error('loadWaBroadcastsUser:', err); tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:20px;color:var(--red2);">Error loading broadcasts</td></tr>'; }
     }
 
-    function openWaBroadcastPreview(id) {
-      var b = _waBroadcastMap[id];
-      if (!b) return;
-      var sc = b.status === 'sent' ? 'b-green' : b.status === 'sending' ? 'b-gold' : b.status === 'failed' ? 'b-red' : 'b-gray';
+    async function openWaBroadcastPreview(id, keepOpen) {
+      try {
+        _currentWaBroadcastPreviewId = id;
+        var res = await fetch(API_BASE + '/wa/broadcast/' + id, { headers: getAuthHeaders() });
+        var b = await res.json();
+        if (!res.ok) throw new Error(b.error || 'Not found');
+        _waBroadcastMap[id] = b;
+      var sc = b.status === 'sent' ? 'b-green' : b.status === 'sending' ? 'b-gold' : b.status === 'failed' ? 'b-red' : b.status === 'partial' ? 'b-gold' : 'b-gray';
       document.getElementById('wabp-total').textContent = b.total || 0;
       document.getElementById('wabp-sent').textContent = b.sent || 0;
       document.getElementById('wabp-failed').textContent = b.failed || 0;
       document.getElementById('wabp-status').innerHTML = '<span class="badge ' + sc + '">' + (b.status||'sending') + '</span>';
       document.getElementById('wabp-date').textContent = b.sent_at ? new Date(b.sent_at).toLocaleString('en-IN', { day:'2-digit', month:'short', year:'numeric', hour:'2-digit', minute:'2-digit' }) : '—';
       document.getElementById('wabp-message').textContent = b.full_message || b.message || '';
-      // Recipients list
       var rcpEl = document.getElementById('wabp-recipients-list');
       var rcps = b.recipients || [];
       if (typeof rcps === 'string') { try { rcps = JSON.parse(rcps); } catch(_) { rcps = []; } }
+      var deliveries = b.deliveries || [];
+      if (typeof deliveries === 'string') { try { deliveries = JSON.parse(deliveries); } catch(_) { deliveries = []; } }
+      var deliveryMap = {};
+      deliveries.forEach(function(d) { if (d.jid) deliveryMap[String(d.jid).toLowerCase()] = d; });
       if (rcps.length) {
         rcpEl.innerHTML = rcps.map(function(r) {
+          var d = deliveryMap[String(r.jid || '').toLowerCase()];
+          var statusBadge = d
+            ? (d.status === 'sent'
+              ? '<span style="font-size:9px;color:var(--green2);margin-left:6px;"><i class="fas fa-check-circle"></i> sent</span>'
+              : d.status === 'failed'
+                ? '<span style="font-size:9px;color:var(--red2);margin-left:6px;"><i class="fas fa-times-circle"></i> failed</span>'
+                : '<span style="font-size:9px;color:var(--gold);margin-left:6px;"><i class="fas fa-hourglass-half"></i> pending</span>')
+            : '<span style="font-size:9px;color:var(--gold);margin-left:6px;"><i class="fas fa-hourglass-half"></i> pending</span>';
           var label = r.name ? '<b style="color:var(--text);">' + escHtml(r.name) + '</b> <span style="color:var(--muted);font-size:11px;">' + escHtml(r.jid) + '</span>' : escHtml(r.jid);
-          return '<div style="padding:5px 0;border-bottom:1px solid rgba(255,255,255,0.05);font-size:12px;color:var(--muted2);">' + label + '</div>';
+          return '<div style="padding:5px 0;border-bottom:1px solid rgba(255,255,255,0.05);font-size:12px;color:var(--muted2);display:flex;align-items:center;flex-wrap:wrap;gap:2px;">' + label + statusBadge + '</div>';
         }).join('');
       } else {
         rcpEl.innerHTML = '<div style="font-size:12px;color:var(--muted);padding:8px 0;">No recipient data (sent before tracking was added)</div>';
       }
-      openModal('wa-broadcast-preview-modal');
+      var undelivered = countUndeliveredFromDeliveries(deliveries, b.total, b.sent);
+      var resendWrap = document.getElementById('wabp-resend-wrap');
+      var resendCount = document.getElementById('wabp-resend-count');
+      var resendBtn = document.getElementById('wabp-resend-btn');
+      if (resendWrap) resendWrap.style.display = undelivered > 0 || b.status === 'sending' ? 'flex' : 'none';
+      if (resendCount) resendCount.textContent = undelivered;
+      if (resendBtn) {
+        resendBtn.disabled = b.status === 'sending' || undelivered === 0;
+        resendBtn.title = b.status === 'sending'
+          ? 'Broadcast is currently sending'
+          : (undelivered > 0 ? 'Send only to pending/failed recipients' : 'All recipients already received this broadcast');
+      }
+      if (!keepOpen) openModal('wa-broadcast-preview-modal');
+      } catch (err) { notify('Error', err.message, 'var(--red)', 'fas fa-exclamation-circle'); }
     }
 
     async function deleteWaBroadcast(id, btn) {
@@ -13507,6 +13535,84 @@ Keep it concise and professional.`;
     }
 
     var _currentBroadcastPreviewId = null;
+    var _currentWaBroadcastPreviewId = null;
+
+    function countUndeliveredFromDeliveries(deliveries, total, sent) {
+      var list = deliveries || [];
+      if (typeof list === 'string') { try { list = JSON.parse(list); } catch (_) { list = []; } }
+      if (!Array.isArray(list)) list = [];
+      if (list.length) return list.filter(function (d) { return d.status !== 'sent'; }).length;
+      return Math.max(0, (parseInt(total || 0, 10) || 0) - (parseInt(sent || 0, 10) || 0));
+    }
+
+    async function resendBroadcast() {
+      if (!_currentBroadcastPreviewId) return;
+      var delaySec = parseInt((document.getElementById('bp-resend-delay-sec') || {}).value || '3', 10);
+      var delayMs = Math.max(0, delaySec) * 1000;
+      if (!confirm('Resend to all pending/failed recipients?\n\nRecipients who already received this email will be skipped (no duplicate send).')) return;
+      var btn = document.getElementById('bp-resend-btn');
+      if (btn) { btn.disabled = true; btn.innerHTML = '<span class="spin-loader"></span> Resuming...'; }
+      try {
+        var res = await fetch(API_BASE + '/broadcast/' + _currentBroadcastPreviewId + '/resend', {
+          method: 'POST',
+          headers: getAuthHeaders(),
+          body: JSON.stringify({ delay_ms: delayMs })
+        });
+        var data = await res.json();
+        if (res.ok) {
+          notify('Broadcast resumed', data.message || ('Queued ' + (data.queued || 0)), 'var(--green2)', 'fas fa-redo');
+          setTimeout(refreshBroadcastPreviewLog, 1200);
+          loadBroadcasts();
+        } else {
+          notify('Resend failed', data.error || 'Failed', 'var(--red)', 'fas fa-exclamation-circle');
+        }
+      } catch (err) {
+        notify('Resend failed', err.message, 'var(--red)', 'fas fa-exclamation-circle');
+      } finally {
+        if (btn) {
+          btn.disabled = false;
+          btn.innerHTML = '<i class="fas fa-redo"></i> Resend pending/failed (<span id="bp-resend-count">0</span>)';
+          openBroadcastPreview(_currentBroadcastPreviewId, true);
+        }
+      }
+    }
+
+    async function resendWaBroadcast() {
+      if (!_currentWaBroadcastPreviewId) return;
+      var delaySec = parseInt((document.getElementById('wabp-resend-delay-sec') || {}).value || '3', 10);
+      var delayMs = Math.max(500, delaySec * 1000);
+      if (!confirm('Resend to all pending/failed WhatsApp recipients?\n\nRecipients who already received this message will be skipped (no duplicate send).')) return;
+      var btn = document.getElementById('wabp-resend-btn');
+      if (btn) { btn.disabled = true; btn.innerHTML = '<span class="spin-loader"></span> Resuming...'; }
+      try {
+        var res = await fetch(API_BASE + '/wa/broadcast/' + _currentWaBroadcastPreviewId + '/resend', {
+          method: 'POST',
+          headers: getAuthHeaders(),
+          body: JSON.stringify({ delay_ms: delayMs })
+        });
+        var data = await res.json();
+        if (res.ok) {
+          notify('WA broadcast resumed', data.message || ('Queued ' + (data.queued || 0)), 'var(--green2)', 'fab fa-whatsapp');
+          setTimeout(refreshWaBroadcastPreviewLog, 1200);
+          loadWaBroadcasts();
+          loadWaBroadcastsUser();
+        } else {
+          notify('Resend failed', data.error || 'Failed', 'var(--red)', 'fas fa-exclamation-circle');
+        }
+      } catch (err) {
+        notify('Resend failed', err.message, 'var(--red)', 'fas fa-exclamation-circle');
+      } finally {
+        if (btn) {
+          btn.disabled = false;
+          btn.innerHTML = '<i class="fas fa-redo"></i> Resend pending/failed (<span id="wabp-resend-count">0</span>)';
+          openWaBroadcastPreview(_currentWaBroadcastPreviewId, true);
+        }
+      }
+    }
+
+    async function refreshWaBroadcastPreviewLog() {
+      if (_currentWaBroadcastPreviewId) await openWaBroadcastPreview(_currentWaBroadcastPreviewId, true);
+    }
 
     async function refreshBroadcastPreviewLog() {
       if (_currentBroadcastPreviewId) await openBroadcastPreview(_currentBroadcastPreviewId, true);
@@ -13535,15 +13641,15 @@ Keep it concise and professional.`;
         var fromEl = document.getElementById('bp-from');
         if (fromEl) fromEl.textContent = 'noreply@unicircuites.live';
 
+        var deliveries = b.deliveries || [];
+        if (typeof deliveries === 'string') { try { deliveries = JSON.parse(deliveries); } catch (_) { deliveries = []; } }
+
         // Recipients list — show with delivery timestamp if available
         var rcpEl = document.getElementById('bp-recipients-list');
         if (rcpEl) {
           var rcps = b.recipients || [];
           if (typeof rcps === 'string') { try { rcps = JSON.parse(rcps); } catch (_) { rcps = []; } }
 
-          // Build delivery map from deliveries array
-          var deliveries = b.deliveries || [];
-          if (typeof deliveries === 'string') { try { deliveries = JSON.parse(deliveries); } catch (_) { deliveries = []; } }
           var deliveryMap = {};
           deliveries.forEach(function (d) { if (d.email) deliveryMap[String(d.email).toLowerCase()] = d; });
 
@@ -13606,6 +13712,19 @@ Keep it concise and professional.`;
           errEl.innerHTML = errors.map(function (e) { return '<div style="padding:3px 0;font-size:11.5px;color:var(--red2);">' + (e.email || '') + ' — ' + (e.error || '') + '</div>'; }).join('');
         } else {
           errWrap.style.display = 'none';
+        }
+
+        var undelivered = countUndeliveredFromDeliveries(deliveries, b.total, b.sent);
+        var resendWrap = document.getElementById('bp-resend-wrap');
+        var resendCount = document.getElementById('bp-resend-count');
+        var resendBtn = document.getElementById('bp-resend-btn');
+        if (resendWrap) resendWrap.style.display = (undelivered > 0 || b.status === 'sending') ? 'flex' : 'none';
+        if (resendCount) resendCount.textContent = undelivered;
+        if (resendBtn) {
+          resendBtn.disabled = b.status === 'sending' || undelivered === 0;
+          resendBtn.title = b.status === 'sending'
+            ? 'Broadcast is currently sending'
+            : (undelivered > 0 ? 'Send only to pending/failed recipients' : 'All recipients already received this broadcast');
         }
 
         if (!keepOpen) openModal('broadcast-preview-modal');
@@ -37027,7 +37146,15 @@ Provide insight in a numbered list. Highlight risks and positives.`;
         </div>
       </div>
 
-      <div style="display:flex;gap:8px;justify-content:flex-end;">
+      <div style="display:flex;gap:8px;justify-content:flex-end;align-items:center;flex-wrap:wrap;">
+        <div id="bp-resend-wrap" style="display:none;flex:1;align-items:center;gap:8px;flex-wrap:wrap;">
+          <span style="font-size:11px;color:var(--muted);">Resend delay:</span>
+          <input class="inp" id="bp-resend-delay-sec" type="number" min="0" value="3" style="width:70px;padding:4px 8px;font-size:12px;" />
+          <span style="font-size:11px;color:var(--muted);">sec between each</span>
+          <button class="btn btn-gold btn-sm" id="bp-resend-btn" onclick="resendBroadcast()" title="Send only to pending/failed recipients">
+            <i class="fas fa-redo"></i> Resend pending/failed (<span id="bp-resend-count">0</span>)
+          </button>
+        </div>
         <button class="btn btn-ghost btn-sm" onclick="refreshBroadcastPreviewLog()">
           <i class="fas fa-sync-alt"></i> Refresh Log
         </button>
@@ -37057,7 +37184,16 @@ Provide insight in a numbered list. Highlight risks and positives.`;
       <div id="wabp-message" style="background:rgba(255,255,255,0.04);border:1px solid var(--border);border-radius:8px;padding:12px;font-size:13px;color:var(--text);white-space:pre-wrap;max-height:180px;overflow-y:auto;margin-bottom:14px;"></div>
       <div style="margin-bottom:6px;font-size:9.5px;color:var(--muted);text-transform:uppercase;letter-spacing:0.5px;">Recipients</div>
       <div id="wabp-recipients-list" style="background:rgba(255,255,255,0.04);border:1px solid var(--border);border-radius:8px;padding:8px 12px;max-height:200px;overflow-y:auto;"></div>
-      <div style="display:flex;justify-content:flex-end;margin-top:14px;">
+      <div style="display:flex;gap:8px;justify-content:flex-end;align-items:center;flex-wrap:wrap;margin-top:14px;">
+        <div id="wabp-resend-wrap" style="display:none;flex:1;align-items:center;gap:8px;flex-wrap:wrap;">
+          <span style="font-size:11px;color:var(--muted);">Resend delay:</span>
+          <input class="inp" id="wabp-resend-delay-sec" type="number" min="1" value="3" style="width:70px;padding:4px 8px;font-size:12px;" />
+          <span style="font-size:11px;color:var(--muted);">sec between each</span>
+          <button class="btn btn-green btn-sm" id="wabp-resend-btn" onclick="resendWaBroadcast()" title="Send only to pending/failed recipients">
+            <i class="fas fa-redo"></i> Resend pending/failed (<span id="wabp-resend-count">0</span>)
+          </button>
+        </div>
+        <button class="btn btn-ghost btn-sm" onclick="refreshWaBroadcastPreviewLog()"><i class="fas fa-sync-alt"></i> Refresh</button>
         <button class="btn btn-ghost btn-sm" onclick="closeModal('wa-broadcast-preview-modal')">Close</button>
       </div>
     </div>

@@ -7,6 +7,13 @@ const path    = require('path');
 const pool    = require('../db/pool');
 const wa      = require('../services/whatsapp');
 const waInventory = require('../services/whatsappInventory');
+const { runWaBroadcastJob } = require('../services/waBroadcastWorker');
+const {
+  parseJsonField,
+  buildUndeliveredWaRecipients,
+  acquireWaBroadcastJob,
+  releaseWaBroadcastJob,
+} = require('../services/broadcastHelpers');
 const { authenticate } = require('../middleware/auth');
 
 const router = express.Router();
@@ -1146,6 +1153,20 @@ pool.query(`
 // Migrate existing table if columns missing
 pool.query(`ALTER TABLE wa_broadcast_history ADD COLUMN IF NOT EXISTS full_message TEXT`).catch(()=>{});
 pool.query(`ALTER TABLE wa_broadcast_history ADD COLUMN IF NOT EXISTS recipients JSONB`).catch(()=>{});
+pool.query(`ALTER TABLE wa_broadcast_history ADD COLUMN IF NOT EXISTS deliveries JSONB DEFAULT '[]'`).catch(()=>{});
+pool.query(`ALTER TABLE wa_broadcast_history ADD COLUMN IF NOT EXISTS attachments JSONB DEFAULT '[]'`).catch(()=>{});
+pool.query(`ALTER TABLE wa_broadcast_history ADD COLUMN IF NOT EXISTS image_url TEXT`).catch(()=>{});
+pool.query(`ALTER TABLE wa_broadcast_history ADD COLUMN IF NOT EXISTS variable_fields JSONB DEFAULT '[]'`).catch(()=>{});
+pool.query(`ALTER TABLE wa_broadcast_history ADD COLUMN IF NOT EXISTS delay_ms INT DEFAULT 2000`).catch(()=>{});
+
+function buildPendingWaDeliveries(recipients) {
+  return (recipients || []).map((r) => ({
+    jid: r.jid,
+    name: r.name || '',
+    status: 'pending',
+    sent_at: null,
+  }));
+}
 
 // POST /api/whatsapp/resolve-lids — re-resolve @lid contacts to real phone numbers
 // using Baileys' authoritative LID↔PN signal store (fixes bogus "+1…" numbers).
@@ -1161,9 +1182,84 @@ router.post('/resolve-lids', authenticate, async (req, res) => {
 
 router.get('/broadcast', authenticate, async (req, res) => {
   try {
-    const rows = await pool.query(`SELECT id, message, full_message, recipients, total, sent, failed, status, sent_at FROM wa_broadcast_history ORDER BY sent_at DESC LIMIT 100`);
+    const rows = await pool.query(`SELECT id, message, full_message, recipients, deliveries, total, sent, failed, status, sent_at, delay_ms FROM wa_broadcast_history ORDER BY sent_at DESC LIMIT 100`);
     res.json(rows.rows);
   } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+router.get('/broadcast/:id', authenticate, async (req, res) => {
+  try {
+    const rows = await pool.query(`SELECT * FROM wa_broadcast_history WHERE id=$1`, [req.params.id]);
+    if (!rows.rows.length) return res.status(404).json({ error: 'Not found' });
+    res.json(rows.rows[0]);
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+router.post('/broadcast/:id/resend', authenticate, async (req, res) => {
+  const histId = parseInt(req.params.id, 10);
+  if (!histId) return res.status(400).json({ error: 'Invalid broadcast id' });
+
+  try {
+    const row = await pool.query(`SELECT * FROM wa_broadcast_history WHERE id=$1`, [histId]);
+    if (!row.rows.length) return res.status(404).json({ error: 'Broadcast not found' });
+    const b = row.rows[0];
+
+    if (!acquireWaBroadcastJob(histId)) {
+      return res.status(409).json({ error: 'WhatsApp broadcast is already sending. Wait for it to finish before resending.' });
+    }
+    releaseWaBroadcastJob(histId);
+
+    const recipients = parseJsonField(b.recipients, []);
+    const baseDeliveries = parseJsonField(b.deliveries, buildPendingWaDeliveries(recipients));
+    const hasSentLog = baseDeliveries.some((d) => d.status === 'sent');
+    if (!hasSentLog && (parseInt(b.sent || 0, 10) || 0) > 0) {
+      return res.status(409).json({
+        error: 'This WhatsApp broadcast has no per-recipient delivery log. Resend is blocked to prevent duplicate sends. Start a new broadcast for remaining contacts.',
+      });
+    }
+    const toSend = buildUndeliveredWaRecipients(recipients, baseDeliveries);
+
+    if (!toSend.length) {
+      return res.json({
+        success: true,
+        broadcast_id: histId,
+        queued: 0,
+        message: 'All recipients already received this broadcast.',
+      });
+    }
+
+    const delay = Math.max(500, Math.min(parseInt(req.body.delay_ms ?? b.delay_ms ?? 2000, 10) || 2000, 24 * 60 * 60 * 1000));
+    const files = parseJsonField(b.attachments, []);
+    const varFields = parseJsonField(b.variable_fields, []);
+    const text = String(b.full_message || b.message || '').trim();
+    const imageUrl = String(b.image_url || '').trim();
+
+    await pool.query(`UPDATE wa_broadcast_history SET status='sending', delay_ms=$2 WHERE id=$1`, [histId, delay]);
+
+    res.json({
+      success: true,
+      broadcast_id: histId,
+      queued: toSend.length,
+      skipped_sent: recipients.length - toSend.length,
+      message: `Resuming WhatsApp broadcast for ${toSend.length} pending/failed recipient(s). Already-sent recipients are skipped.`,
+    });
+
+    runWaBroadcastJob({
+      histId,
+      targets: toSend,
+      text,
+      files,
+      imageUrl,
+      varFields,
+      delay,
+      baseDeliveries,
+      total: recipients.length,
+    }).catch((err) => {
+      console.error(`[WA Broadcast #${histId}] Resend error:`, err.message);
+    });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
 });
 
 router.delete('/broadcast/:id', authenticate, async (req, res) => {
@@ -1224,116 +1320,39 @@ router.post('/broadcast', authenticate, async (req, res) => {
   }
   if (!normalized.length) return res.status(400).json({ error: 'No valid WhatsApp recipients found' });
 
-  const wait = (ms) => new Promise(resolve => setTimeout(resolve, ms));
   const delay = Math.max(500, Math.min(parseInt(delay_ms || 2000, 10) || 2000, 24 * 60 * 60 * 1000));
+  const pendingDeliveries = buildPendingWaDeliveries(normalized.map((r) => ({ jid: r.jid, name: r.name })));
 
   const dbRow = await pool.query(
-    `INSERT INTO wa_broadcast_history (message, full_message, recipients, total, sent, failed, status, sent_at) VALUES ($1,$2,$3,$4,0,0,'sending',NOW()) RETURNING id`,
-    [text.length > 120 ? text.slice(0, 120) + '…' : text, text, JSON.stringify(normalized.map(r => ({ jid: r.jid, name: r.name }))), normalized.length]
+    `INSERT INTO wa_broadcast_history (message, full_message, recipients, deliveries, total, sent, failed, status, sent_at, attachments, image_url, variable_fields, delay_ms)
+     VALUES ($1,$2,$3,$4,$5,0,0,'sending',NOW(),$6,$7,$8,$9) RETURNING id`,
+    [
+      text.length > 120 ? text.slice(0, 120) + '…' : text,
+      text,
+      JSON.stringify(normalized.map((r) => ({ jid: r.jid, name: r.name }))),
+      JSON.stringify(pendingDeliveries),
+      normalized.length,
+      JSON.stringify(files),
+      imageUrl || null,
+      JSON.stringify(varFields),
+      delay,
+    ]
   );
   const histId = dbRow.rows[0].id;
 
-  // Pre-fetch image from URL if provided (once for all recipients)
-  let imageBuf = null, imageMime = 'image/jpeg';
-  if (imageUrl) {
-    try {
-      const https = require('https'), http = require('http');
-      const proto = imageUrl.startsWith('https') ? https : http;
-      imageBuf = await new Promise((resolve, reject) => {
-        proto.get(imageUrl, res => {
-          imageMime = res.headers['content-type'] || 'image/jpeg';
-          const chunks = [];
-          res.on('data', c => chunks.push(c));
-          res.on('end', () => resolve(Buffer.concat(chunks)));
-          res.on('error', reject);
-        }).on('error', reject);
-      });
-    } catch (e) {
-      console.warn('[WA Broadcast] Could not fetch image URL:', e.message);
-    }
-  }
-
   res.json({ success: true, total: normalized.length, queued: normalized.length });
 
-  const waSendTimeoutMs = Math.max(15000, parseInt(process.env.WA_BROADCAST_SEND_TIMEOUT_MS || '90000', 10) || 90000);
-  function withWaSendTimeout(promise, label) {
-    return Promise.race([
-      promise,
-      new Promise((_, reject) => setTimeout(() => reject(new Error(`${label} timed out after ${waSendTimeoutMs}ms`)), waSendTimeoutMs)),
-    ]);
-  }
-
-  (async () => {
-    let sent = 0;
-    let failed = 0;
-    async function updateWaBroadcastProgress(forceStatus) {
-      const status = forceStatus || (sent + failed >= normalized.length
-        ? (failed === normalized.length ? 'failed' : 'sent')
-        : 'sending');
-      await pool.query(
-        `UPDATE wa_broadcast_history SET sent=$1, failed=$2, status=$3 WHERE id=$4`,
-        [sent, failed, status, histId]
-      ).catch((e) => console.error('[WA Broadcast] progress update:', e.message));
-    }
-    try {
-      for (let i = 0; i < normalized.length; i++) {
-        const target = normalized[i];
-        const msg = applyVarFields(text, target.name);
-        try {
-          if (imageBuf) {
-            await withWaSendTimeout(wa.sendMediaMessage(target.jid, {
-              buffer: imageBuf,
-              filename: 'image.jpg',
-              mimetype: imageMime,
-              mediaType: 'image',
-              caption: msg,
-            }, null), `Media send to ${target.jid}`);
-            if (files.length) await wait(800);
-          }
-          if (files.length) {
-            for (let f = 0; f < files.length; f++) {
-              const att = files[f] || {};
-              const buffer = Buffer.from(String(att.contentBytes || att.data || '').replace(/^data:[^,]+,/, ''), 'base64');
-              if (!buffer.length) continue;
-              const mime = att.contentType || att.mimeType || 'application/octet-stream';
-              const mediaType = String(att.mediaType || '').toLowerCase()
-                || (String(mime).startsWith('image/') ? 'image'
-                  : String(mime).startsWith('video/') ? 'video'
-                    : 'document');
-              await withWaSendTimeout(wa.sendMediaMessage(target.jid, {
-                buffer,
-                filename: att.name || att.fileName || 'broadcast-attachment',
-                mimetype: mime,
-                mediaType,
-                caption: f === 0 && !imageBuf ? msg : '',
-              }, null), `Attachment send to ${target.jid}`);
-              if (f < files.length - 1) await wait(800);
-            }
-          } else if (!imageBuf) {
-            await withWaSendTimeout(wa.sendMessage(target.jid, msg, null), `Message send to ${target.jid}`);
-          }
-          sent += 1;
-        } catch (err) {
-          failed += 1;
-          console.error(`[WA Broadcast] Failed for ${target.jid}:`, err.message);
-          if (/rate.?overlimit|rate.?limit|429|timed out/i.test(String(err.message || ''))) {
-            const backoff = Math.min(delay * 2, 120000);
-            console.warn(`[WA Broadcast] Rate limit/timeout — waiting ${backoff}ms before continuing`);
-            await wait(backoff);
-          }
-        }
-
-        await updateWaBroadcastProgress();
-
-        if (i < normalized.length - 1) await wait(delay);
-      }
-      console.log(`[WA Broadcast] Done - sent:${sent} failed:${failed}`);
-      await updateWaBroadcastProgress(failed === normalized.length ? 'failed' : 'sent');
-    } catch (err) {
-      console.error('[WA Broadcast] Worker error:', err.message);
-      await updateWaBroadcastProgress(failed === normalized.length ? 'failed' : 'partial');
-    }
-  })().catch(async (err) => {
+  runWaBroadcastJob({
+    histId,
+    targets: normalized,
+    text,
+    files,
+    imageUrl,
+    varFields,
+    delay,
+    baseDeliveries: pendingDeliveries,
+    total: normalized.length,
+  }).catch(async (err) => {
     console.error('[WA Broadcast] Worker error:', err.message);
     await pool.query(
       `UPDATE wa_broadcast_history SET status='failed' WHERE id=$1`,
