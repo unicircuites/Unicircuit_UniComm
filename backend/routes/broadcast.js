@@ -123,21 +123,27 @@ router.post('/send', async (req, res) => {
   res.json({ success: true, broadcast_id: broadcastId, total: recipients.length });
 
   // Send in background
-  const delay = parseInt(delay_ms || 2000);
+  const delay = parseInt(delay_ms || 2000, 10);
   const batchSize = Math.max(1, parseInt(batch_size || 1, 10) || 1);
+
+  function mergeDeliveries(results) {
+    const doneByEmail = new Map((results.deliveries || []).map((d) => [String(d.email || '').toLowerCase(), d]));
+    return pendingDeliveries.map((d) => doneByEmail.get(String(d.email || '').toLowerCase()) || d);
+  }
+
   eb.sendBroadcast(recipients, subject, html, async (sent, failed, _current, results) => {
-    const doneByEmail = new Map(results.deliveries.map((d) => [String(d.email || '').toLowerCase(), d]));
-    const mergedDeliveries = pendingDeliveries.map((d) => doneByEmail.get(String(d.email || '').toLowerCase()) || d);
+    const mergedDeliveries = mergeDeliveries(results);
     await pool.query(
       `UPDATE email_broadcasts SET sent=$1, failed=$2, errors=$3, deliveries=$4 WHERE id=$5`,
       [sent, failed, JSON.stringify(results.errors), JSON.stringify(mergedDeliveries), broadcastId]
     );
   }, delay, attachments, batchSize, variable_fields)
     .then(async (results) => {
+      const finalStatus = results.failed === recipients.length ? 'failed' : 'sent';
       try {
         await pool.query(
-          `UPDATE email_broadcasts SET sent=$1, failed=$2, status='sent', sent_at=NOW(), errors=$3, deliveries=$4 WHERE id=$5`,
-          [results.sent, results.failed, JSON.stringify(results.errors), JSON.stringify(results.deliveries), broadcastId]
+          `UPDATE email_broadcasts SET sent=$1, failed=$2, status=$3, sent_at=NOW(), errors=$4, deliveries=$5 WHERE id=$6`,
+          [results.sent, results.failed, finalStatus, JSON.stringify(results.errors), JSON.stringify(results.deliveries), broadcastId]
         );
       } catch (err) {
         console.error(`[Broadcast #${broadcastId}] Final log update failed:`, err.message);
@@ -145,10 +151,15 @@ router.post('/send', async (req, res) => {
       console.log(`[Broadcast #${broadcastId}] Done — sent:${results.sent} failed:${results.failed}`);
     })
     .catch(async (err) => {
-      await pool.query(
-        `UPDATE email_broadcasts SET status='failed' WHERE id=$1`, [broadcastId]
-      );
       console.error(`[Broadcast #${broadcastId}] Error:`, err.message);
+      try {
+        await pool.query(
+          `UPDATE email_broadcasts SET status='failed', errors=$2 WHERE id=$1`,
+          [broadcastId, JSON.stringify([{ error: err.message }])]
+        );
+      } catch (updateErr) {
+        console.error(`[Broadcast #${broadcastId}] Failed status update failed:`, updateErr.message);
+      }
     });
 });
 

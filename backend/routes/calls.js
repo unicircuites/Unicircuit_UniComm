@@ -1664,6 +1664,20 @@ router.get('/recordings/play', async (req, res) => {
 
     let fullPath = recordingLinker.resolveRecordingFullPath(file, REC_DIR);
     if (!fullPath) {
+      const filename = path.basename(file);
+      console.log(`[Calls Play] Local file not found: ${file}. Trying OneDrive: ${filename}`);
+      try {
+        const { ensureLocalRecording } = require('../services/oneDriveSync');
+        const downloadedPath = await ensureLocalRecording(filename);
+        if (downloadedPath) {
+          fullPath = downloadedPath;
+        }
+      } catch (err) {
+        console.error('[Calls Play] OneDrive download error:', err.message);
+      }
+    }
+
+    if (!fullPath) {
       return res.status(404).json({ error: 'Recording file not found' });
     }
 

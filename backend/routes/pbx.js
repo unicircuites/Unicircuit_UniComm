@@ -9,6 +9,7 @@ const pool = require('../db/pool');
 const fsp = fs.promises;
 
 const router = express.Router();
+const { ensureLocalRecording } = require('../services/oneDriveSync');
 
 global.pbxSyncProgress = {
   running: false,
@@ -166,7 +167,7 @@ router.post(
         completed: false
       };
 
-      // ── STEP 1: Collect ALL wav files from every backup/extension folder ──
+      // â”€â”€ STEP 1: Collect ALL wav files from every backup/extension folder â”€â”€
       const allWavFiles = [];
 
       if (!fs.existsSync(PBX_ROOT)) {
@@ -219,7 +220,7 @@ router.post(
         }
       }
 
-      // ── STEP 2: Sort newest-date FIRST so DB always has latest at top ──
+      // â”€â”€ STEP 2: Sort newest-date FIRST so DB always has latest at top â”€â”€
       allWavFiles.sort((a, b) => b.sortDate - a.sortDate);
 
       const requestedFolder = safeFolderName(req.body?.snapshotFolder, '');
@@ -242,7 +243,7 @@ router.post(
 
       global.pbxSyncProgress.total = uniqueWavFiles.length;
 
-      // ── STEP 3: Load already-stored filenames from DB (global dedup) ──
+      // â”€â”€ STEP 3: Load already-stored filenames from DB (global dedup) â”€â”€
       const existingRes = await pool.query(
         `SELECT id, original_filename, local_path, file_size FROM pbx_recordings`
       );
@@ -253,7 +254,7 @@ router.post(
       let sourceDeleted = 0;
       let sourceDeleteFailed = 0;
 
-      // ── STEP 4: Insert only truly new unique files ──
+      // â”€â”€ STEP 4: Insert only truly new unique files â”€â”€
       for (const item of uniqueWavFiles) {
         const { file, backupFolder, extensionFolder, extensionPath, fullPath, parsed } = item;
 
@@ -263,7 +264,7 @@ router.post(
           ? Math.round((global.pbxSyncProgress.processed / global.pbxSyncProgress.total) * 100)
           : 100;
 
-        // Global dedup — skip if this filename was already stored from ANY folder
+        // Global dedup â€” skip if this filename was already stored from ANY folder
         let stats;
         try { stats = fs.statSync(fullPath); } catch (_) {
           console.warn(`[PBX] Skipping missing file: ${fullPath}`);
@@ -597,7 +598,7 @@ router.get('/db-folders',
                  extension_folder ASC
       `);
 
-      // Build tree: backup_folder → extension_folder → [files]
+      // Build tree: backup_folder â†’ extension_folder â†’ [files]
       // Preserve insertion order (newest backup folder encountered first)
       const tree = {};
       for (const row of result.rows) {
@@ -750,11 +751,23 @@ router.get(
         if (
             !fs.existsSync(filePath)
         ) {
-
-            return res
-            .status(404)
-            .send('File missing');
-
+            const filename = result.rows[0].original_filename || path.basename(filePath);
+            console.log(`[PBX Play] Local file not found: ${filePath}. Trying OneDrive: ${filename}`);
+            try {
+                const downloadedPath = await ensureLocalRecording(filename);
+                if (downloadedPath && fs.existsSync(downloadedPath)) {
+                    filePath = downloadedPath;
+                } else {
+                    return res
+                    .status(404)
+                    .send('File missing');
+                }
+            } catch (err) {
+                console.error('[PBX Play] OneDrive download error:', err.message);
+                return res
+                .status(404)
+                .send('File missing');
+            }
         }
 
         res.sendFile(
@@ -780,7 +793,7 @@ router.get(
 // Start SMDR service on PBX via web automation
 router.post('/start-smdr-service', async (req, res) => {
   try {
-    console.log('\n[API] POST /pbx/start-smdr-service — Starting SMDR automation...');
+    console.log('\n[API] POST /pbx/start-smdr-service â€” Starting SMDR automation...');
     
     const { startSmdrService } = require('../services/matrixSmdrControl');
     const result = await startSmdrService();
@@ -808,6 +821,31 @@ router.get('/status', (req, res) => {
   } catch (err) {
     console.error('[API] Error getting SMDR status:', err.message);
     res.status(500).json({ error: err.message });
+  }
+});
+
+// Get OneDrive sync status
+router.get('/onedrive-status', async (req, res) => {
+  try {
+    const { getSyncStatus } = require('../services/oneDriveSync');
+    const status = await getSyncStatus();
+    res.json(status);
+  } catch (err) {
+    console.error('[API] Error getting OneDrive status:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Trigger OneDrive sync manual upload job
+router.post('/onedrive-sync', async (req, res) => {
+  try {
+    const { runUploadJob } = require('../services/oneDriveSync');
+    console.log('[API] Manual OneDrive upload job triggered.');
+    const result = await runUploadJob();
+    res.json({ success: true, result });
+  } catch (err) {
+    console.error('[API] Error running OneDrive upload job:', err.message);
+    res.status(500).json({ success: false, error: err.message });
   }
 });
 

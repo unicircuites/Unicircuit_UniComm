@@ -1,9 +1,16 @@
 /**
- * OneDrive Recordings Sync Service — UniComm Pro
+ * OneDrive Call Recordings Sync Service — UniComm Pro
  * ─────────────────────────────────────────────────────────────────────────
- * UPLOAD  : Daily at 6:30 PM IST — scans PBX_RECORDINGS_DIR for new/unique
- *           recordings and uploads them to OneDrive (UniComm_Recordings folder)
- *           under sales@unicircuites.com's personal drive.
+ * STORAGE : Tower server local FS (D:\Unicomm_Storage) acts as the primary
+ *           working store. PBX → network share → local FS → OneDrive.
+ *
+ * TARGET  : sales@unicircuites.com OneDrive → Documents/Call_Recordings
+ *           https://unicircuites-my.sharepoint.com/:f:/r/personal/
+ *                sales_unicircuites_com/Documents/Call_Recordings
+ *
+ * UPLOAD  : Daily at 6:30 PM IST — scans PBX_RECORDINGS_DIR (PBX network
+ *           share) and PBX_LOCAL_RECORDINGS_DIR (local FS cache) for new
+ *           recordings and uploads them to the OneDrive Call_Recordings folder.
  *
  * DOWNLOAD: On-demand — when a recording is requested and not found locally,
  *           fetches it from OneDrive into PBX_LOCAL_RECORDINGS_DIR (cache).
@@ -25,10 +32,15 @@ const fetch   = require('node-fetch');
 const { getAccessToken, getClientCredentialsToken } = require('./msGraph');
 
 // ── Config ─────────────────────────────────────────────────────────────────
+// PBX source: network share where the PBX deposits voice-mail/recording files
 const PBX_SOURCE_DIR  = process.env.PBX_RECORDINGS_DIR       || '\\\\UNISERVER\\MatrixVMS\\Voicemail_Backup';
+// Local FS cache on tower server (D:\Unicomm_Storage) — primary working store
 const LOCAL_CACHE_DIR = process.env.PBX_LOCAL_RECORDINGS_DIR || 'D:\\Unicomm_Storage';
 const CACHE_DAYS      = parseInt(process.env.ONEDRIVE_CACHE_DAYS || '30', 10);
-const OD_FOLDER       = process.env.ONEDRIVE_FOLDER           || 'UniComm_Recordings';
+// OneDrive target folder name (used only when ONEDRIVE_FOLDER_LINK is NOT set)
+const OD_FOLDER       = process.env.ONEDRIVE_FOLDER           || 'Call_Recordings';
+// SharePoint sharing link to the Call_Recordings folder — preferred over folder name
+// Expected: https://unicircuites-my.sharepoint.com/:f:/r/personal/sales_unicircuites_com/Documents/Call_Recordings
 const OD_FOLDER_LINK  = process.env.ONEDRIVE_FOLDER_LINK      || '';
 const USER_EMAIL      = process.env.MS_USER_EMAIL             || 'sales@unicircuites.com';
 const GRAPH           = 'https://graph.microsoft.com/v1.0';
@@ -80,7 +92,7 @@ function encodeSharingUrl(url) {
     .replace(/\+/g, '-')}`;
 }
 
-// ── Ensure OneDrive folder exists ──────────────────────────────────────────
+// ── Ensure OneDrive folder exists (fallback when no link configured) ────────
 async function ensureOneDriveFolder(token) {
   const encodedUser = encodeURIComponent(USER_EMAIL);
   const url = `${GRAPH}/users/${encodedUser}/drive/root:/${OD_FOLDER}`;
@@ -113,26 +125,78 @@ async function ensureOneDriveFolder(token) {
   return created.id;
 }
 
+/**
+ * Resolve the target OneDrive folder for Call_Recordings.
+ *
+ * Three-strategy approach to handle the /:f:/r/ style SharePoint redirect links:
+ *   1. Sharing-URL API — works for /:f:/p/ links (and sometimes /:f:/r/)
+ *   2. Direct drive-path lookup — Documents/Call_Recordings via Graph path API
+ *   3. Create the folder inside Documents if it doesn't exist yet
+ *
+ * When ONEDRIVE_FOLDER_LINK is not configured, falls back to root-level folder
+ * named by ONEDRIVE_FOLDER (default: Call_Recordings).
+ */
 async function getTargetFolder(token) {
   if (OD_FOLDER_LINK) {
-    const shareId = encodeSharingUrl(OD_FOLDER_LINK);
-    const res = await fetch(`${GRAPH}/shares/${shareId}/driveItem`, {
-      headers: { Authorization: `Bearer ${token}` },
-    });
+    // ── Strategy 1: Try sharing-URL resolution ──────────────────────────────
+    // Works for /:f:/p/ style links; may work for /:f:/r/ depending on share settings
+    try {
+      const shareId = encodeSharingUrl(OD_FOLDER_LINK);
+      const res = await fetch(`${GRAPH}/shares/${shareId}/driveItem`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
 
-    if (!res.ok) {
-      const err = await res.json().catch(() => ({}));
-      throw new Error(`Failed to resolve OneDrive folder link: ${err.error?.message || res.status}`);
+      if (res.ok) {
+        const item = await res.json();
+        console.log(`[OneDrive] ✅ Resolved Call_Recordings folder via sharing link (id: ${item.id})`);
+        return {
+          driveId: item.parentReference?.driveId,
+          itemId: item.id,
+          label: item.webUrl || OD_FOLDER_LINK,
+        };
+      }
+
+      const errBody = await res.json().catch(() => ({}));
+      console.warn(`[OneDrive] Sharing link resolution returned ${res.status}: ${errBody.error?.message || 'unknown'}. Trying drive-path fallback...`);
+    } catch (shareErr) {
+      console.warn('[OneDrive] Sharing link resolution error:', shareErr.message, '— trying drive-path fallback...');
     }
 
-    const item = await res.json();
-    return {
-      driveId: item.parentReference?.driveId,
-      itemId: item.id,
-      label: item.webUrl || OD_FOLDER_LINK,
-    };
+    // ── Strategy 2: Path-based lookup — Documents/Call_Recordings ──────────
+    // Handles /:f:/r/ (redirect) style links which may not resolve via /shares/
+    try {
+      const encodedUser = encodeURIComponent(USER_EMAIL);
+      const pathUrl = `${GRAPH}/users/${encodedUser}/drive/root:/Documents/Call_Recordings`;
+      const pathRes = await fetch(pathUrl, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+
+      if (pathRes.ok) {
+        const item = await pathRes.json();
+        const driveRes = await fetch(`${GRAPH}/users/${encodedUser}/drive`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        const drive = driveRes.ok ? await driveRes.json() : {};
+        console.log(`[OneDrive] ✅ Resolved Call_Recordings via drive path Documents/Call_Recordings (id: ${item.id})`);
+        return {
+          driveId: drive.id || item.parentReference?.driveId,
+          itemId: item.id,
+          label: 'Documents/Call_Recordings',
+        };
+      }
+
+      const pathErrBody = await pathRes.json().catch(() => ({}));
+      console.warn(`[OneDrive] Drive path lookup returned ${pathRes.status}: ${pathErrBody.error?.message || 'unknown'}. Creating folder...`);
+    } catch (pathErr) {
+      console.warn('[OneDrive] Drive path lookup error:', pathErr.message);
+    }
+
+    // ── Strategy 3: Create Documents/Call_Recordings ────────────────────────
+    console.log('[OneDrive] Creating Documents/Call_Recordings folder...');
+    return await createCallRecordingsFolder(token);
   }
 
+  // No ONEDRIVE_FOLDER_LINK configured — use folder name in drive root
   const encodedUser = encodeURIComponent(USER_EMAIL);
   const itemId = await ensureOneDriveFolder(token);
   const driveRes = await fetch(`${GRAPH}/users/${encodedUser}/drive`, {
@@ -147,7 +211,57 @@ async function getTargetFolder(token) {
   return { driveId: drive.id, itemId, label: OD_FOLDER };
 }
 
-// ── Upload a single file to OneDrive ──────────────────────────────────────
+/**
+ * Create Documents/Call_Recordings folder inside the user's OneDrive.
+ * Used as last-resort fallback when the sharing link can't be resolved.
+ */
+async function createCallRecordingsFolder(token) {
+  const encodedUser = encodeURIComponent(USER_EMAIL);
+
+  // Get Documents folder (should always exist in a personal OneDrive)
+  const docsRes = await fetch(`${GRAPH}/users/${encodedUser}/drive/root:/Documents`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!docsRes.ok) throw new Error(`Cannot access Documents folder: HTTP ${docsRes.status}`);
+  const docsFolder = await docsRes.json();
+
+  const driveRes = await fetch(`${GRAPH}/users/${encodedUser}/drive`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  const drive = driveRes.ok ? await driveRes.json() : {};
+
+  // Attempt to create Call_Recordings inside Documents
+  const createRes = await fetch(
+    `${GRAPH}/users/${encodedUser}/drive/items/${docsFolder.id}/children`,
+    {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: 'Call_Recordings', folder: {}, '@microsoft.graph.conflictBehavior': 'fail' }),
+    }
+  );
+
+  if (createRes.status === 409) {
+    // Already exists — fetch it
+    const existing = await fetch(`${GRAPH}/users/${encodedUser}/drive/root:/Documents/Call_Recordings`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (!existing.ok) throw new Error('Call_Recordings exists but could not be fetched');
+    const item = await existing.json();
+    console.log(`[OneDrive] ✅ Call_Recordings already exists in Documents (id: ${item.id})`);
+    return { driveId: drive.id || item.parentReference?.driveId, itemId: item.id, label: 'Documents/Call_Recordings' };
+  }
+
+  if (!createRes.ok) {
+    const err = await createRes.json().catch(() => ({}));
+    throw new Error(`Failed to create Documents/Call_Recordings: ${err.error?.message || createRes.status}`);
+  }
+
+  const created = await createRes.json();
+  console.log(`[OneDrive] ✅ Created Documents/Call_Recordings (id: ${created.id})`);
+  return { driveId: drive.id || created.parentReference?.driveId, itemId: created.id, label: 'Documents/Call_Recordings' };
+}
+
+// ── Upload a single file to OneDrive ─────────────────────────────────────
 // Uses Graph simple upload for files < 4 MB, large-file upload session for bigger files
 async function uploadFile(token, targetFolder, localFilePath, remoteFileName) {
   const encodedName = encodeURIComponent(remoteFileName);
@@ -213,7 +327,7 @@ async function uploadFile(token, targetFolder, localFilePath, remoteFileName) {
   return { name: remoteFileName };
 }
 
-// ── Recursively collect all audio/recording files from source dir ──────────
+// ── Recursively collect all audio/recording files from a directory ──────────
 async function collectRecordingFiles(dir, results = []) {
   let entries;
   try {
@@ -237,9 +351,14 @@ async function collectRecordingFiles(dir, results = []) {
   return results;
 }
 
-// ── Main upload job ────────────────────────────────────────────────────────
+// ── Main upload job ───────────────────────────────────────────────────────
+// Scans BOTH the PBX network share (PBX_SOURCE_DIR) and the local FS cache
+// (LOCAL_CACHE_DIR) to ensure all recordings reach OneDrive Call_Recordings.
 async function runUploadJob() {
   console.log('[OneDrive] ⬆️  Starting daily recording upload job...');
+  console.log(`[OneDrive]    Source (PBX share) : ${PBX_SOURCE_DIR}`);
+  console.log(`[OneDrive]    Local cache        : ${LOCAL_CACHE_DIR}`);
+  console.log(`[OneDrive]    Target (OneDrive)  : Documents/Call_Recordings`);
   const log = await loadSyncLog();
 
   let token;
@@ -259,9 +378,18 @@ async function runUploadJob() {
     return { uploaded: 0, skipped: 0, failed: 0, error: err.message };
   }
 
-  // Collect all recording files from PBX source
-  const files = await collectRecordingFiles(PBX_SOURCE_DIR);
-  console.log(`[OneDrive] Found ${files.length} recording file(s) in source dir.`);
+  // Collect recording files from PBX network share AND local FS cache
+  const pbxFiles   = await collectRecordingFiles(PBX_SOURCE_DIR);
+  const localFiles = await collectRecordingFiles(LOCAL_CACHE_DIR);
+
+  // Deduplicate by filename — prefer the local copy over the PBX share copy
+  const fileMap = new Map();
+  for (const fp of [...pbxFiles, ...localFiles]) {
+    fileMap.set(path.basename(fp), fp); // later entries (local) win
+  }
+  const files = [...fileMap.values()];
+
+  console.log(`[OneDrive] Found ${pbxFiles.length} PBX share file(s), ${localFiles.length} local cache file(s) → ${files.length} unique file(s) to process.`);
 
   let uploaded = 0, skipped = 0, failed = 0;
 
@@ -293,7 +421,7 @@ async function runUploadJob() {
   return { uploaded, skipped, failed };
 }
 
-// ── Local cache cleanup (delete files older than CACHE_DAYS) ──────────────
+// ── Local cache cleanup (delete files older than CACHE_DAYS) ───────────────
 async function cleanLocalCache() {
   console.log(`[OneDrive] 🧹 Cleaning local cache (>${CACHE_DAYS} days old) in ${LOCAL_CACHE_DIR}`);
   let deleted = 0;
@@ -332,7 +460,7 @@ async function cleanLocalCache() {
 /**
  * Ensures a recording file is available locally.
  * 1. If found in LOCAL_CACHE_DIR — returns local path immediately.
- * 2. If not found — downloads from OneDrive, saves to LOCAL_CACHE_DIR, returns path.
+ * 2. If not found — downloads from OneDrive Call_Recordings, saves to LOCAL_CACHE_DIR.
  * 3. If not in OneDrive either — returns null.
  *
  * @param {string} filename  e.g. "EXT390_20260622_145056.wav"
@@ -348,8 +476,8 @@ async function ensureLocalRecording(filename) {
     return localPath;
   } catch { /* not cached — fall through */ }
 
-  // 2. Download from OneDrive
-  console.log(`[OneDrive] Cache miss — downloading from OneDrive: ${filename}`);
+  // 2. Download from OneDrive Call_Recordings
+  console.log(`[OneDrive] Cache miss — downloading from OneDrive Call_Recordings: ${filename}`);
   let token;
   try {
     token = await getBestToken();
@@ -376,7 +504,7 @@ async function ensureLocalRecording(filename) {
 
   if (!res.ok) {
     if (res.status === 404) {
-      console.warn(`[OneDrive] File not found in OneDrive: ${filename}`);
+      console.warn(`[OneDrive] File not found in Call_Recordings: ${filename}`);
     } else {
       console.error(`[OneDrive] Download failed for ${filename}: HTTP ${res.status}`);
     }
@@ -396,7 +524,7 @@ async function ensureLocalRecording(filename) {
   return localPath;
 }
 
-// ── List all files in OneDrive folder ────────────────────────────────────
+// ── List all files in OneDrive Call_Recordings folder ────────────────────
 async function listOneDriveRecordings() {
   let token;
   try {
@@ -437,8 +565,10 @@ async function getSyncStatus() {
     cacheDir: LOCAL_CACHE_DIR,
     cacheDays: CACHE_DAYS,
     oneDriveFolder: OD_FOLDER,
+    oneDriveFolderLink: OD_FOLDER_LINK || '(not configured — using drive root folder)',
     oneDriveFolderLinkConfigured: !!OD_FOLDER_LINK,
     userEmail: USER_EMAIL,
+    targetDescription: 'Documents/Call_Recordings on sales@unicircuites.com OneDrive',
   };
 }
 
@@ -447,7 +577,10 @@ function start() {
   // Ensure local cache dir exists on startup
   fs.mkdirSync(LOCAL_CACHE_DIR, { recursive: true });
   cleanLocalCache().catch(err => console.error('[OneDrive] Startup cache cleanup failed:', err.message));
-  console.log('[OneDrive] Manual upload service ready. Cache cleanup retention:', CACHE_DAYS, 'days');
+  console.log('[OneDrive] Call Recordings sync service ready.');
+  console.log(`[OneDrive]   Local cache  : ${LOCAL_CACHE_DIR}`);
+  console.log(`[OneDrive]   Target folder: Documents/Call_Recordings (${USER_EMAIL} OneDrive)`);
+  console.log(`[OneDrive]   Cache retention: ${CACHE_DAYS} days`);
 }
 
 module.exports = {

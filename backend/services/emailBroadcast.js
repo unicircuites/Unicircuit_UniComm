@@ -9,25 +9,68 @@ const {
   substitute,
 } = require('./emailTemplateVars');
 
+const SMTP_SEND_TIMEOUT_MS = parseInt(process.env.SMTP_SEND_TIMEOUT_MS || '60000', 10);
+const SMTP_MAX_RETRIES = parseInt(process.env.SMTP_MAX_RETRIES || '3', 10);
+
+let sharedTransporter = null;
+
 // ── TRANSPORTER ───────────────────────────────────────────────────────────
 function createTransporter() {
   return nodemailer.createTransport({
-    host:   process.env.SMTP_HOST || 'smtp.office365.com',
-    port:   parseInt(process.env.SMTP_PORT || '587'),
+    host: process.env.SMTP_HOST || 'smtp.office365.com',
+    port: parseInt(process.env.SMTP_PORT || '587', 10),
     secure: false, // STARTTLS
     auth: {
       user: process.env.SMTP_USER,
       pass: process.env.SMTP_PASS,
     },
-    tls: { ciphers: 'SSLv3', rejectUnauthorized: false },
+    pool: true,
+    maxConnections: 1,
+    maxMessages: 500,
+    connectionTimeout: 30000,
+    greetingTimeout: 30000,
+    socketTimeout: SMTP_SEND_TIMEOUT_MS,
+    tls: { minVersion: 'TLSv1.2', rejectUnauthorized: false },
   });
+}
+
+function getTransporter() {
+  if (!sharedTransporter) {
+    sharedTransporter = createTransporter();
+  }
+  return sharedTransporter;
+}
+
+async function closeTransporter() {
+  if (!sharedTransporter) return;
+  try {
+    sharedTransporter.close();
+  } catch (_) { /* ignore */ }
+  sharedTransporter = null;
+}
+
+function withTimeout(promise, ms, label) {
+  let timer;
+  const timeout = new Promise((_, reject) => {
+    timer = setTimeout(() => reject(new Error(`${label} timed out after ${ms}ms`)), ms);
+  });
+  return Promise.race([promise, timeout]).finally(() => clearTimeout(timer));
+}
+
+function isRetryableSmtpError(err) {
+  const msg = String(err && err.message || err).toLowerCase();
+  return /421|432|450|451|452|454|rate|throttl|too many|timeout|timed out|econnreset|econnrefused|etimedout|temporary|service not available|connection closed/.test(msg);
 }
 
 // ── VERIFY CONNECTION ─────────────────────────────────────────────────────
 async function verifyConnection() {
   const t = createTransporter();
-  await t.verify();
-  return true;
+  try {
+    await t.verify();
+    return true;
+  } finally {
+    t.close();
+  }
 }
 
 // ── SEND SINGLE EMAIL ─────────────────────────────────────────────────────
@@ -73,17 +116,49 @@ function appendUnsubscribeFooter(html, recipientEmail) {
   return html + footer;
 }
 
-async function sendOne(to, subject, html, text, attachments) {
-  const t = createTransporter();
-  const info = await t.sendMail({
-    from:    `"${process.env.SMTP_FROM_NAME || 'Unicircuit'}" <${process.env.SMTP_FROM || process.env.SMTP_USER}>`,
+function buildMailOptions(to, subject, html, text, attachments) {
+  return {
+    from: `"${process.env.SMTP_FROM_NAME || 'Unicircuit'}" <${process.env.SMTP_FROM || process.env.SMTP_USER}>`,
     to,
     subject,
     html,
     text: text || html.replace(/<[^>]+>/g, ''),
     attachments: normalizeAttachments(attachments),
-  });
-  return info;
+  };
+}
+
+async function sendMailWithRetry(transporter, mailOptions) {
+  let lastErr;
+  for (let attempt = 0; attempt <= SMTP_MAX_RETRIES; attempt++) {
+    try {
+      return await withTimeout(
+        transporter.sendMail(mailOptions),
+        SMTP_SEND_TIMEOUT_MS,
+        'SMTP send'
+      );
+    } catch (err) {
+      lastErr = err;
+      if (attempt < SMTP_MAX_RETRIES && isRetryableSmtpError(err)) {
+        const waitMs = Math.min(60000, 5000 * (2 ** attempt));
+        console.warn(`[Broadcast] SMTP retry ${attempt + 1}/${SMTP_MAX_RETRIES} in ${waitMs}ms: ${err.message}`);
+        await closeTransporter();
+        await new Promise((resolve) => setTimeout(resolve, waitMs));
+        transporter = getTransporter();
+        continue;
+      }
+      throw err;
+    }
+  }
+  throw lastErr;
+}
+
+async function sendOne(to, subject, html, text, attachments) {
+  const t = getTransporter();
+  try {
+    return await sendMailWithRetry(t, buildMailOptions(to, subject, html, text, attachments));
+  } finally {
+    await closeTransporter();
+  }
 }
 
 async function reportProgress(onProgress, results, email) {
@@ -102,55 +177,61 @@ async function sendBroadcast(recipients, subject, html, onProgress, delayMs = 20
   const fieldDefs = normalizeFieldDefs(variableFields);
   const results = { sent: 0, failed: 0, errors: [], deliveries: [] };
   const safeBatchSize = Math.max(1, parseInt(batchSize || 1, 10) || 1);
+  const safeDelayMs = Math.max(0, parseInt(delayMs || 0, 10) || 0);
+  const transporter = getTransporter();
 
-  for (let i = 0; i < recipients.length; i++) {
-    const r = recipients[i];
-    const email = typeof r === 'string' ? r : r.email;
-    const name  = typeof r === 'object' ? (r.name || '') : '';
+  try {
+    for (let i = 0; i < recipients.length; i++) {
+      const r = recipients[i];
+      const email = typeof r === 'string' ? r : r.email;
+      const name = typeof r === 'object' ? (r.name || '') : '';
 
-    if (!email || !email.includes('@')) {
-      results.failed++;
-      results.errors.push({ email, error: 'Invalid email' });
-      results.deliveries.push({ email, name, status: 'failed', error: 'Invalid email', sent_at: new Date().toISOString() });
-      await reportProgress(onProgress, results, email);
-      continue;
-    }
-
-    const recipientObj = typeof r === 'object'
-      ? { email, name, company: r.company || '' }
-      : { email, name: '', company: '' };
-    const varMap = buildRecipientMap(recipientObj, fieldDefs);
-    const personalSubject = substitute(subject, varMap);
-    const personalHtml = appendUnsubscribeFooter(substitute(html, varMap), email);
-
-    const sentAt = new Date().toISOString();
-    try {
-      const info = await sendOne(email, personalSubject, personalHtml, null, attachments);
-      const accepted = Array.isArray(info.accepted) ? info.accepted.map(v => String(v).toLowerCase()) : [];
-      const rejected = Array.isArray(info.rejected) ? info.rejected.map(v => String(v).toLowerCase()) : [];
-      const lowerEmail = String(email).toLowerCase();
-      if (rejected.includes(lowerEmail) && !accepted.includes(lowerEmail)) {
-        throw new Error('SMTP rejected recipient');
+      if (!email || !email.includes('@')) {
+        results.failed++;
+        results.errors.push({ email, error: 'Invalid email' });
+        results.deliveries.push({ email, name, status: 'failed', error: 'Invalid email', sent_at: new Date().toISOString() });
+        await reportProgress(onProgress, results, email);
+        continue;
       }
-      results.sent++;
-      results.deliveries.push({ email, name, status: 'sent', sent_at: sentAt, message_id: info.messageId || null, smtp_accepted: accepted });
-      console.log(`[Broadcast] Sent ${i+1}/${recipients.length} → ${email} @ ${sentAt}`);
-    } catch (err) {
-      results.failed++;
-      results.errors.push({ email, error: err.message });
-      results.deliveries.push({ email, name, status: 'failed', error: err.message, sent_at: sentAt });
-      console.error(`[Broadcast] Failed → ${email}:`, err.message);
-    }
 
-    await reportProgress(onProgress, results, email);
+      const recipientObj = typeof r === 'object'
+        ? { email, name, company: r.company || '' }
+        : { email, name: '', company: '' };
+      const varMap = buildRecipientMap(recipientObj, fieldDefs);
+      const personalSubject = substitute(subject, varMap);
+      const personalHtml = appendUnsubscribeFooter(substitute(html, varMap), email);
 
-    // Delay after each batch to avoid rate limiting.
-    if (i < recipients.length - 1 && (i + 1) % safeBatchSize === 0) {
-      await new Promise(r => setTimeout(r, delayMs));
+      const sentAt = new Date().toISOString();
+      try {
+        const info = await sendMailWithRetry(transporter, buildMailOptions(email, personalSubject, personalHtml, null, attachments));
+        const accepted = Array.isArray(info.accepted) ? info.accepted.map((v) => String(v).toLowerCase()) : [];
+        const rejected = Array.isArray(info.rejected) ? info.rejected.map((v) => String(v).toLowerCase()) : [];
+        const lowerEmail = String(email).toLowerCase();
+        if (rejected.includes(lowerEmail) && !accepted.includes(lowerEmail)) {
+          throw new Error('SMTP rejected recipient');
+        }
+        results.sent++;
+        results.deliveries.push({ email, name, status: 'sent', sent_at: sentAt, message_id: info.messageId || null, smtp_accepted: accepted });
+        console.log(`[Broadcast] Sent ${i + 1}/${recipients.length} → ${email} @ ${sentAt}`);
+      } catch (err) {
+        results.failed++;
+        results.errors.push({ email, error: err.message });
+        results.deliveries.push({ email, name, status: 'failed', error: err.message, sent_at: sentAt });
+        console.error(`[Broadcast] Failed → ${email}:`, err.message);
+      }
+
+      await reportProgress(onProgress, results, email);
+
+      // Delay after each batch to avoid rate limiting.
+      if (i < recipients.length - 1 && (i + 1) % safeBatchSize === 0 && safeDelayMs > 0) {
+        await new Promise((resolve) => setTimeout(resolve, safeDelayMs));
+      }
     }
+  } finally {
+    await closeTransporter();
   }
 
   return results;
 }
 
-module.exports = { sendOne, sendBroadcast, verifyConnection, normalizeAttachments };
+module.exports = { sendOne, sendBroadcast, verifyConnection, normalizeAttachments, closeTransporter };

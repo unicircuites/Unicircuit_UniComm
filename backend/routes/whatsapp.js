@@ -1255,58 +1255,91 @@ router.post('/broadcast', authenticate, async (req, res) => {
 
   res.json({ success: true, total: normalized.length, queued: normalized.length });
 
+  const waSendTimeoutMs = Math.max(15000, parseInt(process.env.WA_BROADCAST_SEND_TIMEOUT_MS || '90000', 10) || 90000);
+  function withWaSendTimeout(promise, label) {
+    return Promise.race([
+      promise,
+      new Promise((_, reject) => setTimeout(() => reject(new Error(`${label} timed out after ${waSendTimeoutMs}ms`)), waSendTimeoutMs)),
+    ]);
+  }
+
   (async () => {
     let sent = 0;
     let failed = 0;
-    for (let i = 0; i < normalized.length; i++) {
-      const target = normalized[i];
-      const msg = applyVarFields(text, target.name);
-      try {
-        if (imageBuf) {
-          await wa.sendMediaMessage(target.jid, {
-            buffer: imageBuf,
-            filename: 'image.jpg',
-            mimetype: imageMime,
-            mediaType: 'image',
-            caption: msg,
-          }, null);
-          if (files.length) await wait(800);
-        }
-        if (files.length) {
-          for (let f = 0; f < files.length; f++) {
-            const att = files[f] || {};
-            const buffer = Buffer.from(String(att.contentBytes || att.data || '').replace(/^data:[^,]+,/, ''), 'base64');
-            if (!buffer.length) continue;
-            const mime = att.contentType || att.mimeType || 'application/octet-stream';
-            const mediaType = String(att.mediaType || '').toLowerCase()
-              || (String(mime).startsWith('image/') ? 'image'
-                : String(mime).startsWith('video/') ? 'video'
-                  : 'document');
-            await wa.sendMediaMessage(target.jid, {
-              buffer,
-              filename: att.name || att.fileName || 'broadcast-attachment',
-              mimetype: mime,
-              mediaType,
-              caption: f === 0 && !imageBuf ? msg : '',
-            }, null);
-            if (f < files.length - 1) await wait(800);
-          }
-        } else if (!imageBuf) {
-          await wa.sendMessage(target.jid, msg, null);
-        }
-        sent += 1;
-      } catch (err) {
-        failed += 1;
-        console.error(`[WA Broadcast] Failed for ${target.jid}:`, err.message);
-      }
-      if (i < normalized.length - 1) await wait(delay);
+    async function updateWaBroadcastProgress(forceStatus) {
+      const status = forceStatus || (sent + failed >= normalized.length
+        ? (failed === normalized.length ? 'failed' : 'sent')
+        : 'sending');
+      await pool.query(
+        `UPDATE wa_broadcast_history SET sent=$1, failed=$2, status=$3 WHERE id=$4`,
+        [sent, failed, status, histId]
+      ).catch((e) => console.error('[WA Broadcast] progress update:', e.message));
     }
-    console.log(`[WA Broadcast] Done - sent:${sent} failed:${failed}`);
+    try {
+      for (let i = 0; i < normalized.length; i++) {
+        const target = normalized[i];
+        const msg = applyVarFields(text, target.name);
+        try {
+          if (imageBuf) {
+            await withWaSendTimeout(wa.sendMediaMessage(target.jid, {
+              buffer: imageBuf,
+              filename: 'image.jpg',
+              mimetype: imageMime,
+              mediaType: 'image',
+              caption: msg,
+            }, null), `Media send to ${target.jid}`);
+            if (files.length) await wait(800);
+          }
+          if (files.length) {
+            for (let f = 0; f < files.length; f++) {
+              const att = files[f] || {};
+              const buffer = Buffer.from(String(att.contentBytes || att.data || '').replace(/^data:[^,]+,/, ''), 'base64');
+              if (!buffer.length) continue;
+              const mime = att.contentType || att.mimeType || 'application/octet-stream';
+              const mediaType = String(att.mediaType || '').toLowerCase()
+                || (String(mime).startsWith('image/') ? 'image'
+                  : String(mime).startsWith('video/') ? 'video'
+                    : 'document');
+              await withWaSendTimeout(wa.sendMediaMessage(target.jid, {
+                buffer,
+                filename: att.name || att.fileName || 'broadcast-attachment',
+                mimetype: mime,
+                mediaType,
+                caption: f === 0 && !imageBuf ? msg : '',
+              }, null), `Attachment send to ${target.jid}`);
+              if (f < files.length - 1) await wait(800);
+            }
+          } else if (!imageBuf) {
+            await withWaSendTimeout(wa.sendMessage(target.jid, msg, null), `Message send to ${target.jid}`);
+          }
+          sent += 1;
+        } catch (err) {
+          failed += 1;
+          console.error(`[WA Broadcast] Failed for ${target.jid}:`, err.message);
+          if (/rate.?overlimit|rate.?limit|429|timed out/i.test(String(err.message || ''))) {
+            const backoff = Math.min(delay * 2, 120000);
+            console.warn(`[WA Broadcast] Rate limit/timeout — waiting ${backoff}ms before continuing`);
+            await wait(backoff);
+          }
+        }
+
+        await updateWaBroadcastProgress();
+
+        if (i < normalized.length - 1) await wait(delay);
+      }
+      console.log(`[WA Broadcast] Done - sent:${sent} failed:${failed}`);
+      await updateWaBroadcastProgress(failed === normalized.length ? 'failed' : 'sent');
+    } catch (err) {
+      console.error('[WA Broadcast] Worker error:', err.message);
+      await updateWaBroadcastProgress(failed === normalized.length ? 'failed' : 'partial');
+    }
+  })().catch(async (err) => {
+    console.error('[WA Broadcast] Worker error:', err.message);
     await pool.query(
-      `UPDATE wa_broadcast_history SET sent=$1, failed=$2, status=$3 WHERE id=$4`,
-      [sent, failed, failed === normalized.length ? 'failed' : 'sent', histId]
-    ).catch(e => console.error('[WA Broadcast] history update:', e.message));
-  })().catch(err => console.error('[WA Broadcast] Worker error:', err.message));
+      `UPDATE wa_broadcast_history SET status='failed' WHERE id=$1`,
+      [histId]
+    ).catch((e) => console.error('[WA Broadcast] failed status update:', e.message));
+  });
 });
 
 router.get('/media-health', authenticate, async (_req, res) => {

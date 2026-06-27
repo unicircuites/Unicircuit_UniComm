@@ -59,6 +59,7 @@ const { serviceState } = systemRoutes;
 const msGraph = require('./services/msGraph');
 const cron = require('node-cron');
 const maintenance = require('./services/maintenance');
+const oneDriveSync = require('./services/oneDriveSync');
 
 const httpsAgent = new https.Agent({
   rejectUnauthorized: false
@@ -848,6 +849,7 @@ server.listen(PORT, HOST, async () => {
     mktCron.start(io);
     waInventory.startDailyBackup(() => wa.getConnectedPhone());
     taskNotifier.start(pool);
+    oneDriveSync.start();
 
     console.log('[System] ✅ All background services initialized.');
   } catch (err) {
@@ -862,6 +864,16 @@ server.listen(PORT, HOST, async () => {
       await maintenance.pruneAntigravityLogs();
     } catch (err) {
       console.error('[Maintenance] Cron error:', err.message);
+    }
+  });
+
+  // ✅ 3. START DAILY PBX RECORDINGS ONEDRIVE UPLOAD (6:30 PM IST)
+  cron.schedule('30 18 * * *', async () => {
+    console.log('[OneDrive] Running scheduled daily PBX recordings upload...');
+    try {
+      await oneDriveSync.runUploadJob();
+    } catch (err) {
+      console.error('[OneDrive] Scheduled upload job error:', err.message);
     }
   });
 

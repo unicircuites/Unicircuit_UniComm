@@ -13545,13 +13545,13 @@ Keep it concise and professional.`;
           var deliveries = b.deliveries || [];
           if (typeof deliveries === 'string') { try { deliveries = JSON.parse(deliveries); } catch (_) { deliveries = []; } }
           var deliveryMap = {};
-          deliveries.forEach(function (d) { if (d.email) deliveryMap[d.email] = d; });
+          deliveries.forEach(function (d) { if (d.email) deliveryMap[String(d.email).toLowerCase()] = d; });
 
           if (rcps.length) {
             rcpEl.innerHTML = rcps.map(function (r) {
               var email = typeof r === 'string' ? r : (r.email || '');
               var name = typeof r === 'object' ? (r.name || '') : '';
-              var d = deliveryMap[email];
+              var d = deliveryMap[String(email).toLowerCase()];
               var statusBadge = '';
               var timeStr = '';
               if (d) {
