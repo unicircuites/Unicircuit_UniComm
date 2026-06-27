@@ -8872,8 +8872,94 @@ Always write in a professional yet warm Indian B2B communication style. Use form
       if (!el) return;
       el.style.display = 'none';
       el.classList.remove('open');
+
+      // Stop audio playback if closing transcript modal
+      if (id === 'pbx-transcript-modal') {
+        const audio = document.getElementById('pbx-trans-audio');
+        if (audio) audio.pause();
+      }
     }
     // Note: outside-click to close modals is intentionally disabled for all modals.
+
+    // ── PBX TRANSCRIPTION MODAL HANDLERS ──
+    function parseTimelineToSeconds(timeStr) {
+      const parts = timeStr.split(':');
+      if (parts.length !== 3) return 0;
+      const h = parseFloat(parts[0]);
+      const m = parseFloat(parts[1]);
+      const sParts = parts[2].split('.');
+      const s = parseFloat(sParts[0]);
+      const ms = sParts[1] ? parseFloat(sParts[1]) / 1000 : 0;
+      return h * 3600 + m * 60 + s + ms;
+    }
+
+    window.seekPbxAudio = function(seconds) {
+      const audio = document.getElementById('pbx-trans-audio');
+      if (audio) {
+        audio.currentTime = seconds;
+        audio.play().catch(function() {});
+      }
+    };
+
+    window.showRecordingTranscript = async function(recordingId, filename) {
+      document.getElementById('pbx-trans-title').innerText = 'Transcript: ' + filename;
+      const audio = document.getElementById('pbx-trans-audio');
+      audio.src = '/api/pbx/play-db/' + recordingId;
+      audio.load();
+
+      openModal('pbx-transcript-modal');
+
+      const body = document.getElementById('pbx-trans-body');
+      body.innerHTML = `
+        <div style="text-align:center;color:var(--muted);padding:40px;font-style:italic;">
+          <i class="fas fa-spinner fa-spin" style="margin-right:8px;color:var(--gold);"></i>
+          Transcribing recording / loading script... (Hindi, Marathi, English, and Hinglish are all supported)
+        </div>
+      `;
+
+      try {
+        const res = await fetch('/api/pbx/transcript-db/' + recordingId);
+        const data = await res.json();
+        
+        if (!data.success) {
+          throw new Error(data.error || 'Failed to fetch transcript');
+        }
+
+        const segments = data.segments || [];
+        if (segments.length === 0) {
+          body.innerHTML = `
+            <div style="text-align:center;color:var(--muted);padding:40px;font-style:italic;">
+              No speech detected in this recording.
+            </div>
+          `;
+          return;
+        }
+
+        body.innerHTML = segments.map(function(seg) {
+          const displayStart = seg.start.split('.')[0];
+          const seconds = parseTimelineToSeconds(seg.start);
+
+          return `
+            <div style="display:flex;gap:14px;align-items:flex-start;border-bottom:1px solid rgba(255,255,255,0.03);padding-bottom:8px;margin-bottom:4px;">
+              <button class="btn btn-ghost btn-sm" onclick="seekPbxAudio(${seconds})" style="padding:2px 8px;font-size:11px;font-family:monospace;color:var(--gold);border:1px solid rgba(212,175,55,0.3);border-radius:6px;flex-shrink:0;height:24px;">
+                <i class="fas fa-play" style="font-size:8px;margin-right:4px;"></i> ${displayStart}
+              </button>
+              <div style="color:var(--text);font-size:13px;line-height:1.5;padding-top:2px;text-align:left;">
+                ${escHtml(seg.text)}
+              </div>
+            </div>
+          `;
+        }).join('');
+
+      } catch (err) {
+        body.innerHTML = `
+          <div style="text-align:center;color:var(--red2);padding:40px;font-style:italic;">
+            <i class="fas fa-exclamation-triangle" style="margin-right:8px;"></i>
+            Error loading transcript: ${err.message}
+          </div>
+        `;
+      }
+    };
 
     // ──────────────────────────────────
     // CONTACTS MODULE
@@ -35240,7 +35326,7 @@ ${plainText}`;
               border-radius:14px;
               padding:14px;
               display:grid;
-              grid-template-columns:1fr 120px 120px 320px;
+              grid-template-columns:1fr 120px 120px 240px 110px;
               align-items:center;
               gap:14px;
             ">
@@ -35281,6 +35367,9 @@ ${plainText}`;
                   type="audio/wav"
                 >
               </audio>
+              <button class="btn btn-ghost btn-sm" onclick="showRecordingTranscript(${file.id}, '${escHtml(file.original_filename || '')}')" style="display:flex;align-items:center;gap:6px;justify-content:center;height:36px;border:1px solid var(--border);">
+                <i class="fas fa-file-alt" style="color:var(--gold);"></i> Script
+              </button>
             </div>
           `).join('')}
         </div>
@@ -37279,6 +37368,35 @@ Provide insight in a numbered list. Highlight risks and positives.`;
           <i class="fas fa-sync-alt"></i> Refresh Log
         </button>
         <button class="btn btn-ghost btn-sm" onclick="closeModal('broadcast-preview-modal')">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- PBX Recording Transcript Modal -->
+  <div class="modal-overlay" id="pbx-transcript-modal">
+    <div class="modal" style="max-width:760px;width:94vw;max-height:86vh;display:flex;flex-direction:column;padding:18px;">
+      <div class="modal-title" style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-shrink:0;">
+        <span style="font-weight:700;font-size:16px;color:var(--text);display:flex;align-items:center;gap:8px;">
+          <i class="fas fa-file-alt" style="color:var(--gold);"></i>
+          <span id="pbx-trans-title">Recording Transcript</span>
+        </span>
+        <span class="modal-close" onclick="closeModal('pbx-transcript-modal')" style="cursor:pointer;color:var(--muted);"><i class="fas fa-times"></i></span>
+      </div>
+      
+      <!-- Modal Player -->
+      <div style="background:rgba(255,255,255,0.03);border:1px solid var(--border);border-radius:10px;padding:12px;margin-bottom:14px;display:flex;flex-direction:column;gap:8px;flex-shrink:0;">
+        <div style="font-size:11px;color:var(--muted2);text-transform:uppercase;letter-spacing:0.5px;">Audio Player</div>
+        <audio id="pbx-trans-audio" controls style="width:100%;"></audio>
+        <div style="font-size:11px;color:var(--muted);font-style:italic;">💡 Click on any time stamp pill below to seek to that part of the audio.</div>
+      </div>
+      
+      <!-- Script Timeline Body -->
+      <div id="pbx-trans-body" style="flex:1;overflow-y:auto;background:rgba(0,0,0,0.2);border:1px solid var(--border);border-radius:10px;padding:14px;display:flex;flex-direction:column;gap:12px;">
+        <!-- Timelines will load here -->
+      </div>
+      
+      <div style="display:flex;justify-content:flex-end;margin-top:14px;flex-shrink:0;">
+        <button class="btn btn-ghost btn-sm" onclick="closeModal('pbx-transcript-modal')">Close</button>
       </div>
     </div>
   </div>
