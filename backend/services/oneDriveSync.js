@@ -162,17 +162,39 @@ async function getTargetFolder(token) {
       console.warn('[OneDrive] Sharing link resolution error:', shareErr.message, '— trying drive-path fallback...');
     }
 
-    // ── Strategy 2: Path-based lookup — Documents/Call_Recordings ──────────
-    // Handles /:f:/r/ (redirect) style links which may not resolve via /shares/
+    // ── Strategy 2: Path-based lookup (root folder / Call_Recordings) ──────────
+    // In SharePoint/OneDrive for Business, "/Documents/" in the web URL maps directly to 
+    // the root of the drive. Thus, "Call_Recordings" is usually at the root path, not inside a "Documents" subfolder.
     try {
       const encodedUser = encodeURIComponent(USER_EMAIL);
-      const pathUrl = `${GRAPH}/users/${encodedUser}/drive/root:/Documents/Call_Recordings`;
+      // Try root-level first (most common for OneDrive for Business)
+      const pathUrl = `${GRAPH}/users/${encodedUser}/drive/root:/Call_Recordings`;
       const pathRes = await fetch(pathUrl, {
         headers: { Authorization: `Bearer ${token}` },
       });
 
       if (pathRes.ok) {
         const item = await pathRes.json();
+        const driveRes = await fetch(`${GRAPH}/users/${encodedUser}/drive`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        const drive = driveRes.ok ? await driveRes.json() : {};
+        console.log(`[OneDrive] ✅ Resolved Call_Recordings via drive root (id: ${item.id})`);
+        return {
+          driveId: drive.id || item.parentReference?.driveId,
+          itemId: item.id,
+          label: 'root:/Call_Recordings',
+        };
+      }
+
+      // Try Documents subfolder (fallback for personal OneDrive root structures)
+      const pathUrlBackup = `${GRAPH}/users/${encodedUser}/drive/root:/Documents/Call_Recordings`;
+      const pathResBackup = await fetch(pathUrlBackup, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+
+      if (pathResBackup.ok) {
+        const item = await pathResBackup.json();
         const driveRes = await fetch(`${GRAPH}/users/${encodedUser}/drive`, {
           headers: { Authorization: `Bearer ${token}` },
         });
@@ -191,8 +213,8 @@ async function getTargetFolder(token) {
       console.warn('[OneDrive] Drive path lookup error:', pathErr.message);
     }
 
-    // ── Strategy 3: Create Documents/Call_Recordings ────────────────────────
-    console.log('[OneDrive] Creating Documents/Call_Recordings folder...');
+    // ── Strategy 3: Create Call_Recordings folder ────────────────────────
+    console.log('[OneDrive] Creating Call_Recordings folder in root...');
     return await createCallRecordingsFolder(token);
   }
 
@@ -212,53 +234,74 @@ async function getTargetFolder(token) {
 }
 
 /**
- * Create Documents/Call_Recordings folder inside the user's OneDrive.
+ * Create Call_Recordings folder inside the root of the user's OneDrive.
  * Used as last-resort fallback when the sharing link can't be resolved.
  */
 async function createCallRecordingsFolder(token) {
   const encodedUser = encodeURIComponent(USER_EMAIL);
 
-  // Get Documents folder (should always exist in a personal OneDrive)
-  const docsRes = await fetch(`${GRAPH}/users/${encodedUser}/drive/root:/Documents`, {
-    headers: { Authorization: `Bearer ${token}` },
-  });
-  if (!docsRes.ok) throw new Error(`Cannot access Documents folder: HTTP ${docsRes.status}`);
-  const docsFolder = await docsRes.json();
-
   const driveRes = await fetch(`${GRAPH}/users/${encodedUser}/drive`, {
     headers: { Authorization: `Bearer ${token}` },
   });
-  const drive = driveRes.ok ? await driveRes.json() : {};
+  if (!driveRes.ok) throw new Error(`Cannot access OneDrive drive: HTTP ${driveRes.status}`);
+  const drive = await driveRes.json();
 
-  // Attempt to create Call_Recordings inside Documents
+  // Attempt to create Call_Recordings in the root of the drive (default documents library root)
   const createRes = await fetch(
-    `${GRAPH}/users/${encodedUser}/drive/items/${docsFolder.id}/children`,
+    `${GRAPH}/users/${encodedUser}/drive/root/children`,
     {
       method: 'POST',
       headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name: 'Call_Recordings', folder: {}, '@microsoft.graph.conflictBehavior': 'fail' }),
+      body: JSON.stringify({ name: OD_FOLDER, folder: {}, '@microsoft.graph.conflictBehavior': 'fail' }),
     }
   );
 
-  if (createRes.status === 409) {
+  if (createRes.ok) {
+    const created = await createRes.json();
+    console.log(`[OneDrive] ✅ Created Call_Recordings in root (id: ${created.id})`);
+    return { driveId: drive.id || created.parentReference?.driveId, itemId: created.id, label: 'root:/Call_Recordings' };
+  }
+
+  const err = await createRes.json().catch(() => ({}));
+  if (createRes.status === 409 || (err.error && err.error.code === 'nameAlreadyExists')) {
     // Already exists — fetch it
-    const existing = await fetch(`${GRAPH}/users/${encodedUser}/drive/root:/Documents/Call_Recordings`, {
+    const existing = await fetch(`${GRAPH}/users/${encodedUser}/drive/root:/Call_Recordings`, {
       headers: { Authorization: `Bearer ${token}` },
     });
-    if (!existing.ok) throw new Error('Call_Recordings exists but could not be fetched');
-    const item = await existing.json();
-    console.log(`[OneDrive] ✅ Call_Recordings already exists in Documents (id: ${item.id})`);
-    return { driveId: drive.id || item.parentReference?.driveId, itemId: item.id, label: 'Documents/Call_Recordings' };
+    if (existing.ok) {
+      const item = await existing.json();
+      console.log(`[OneDrive] ✅ Call_Recordings already exists in root (id: ${item.id})`);
+      return { driveId: drive.id || item.parentReference?.driveId, itemId: item.id, label: 'root:/Call_Recordings' };
+    }
   }
 
-  if (!createRes.ok) {
-    const err = await createRes.json().catch(() => ({}));
-    throw new Error(`Failed to create Documents/Call_Recordings: ${err.error?.message || createRes.status}`);
+  // If root creation failed, try Documents subfolder as a fallback
+  console.log(`[OneDrive] Root creation failed (${err.error?.message || createRes.status}). Trying to create in Documents folder...`);
+  try {
+    const docsRes = await fetch(`${GRAPH}/users/${encodedUser}/drive/root:/Documents`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (docsRes.ok) {
+      const docsFolder = await docsRes.json();
+      const createDocsRes = await fetch(
+        `${GRAPH}/users/${encodedUser}/drive/items/${docsFolder.id}/children`,
+        {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name: OD_FOLDER, folder: {}, '@microsoft.graph.conflictBehavior': 'fail' }),
+        }
+      );
+      if (createDocsRes.ok) {
+        const created = await createDocsRes.json();
+        console.log(`[OneDrive] ✅ Created Call_Recordings in Documents (id: ${created.id})`);
+        return { driveId: drive.id || created.parentReference?.driveId, itemId: created.id, label: 'Documents/Call_Recordings' };
+      }
+    }
+  } catch (docsErr) {
+    console.warn('[OneDrive] Documents fallback creation error:', docsErr.message);
   }
 
-  const created = await createRes.json();
-  console.log(`[OneDrive] ✅ Created Documents/Call_Recordings (id: ${created.id})`);
-  return { driveId: drive.id || created.parentReference?.driveId, itemId: created.id, label: 'Documents/Call_Recordings' };
+  throw new Error(`Failed to create Call_Recordings: ${err.error?.message || createRes.status}`);
 }
 
 // ── Upload a single file to OneDrive ─────────────────────────────────────
