@@ -109,29 +109,6 @@ function decodeAndUpsampleWav(inputPath, outputPath) {
     upsampledSamples = pcm16Samples;
   }
   
-  // Apply Bandpass Filter (HPF at ~200Hz, LPF at ~3400Hz) to isolate human voice band
-  const lpfAlpha = 0.57;
-  const hpfAlpha = 0.927;
-  
-  let lpfPrev = 0;
-  let hpfPrevY = 0;
-  let hpfPrevX = 0;
-  
-  for (let i = 0; i < upsampledSamples.length; i++) {
-    let x = upsampledSamples[i];
-    
-    // Low-Pass Filter
-    let yLpf = lpfPrev + lpfAlpha * (x - lpfPrev);
-    lpfPrev = yLpf;
-    
-    // High-Pass Filter on LPF output
-    let yHpf = hpfAlpha * (hpfPrevY + yLpf - hpfPrevX);
-    hpfPrevY = yHpf;
-    hpfPrevX = yLpf;
-    
-    upsampledSamples[i] = yHpf;
-  }
-  
   // Apply block-based Automatic Gain Control (AGC) to boost quiet voices
   const blockSize = 8000; // 0.5 seconds at 16kHz
   const targetPeak = 24000;
@@ -286,7 +263,7 @@ async function transcribeViaGroq(filePath) {
     formData.append('response_format', 'verbose_json');
     formData.append('temperature', '0.0');
     formData.append('language', 'hi'); // Force Hindi detection to ensure no speech segment is skipped
-    formData.append('prompt', 'Hello, welcome to Unicircuit. Sangshil sir ko connect karna hai. Haan, main check karke batata hoon. Yes sir, quotation ready hai. Sangshil, Shiva Shish, Nirisha, Kaushal Gupta, Pawan, Adani, lead active, lead closed, WhatsApp broadcast, extension, caller, recording, details, connect, discuss.');
+    formData.append('prompt', 'Hello, welcome to Unicircuit. Haan, main check karke batata hoon. Yes sir, quotation ready hai, please check. OK, please wait. Adani, lead active, lead closed, WhatsApp broadcast, extension, caller, recording, details, talk, connect, discuss.');
 
     const response = await fetch('https://api.groq.com/openai/v1/audio/transcriptions', {
       method: 'POST',
