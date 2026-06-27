@@ -786,6 +786,14 @@
       gap: 8px;
       margin-left: auto;
       align-items: center;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+      min-width: 0;
+    }
+
+    .topbar-title {
+      min-width: 0;
+      flex: 1;
     }
 
     .pill-tag {
@@ -3485,6 +3493,60 @@
       transform: translateX(0) !important;
     }
 
+    .alp-svc-strip {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 6px;
+      padding: 10px 18px;
+      border-bottom: 1px solid var(--border);
+      flex-shrink: 0;
+    }
+
+    .alp-svc-chip {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 8px;
+      border-radius: 6px;
+      border: 1px solid var(--border2);
+      background: rgba(255, 255, 255, 0.03);
+      font-size: 11px;
+      color: var(--muted2);
+      font-weight: 500;
+      min-width: 0;
+    }
+
+    .alp-svc-chip.alp-svc-online {
+      border-color: rgba(16, 185, 129, 0.35);
+      color: var(--text);
+    }
+
+    .alp-svc-chip.alp-svc-standby {
+      border-color: rgba(245, 158, 11, 0.35);
+      color: var(--text);
+    }
+
+    .alp-svc-chip.alp-svc-offline {
+      border-color: rgba(239, 68, 68, 0.35);
+    }
+
+    .alp-svc-chip.alp-svc-clickable {
+      cursor: pointer;
+    }
+
+    .alp-svc-chip.alp-svc-clickable:hover {
+      background: rgba(255, 255, 255, 0.06);
+    }
+
+    .alp-svc-chip .svc-dot {
+      display: inline-block;
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: var(--muted);
+      flex-shrink: 0;
+    }
+
     .alp-row {
       display: flex;
       align-items: flex-start;
@@ -4558,37 +4620,16 @@
         </div>
         <div class="topbar-actions">
           <div class="pill-tag" id="topbar-clock"
-            style="font-family:'JetBrains Mono',monospace;font-size:11.5px;min-width:220px;justify-content:center;">
+            style="font-family:'JetBrains Mono',monospace;font-size:11.5px;min-width:0;justify-content:center;">
           </div>
           <button type="button" class="btn btn-ghost btn-sm" id="dashboard-kpi-refresh"
             onclick="refreshDashboardKpis()" title="Refresh dashboard KPIs">
             <i class="fas fa-sync-alt" id="dashboard-kpi-refresh-icon"></i>
           </button>
-          <!-- PostgreSQL -->
-          <div class="pill-tag" id="svc-postgres" style="cursor:default;">
-            <span class="svc-dot" id="dot-postgres"
-              style="display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--muted);margin-right:4px;vertical-align:middle;"></span>PostgreSQL
-          </div>
-          <!-- Matrix PBX -->
-          <div class="pill-tag" id="svc-pbx" style="cursor:default;">
-            <span class="svc-dot" id="dot-pbx"
-              style="display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--muted);margin-right:4px;vertical-align:middle;"></span>Matrix
-            PBX
-          </div>
-          <!-- WA Business -->
-          <div class="pill-tag" id="svc-whatsapp" style="cursor:pointer;" onclick="nav('whatsapp', null)">
-            <i class="fab fa-whatsapp" id="dot-whatsapp"
-              style="font-size:11px;color:var(--muted);margin-right:4px;"></i>WA Business
-          </div>
-          <!-- Outlook -->
-          <div class="pill-tag" id="svc-outlook" style="cursor:default;">
-            <i class="fas fa-envelope" id="dot-outlook"
-              style="font-size:11px;color:var(--muted);margin-right:4px;"></i>Outlook
-          </div>
           <button type="button" class="btn btn-gold btn-sm" id="topbar-compose-email" style="display:none;"
             onclick="openComposeEmailModal()"><i class="fas fa-pen"></i> Compose</button>
           <button class="btn btn-ghost btn-sm" id="topbar-activity-log" onclick="openActivityLog()"
-            title="System Activity Log"><i class="fas fa-list-alt"></i> Activity Log</button>
+            title="Activity log and service status (PostgreSQL, PBX, WhatsApp, Outlook)"><i class="fas fa-list-alt"></i> Activity Log</button>
           <button class="btn btn-gold btn-sm" id="topbar-add-contact" onclick="openModal('contact-modal')"><i class="fas fa-user-plus"></i> Add
             Contact</button>
           <button class="btn btn-ghost btn-sm" onclick="nav('ai',null)"><i class="fas fa-robot"></i> Ask AI</button>
@@ -8290,8 +8331,8 @@
 
     <div class="form-row">
       <div>
-        <label class="form-label">Send Interval — Delay between emails</label>
-        <div style="display:flex;gap:6px;align-items:center;">
+        <label class="form-label" id="bc-delay-label">Send interval — delay between batches</label>
+        <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;">
           <input class="inp" id="bc-delay-val" type="number" value="3" min="1" max="999"
             style="width:80px;flex-shrink:0;" oninput="bcUpdateIntervalPreview()" />
           <select class="inp" id="bc-delay-unit" style="width:auto;" onchange="bcUpdateIntervalPreview()">
@@ -8301,6 +8342,14 @@
           </select>
           <span id="bc-delay-preview" style="font-size:11px;color:var(--muted);white-space:nowrap;">= 3
             min</span>
+        </div>
+      </div>
+      <div id="bc-email-batch-wrap">
+        <label class="form-label">Recipients per batch</label>
+        <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;">
+          <input class="inp" id="bc-batch-size" type="number" value="1" min="1" max="20"
+            style="width:80px;flex-shrink:0;" oninput="bcUpdateIntervalPreview()" />
+          <span id="bc-batch-preview" style="font-size:11px;color:var(--muted);line-height:1.35;">Max 20 per batch · 1 = pause after each email</span>
         </div>
       </div>
       <div id="bc-test-email-wrap">
@@ -12504,6 +12553,8 @@ Keep it concise and professional.`;
       if (contactsBtn) contactsBtn.style.display = isWa ? 'none' : '';
       var testWrap = document.getElementById('bc-test-email-wrap');
       if (testWrap) testWrap.style.display = isWa ? 'none' : '';
+      var batchWrap = document.getElementById('bc-email-batch-wrap');
+      if (batchWrap) batchWrap.style.display = isWa ? 'none' : '';
       var bcImgWrap = document.getElementById('bc-banner-image-wrap');
       if (bcImgWrap) bcImgWrap.style.display = isWa ? 'none' : '';
       var textarea = document.getElementById('bc-recipients');
@@ -12693,9 +12744,23 @@ Keep it concise and professional.`;
       var count = _bcChannel === 'whatsapp' ? bcParseWhatsAppRecipients(raw).length : bcParseRecipients(raw).length;
       var el = document.getElementById('bc-recipient-count');
       if (el) el.textContent = count + ' recipient' + (count !== 1 ? 's' : '');
+      bcUpdateIntervalPreview();
     }
 
-    // Live interval preview: "3 minutes = 180 sec between each email"
+    function bcFormatDurationSec(totalSec) {
+      totalSec = Math.max(0, parseInt(totalSec || 0, 10) || 0);
+      if (totalSec < 60) return totalSec + ' sec';
+      if (totalSec < 3600) {
+        var m = Math.floor(totalSec / 60);
+        var s = totalSec % 60;
+        return s ? (m + ' min ' + s + ' sec') : (m + ' min');
+      }
+      var h = Math.floor(totalSec / 3600);
+      var rm = Math.floor((totalSec % 3600) / 60);
+      return rm ? (h + ' hr ' + rm + ' min') : (h + ' hr');
+    }
+
+    // Live interval preview — batch 4 + 20 sec = send r1–r4, pause, send r5–r8, …
     function bcUpdateIntervalPreview() {
       var val = parseInt((document.getElementById('bc-delay-val') || {}).value || 1);
       var unit = parseInt((document.getElementById('bc-delay-unit') || {}).value || 60000);
@@ -12704,7 +12769,43 @@ Keep it concise and professional.`;
         : unit === 60000 ? (val === 1 ? '1 min' : val + ' min')
           : (val === 1 ? '1 hr' : val + ' hr');
       var el = document.getElementById('bc-delay-preview');
-      if (el) el.textContent = '= ' + label + ' between each ' + (_bcChannel === 'whatsapp' ? 'WhatsApp send' : 'email');
+      var batchEl = document.getElementById('bc-batch-preview');
+      var delayLabel = document.getElementById('bc-delay-label');
+      var batchSize = Math.max(1, Math.min(20, parseInt((document.getElementById('bc-batch-size') || {}).value || 1, 10) || 1));
+      var isWa = _bcChannel === 'whatsapp';
+
+      if (delayLabel) {
+        delayLabel.textContent = isWa
+          ? 'Send interval — delay between each send'
+          : (batchSize <= 1 ? 'Send interval — delay between each email' : 'Send interval — delay between batches');
+      }
+
+      if (el) {
+        if (isWa) {
+          el.textContent = '= ' + label + ' between each WhatsApp send';
+        } else if (batchSize <= 1) {
+          el.textContent = '= ' + label + ' between each email';
+        } else {
+          el.textContent = '= ' + label + ' pause after every ' + batchSize + ' emails';
+        }
+      }
+
+      if (batchEl && !isWa) {
+        if (batchSize <= 1) {
+          batchEl.textContent = '1 = send one email, pause, repeat (slowest, safest for Outlook limits)';
+        } else {
+          var raw = (document.getElementById('bc-recipients') || {}).value.trim();
+          var count = bcParseRecipients(raw).length;
+          var batchCount = count > 0 ? Math.ceil(count / batchSize) : 0;
+          var delayPauses = batchCount > 0 ? Math.max(0, batchCount - 1) : 0;
+          var delayOnlySec = Math.round((delayPauses * ms) / 1000);
+          var hint = 'Batch 1: r1–r' + batchSize + ' (no pause inside batch) → ' + label + ' → Batch 2: next ' + batchSize + ', …';
+          if (count > 0) {
+            hint += ' · ~' + bcFormatDurationSec(delayOnlySec) + ' total pause time for ' + count + ' recipients (' + batchCount + ' batches)';
+          }
+          batchEl.textContent = hint;
+        }
+      }
     }
 
     async function bcLoadFromContacts() {
@@ -13431,6 +13532,7 @@ Keep it concise and professional.`;
       var delayVal = parseInt((document.getElementById('bc-delay-val') || {}).value || 3);
       var delayUnit = parseInt((document.getElementById('bc-delay-unit') || {}).value || 60000);
       var delay = delayVal * delayUnit;
+      var batchSize = Math.max(1, Math.min(20, parseInt((document.getElementById('bc-batch-size') || {}).value || 1, 10) || 1));
       var statusEl = document.getElementById('bc-status');
       if (_bcChannel === 'whatsapp') {
         if (!htmlBody || !raw) { if (statusEl) statusEl.innerHTML = '<span style="color:var(--red2);">Message and WhatsApp recipients required</span>'; return; }
@@ -13477,7 +13579,7 @@ Keep it concise and professional.`;
           if (statusEl) statusEl.innerHTML = '<span style="color:var(--red2);">Map all variable fields before sending (' + unmapped.map(function (f) { return '{{' + f.key + '}}'; }).join(', ') + ')</span>';
           return;
         }
-        var res = await fetch(API_BASE + '/broadcast/send', { method: 'POST', headers: getAuthHeaders(), body: JSON.stringify({ subject, html: htmlBody, recipients, delay_ms: delay, attachments, variable_fields }) });
+        var res = await fetch(API_BASE + '/broadcast/send', { method: 'POST', headers: getAuthHeaders(), body: JSON.stringify({ subject, html: htmlBody, recipients, delay_ms: delay, batch_size: batchSize, attachments, variable_fields }) });
         var data = await res.json();
         if (res.ok) {
           if (statusEl) statusEl.innerHTML = '<span style="color:var(--green2);"><i class="fas fa-check"></i> Broadcast started! #' + data.broadcast_id + ' — ' + data.total + ' emails queued</span>';
@@ -13549,6 +13651,7 @@ Keep it concise and professional.`;
       if (!_currentBroadcastPreviewId) return;
       var delaySec = parseInt((document.getElementById('bp-resend-delay-sec') || {}).value || '3', 10);
       var delayMs = Math.max(0, delaySec) * 1000;
+      var batchSize = Math.max(1, Math.min(20, parseInt((document.getElementById('bp-resend-batch-size') || {}).value || 1, 10) || 1));
       if (!confirm('Resend to all pending/failed recipients?\n\nRecipients who already received this email will be skipped (no duplicate send).')) return;
       var btn = document.getElementById('bp-resend-btn');
       if (btn) { btn.disabled = true; btn.innerHTML = '<span class="spin-loader"></span> Resuming...'; }
@@ -13556,7 +13659,7 @@ Keep it concise and professional.`;
         var res = await fetch(API_BASE + '/broadcast/' + _currentBroadcastPreviewId + '/resend', {
           method: 'POST',
           headers: getAuthHeaders(),
-          body: JSON.stringify({ delay_ms: delayMs })
+          body: JSON.stringify({ delay_ms: delayMs, batch_size: batchSize })
         });
         var data = await res.json();
         if (res.ok) {
@@ -13668,7 +13771,7 @@ Keep it concise and professional.`;
                     : '<span style="font-size:9px;color:var(--gold);margin-left:6px;"><i class="fas fa-hourglass-half"></i> pending</span>';
                 timeStr = d.sent_at
                   ? '<span style="font-size:10px;color:var(--muted);margin-left:6px;">' +
-                  new Date(d.sent_at).toLocaleString('en-IN', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }) +
+                  new Date(d.sent_at).toLocaleString('en-IN', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit', second: '2-digit' }) +
                   '</span>'
                   : '';
               } else if (b.status === 'sending') {
@@ -13718,6 +13821,19 @@ Keep it concise and professional.`;
         var resendWrap = document.getElementById('bp-resend-wrap');
         var resendCount = document.getElementById('bp-resend-count');
         var resendBtn = document.getElementById('bp-resend-btn');
+        var resendBatchEl = document.getElementById('bp-resend-batch-size');
+        if (resendBatchEl) resendBatchEl.value = Math.max(1, parseInt(b.batch_size || 1, 10) || 1);
+        var bpBatchMeta = document.getElementById('bp-batch-meta');
+        if (bpBatchMeta) {
+          var storedDelayMs = parseInt(b.delay_ms || 0, 10) || 0;
+          var storedBatch = Math.max(1, parseInt(b.batch_size || 1, 10) || 1);
+          var delayLabel = storedDelayMs >= 60000
+            ? (Math.round(storedDelayMs / 60000) + ' min')
+            : (Math.round(storedDelayMs / 1000) + ' sec');
+          bpBatchMeta.textContent = storedBatch <= 1
+            ? (delayLabel + ' between each email')
+            : (storedBatch + ' per batch · ' + delayLabel + ' between batches');
+        }
         if (resendWrap) resendWrap.style.display = (undelivered > 0 || b.status === 'sending') ? 'flex' : 'none';
         if (resendCount) resendCount.textContent = undelivered;
         if (resendBtn) {
@@ -14643,7 +14759,6 @@ Keep it concise and professional.`;
           ['nav-label-overview','nav-calls','nav-email','nav-label-comms',
            'nav-pipeline','nav-label-crm','nav-marketing','nav-analytics','nav-label-intel',
            'topbar-activity-log','topbar-add-contact','mkt-quick-wrap','dashboard-kpi-refresh',
-           'svc-pbx','svc-outlook',
            'contacts-toolbar-actions', 'nav-webscraper'].forEach(function(id) {
             var el = document.getElementById(id); if (el) el.style.display = 'none';
           });
@@ -16525,16 +16640,7 @@ Best regards,<br>
 
     // ── DB STATUS BADGE ──────────────────────────────────────────────────────────
     function showDbStatus(online) {
-      // Add a small badge to the topbar
-      const actions = document.querySelector('.topbar-actions');
-      if (!actions) return;
-      const existing = document.getElementById('db-status-badge');
-      if (existing) existing.remove();
-      const badge = document.createElement('div');
-      badge.id = 'db-status-badge';
-      badge.className = 'db-badge';
-      badge.innerHTML = `<span class="db-dot ${online ? '' : 'offline'}"></span>${online ? 'PostgreSQL Live' : 'Offline Mode'}`;
-      actions.prepend(badge);
+      updateServiceIndicator('postgres', !!online);
     }
 
     // ── OVERRIDE saveContact TO USE API ─────────────────────────────────────────
@@ -16946,12 +17052,39 @@ Best regards,<br>
       const c = colors[service] || { on: 'var(--green)', off: 'var(--red)' };
       const color = online === 'standby' ? (c.standby || 'var(--gold)') : (online ? c.on : c.off);
       const dotEl = document.getElementById('dot-' + service);
-      if (!dotEl) return;
-      if (dotEl.tagName === 'SPAN') {
-        dotEl.style.background = color;
-      } else {
-        dotEl.style.color = color;
+      if (dotEl) {
+        if (dotEl.tagName === 'SPAN') {
+          dotEl.style.background = color;
+        } else {
+          dotEl.style.color = color;
+        }
       }
+      const chipEl = document.getElementById('alp-svc-' + service);
+      if (chipEl) {
+        chipEl.classList.remove('alp-svc-online', 'alp-svc-standby', 'alp-svc-offline');
+        if (online === 'standby') chipEl.classList.add('alp-svc-standby');
+        else if (online) chipEl.classList.add('alp-svc-online');
+        else chipEl.classList.add('alp-svc-offline');
+      }
+    }
+
+    function serviceIndicatorStateFromStatus(svc, info) {
+      if (!info) return false;
+      return info.status === 'online'
+        || info.status === 'connected'
+        || info.status === 'ready'
+        || (svc === 'pbx' && info.status === 'listening');
+    }
+
+    async function refreshAlpServiceStrip() {
+      try {
+        const res = await fetch(`${API_BASE}/system/status`, { headers: getAuthHeaders() });
+        if (!res.ok) return;
+        const data = await res.json();
+        ['whatsapp', 'pbx', 'outlook', 'postgres'].forEach((svc) => {
+          if (data[svc]) updateServiceIndicator(svc, serviceIndicatorStateFromStatus(svc, data[svc]));
+        });
+      } catch (_) { }
     }
 
     function pbxTraceId(label) {
@@ -17010,7 +17143,7 @@ Best regards,<br>
         // Update generic topbar indicators
         ['whatsapp', 'pbx', 'outlook', 'postgres'].forEach(svc => {
           if (data[svc]) {
-            const indicatorState = data[svc].status === 'online' || data[svc].status === 'connected' || data[svc].status === 'ready' || (svc === 'pbx' && data[svc].status === 'listening');
+            const indicatorState = serviceIndicatorStateFromStatus(svc, data[svc]);
             pbxConsoleStep(traceId, `service indicator ${svc}`, { serviceState: data[svc], indicatorState });
             updateServiceIndicator(svc, indicatorState);
           }
@@ -17112,42 +17245,21 @@ Best regards,<br>
       const list = document.getElementById('alp-list');
       if (list) list.innerHTML = '<div style="text-align:center;padding:20px;color:var(--muted);font-size:12px;"><div class="spin-loader" style="margin:0 auto 8px;"></div>Loading...</div>';
 
-      // First: load current service status snapshot
-      const statusRows = [];
-      try {
-        const sRes = await fetch(`${API_BASE}/system/status`, { headers: getAuthHeaders() });
-        if (sRes.ok) {
-          const sData = await sRes.json();
-          const svcLabels = { whatsapp: '📱 WhatsApp', pbx: '📞 Matrix PBX', outlook: '📧 Outlook', postgres: '🗄️ PostgreSQL' };
-          const now = new Date().toISOString();
-          Object.entries(sData).forEach(([svc, info]) => {
-            const online = info.status === 'online';
-            statusRows.push(renderLogEvent({
-              seq: 0,
-              type: online ? 'online' : 'offline',
-              service: svc,
-              message: `${svcLabels[svc] || svc}: ${online ? 'Connected ✅' : 'Disconnected ❌'}${info.lastConnected ? ' (last connected: ' + new Date(info.lastConnected).toLocaleTimeString('en-GB') + ')' : ''}`,
-              timestamp: now,
-            }));
-          });
-        }
-      } catch (_) { }
+      await refreshAlpServiceStrip();
 
-      // Then: load recent events from API
+      // Load recent events from API
       try {
         const res = await fetch(`${API_BASE}/system/log?limit=100`, { headers: getAuthHeaders() });
         if (res.ok) {
           const data = await res.json();
           if (list) {
             const events = (data.events || []).filter(e => e.seq && e.type && e.service && e.message && e.timestamp);
-            // Show status snapshot at top, then recent events below
-            const divider = statusRows.length
-              ? `<div style="padding:6px 18px;font-size:10.5px;color:var(--muted);background:rgba(255,255,255,0.03);border-bottom:1px solid var(--border);letter-spacing:0.05em;text-transform:uppercase;">── Current Status ──</div>`
-              + statusRows.join('')
-              + `<div style="padding:6px 18px;font-size:10.5px;color:var(--muted);background:rgba(255,255,255,0.03);border-bottom:1px solid var(--border);letter-spacing:0.05em;text-transform:uppercase;">── Recent Events ──</div>`
+            const divider = events.length
+              ? `<div style="padding:6px 18px;font-size:10.5px;color:var(--muted);background:rgba(255,255,255,0.03);border-bottom:1px solid var(--border);letter-spacing:0.05em;text-transform:uppercase;">── Recent Events ──</div>`
               : '';
-            if (list) list.innerHTML = divider + events.map(renderLogEvent).join('');
-            _alpEventCount = events.length + statusRows.length;
+            list.innerHTML = divider + events.map(renderLogEvent).join('') ||
+              '<div style="text-align:center;padding:20px;color:var(--muted);font-size:12px;">No recent events</div>';
+            _alpEventCount = events.length;
             const countEl = document.getElementById('alp-count');
             if (countEl) countEl.textContent = `(${_alpEventCount})`;
           }
@@ -19624,8 +19736,8 @@ Best regards,<br>
           if (banner) banner.style.display = 'none';
           if (offlineBtn) offlineBtn.style.display = 'inline-flex';
 
-          const pill = document.querySelector('.pill-tag i.fa-envelope');
-          if (pill) pill.parentElement.style.borderColor = 'rgba(16,185,129,0.3)';
+          const outlookChip = document.getElementById('alp-svc-outlook');
+          if (outlookChip) outlookChip.classList.toggle('alp-svc-online', true);
 
           // Update counts immediately on connection check
           updateFolderCounts().catch(() => { });
@@ -37092,7 +37204,7 @@ Provide insight in a numbered list. Highlight risks and positives.`;
       </div>
 
       <!-- Meta info -->
-      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:14px;">
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:10px;margin-bottom:14px;">
         <div>
           <div
             style="font-size:9.5px;color:var(--muted);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:3px;">
@@ -37104,6 +37216,12 @@ Provide insight in a numbered list. Highlight risks and positives.`;
             style="font-size:9.5px;color:var(--muted);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:3px;">
             From</div>
           <div id="bp-from" style="font-size:12px;color:var(--muted2);"></div>
+        </div>
+        <div>
+          <div
+            style="font-size:9.5px;color:var(--muted);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:3px;">
+            Send plan</div>
+          <div id="bp-batch-meta" style="font-size:12px;color:var(--muted2);"></div>
         </div>
         <div>
           <div
@@ -37148,9 +37266,11 @@ Provide insight in a numbered list. Highlight risks and positives.`;
 
       <div style="display:flex;gap:8px;justify-content:flex-end;align-items:center;flex-wrap:wrap;">
         <div id="bp-resend-wrap" style="display:none;flex:1;align-items:center;gap:8px;flex-wrap:wrap;">
-          <span style="font-size:11px;color:var(--muted);">Resend delay:</span>
+          <span style="font-size:11px;color:var(--muted);">Batch size:</span>
+          <input class="inp" id="bp-resend-batch-size" type="number" min="1" max="20" value="1" style="width:56px;padding:4px 8px;font-size:12px;" />
+          <span style="font-size:11px;color:var(--muted);">Delay:</span>
           <input class="inp" id="bp-resend-delay-sec" type="number" min="0" value="3" style="width:70px;padding:4px 8px;font-size:12px;" />
-          <span style="font-size:11px;color:var(--muted);">sec between each</span>
+          <span style="font-size:11px;color:var(--muted);">sec between batches</span>
           <button class="btn btn-gold btn-sm" id="bp-resend-btn" onclick="resendBroadcast()" title="Send only to pending/failed recipients">
             <i class="fas fa-redo"></i> Resend pending/failed (<span id="bp-resend-count">0</span>)
           </button>
@@ -38788,6 +38908,21 @@ Nagpur, Maharashtra, 440017, India<br>
           class="fas fa-trash-alt"></i></button>
       <button class="btn btn-ghost btn-xs" id="alp-close-btn" onclick="closeActivityLog()" title="Close"><i
           class="fas fa-times"></i></button>
+    </div>
+    <div id="alp-service-status" class="alp-svc-strip" aria-label="Service status">
+      <div class="alp-svc-chip alp-svc-offline" id="alp-svc-postgres">
+        <span class="svc-dot" id="dot-postgres"></span><span>PostgreSQL</span>
+      </div>
+      <div class="alp-svc-chip alp-svc-offline" id="alp-svc-pbx">
+        <span class="svc-dot" id="dot-pbx"></span><span>Matrix PBX</span>
+      </div>
+      <div class="alp-svc-chip alp-svc-offline alp-svc-clickable" id="alp-svc-whatsapp" role="button" tabindex="0"
+        onclick="closeActivityLog();nav('whatsapp', null)" onkeydown="if(event.key==='Enter'){closeActivityLog();nav('whatsapp', null);}">
+        <i class="fab fa-whatsapp" id="dot-whatsapp" style="font-size:11px;color:var(--muted);"></i><span>WA Business</span>
+      </div>
+      <div class="alp-svc-chip alp-svc-offline" id="alp-svc-outlook">
+        <i class="fas fa-envelope" id="dot-outlook" style="font-size:11px;color:var(--muted);"></i><span>Outlook</span>
+      </div>
     </div>
     <div id="alp-user-info"
       style="padding:8px 18px;border-bottom:1px solid var(--border);font-size:11.5px;color:var(--muted);flex-shrink:0;">

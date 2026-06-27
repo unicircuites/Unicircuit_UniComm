@@ -168,7 +168,7 @@ async function sendOne(to, subject, html, text, attachments) {
 async function sendBroadcast(recipients, subject, html, onProgress, delayMs = 2000, attachments = [], batchSize = 1, variableFields = []) {
   const fieldDefs = normalizeFieldDefs(variableFields);
   const results = { sent: 0, failed: 0, errors: [], deliveries: [] };
-  const safeBatchSize = Math.max(1, parseInt(batchSize || 1, 10) || 1);
+  const safeBatchSize = Math.max(1, Math.min(20, parseInt(batchSize || 1, 10) || 1));
   const safeDelayMs = Math.max(0, parseInt(delayMs || 0, 10) || 0);
   const preparedAttachments = normalizeAttachments(attachments);
   const transporter = getTransporter();
@@ -225,7 +225,8 @@ async function sendBroadcast(recipients, subject, html, onProgress, delayMs = 20
         console.error(`[Broadcast] Failed → ${email}:`, err.message);
       }
 
-      // Fixed delay between recipients — not inflated by DB/progress work.
+      // Fixed delay between batches — not inflated by DB/progress work.
+      // batchSize 1: pause after every email. batchSize 4: send r1–r4, pause, send r5–r8, …
       if (i < recipients.length - 1 && shouldApplySendDelay(i, safeBatchSize, safeDelayMs)) {
         await new Promise((resolve) => setTimeout(resolve, safeDelayMs));
       }

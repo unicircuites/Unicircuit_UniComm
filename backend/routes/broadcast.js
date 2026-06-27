@@ -175,7 +175,7 @@ router.post('/send', async (req, res) => {
 
   const pendingDeliveries = buildPendingDeliveries(recipients);
   const delay = parseInt(delay_ms || 2000, 10);
-  const batchSize = Math.max(1, parseInt(batch_size || 1, 10) || 1);
+  const batchSize = Math.max(1, Math.min(20, parseInt(batch_size || 1, 10) || 1));
   const safeAttachments = Array.isArray(attachments) ? attachments : [];
   const safeVariableFields = Array.isArray(variable_fields) ? variable_fields : [];
 
@@ -253,7 +253,7 @@ router.post('/:id/resend', async (req, res) => {
     }
 
     const delay = parseInt(req.body.delay_ms ?? b.delay_ms ?? 2000, 10);
-    const batchSize = Math.max(1, parseInt(req.body.batch_size ?? b.batch_size ?? 1, 10) || 1);
+    const batchSize = Math.max(1, Math.min(20, parseInt(req.body.batch_size ?? b.batch_size ?? 1, 10) || 1));
     const attachments = parseJsonField(b.attachments, []);
     const variable_fields = parseJsonField(b.variable_fields, []);
 
