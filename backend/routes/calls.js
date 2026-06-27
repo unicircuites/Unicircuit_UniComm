@@ -1663,6 +1663,23 @@ router.get('/recordings/play', async (req, res) => {
     if (!file) return res.status(400).json({ error: 'No file specified' });
 
     let fullPath = recordingLinker.resolveRecordingFullPath(file, REC_DIR);
+
+    // Database lookup fallback if not found by file path resolver
+    if (!fullPath) {
+      const filename = path.basename(file);
+      try {
+        const dbRes = await pool.query(
+          `SELECT local_path FROM pbx_recordings WHERE original_filename = $1 OR local_path LIKE $2 LIMIT 1`,
+          [filename, `%${filename}`]
+        );
+        if (dbRes.rows.length > 0 && fs.existsSync(dbRes.rows[0].local_path)) {
+          fullPath = dbRes.rows[0].local_path;
+        }
+      } catch (dbErr) {
+        console.error('[Calls Play] Database path resolution error:', dbErr.message);
+      }
+    }
+
     if (!fullPath) {
       const filename = path.basename(file);
       console.log(`[Calls Play] Local file not found: ${file}. Trying OneDrive: ${filename}`);
@@ -1683,7 +1700,8 @@ router.get('/recordings/play', async (req, res) => {
 
     const allowedRoots = [
       path.resolve(REC_DIR),
-      path.resolve(recordingLinker.LOCAL_STORED_DIR)
+      path.resolve(recordingLinker.LOCAL_STORED_DIR),
+      path.resolve(path.join(__dirname, '../pbx_recordings'))
     ];
     if (!allowedRoots.some(root => fullPath.startsWith(root))) {
       return res.status(403).json({ error: 'Access forbidden' });

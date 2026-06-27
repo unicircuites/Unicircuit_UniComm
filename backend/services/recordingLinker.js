@@ -473,7 +473,8 @@ function resolveRecordingFullPath(fileParam, recordingsDir) {
   const normalized = String(fileParam).replace(/\\/g, '/');
   const roots = [
     { base: path.resolve(recordingsDir || ''), file: normalized },
-    { base: path.resolve(LOCAL_STORED_DIR), file: normalized }
+    { base: path.resolve(LOCAL_STORED_DIR), file: normalized },
+    { base: path.resolve(path.join(__dirname, '..', 'pbx_recordings')), file: normalized }
   ];
 
   if (path.isAbsolute(fileParam)) {
