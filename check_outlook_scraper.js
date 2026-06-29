@@ -1,4 +1,5 @@
-require('dotenv').config({ path: './backend/.env' });
+const path = require('path');
+require(path.join(__dirname, 'backend', 'node_modules', 'dotenv')).config({ path: path.join(__dirname, 'backend', '.env') });
 const pool = require('./backend/db/pool');
 const scraper = require('./outlook_lead_scrape/module/outlookLeadScrapeService');
 
