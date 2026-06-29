@@ -1,0 +1,11 @@
+{
+  "name": "unicomm-outlook-lead-scrape",
+  "version": "1.0.0",
+  "description": "Outlook email lead extraction brain + background service for UniComm Pro CRM",
+  "private": true,
+  "main": "outlookLeadScrapeService.js",
+  "scripts": {
+    "test": "node test/test_classify.js && node test/test_extract_phone.js && node test/test_dedup.js && node test/test_insert_payload.js"
+  },
+  "dependencies": {}
+}
