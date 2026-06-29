@@ -454,6 +454,9 @@ async function ensureLeadsTable() {
   await pool.query(`ALTER TABLE leads ADD COLUMN IF NOT EXISTS contact_phone VARCHAR(50)`);
   await pool.query(`ALTER TABLE leads ADD COLUMN IF NOT EXISTS contact_tags TEXT[]`);
   await pool.query(`ALTER TABLE leads ADD COLUMN IF NOT EXISTS created_by INTEGER`);
+  await pool.query(`ALTER TABLE leads ADD COLUMN IF NOT EXISTS lead_date DATE`);
+  await pool.query(`ALTER TABLE leads ADD COLUMN IF NOT EXISTS lead_time TIME`);
+  await pool.query(`ALTER TABLE leads ADD COLUMN IF NOT EXISTS platform VARCHAR(50) DEFAULT 'pbx'`);
   console.log('[Leads] Table ensured.');
 }
 ensureLeadsTable().catch(err => console.warn('[Leads] table error:', err.message));
