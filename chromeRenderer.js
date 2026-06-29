@@ -16,7 +16,7 @@
  * ------------------------------------------------------------------
  */
 
-const puppeteer = require('puppeteer');
+
 
 /**
  * Scrolls the page in steps to trigger lazy-loaded images/content,
@@ -57,6 +57,8 @@ async function renderUrlWithChrome(url, options = {}) {
   if (!url || typeof url !== 'string') {
     throw new Error('renderUrlWithChrome: url must be a non-empty string');
   }
+
+  const puppeteer = (await import('puppeteer')).default;
 
   const browser = await puppeteer.launch({
     headless: 'new',
