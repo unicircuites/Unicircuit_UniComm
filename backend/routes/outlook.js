@@ -27,6 +27,7 @@ const pool     = require('../db/pool');
 const mailStats  = require('../services/outlookContactMailStats');
 const statsCache = require('../services/outlookStatsCache');
 const mailStore  = require('../services/outlookMailStore');
+const outlookLeadScrape = require('../../outlook_lead_scrape/module/outlookLeadScrapeService');
 const { authenticate } = require('../middleware/auth');
 const activityLog = require('../services/activityLog');
 
@@ -3495,6 +3496,22 @@ router.post('/contacts/import', async (req, res) => {
   } catch (err) {
     if (err.message === 'NOT_AUTHENTICATED') return res.status(401).json({ error: 'NOT_AUTHENTICATED' });
     console.error('[Outlook] contacts/import', err.message);
+    return res.status(500).json({ error: err.message });
+  }
+});
+
+// ── POST /api/outlook/scrape-leads ───────────────────────────────────────
+// Manually trigger Outlook → leads extraction pass (no frontend required).
+router.post('/scrape-leads', async (req, res) => {
+  try {
+    const summary = await outlookLeadScrape.runOnce({
+      trigger: 'manual',
+      maxEmails: req.body?.maxEmails,
+      sinceHours: req.body?.sinceHours,
+    });
+    return res.json(summary);
+  } catch (err) {
+    console.error('[Outlook] scrape-leads error:', err.message);
     return res.status(500).json({ error: err.message });
   }
 });

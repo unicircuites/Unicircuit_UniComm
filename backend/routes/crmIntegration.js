@@ -592,6 +592,38 @@ router.post('/scraper/upload-html', async (req, res, next) => {
   }
 });
 
+router.post('/scraper/extract-all', async (req, res) => {
+  try {
+    const { sourceType, url, html, mode, selectedFieldsByType } = req.body || {};
+    const result = await scraperService.extractAllFieldsWithAI({
+      sourceType,
+      url,
+      html,
+      mode: mode === 'discover' ? 'discover' : 'extract',
+      selectedFieldsByType: selectedFieldsByType || null,
+    });
+    return res.json(result);
+  } catch (err) {
+    const message = err.message || 'Extraction failed.';
+    const isClientError = /paste html|enter a target url|invalid url|login|verification|readable html|fetch failed|select at least one/i.test(message);
+    console.warn('[SCRAPER] extract-all failed:', message);
+    return res.status(isClientError ? 400 : 500).json({ error: message });
+  }
+});
+
+router.post('/scraper/discover-fields', async (req, res) => {
+  try {
+    const { sourceType, url, html } = req.body || {};
+    const result = await scraperService.discoverVariableFields({ sourceType, url, html });
+    return res.json(result);
+  } catch (err) {
+    const message = err.message || 'Field discovery failed.';
+    const isClientError = /paste html|enter a target url|invalid url|login|verification|readable html|fetch failed/i.test(message);
+    console.warn('[SCRAPER] discover-fields failed:', message);
+    return res.status(isClientError ? 400 : 500).json({ error: message });
+  }
+});
+
 router.post('/scraper/analyze', async (req, res, next) => {
   try {
     const { url, cookies, showBrowser } = req.body;

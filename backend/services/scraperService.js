@@ -1,6 +1,13 @@
 const axios = require('axios');
 const { JSDOM } = require('jsdom');
 const { chromium } = require('playwright');
+const { renderUrlWithChrome } = require('../../chromeRenderer');
+const {
+  runDeepExtraction,
+  runFieldDiscovery,
+  heuristicToRecordTypes,
+  heuristicDiscoverFromHeuristic,
+} = require('../../extractDeepFieldsWithAI');
 
 const activeSessions = new Map();
 
@@ -1738,6 +1745,226 @@ async function analyzeURL(url, cookies = null, showBrowser = false) {
   }
 }
 
+
+
+// --- AI EXTRACTION PIPELINE ---
+
+async function fetchPublicPageHtml(url) {
+  let parsed;
+  try {
+    parsed = new URL(url);
+  } catch (_) {
+    throw new Error('Invalid URL format. Please include http:// or https://');
+  }
+
+  if (!['http:', 'https:'].includes(parsed.protocol)) {
+    throw new Error('Only http:// and https:// URLs are supported.');
+  }
+
+  // Prefer headless Chrome so JS-rendered / lazy-loaded content is captured.
+  try {
+    console.log(`[SCRAPER] Rendering URL with headless Chrome: ${url}`);
+    const rendered = await renderUrlWithChrome(url, {
+      navigationTimeoutMs: 45000,
+      extraWaitMs: 1500,
+      autoScrollSteps: 8,
+    });
+
+    const html = rendered.html || '';
+    if (!html || (!html.toLowerCase().includes('<html') && !html.toLowerCase().includes('<body'))) {
+      throw new Error('Chrome render did not return readable HTML.');
+    }
+
+    const dom = new JSDOM(html);
+    const hasPasswordInput = !!dom.window.document.querySelector('input[type="password"]');
+    const finalUrl = rendered.finalUrl || url;
+    const loginWall =
+      hasPasswordInput || /login|signin|two-factor|checkpoint|verify/i.test(finalUrl);
+    if (loginWall) {
+      throw new Error(
+        'This page appears to require login or verification. Use Paste HTML after signing in inside your own browser.'
+      );
+    }
+
+    return { html, finalUrl, chromeRendered: true };
+  } catch (chromeErr) {
+    console.warn(`[SCRAPER] Chrome render failed (${chromeErr.message}). Falling back to Axios...`);
+  }
+
+  const response = await axios.get(url, {
+    headers: {
+      'User-Agent':
+        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+      Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+      'Accept-Language': 'en-US,en;q=0.9',
+    },
+    timeout: 15000,
+    maxContentLength: 5 * 1024 * 1024,
+    validateStatus: () => true,
+  });
+
+  if (response.status >= 400) {
+    throw new Error(`Public URL fetch failed with status ${response.status}.`);
+  }
+
+  const html = typeof response.data === 'string' ? response.data : '';
+  if (!html || (!html.toLowerCase().includes('<html') && !html.toLowerCase().includes('<body'))) {
+    throw new Error('The URL did not return readable HTML content.');
+  }
+
+  const dom = new JSDOM(html);
+  const hasPasswordInput = !!dom.window.document.querySelector('input[type="password"]');
+  const finalUrl = response.request?.res?.responseUrl || url;
+  const loginWall = hasPasswordInput || /login|signin|two-factor|checkpoint|verify/i.test(finalUrl);
+  if (loginWall) {
+    throw new Error(
+      'This page appears to require login or verification. Use Paste HTML after signing in inside your own browser.'
+    );
+  }
+
+  return { html, finalUrl, chromeRendered: false };
+}
+
+function heuristicExtractLeadsFromHTML(html, url = '') {
+  const dom = new JSDOM(html);
+  const doc = dom.window.document;
+  const defaultFields = ['name', 'company', 'email', 'phone', 'address', 'website'];
+  const { results } = extractDataFromHTML(html, defaultFields, {
+    expandReadMore: true,
+    formatters: { text: true, date: true, number: true }
+  });
+
+  const cleanedRows = (results || [])
+    .map((row) => {
+      const cleaned = {};
+      Object.entries(row).forEach(([key, value]) => {
+        const val = String(value || '').trim();
+        if (val && val !== 'N/A') cleaned[key] = val;
+      });
+      return cleaned;
+    })
+    .filter((row) => Object.keys(row).length > 0);
+
+  if (cleanedRows.length > 0) {
+    return {
+      page_title: (doc.title || '').trim() || 'Extracted Page',
+      extracted_fields: cleanedRows,
+      navigation_links: []
+    };
+  }
+
+  const bodyText = getCleanText(doc.body || doc.documentElement);
+  const emailMatch = bodyText.match(/[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/);
+  const phoneMatch = bodyText.match(/(?:\+?\d{1,3}[-.\s]?)?\(?\d{2,4}\)?[-.\s]?\d{3,4}[-.\s]?\d{4,}/);
+  const ogTitle = doc.querySelector('meta[property="og:title"]');
+  const ogDesc = doc.querySelector('meta[property="og:description"]');
+
+  const singleRow = {};
+  if (ogTitle) singleRow.name = (ogTitle.getAttribute('content') || '').trim();
+  if (!singleRow.name && doc.title) singleRow.name = doc.title.trim();
+  if (ogDesc) singleRow.description = (ogDesc.getAttribute('content') || '').trim();
+  if (emailMatch) singleRow.email = emailMatch[0];
+  if (phoneMatch) singleRow.phone = phoneMatch[0];
+  if (url) singleRow.page_url = url;
+
+  return {
+    page_title: singleRow.name || (doc.title || '').trim() || 'Extracted Page',
+    extracted_fields: Object.keys(singleRow).length ? [singleRow] : [],
+    navigation_links: []
+  };
+}
+
+function extractJsonBlock(rawText) {
+  if (typeof rawText !== 'string' || rawText.trim() === '') {
+    throw new Error('extractJsonBlock: LLM response was empty or not text');
+  }
+  let text = rawText.trim();
+  const fenceMatch = text.match(/\`\`\`(?:json)?\s*([\s\S]*?)\`\`\`/i);
+  if (fenceMatch) {
+    text = fenceMatch[1].trim();
+  }
+  const firstBrace = text.indexOf('{');
+  const lastBrace = text.lastIndexOf('}');
+  if (firstBrace === -1 || lastBrace === -1 || lastBrace < firstBrace) {
+    throw new Error('extractJsonBlock: no JSON object found in LLM response');
+  }
+  const jsonCandidate = text.slice(firstBrace, lastBrace + 1);
+  let parsed;
+  try {
+    parsed = JSON.parse(jsonCandidate);
+  } catch (err) {
+    throw new Error('extractJsonBlock: failed to parse JSON from LLM response: ' + err.message);
+  }
+  if (parsed === null || typeof parsed !== 'object' || Array.isArray(parsed)) {
+    throw new Error('extractJsonBlock: parsed JSON is not a plain object');
+  }
+  return parsed;
+}
+
+function sanitizeNavigationLinks(rawLinks) {
+  if (!Array.isArray(rawLinks)) return [];
+  return rawLinks
+    .filter(link => link && typeof link === 'object' && typeof link.url === 'string' && link.url.trim() !== '')
+    .map(link => ({
+      link_text: typeof link.link_text === 'string' ? link.link_text.trim() : '',
+      url: link.url.trim(),
+    }));
+}
+
+function sanitizeExtractedData(rawArray) {
+  if (!Array.isArray(rawArray)) return [];
+  return rawArray
+    .map(row => {
+      if (!row || typeof row !== 'object' || Array.isArray(row)) return null;
+      const cleaned = {};
+      for (const [key, value] of Object.entries(row)) {
+        if (value === null || value === undefined) continue;
+        const strVal = String(value).trim();
+        if (strVal === '') continue;
+        cleaned[key] = strVal;
+      }
+      return cleaned;
+    })
+    .filter(row => row && Object.keys(row).length > 0);
+}
+
+const scraperFetchDeps = {
+  fetchPageHtml: async (targetUrl) => fetchPublicPageHtml(targetUrl),
+  heuristicFallback: (pageHtml, targetUrl) =>
+    heuristicToRecordTypes(heuristicExtractLeadsFromHTML(pageHtml, targetUrl)),
+  heuristicDiscoverFallback: (pageHtml, targetUrl) =>
+    heuristicDiscoverFromHeuristic(heuristicExtractLeadsFromHTML(pageHtml, targetUrl)),
+};
+
+async function discoverVariableFields({ sourceType = 'manual_html', url = '', html = '' } = {}) {
+  return runFieldDiscovery({
+    sourceType,
+    url,
+    html,
+    ...scraperFetchDeps,
+  });
+}
+
+async function extractAllFieldsWithAI({
+  sourceType = 'manual_html',
+  url = '',
+  html = '',
+  mode = 'extract',
+  selectedFieldsByType = null,
+} = {}) {
+  if (mode === 'discover') {
+    return discoverVariableFields({ sourceType, url, html });
+  }
+
+  return runDeepExtraction({
+    sourceType,
+    url,
+    html,
+    selectedFieldsByType,
+    ...scraperFetchDeps,
+  });
+}
+
 module.exports = {
   startScrape,
   stopScrape,
@@ -1745,4 +1972,6 @@ module.exports = {
   parseLocalHTML,
   analyzeURL,
   getLoginWaitStatus
+  ,extractAllFieldsWithAI
+  ,discoverVariableFields
 };

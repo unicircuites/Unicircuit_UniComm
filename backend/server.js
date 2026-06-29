@@ -52,6 +52,7 @@ const mktCron = require('./services/marketingCron');
 const taskNotifier = require('./services/taskNotifier');
 const automatedAI = require('./services/automatedAI');
 const aiTaskQueue = require('./services/aiTaskQueue');
+const outlookLeadScrape = require('../outlook_lead_scrape/module/outlookLeadScrapeService');
 const pool = require('./db/pool');
 const activityLog = require('./services/activityLog');
 const systemRoutes = require('./routes/system');
@@ -485,6 +486,11 @@ function systemBridge(event, data) {
     else if (event === 'outlook:mail_synced') {
       const count = data?.count || 0;
       activityLog.append({ type: 'info', service: 'outlook', message: `Outlook synced ${count} new mail(s)`, timestamp: _now() });
+      if (process.env.LEAD_SCRAPE_ENABLED !== 'false') {
+        outlookLeadScrape.runOnce({ trigger: 'mail_synced', io, count }).catch((err) => {
+          console.warn('[OutlookLeadScrape] mail_synced run failed:', err.message);
+        });
+      }
     }
     else if (event === 'outlook:unread_update') {
       activityLog.append({ type: 'info', service: 'outlook', message: `Outlook unread: ${data?.unread ?? '?'}`, timestamp: _now() });
@@ -850,6 +856,12 @@ server.listen(PORT, HOST, async () => {
     waInventory.startDailyBackup(() => wa.getConnectedPhone());
     taskNotifier.start(pool);
     oneDriveSync.start();
+
+    if (process.env.LEAD_SCRAPE_ENABLED !== 'false') {
+      const scrapeIntervalMin = parseInt(process.env.LEAD_SCRAPE_INTERVAL_MIN || '5', 10);
+      outlookLeadScrape.start(io, scrapeIntervalMin);
+      console.log(`[System] Outlook lead scrape scheduler started (every ${scrapeIntervalMin} min)`);
+    }
 
     console.log('[System] ✅ All background services initialized.');
   } catch (err) {

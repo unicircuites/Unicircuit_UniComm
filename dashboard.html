@@ -4583,6 +4583,8 @@
         <div class="nav-label" id="nav-label-crm">CRM</div>
         <div class="nav-item" onclick="nav('contacts',this)"><i class="fas fa-address-book"></i> Contacts <span
             class="nav-badge nb-blue">48</span></div>
+        <div class="nav-item" id="nav-leads" onclick="nav('leads',this)"><i class="fas fa-star"></i> Leads <span
+            id="main-nav-leads-badge" class="nav-badge nb-gold" style="display:none;">0</span></div>
         <div class="nav-item" id="nav-pipeline" onclick="nav('pipeline',this)"><i class="fas fa-filter"></i> Sales Pipeline <span
             class="nav-badge nb-gold">6</span></div>
 
@@ -5020,8 +5022,9 @@
                   </select>
                   <input type="date" class="inp" id="call-filter-from"
                     style="width:auto;font-size:12px;padding:5px 8px;" onchange="loadCallLogs()">
-                  <button class="btn btn-ghost btn-sm" onclick="exportCallCSV()"><i class="fas fa-download"></i> Export
+                   <button class="btn btn-ghost btn-sm" onclick="exportCallCSV()"><i class="fas fa-download"></i> Export
                     CSV</button>
+                  <button class="btn btn-gold btn-sm" id="add-lead-btn" onclick="openLeadModal()" style="display:flex;align-items:center;gap:5px;"><i class="fas fa-star"></i> Add Lead</button>
                 </div>
               </div>
               <div style="overflow-x:auto;">
@@ -5033,6 +5036,7 @@
                       <th>Destination</th>
                       <th>Duration</th>
                       <th>Type</th>
+                      <th>Tags</th>
                       <th>Trunk</th>
                       <th>Recording</th>
                       <th>AI Action</th>
@@ -5412,6 +5416,46 @@
 
         </div>
 
+        <!-- ── MAIN SECTION: LEADS ── -->
+        <div class="section-view fu" id="sec-leads">
+          <div class="card" style="margin-bottom:14px;">
+            <div class="card-header">
+              <h3><i class="fas fa-star" style="color:var(--gold);"></i> Lead Tracker</h3>
+              <div style="display:flex;gap:8px;align-items:center;">
+                <input class="inp" id="leads-search" placeholder="Search leads..." style="width:160px;font-size:12px;padding:5px 10px;" oninput="_leadsCurrentPage=1; renderLeadsTable()">
+                <select class="inp" id="leads-filter-platform" style="width:auto;font-size:12px;padding:5px 8px;" onchange="_leadsCurrentPage=1; renderLeadsTable()">
+                  <option value="">All Platforms</option>
+                  <option value="pbx">PBX</option>
+                  <option value="whatsapp">WhatsApp</option>
+                  <option value="outlook">Outlook</option>
+                </select>
+                <button class="btn btn-ghost btn-sm" onclick="loadLeads()"><i class="fas fa-sync-alt"></i> Refresh</button>
+                <button class="btn btn-gold btn-sm" onclick="openLeadModal()"><i class="fas fa-plus"></i> Add Lead</button>
+              </div>
+            </div>
+            <div style="overflow-x:auto;">
+              <table class="data-table" id="leads-table">
+                <thead>
+                  <tr>
+                    <th>#</th>
+                    <th>Lead Name</th>
+                    <th>Subject</th>
+                    <th>Platform</th>
+                    <th>Date</th>
+                    <th>Time</th>
+                    <th>Notes</th>
+                    <th>Actions</th>
+                  </tr>
+                </thead>
+                <tbody id="leads-tbody">
+                  <tr><td colspan="8" style="text-align:center;padding:30px;color:var(--muted);"><div class="spin-loader" style="margin:0 auto 10px;"></div>Loading leads...</td></tr>
+                </tbody>
+              </table>
+            </div>
+            <div style="padding:8px 16px;border-top:1px solid var(--border);font-size:11.5px;color:var(--muted);" id="leads-count-bar">0 leads</div>
+          </div>
+        </div>
+
         <!-- PBX CALL DETAILS MODAL -->
         <div class="modal-overlay" id="pbx-call-details-modal">
           <div class="modal" style="max-width:720px;">
@@ -5442,7 +5486,7 @@
             </div>
             <div class="form-group">
               <label class="form-label">Company</label>
-              <input class="inp" id="pbx-save-company" placeholder="e.g. L&T ECC">
+              <input class="inp" id="pbx-save-company" placeholder="e.g. L&amp;T ECC">
             </div>
             <div class="form-group">
               <label class="form-label">Notes</label>
@@ -5464,10 +5508,92 @@
               <input class="inp" id="pbx-save-mobile" type="tel" placeholder="e.g. 9545073545">
               <div id="pbx-save-mobile-warn" style="display:none;font-size:11px;color:var(--gold2);margin-top:4px;"><i class="fas fa-exclamation-triangle"></i> Without mobile number, this contact won't merge with WhatsApp in the All tab.</div>
             </div>
+            <!-- ══ CONTACT TAGS ══ -->
+            <div class="form-group">
+              <label class="form-label" style="display:flex;align-items:center;gap:6px;">
+                <i class="fas fa-tags" style="color:var(--gold);"></i> Call Tags
+                <span style="font-size:10.5px;color:var(--muted);font-weight:400;">visible in call logs</span>
+              </label>
+              <div id="pbx-save-tags-list" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px;min-height:28px;"></div>
+              <div style="display:flex;gap:6px;">
+                <button type="button" class="btn btn-ghost btn-xs" id="tag-preset-lead" onclick="pbxTogglePresetTag('Lead Call')" style="border-color:rgba(245,158,11,0.5);color:var(--gold);"><i class="fas fa-star"></i> Lead Call</button>
+                <button type="button" class="btn btn-ghost btn-xs" id="tag-preset-followup" onclick="pbxTogglePresetTag('Follow Up')" style="border-color:rgba(59,130,246,0.5);color:#60a5fa;"><i class="fas fa-redo"></i> Follow Up</button>
+              </div>
+              <div style="display:flex;gap:6px;margin-top:8px;">
+                <input class="inp" id="pbx-custom-tag-input" placeholder="Custom tag..." style="flex:1;font-size:12px;padding:5px 8px;" onkeydown="if(event.key==='Enter'){event.preventDefault();pbxAddCustomTag();}">
+                <button class="btn btn-ghost btn-xs" onclick="pbxAddCustomTag()" style="padding:4px 10px;"><i class="fas fa-plus"></i></button>
+              </div>
+            </div>
             <div style="display:flex;gap:8px;margin-top:4px;">
               <button class="btn btn-gold" id="pbx-save-submit-btn" style="flex:1;justify-content:center;" onclick="pbxSaveContactSubmit()"><i
                   class="fas fa-save"></i> Save Contact</button>
               <button class="btn btn-ghost" onclick="closeModal('pbx-save-contact-modal')">Cancel</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- ══ LEAD FORM MODAL ══ -->
+        <div class="modal-overlay" id="lead-form-modal">
+          <div class="modal" style="max-width:480px;">
+            <div class="modal-title">
+              <span><i class="fas fa-star" style="color:var(--gold);margin-right:8px;"></i><span id="lead-modal-title">Add Lead</span></span>
+              <span class="modal-close" onclick="closeModal('lead-form-modal')"><i class="fas fa-times"></i></span>
+            </div>
+            <input type="hidden" id="lead-edit-id">
+            <div class="form-group">
+              <label class="form-label">Lead Name *</label>
+              <input class="inp" id="lead-form-name" placeholder="e.g. Gupta ji — Biometric Machine">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Subject</label>
+              <input class="inp" id="lead-form-subject" placeholder="e.g. New biometric machine purchase inquiry">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Notes</label>
+              <div class="inp" id="lead-form-notes" contenteditable="true" style="min-height: 100px; max-height: 400px; overflow-y: auto; background: var(--bg); border: 1px solid var(--border); padding: 8px; border-radius: 4px;" placeholder="Discussion points, requirements, follow-up actions…"></div>
+            </div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+              <div class="form-group">
+                <label class="form-label">Platform</label>
+                <select class="inp" id="lead-form-platform">
+                  <option value="pbx"><i class="fas fa-phone-alt"></i> PBX</option>
+                  <option value="whatsapp">WhatsApp</option>
+                  <option value="outlook">Outlook</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label class="form-label">Contact Phone</label>
+                <input class="inp" id="lead-form-phone" placeholder="e.g. 9920000000" type="tel">
+              </div>
+            </div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+              <div class="form-group">
+                <label class="form-label">Date</label>
+                <input class="inp" id="lead-form-date" type="date">
+              </div>
+              <div class="form-group">
+                <label class="form-label">Time</label>
+                <input class="inp" id="lead-form-time" type="time">
+              </div>
+            </div>
+            <div style="display:flex;gap:8px;margin-top:4px;">
+              <button class="btn btn-gold" style="flex:1;justify-content:center;" onclick="submitLeadForm()"><i class="fas fa-save"></i> Save Lead</button>
+              <button class="btn btn-ghost" onclick="closeModal('lead-form-modal')">Cancel</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- ══ LEAD DETAIL MODAL ══ -->
+        <div class="modal-overlay" id="lead-detail-modal">
+          <div class="modal" style="max-width:800px; width:95%;">
+            <div class="modal-title">
+              <span><i class="fas fa-star" style="color:var(--gold);margin-right:8px;"></i>Lead Details</span>
+              <span class="modal-close" onclick="closeModal('lead-detail-modal')"><i class="fas fa-times"></i></span>
+            </div>
+            <div id="lead-detail-body" style="font-size:13px;color:var(--text);"></div>
+            <div style="display:flex;gap:8px;margin-top:14px;">
+              <button class="btn btn-gold btn-sm" style="flex:1;justify-content:center;" onclick="editLeadFromDetail()"><i class="fas fa-pen"></i> Edit</button>
+              <button class="btn btn-ghost btn-sm" onclick="closeModal('lead-detail-modal')">Close</button>
             </div>
           </div>
         </div>
@@ -7655,16 +7781,30 @@
                 <!-- Scrollable fields wrapper -->
                 <div style="flex: 1; overflow-y: auto; padding-right: 6px; margin-bottom: 12px; min-height: 0;">
                 
+                <div style="display:flex; gap:8px; margin-bottom:12px;">
+                  <button type="button" id="scrape-mode-manual" class="btn btn-primary btn-sm" onclick="setWebScrapeMode('manual_html')" style="flex:1; justify-content:center; height:32px;">
+                    <i class="fas fa-file-code" style="margin-right:6px;"></i> Paste HTML
+                  </button>
+                  <button type="button" id="scrape-mode-url" class="btn btn-ghost btn-sm" onclick="setWebScrapeMode('url')" style="flex:1; justify-content:center; height:32px; border:1px solid var(--border2);">
+                    <i class="fas fa-link" style="margin-right:6px;"></i> Public URL
+                  </button>
+                </div>
+
+                <div id="scrape-mode-note" style="font-size: 10px; color: var(--muted2); margin-bottom: 12px; line-height: 1.45; padding: 10px 12px; border: 1px solid var(--border2); border-radius: 8px; background: rgba(212,175,55,0.06);">
+                  Paste HTML is the recommended mode. For authenticated or 2FA-protected pages, open the page in your own browser, complete login, then copy <strong style="color:var(--gold2);">View Page Source</strong> into this tab.
+                </div>
+
+                <div id="url-specific-fields">
                 <div class="form-group" style="margin-bottom: 12px;">
                   <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
-                    <label class="form-label" style="font-size: 11px; color: var(--muted); font-weight: 600; text-transform: uppercase; margin: 0;">Target URL *</label>
+                    <label class="form-label" style="font-size: 11px; color: var(--muted); font-weight: 600; text-transform: uppercase; margin: 0;">Target URL</label>
                     <button id="btn-analyze-url" class="btn btn-ghost" onclick="analyzeTargetURL()" style="color: var(--gold); border: 1px solid rgba(212,175,55,0.3); padding: 2px 6px; font-size: 9px; border-radius: 4px; display: inline-flex; align-items: center; gap: 4px; height: auto; cursor: pointer; background: transparent;">
-                      <i class="fas fa-magic"></i> Auto-Detect Selector
+                      <i class="fas fa-magic"></i> Preview Public Page
                     </button>
                   </div>
                   <input class="inp" id="scrape-url" placeholder="https://example.com/leads" style="font-size: 12px; padding: 8px 12px;" value="https://example.com/leads" />
                   <div style="font-size: 10px; color: var(--muted2); margin-top: 4px; line-height: 1.4;">
-                    Sites requiring login (e.g. Facebook) open Chrome for manual sign-in — up to <strong style="color: var(--gold2);">5 minutes</strong>. Timer shows in metrics while waiting.
+                    Public URL mode uses headless Chrome to render JS-heavy pages, then AI-extracts all repeating record types. For login / 2FA pages, switch to <strong style="color: var(--gold2);">Paste HTML</strong>.
                   </div>
                 </div>
 
@@ -7688,7 +7828,9 @@
                   </div>
                   <input class="inp" id="scrape-page-param" value="page" placeholder="page" style="font-size: 12px; padding: 4px 8px; flex: 1;" />
                 </div>
+                </div>
 
+                <div id="advanced-selector-fields">
                 <!-- DOM SELECTORS (Item, Start, End, Pagination Bar Selector) -->
                 <div style="background: rgba(39, 150, 196, 0.04); border: 1px solid var(--border2); padding: 12px; border-radius: 8px; margin-bottom: 12px; display: flex; flex-direction: column; gap: 10px;">
                   <div style="font-size: 11px; font-weight: 700; color: var(--gold2); letter-spacing: 0.4px; text-transform: uppercase;">
@@ -7716,6 +7858,7 @@
                     <input class="inp" id="scrape-pagination-selector" placeholder="e.g. .pagination, nav.pages" style="font-size: 11px; padding: 6px 10px;" />
                   </div>
                 </div>
+                </div>
 
                 <!-- Fields List -->
                 <div class="form-group" style="margin-bottom: 12px;">
@@ -7723,16 +7866,12 @@
                   <input class="inp" id="scrape-fields" value="name, company, email, phone, address" placeholder="name, company, email, phone" style="font-size: 12px; padding: 8px 12px;" />
                 </div>
 
+                <div id="buffer-fields">
                 <!-- Buffer and Scroll -->
                 <div class="form-group" style="margin-bottom: 12px;">
                   <label class="form-label" style="font-size: 11px; color: var(--muted); font-weight: 600; text-transform: uppercase;">Buffer Reload Delay (ms)</label>
                   <input class="inp" type="number" id="scrape-buffer" value="1500" placeholder="e.g. 1500" style="font-size: 12px; padding: 8px 12px;" />
                 </div>
-
-                <!-- Session Cookies (JSON) -->
-                <div class="form-group" style="margin-bottom: 12px;">
-                  <label class="form-label" style="font-size: 11px; color: var(--muted); font-weight: 600; text-transform: uppercase; margin-bottom: 4px;">Session Cookies (JSON Array)</label>
-                  <textarea class="inp" id="scrape-cookies" placeholder='[{"name": "session", "value": "xyz", "domain": "example.com"}]' style="font-size: 11px; padding: 8px 12px; height: 60px; font-family: monospace; resize: vertical;"></textarea>
                 </div>
 
                 <!-- Checkboxes for optional settings -->
@@ -7745,11 +7884,6 @@
                     <input type="checkbox" id="scrape-translate" checked style="cursor: pointer;" />
                     <label for="scrape-translate" style="font-size: 12px; color: var(--text2); cursor: pointer;">Translate to English (Auto)</label>
                   </div>
-                  <div style="display: flex; align-items: center; gap: 8px;">
-                    <input type="checkbox" id="scrape-show-browser" style="cursor: pointer;" />
-                    <label for="scrape-show-browser" style="font-size: 12px; color: var(--gold2); font-weight: 600; cursor: pointer;">Show browser window (Test visibility)</label>
-                  </div>
-                  
                   <div style="font-size: 10px; color: var(--muted); font-weight: 600; margin-top: 4px; border-top: 1px solid var(--border); padding-top: 4px;">FORMATTERS</div>
                   
                   <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
@@ -7771,8 +7905,8 @@
 
                 <!-- Buttons -->
                 <div style="display: flex; gap: 10px; flex-shrink: 0;">
-                  <button class="btn btn-primary" id="btn-start-scrape" onclick="startWebScrape()" style="flex: 1; justify-content: center; height: 38px;">
-                    <i class="fas fa-play" style="margin-right: 6px;"></i> Webscrape
+                  <button class="btn btn-secondary" id="btn-discover-url" onclick="discoverFieldsFromUrl()" style="flex: 1; justify-content: center; height: 38px;">
+                    <i class="fas fa-search" style="margin-right: 6px;"></i> AI Discover Variable Fields
                   </button>
                   <button class="btn" id="btn-stop-scrape" onclick="stopWebScrape()" style="background: var(--red); color: white; flex: 1; justify-content: center; height: 38px;" disabled>
                     <i class="fas fa-stop" style="margin-right: 6px;"></i> Stop
@@ -7783,15 +7917,16 @@
               <!-- Card 2: Upload/Paste HTML Document -->
               <div class="card" style="background: var(--bg3); border: 1px solid var(--border2); border-radius: 12px; padding: 20px; max-height: 300px; overflow-y: auto; display: flex; flex-direction: column;">
                 <div style="font-size: 14px; font-weight: 600; color: var(--text); margin-bottom: 12px; display: flex; align-items: center; justify-content: space-between;">
-                  <span><i class="fas fa-file-code" style="color: var(--gold); margin-right: 6px;"></i>HTML Document Scraper</span>
-                  <span style="font-size: 10px; color: var(--muted); border: 1px solid var(--border); padding: 2px 6px; border-radius: 4px;">OPTIONAL</span>
+                  <span><i class="fas fa-file-code" style="color: var(--gold); margin-right: 6px;"></i>Authenticated Page Helper</span>
+                  <span style="font-size: 10px; color: var(--muted); border: 1px solid var(--border); padding: 2px 6px; border-radius: 4px;">RECOMMENDED</span>
                 </div>
                 <p style="font-size: 11px; color: var(--muted2); margin-top: 0; margin-bottom: 12px; line-height: 1.4;">
-                  If the URL cannot be scraped due to CORS/auth barriers, upload or paste the raw HTML content to extract data fields instantly.
+                  This is the Base44-style workflow for login / 2FA pages: paste HTML, click <strong style="color:var(--gold2);">AI Discover Variable Fields</strong>, choose which repeating fields to scrape, then click <strong style="color:var(--gold2);">Scrape Data</strong>.
                 </p>
 
                 <!-- Drop area / Upload button -->
                 <div style="display: flex; flex-direction: column; gap: 10px;">
+                  <input class="inp" id="manual-html-source-url" placeholder="Optional source URL for reference, e.g. https://example.com/account" style="font-size: 11px; padding: 8px 10px;" />
                   <div style="border: 2px dashed var(--border2); border-radius: 8px; padding: 12px; text-align: center; background: rgba(0,0,0,0.2); cursor: pointer; position: relative;" onclick="document.getElementById('html-file-input').click()">
                     <i class="fas fa-cloud-upload-alt" style="font-size: 20px; color: var(--muted); margin-bottom: 4px;"></i>
                     <div style="font-size: 11px; color: var(--text2); font-weight: 500;">Click to upload HTML File</div>
@@ -7802,8 +7937,8 @@
 
                   <textarea class="inp" id="html-paste-area" placeholder="Paste <html> source code here..." style="font-family: monospace; font-size: 11px; height: 80px; resize: vertical; padding: 8px; background: rgba(0,0,0,0.3); border: 1px solid var(--border);"></textarea>
 
-                  <button class="btn btn-secondary btn-sm" onclick="parsePastedHTML()" style="justify-content: center; height: 32px; border: 1px solid var(--border2);">
-                    <i class="fas fa-file-invoice" style="margin-right: 6px;"></i> Parse HTML Content
+                  <button class="btn btn-secondary btn-sm" onclick="discoverFieldsFromHTML()" style="justify-content: center; height: 32px; border: 1px solid var(--border2);">
+                    <i class="fas fa-search" style="margin-right: 6px;"></i> AI Discover Variable Fields
                   </button>
                 </div>
               </div>
@@ -7914,10 +8049,49 @@
                   <div style="font-size: 13px; font-weight: 600; color: var(--text);">
                     <i class="fas fa-table" style="color: var(--gold); margin-right: 6px;"></i> Live Scraped Data Preview
                   </div>
-                  <div id="preview-row-count" style="font-size: 11px; color: var(--muted);">Showing 0 rows</div>
+                  <div style="display: flex; align-items: center; gap: 12px;">
+                    <button class="btn btn-ghost btn-sm" id="btn-header-export-excel" onclick="exportCollectedToExcel()" style="display: none; justify-content: center; height: 30px; font-size: 11px; border: 1px solid var(--border);">
+                      <i class="fas fa-file-excel" style="color: var(--green); margin-right: 6px;"></i> Export to Excel
+                    </button>
+                    <div id="preview-row-count" style="font-size: 11px; color: var(--muted);">Showing 0 rows</div>
+                  </div>
                 </div>
 
-                <div style="flex: 1; overflow: auto; border: 1px solid var(--border); border-radius: 6px; background: rgba(0,0,0,0.15);">
+                <div id="deep-extraction-meta" style="display: none; margin-bottom: 12px; padding: 10px 12px; border: 1px solid var(--border2); border-radius: 8px; background: rgba(0,0,0,0.2); font-size: 11px; color: var(--text2);">
+                  <div style="margin-bottom: 4px;"><span style="color: var(--muted); font-weight: 600;">Page:</span> <span id="pageTitleDisplay"></span></div>
+                  <div style="margin-bottom: 6px;"><span style="color: var(--muted); font-weight: 600;">URL:</span> <span id="sourceUrlDisplay" style="word-break: break-all;"></span></div>
+                  <div id="navigationLinksContainer"></div>
+                </div>
+
+                <div id="variableFieldsContainer" style="display: none; margin-bottom: 12px; padding: 12px; border: 1px solid var(--border2); border-radius: 8px; background: rgba(212,175,55,0.04); max-height: 220px; overflow-y: auto;"></div>
+
+                <div id="recordTypesContainer" style="flex: 1; overflow: auto; margin-bottom: 10px;"></div>
+
+                <style>
+                  #variableFieldsContainer .vf-section { margin-bottom: 14px; }
+                  #variableFieldsContainer .vf-heading { font-size: 11px; font-weight: 700; color: var(--gold2); margin: 0 0 8px; text-transform: uppercase; }
+                  #variableFieldsContainer .vf-hint { font-size: 10px; color: var(--muted2); margin: 0 0 8px; line-height: 1.4; }
+                  #variableFieldsContainer .vf-fields { display: flex; flex-wrap: wrap; gap: 6px 12px; }
+                  #variableFieldsContainer .vf-field-item { font-size: 10px; color: var(--text2); display: inline-flex; align-items: center; gap: 5px; cursor: pointer; padding: 4px 6px; border: 1px solid var(--border2); border-radius: 6px; background: rgba(0,0,0,0.2); }
+                  #variableFieldsContainer .vf-score { font-size: 9px; color: var(--muted); background: rgba(255,255,255,0.06); padding: 1px 4px; border-radius: 4px; }
+                  #variableFieldsContainer .vf-sample { font-size: 9px; color: var(--muted2); max-width: 140px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+                  #recordTypesContainer .record-type-section { margin-bottom: 18px; padding-bottom: 14px; border-bottom: 1px solid var(--border2); }
+                  #recordTypesContainer .record-type-heading { font-size: 12px; font-weight: 700; color: var(--gold2); margin: 0 0 8px; text-transform: uppercase; letter-spacing: 0.4px; }
+                  #recordTypesContainer .field-picker { display: flex; flex-wrap: wrap; gap: 6px 12px; margin-bottom: 8px; align-items: center; }
+                  #recordTypesContainer .field-picker-item { font-size: 10px; color: var(--text2); display: inline-flex; align-items: center; gap: 4px; cursor: pointer; }
+                  #recordTypesContainer .add-field-form { display: inline-flex; gap: 4px; align-items: center; }
+                  #recordTypesContainer .add-field-input { font-size: 10px; padding: 3px 6px; width: 110px; background: rgba(0,0,0,0.3); border: 1px solid var(--border); border-radius: 4px; color: var(--text); }
+                  #recordTypesContainer .add-field-button { font-size: 10px; padding: 3px 8px; background: var(--bg2); border: 1px solid var(--border2); border-radius: 4px; color: var(--gold2); cursor: pointer; }
+                  #recordTypesContainer .record-type-table { width: 100%; border-collapse: collapse; font-size: 11px; }
+                  #recordTypesContainer .record-type-table th { padding: 6px 8px; background: var(--bg2); border: 1px solid var(--border); color: var(--text2); font-weight: 600; text-align: left; white-space: nowrap; }
+                  #recordTypesContainer .record-type-table td { padding: 6px 8px; border: 1px solid var(--border); color: var(--text); max-width: 220px; overflow-wrap: anywhere; }
+                  #recordTypesContainer .record-type-table td[contenteditable="true"]:focus { outline: 1px solid var(--gold); background: rgba(212,175,55,0.08); }
+                  #recordTypesContainer .empty-state { font-size: 11px; color: var(--muted); font-style: italic; padding: 8px 0; }
+                  #navigationLinksContainer .nav-links-list { margin: 0; padding-left: 16px; font-size: 10px; color: var(--muted2); }
+                  #navigationLinksContainer .nav-links-list a { color: var(--blue); text-decoration: none; }
+                </style>
+
+                <div id="flat-preview-wrapper" style="flex: 1; overflow: auto; border: 1px solid var(--border); border-radius: 6px; background: rgba(0,0,0,0.15);">
                   <table style="width: 100%; border-collapse: collapse; font-size: 12px; text-align: left;" id="scraper-preview-table">
                     <thead>
                       <tr id="scraper-table-header" style="background: var(--bg2); border-bottom: 1px solid var(--border); color: var(--text2);">
@@ -8757,6 +8931,7 @@ Always write in a professional yet warm Indian B2B communication style. Use form
       n8n: ['Workflow Automation', 'Manage your backend n8n workflows and webhooks'],
       webscraper: ['Lead Web Scraper', 'Test website scraping & generate structured Excel files'],
       usermgmt: ['User Management', 'Manage users, roles and access'],
+      leads: ['Lead Management', 'Track and manage unified leads across all platforms'],
     };
 
     function nav(id, el) {
@@ -8786,6 +8961,7 @@ Always write in a professional yet warm Indian B2B communication style. Use form
       const topCompose = document.getElementById('topbar-compose-email');
       if (topCompose) topCompose.style.display = id === 'email' ? '' : 'none';
       if (id === 'contacts') { refreshContactsSection(); }
+      if (id === 'leads') { if (!_leadsLoaded) loadLeads(); }
       if (id === 'whatsapp') checkWAStatus(true);
       if (id === 'calls') { initWASocket(); refreshPbxCallLogsLatest('nav'); }
       if (id === 'marketing') { initWASocket(); loadMarketingData(); loadBroadcasts(); loadWaBroadcasts(); mktLoadTemplates(); }
@@ -14970,6 +15146,7 @@ Keep it concise and professional.`;
     let lastLoginWaitLogSecond = -1;
     let loginWaitAnnounced = false;
     let currentScraperSessionId = null;
+    let webScrapeMode = 'manual_html';
     let cachedScrapedData = [];
     let cachedFields = [];
     let loggedErrorsCount = 0;
@@ -14990,6 +15167,275 @@ Keep it concise and professional.`;
     function clearScraperLogs() {
       const consoleEl = document.getElementById('scraper-console-logs');
       if (consoleEl) consoleEl.innerHTML = '';
+    }
+
+    function setWebScrapeMode(mode) {
+      webScrapeMode = mode === 'url' ? 'url' : 'manual_html';
+      const manualBtn = document.getElementById('scrape-mode-manual');
+      const urlBtn = document.getElementById('scrape-mode-url');
+      const noteEl = document.getElementById('scrape-mode-note');
+      const urlFields = document.getElementById('url-specific-fields');
+      const advancedFields = document.getElementById('advanced-selector-fields');
+      const bufferFields = document.getElementById('buffer-fields');
+      const helperCard = document.querySelector('#manual-html-source-url')?.closest('.card');
+      
+      if (manualBtn) manualBtn.className = webScrapeMode === 'manual_html' ? 'btn btn-primary btn-sm' : 'btn btn-ghost btn-sm';
+      if (urlBtn) urlBtn.className = webScrapeMode === 'url' ? 'btn btn-primary btn-sm' : 'btn btn-ghost btn-sm';
+      
+      if (urlFields) {
+        urlFields.style.display = webScrapeMode === 'manual_html' ? 'none' : 'block';
+      }
+      if (advancedFields) {
+        advancedFields.style.display = webScrapeMode === 'manual_html' ? 'none' : 'block';
+      }
+      if (bufferFields) {
+        bufferFields.style.display = webScrapeMode === 'manual_html' ? 'none' : 'block';
+      }
+      if (helperCard) {
+        helperCard.style.display = webScrapeMode === 'manual_html' ? 'flex' : 'none';
+      }
+      
+      if (noteEl) {
+        noteEl.innerHTML = webScrapeMode === 'manual_html'
+          ? 'Paste HTML → Discover Variable Fields (checkboxes) → Scrape Data. For login / 2FA pages, copy <strong style="color:var(--gold2);">View Page Source</strong> from your browser after signing in.'
+          : 'Public URL mode renders pages in headless Chrome (JS/lazy content) then runs deep AI extraction. It cannot access logged-in or 2FA-protected views — use Paste HTML for those.';
+      }
+    }
+
+    let cachedRecordTypes = [];
+    let pendingScrapeSource = null;
+    let discoveryRecordTypes = [];
+
+    function escapeHtmlScraper(value) {
+      return String(value)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+    }
+
+    function humanizeTypeNameScraper(typeName) {
+      return String(typeName)
+        .split('_')
+        .filter(Boolean)
+        .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+        .join(' ');
+    }
+
+    function showScrapeDataButton(show) {
+      const btn = document.getElementById('btn-scrape-data');
+      if (btn) btn.style.display = show ? '' : 'none';
+    }
+
+    function renderVariableFieldPicker(discoveryTypes) {
+      const container = document.getElementById('variableFieldsContainer');
+      if (!container) return;
+
+      if (!discoveryTypes || discoveryTypes.length === 0) {
+        container.style.display = 'none';
+        container.innerHTML = '';
+        showScrapeDataButton(false);
+        return;
+      }
+
+      container.style.display = 'block';
+      
+      let html = '<div class="vf-hint">Variable fields are data attributes that repeat across most rows. Uncheck any you do not want scraped, then click <strong style="color:var(--gold2);">Scrape Data</strong>.</div>';
+      
+      html += '<table class="leads-table" style="width: 100%; border-collapse: collapse; margin-top: 12px; font-size: 12px;">';
+      html += '<thead><tr>';
+      html += '<th style="text-align: left; padding: 10px; border-bottom: 1px solid var(--border);">Record Type</th>';
+      html += '<th style="text-align: left; padding: 10px; border-bottom: 1px solid var(--border);">Data Preview (Fields)</th>';
+      html += '<th style="text-align: left; padding: 10px; border-bottom: 1px solid var(--border);">Action</th>';
+      html += '</tr></thead><tbody>';
+
+      discoveryTypes.forEach((rt) => {
+        const countLabel = rt.estimated_record_count ? `<br><span style="color: var(--muted); font-size: 10px; font-weight: normal;">~${rt.estimated_record_count} rows</span>` : '';
+        const titleText = `${humanizeTypeNameScraper(rt.type_name)}${countLabel}`;
+        
+        html += `<tr data-type-name="${rt.type_name}">`;
+        html += `<td style="padding: 10px; border-bottom: 1px solid var(--border); vertical-align: top; font-weight: 600;">${titleText}</td>`;
+        
+        // Fields column
+        html += `<td style="padding: 10px; border-bottom: 1px solid var(--border); vertical-align: top;">`;
+        html += `<div class="vf-fields" style="display: flex; flex-wrap: wrap; gap: 8px;">`;
+        
+        const variableFields = rt.variable_fields || rt.fields?.map((f) => ({
+          field_name: f,
+          repeat_score: 80,
+          sample_value: '',
+        })) || [];
+
+        variableFields.forEach((field) => {
+          const checked = (field.repeat_score ?? 50) >= 50 ? 'checked' : '';
+          const sampleHtml = field.sample_value ? `<span class="vf-sample" title="${escapeHtmlScraper(field.sample_value)}">"${escapeHtmlScraper(field.sample_value)}"</span>` : '';
+          
+          html += `
+            <label class="vf-field-item">
+              <input type="checkbox" class="vf-field-checkbox" data-type-name="${rt.type_name}" data-field-name="${escapeHtmlScraper(field.field_name)}" ${checked}>
+              <span>${escapeHtmlScraper(field.field_name)}</span>
+              <span class="vf-score">${field.repeat_score ?? 50}%</span>
+              ${sampleHtml}
+            </label>
+          `;
+        });
+        
+        html += `</div></td>`;
+        
+        // Action column
+        html += `<td style="padding: 10px; border-bottom: 1px solid var(--border); vertical-align: top; width: 120px;">`;
+        html += `<button class="btn btn-primary btn-sm" onclick="scrapeDataWithSelectedFields('${rt.type_name}')" style="padding: 4px 10px; font-size: 11px; width: 100%;">`;
+        html += `<i class="fas fa-play" style="margin-right: 4px;"></i> Scrape Data</button>`;
+        html += `</td>`;
+        
+        html += `</tr>`;
+      });
+      
+      html += '</tbody></table>';
+      container.innerHTML = html;
+
+      showScrapeDataButton(true);
+    }
+
+
+    function collectSelectedFieldsByType() {
+      const selected = {};
+      document.querySelectorAll('#variableFieldsContainer .vf-field-checkbox').forEach((checkbox) => {
+        if (!checkbox.checked) return;
+        const typeName = checkbox.dataset.typeName;
+        const fieldName = checkbox.dataset.fieldName;
+        if (!typeName || !fieldName) return;
+        if (!selected[typeName]) selected[typeName] = [];
+        selected[typeName].push(fieldName);
+      });
+      return selected;
+    }
+
+    function applyDiscoveryResult(data) {
+      discoveryRecordTypes = data.discovery_record_types || data.record_types || [];
+      pendingScrapeSource = {
+        sourceType: data.source_type || webScrapeMode,
+        url: data.url || data.source_url || '',
+        html: document.getElementById('html-paste-area')?.value?.trim() || '',
+      };
+
+      const metaEl = document.getElementById('deep-extraction-meta');
+      const recordContainer = document.getElementById('recordTypesContainer');
+      const flatWrapper = document.getElementById('flat-preview-wrapper');
+      if (metaEl) metaEl.style.display = 'block';
+      if (recordContainer) recordContainer.innerHTML = '';
+      if (flatWrapper) flatWrapper.style.display = 'none';
+
+      if (document.getElementById('pageTitleDisplay')) {
+        document.getElementById('pageTitleDisplay').textContent = data.page_title || '';
+      }
+      if (document.getElementById('sourceUrlDisplay')) {
+        document.getElementById('sourceUrlDisplay').textContent = data.source_url || data.url || '';
+      }
+      const navContainer = document.getElementById('navigationLinksContainer');
+      if (navContainer) {
+        const links = data.navigation_links || [];
+        if (!links.length) {
+          navContainer.innerHTML = '';
+        } else {
+          navContainer.innerHTML = '<ul class="nav-links-list">' + links.map((link) => {
+            const label = link.link_text && link.link_text.trim() ? link.link_text : link.url;
+            return `<li><a href="${escapeHtmlScraper(link.url)}" target="_blank" rel="noopener noreferrer">${escapeHtmlScraper(label)}</a></li>`;
+          }).join('') + '</ul>';
+        }
+      }
+
+      renderVariableFieldPicker(discoveryRecordTypes);
+
+      const allFieldNames = discoveryRecordTypes.flatMap((rt) =>
+        (rt.variable_fields || []).map((f) => f.field_name)
+      );
+      if (allFieldNames.length > 0) {
+        document.getElementById('scrape-fields').value = allFieldNames.join(', ');
+      }
+
+      cachedScrapedData = [];
+      cachedFields = allFieldNames;
+      updatePreviewTable([], []);
+      updateReportSummary({ collected: [], notCollected: allFieldNames }, allFieldNames, 0);
+
+      document.getElementById('scrape-metric-status').textContent = 'FIELDS READY';
+      document.getElementById('scrape-metric-status').style.color = 'var(--gold)';
+      document.getElementById('scrape-metric-collected').textContent = `${allFieldNames.length} variable fields`;
+      document.getElementById('scrape-metric-page').textContent = 'Choose fields, then Scrape Data';
+      document.getElementById('btn-export-excel').style.display = 'none';
+      if(document.getElementById('btn-header-export-excel')) document.getElementById('btn-header-export-excel').style.display = 'none';
+      document.getElementById('export-excel-disabled').style.display = '';
+    }
+
+    function applyStructuredExtractionResult(data, fallbackFields = []) {
+      const recordTypes = Array.isArray(data?.record_types) ? data.record_types : [];
+      const extracted = data?.extracted_fields;
+      let rows = [];
+      let fields = fallbackFields || [];
+
+      if (recordTypes.length > 0 && typeof window.applyDeepExtractionResult === 'function') {
+        cachedRecordTypes = recordTypes;
+        const metaEl = document.getElementById('deep-extraction-meta');
+        const flatWrapper = document.getElementById('flat-preview-wrapper');
+        const variableContainer = document.getElementById('variableFieldsContainer');
+        if (metaEl) metaEl.style.display = 'block';
+        if (flatWrapper) flatWrapper.style.display = recordTypes.length > 0 ? 'none' : 'block';
+        if (variableContainer) variableContainer.style.display = 'none';
+        showScrapeDataButton(false);
+
+        window.applyDeepExtractionResult({
+          page_title: data.page_title || '',
+          source_url: data.source_url || data.url || '',
+          navigation_links: data.navigation_links || [],
+          record_types: recordTypes,
+        });
+
+        const primary = recordTypes.find((rt) => rt.type_name === data.primary_type_name) || recordTypes[0];
+        rows = primary?.records || [];
+        fields = primary?.fields || [];
+      } else if (Array.isArray(extracted)) {
+        rows = extracted;
+        if (rows.length > 0) {
+          fields = Array.from(new Set(rows.flatMap((r) => Object.keys(r))));
+        }
+        const metaEl = document.getElementById('deep-extraction-meta');
+        const flatWrapper = document.getElementById('flat-preview-wrapper');
+        const recordContainer = document.getElementById('recordTypesContainer');
+        if (metaEl) metaEl.style.display = 'none';
+        if (flatWrapper) flatWrapper.style.display = 'block';
+        if (recordContainer) recordContainer.innerHTML = '';
+      } else if (extracted && typeof extracted === 'object') {
+        const keys = Object.keys(extracted);
+        if (keys.length > 0) {
+          fields = keys;
+          rows = [extracted];
+        }
+      }
+
+      cachedScrapedData = rows;
+      cachedFields = fields;
+      updatePreviewTable(fields, rows);
+      updateReportSummary({
+        collected: fields,
+        notCollected: []
+      }, fields, rows.length);
+
+      document.getElementById('scrape-metric-status').textContent = 'COMPLETED';
+      document.getElementById('scrape-metric-status').style.color = 'var(--green)';
+      const recordLabel = recordTypes.length > 1
+        ? `${recordTypes.length} record types`
+        : (data?.primary_type_name || (webScrapeMode === 'url' ? 'Public URL' : 'Pasted HTML'));
+      document.getElementById('scrape-metric-collected').textContent = data?.record_count != null
+        ? `${data.record_count} records`
+        : `${rows.length} records`;
+      document.getElementById('scrape-metric-page').textContent = recordLabel;
+
+      if (rows.length > 0 || recordTypes.length > 0) {
+        document.getElementById('btn-export-excel').style.display = '';
+        document.getElementById('export-excel-disabled').style.display = 'none';
+      }
     }
 
     function resetAnalyzeMetricLabels() {
@@ -15058,243 +15504,185 @@ Keep it concise and professional.`;
         alert("Please enter a target URL first.");
         return;
       }
-      
-      const cookiesInput = document.getElementById('scrape-cookies').value.trim();
-      const showBrowser = document.getElementById('scrape-show-browser')?.checked || false;
       const btn = document.getElementById('btn-analyze-url');
       const originalText = btn.innerHTML;
-      
+
       try {
         btn.disabled = true;
-        btn.innerHTML = `<i class="fas fa-spinner fa-spin"></i> Analyzing...`;
-        
-        addScraperLog(`Analyzing website structure for: ${url}...`, 'info');
-        addScraperLog(`If login is required, a Chrome window will open — you have up to 5 minutes to sign in.`, 'info');
-        document.getElementById('scrape-metric-status').textContent = 'ANALYZING';
+        btn.innerHTML = `<i class="fas fa-spinner fa-spin"></i> Previewing...`;
+
+        addScraperLog(`Previewing public page: ${url}`, 'info');
+        addScraperLog(`Authenticated pages are not fetched here. Use Paste HTML after logging in inside your own browser.`, 'warn');
+        document.getElementById('scrape-metric-status').textContent = 'PREVIEWING';
         document.getElementById('scrape-metric-status').style.color = 'var(--gold)';
-        document.getElementById('scrape-metric-page').textContent = 'Starting...';
+        document.getElementById('scrape-metric-page').textContent = 'Public URL';
         document.getElementById('scrape-metric-page').style.color = 'var(--blue)';
-        startAnalyzeLoginPolling();
-        
-        const response = await fetch('/api/crm/scraper/analyze', {
+
+        const response = await fetch(`${API_BASE}/crm/scraper/discover-fields`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
             'Authorization': 'Bearer lm_123456'
           },
-          body: JSON.stringify({ url, cookies: cookiesInput, showBrowser })
+          body: JSON.stringify({ sourceType: 'url', url })
         });
-        
+
         const data = await response.json();
-        stopAnalyzeLoginPolling();
-        if (!response.ok || !data.success) {
-          addScraperLog(`Analysis failed: ${data.error || 'Server error'}`, 'error');
+        if (!response.ok) {
+          addScraperLog(`Preview failed: ${data.error || 'Server error'}`, 'error');
           document.getElementById('scrape-metric-status').textContent = 'FAILED';
           document.getElementById('scrape-metric-status').style.color = 'var(--red)';
           document.getElementById('scrape-metric-page').textContent = 'Page -';
           document.getElementById('scrape-metric-page').style.color = 'var(--blue)';
-          alert(`Could not automatically analyze website: ${data.error || 'Check server logs'}`);
+          alert(`Could not preview the public page: ${data.error || 'Check server logs'}`);
           return;
         }
-        
-        addScraperLog(`Website analyzed successfully!`, 'success');
-        document.getElementById('scrape-metric-status').textContent = 'ANALYZED';
-        document.getElementById('scrape-metric-status').style.color = 'var(--green)';
-        document.getElementById('scrape-metric-page').textContent = 'Complete';
+
+        pendingScrapeSource = { sourceType: 'url', url, html: '' };
+        const discoveryTypes = data.discovery_record_types || data.record_types || [];
+        const detectedFields = discoveryTypes.flatMap((rt) =>
+          (rt.variable_fields || []).map((f) => f.field_name)
+        );
+        addScraperLog(`Variable field discovery completed.`, 'success');
+        if (data.chrome_rendered) addScraperLog(`Page rendered with headless Chrome (JS/lazy content included).`, 'success');
+        document.getElementById('scrape-metric-status').textContent = 'FIELDS READY';
+        document.getElementById('scrape-metric-status').style.color = 'var(--gold)';
+        document.getElementById('scrape-metric-page').textContent = 'Choose fields, then Scrape Data';
         document.getElementById('scrape-metric-page').style.color = 'var(--blue)';
-        if (data.cookies) {
-          document.getElementById('scrape-cookies').value = data.cookies;
-          addScraperLog(`- Saved session cookies for re-use (login auth — not lead data)`, 'success');
-        }
-        if (data.isProfilePage) {
-          addScraperLog(`- Detected single profile page (not a lead list)`, 'info');
-        }
-        if (data.sampleRecord && Object.keys(data.sampleRecord).length > 0) {
-          addScraperLog(`- Extracted profile fields: ${Object.keys(data.sampleRecord).join(', ')}`, 'success');
-          Object.entries(data.sampleRecord).forEach(([key, val]) => {
-            if (val) addScraperLog(`    • ${key}: ${String(val).substring(0, 120)}`, 'info');
-          });
-        }
-        addScraperLog(`- Discovered Container: "${data.itemSelector}"`, 'success');
-        addScraperLog(`- Suggested Fields: ${data.suggestedFields.join(', ')}`, 'success');
-        if (data.pagination.enabled) {
-          addScraperLog(`- Detected Pagination Param: "${data.pagination.paramName}"` + (data.pagination.selector ? `, Selector: "${data.pagination.selector}"` : ''), 'success');
+
+        if (detectedFields.length > 0) {
+          document.getElementById('scrape-fields').value = detectedFields.join(', ');
+          addScraperLog(`Discovered ${detectedFields.length} variable field(s): ${detectedFields.join(', ')}`, 'success');
+          applyDiscoveryResult(data);
         } else {
-          addScraperLog(`- No standard pagination bar detected (likely infinite scroll/single page).`, 'info');
+          addScraperLog(`No repeating variable fields were detected on this page.`, 'warn');
         }
-        
-        const previewFields = data.sampleRecord
-          ? Object.entries(data.sampleRecord).map(([k, v]) => `${k}: ${String(v).substring(0, 60)}`).join('\n')
-          : '';
-        const apply = confirm(`Auto-Detection completed successfully!\n\n` +
-          `Discovered Container: ${data.itemSelector}\n` +
-          `Suggested Fields: ${data.suggestedFields.join(', ')}\n` +
-          `Pagination Detected: ${data.pagination.enabled ? 'Yes (' + data.pagination.paramName + ')' : 'No'}` +
-          (previewFields ? `\n\nExtracted preview:\n${previewFields}` : '') +
-          `\n\nDo you want to automatically apply these selectors to the configuration form?`);
-          
-        if (apply) {
-          if (data.itemSelector) {
-            document.getElementById('scrape-item-selector').value = data.itemSelector;
-          }
-          
-          if (data.pagination.enabled) {
-            document.getElementById('scrape-page-enabled').checked = true;
-            document.getElementById('scrape-page-param').value = data.pagination.paramName;
-            if (data.pagination.selector) {
-              document.getElementById('scrape-pagination-selector').value = data.pagination.selector;
-            }
-          } else {
-            document.getElementById('scrape-page-enabled').checked = false;
-          }
-          
-          // Map fields using their advanced mappings to handle nested levels
-          const mappedFields = data.suggestedFields.map(f => data.fieldMappingHelp[f] || f);
-          document.getElementById('scrape-fields').value = mappedFields.join(', ');
-          
-          addScraperLog(`Configuration updated with auto-detected selectors!`, 'success');
-        }
-        
+
       } catch (err) {
-        stopAnalyzeLoginPolling();
-        addScraperLog(`Analysis error: ${err.message}`, 'error');
+        addScraperLog(`Preview error: ${err.message}`, 'error');
         document.getElementById('scrape-metric-status').textContent = 'ERROR';
         document.getElementById('scrape-metric-status').style.color = 'var(--red)';
         document.getElementById('scrape-metric-page').textContent = 'Page -';
         document.getElementById('scrape-metric-page').style.color = 'var(--blue)';
-        alert(`Analysis error: ${err.message}`);
+        alert(`Preview error: ${err.message}`);
       } finally {
-        stopAnalyzeLoginPolling();
         btn.disabled = false;
         btn.innerHTML = originalText;
       }
     }
 
     async function startWebScrape() {
-      const url = document.getElementById('scrape-url').value.trim();
-      const startPoint = parseInt(document.getElementById('scrape-start').value) || 1;
-      const endPoint = parseInt(document.getElementById('scrape-end').value) || 5;
-      const fieldsInput = document.getElementById('scrape-fields').value;
-      const fields = fieldsInput.split(',').map(f => f.trim()).filter(Boolean);
-      const bufferTime = parseInt(document.getElementById('scrape-buffer').value) || 1000;
-      const expandReadMore = document.getElementById('scrape-expand').checked;
-      const translate = document.getElementById('scrape-translate').checked;
-      const pageEnabled = document.getElementById('scrape-page-enabled').checked;
-      const pageParam = document.getElementById('scrape-page-param').value.trim() || 'page';
-      
-      const itemSelector = document.getElementById('scrape-item-selector').value.trim();
-      const startSelector = document.getElementById('scrape-start-selector').value.trim();
-      const endSelector = document.getElementById('scrape-end-selector').value.trim();
-      const pagSelector = document.getElementById('scrape-pagination-selector').value.trim();
-      const cookiesInput = document.getElementById('scrape-cookies').value.trim();
-
-      const textFormatter = document.getElementById('format-text').checked;
-      const dateFormatter = document.getElementById('format-date').checked;
-      const numberFormatter = document.getElementById('format-number').checked;
-
-      if (!url) {
-        alert("Please enter a target URL.");
-        return;
-      }
-      if (!fields.length) {
-        alert("Please list at least one data field to collect.");
-        return;
-      }
-
-      document.getElementById('btn-start-scrape').disabled = true;
-      document.getElementById('btn-stop-scrape').disabled = false;
-      document.getElementById('scrape-metric-status').textContent = 'Starting...';
-      document.getElementById('scrape-metric-status').style.color = 'var(--gold)';
-      
-      clearScraperLogs();
-      addScraperLog(`Initializing scraper session for URL: ${url}`, 'info');
-      addScraperLog(`Fields configured: ${fields.join(', ')}`, 'info');
-
-      currentScraperSessionId = 'session_' + Date.now() + '_' + Math.floor(Math.random() * 1000);
-      cachedScrapedData = [];
-      cachedFields = fields;
-      loggedErrorsCount = 0;
-      updatePreviewTable(fields, []);
-
-      const showBrowser = document.getElementById('scrape-show-browser')?.checked || false;
-      const body = {
-        sessionId: currentScraperSessionId,
-        url: url,
-        showBrowser: showBrowser,
-        fields: fields,
-        startPoint: startPoint,
-        endPoint: endPoint,
-        bufferTime: bufferTime,
-        expandReadMore: expandReadMore,
-        translate: translate,
-        itemSelector: itemSelector,
-        startSelector: startSelector,
-        endSelector: endSelector,
-        cookies: cookiesInput,
-        formatters: {
-          text: textFormatter,
-          date: dateFormatter,
-          number: numberFormatter
-        },
-        pagination: {
-          enabled: pageEnabled,
-          paramName: pageParam,
-          selector: pagSelector
+      if (webScrapeMode === 'manual_html') {
+        if (discoveryRecordTypes.length > 0 && pendingScrapeSource) {
+          await scrapeDataWithSelectedFields();
+        } else {
+          await discoverFieldsFromHTML();
         }
+        return;
+      }
+
+      if (!discoveryRecordTypes.length || !pendingScrapeSource) {
+        addScraperLog(`Discover variable fields first using Preview Public Page.`, 'warn');
+        await analyzeTargetURL();
+        return;
+      }
+
+      await scrapeDataWithSelectedFields();
+    }
+
+    async function scrapeDataWithSelectedFields(targetTypeName = null) {
+      let selectedFieldsByType = collectSelectedFieldsByType();
+      if (targetTypeName) {
+        const filtered = {};
+        if (selectedFieldsByType[targetTypeName]) {
+          filtered[targetTypeName] = selectedFieldsByType[targetTypeName];
+        }
+        selectedFieldsByType = filtered;
+      }
+
+      const selectedCount = Object.values(selectedFieldsByType).reduce((n, arr) => n + arr.length, 0);
+      if (selectedCount === 0) {
+        alert('Select at least one variable field to scrape for this record type.');
+        return;
+      }
+
+      const source = pendingScrapeSource || {
+        sourceType: webScrapeMode,
+        url: webScrapeMode === 'url'
+          ? document.getElementById('scrape-url').value.trim()
+          : document.getElementById('manual-html-source-url').value.trim(),
+        html: document.getElementById('html-paste-area').value.trim(),
       };
 
+      if (source.sourceType === 'manual_html' && !source.html) {
+        alert('Paste HTML content before scraping.');
+        return;
+      }
+
+      if (source.sourceType === 'url' && !source.url) {
+        alert('Enter a target URL before scraping.');
+        return;
+      }
+
+      document.getElementById('btn-start-scrape')?.setAttribute('disabled', 'disabled');
+      document.getElementById('scrape-metric-status').textContent = 'SCRAPING...';
+      document.getElementById('scrape-metric-status').style.color = 'var(--gold)';
+      addScraperLog(`Scraping data for ${selectedCount} selected variable field(s)...`, 'info');
+
       try {
-        const res = await fetch(`${API_BASE}/crm/scraper/start`, {
+        const res = await fetch(`${API_BASE}/crm/scraper/extract-all`, {
           method: 'POST',
           headers: {
             'Authorization': 'Bearer lm_123456',
             'Content-Type': 'application/json'
           },
-          body: JSON.stringify(body)
+          body: JSON.stringify({
+            sourceType: source.sourceType,
+            url: source.url,
+            html: source.html,
+            mode: 'extract',
+            selectedFieldsByType
+          })
         });
-        
+
         const data = await res.json();
-        if (!res.ok) throw new Error(data.error || 'Server rejected scraper start');
+        if (!res.ok) throw new Error(data.error || 'Scrape request failed');
+
+        const fields = Array.isArray(data?.extracted_fields) && data.extracted_fields.length > 0
+          ? Array.from(new Set(data.extracted_fields.flatMap((r) => Object.keys(r))))
+          : Object.values(selectedFieldsByType).flat();
+        document.getElementById('scrape-fields').value = fields.join(', ');
         
-        addScraperLog(`Backend scrape engine started successfully. Session: ${currentScraperSessionId}`, 'success');
-        startScraperStatusPolling(currentScraperSessionId);
+        cachedScrapedData = Array.isArray(data?.extracted_data) ? data.extracted_data : (Array.isArray(data?.extracted_fields) ? data.extracted_fields : []);
+        cachedFields = fields;
+        updatePreviewTable(fields, cachedScrapedData);
+
+        document.getElementById('scrape-metric-status').textContent = 'Done';
+        document.getElementById('scrape-metric-status').style.color = 'var(--green)';
+        document.getElementById('scrape-metric-collected').textContent = cachedScrapedData.length;
+        document.getElementById('btn-export-excel').style.display = '';
+        if(document.getElementById('btn-header-export-excel')) document.getElementById('btn-header-export-excel').style.display = 'flex';
+        document.getElementById('export-excel-disabled').style.display = 'none';
+
+        addScraperLog(`Scrape complete. ${cachedScrapedData.length} record(s) collected.`, 'success');
+        if (data.page_title) addScraperLog(`Page title: ${data.page_title}`, 'info');
+        if (data.chrome_rendered) addScraperLog(`Headless Chrome rendered the page before scraping.`, 'success');
+        if (data.ai_used) addScraperLog(`AI-assisted extraction applied.`, 'success');
+        addScraperLog(`Use Save .XLSX when you are ready to export.`, 'info');
       } catch (err) {
-        addScraperLog(`Error starting scraper: ${err.message}`, 'error');
-        document.getElementById('btn-start-scrape').disabled = false;
-        document.getElementById('btn-stop-scrape').disabled = true;
+        addScraperLog(`Scrape failed: ${err.message}`, 'error');
         document.getElementById('scrape-metric-status').textContent = 'Error';
         document.getElementById('scrape-metric-status').style.color = 'var(--red)';
+      } finally {
+        document.getElementById('btn-start-scrape')?.removeAttribute('disabled');
+        document.getElementById('btn-stop-scrape').disabled = true;
       }
     }
 
     async function stopWebScrape() {
-      if (!currentScraperSessionId) return;
-      addScraperLog(`Halting scraper session. Requesting partial data...`, 'warn');
-      
-      try {
-        const res = await fetch(`${API_BASE}/crm/scraper/stop`, {
-          method: 'POST',
-          headers: {
-            'Authorization': 'Bearer lm_123456',
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({ sessionId: currentScraperSessionId })
-        });
-        
-        const data = await res.json();
-        if (!res.ok) throw new Error(data.error || 'Failed to stop session');
-        
-        addScraperLog(`Scrape session stopped by user. Received ${data.scrapedData?.length || 0} partial records.`, 'success');
-        
-        if (scraperPollInterval) {
-          clearInterval(scraperPollInterval);
-          scraperPollInterval = null;
-        }
-        
-        handleScraperSessionCompletion(data);
-      } catch (err) {
-        addScraperLog(`Error stopping scraper: ${err.message}`, 'error');
-      }
+      addScraperLog(`This extraction mode runs as a single request, so there is no live browser session to stop.`, 'warn');
+      document.getElementById('btn-stop-scrape').disabled = true;
+      document.getElementById('btn-start-scrape')?.removeAttribute('disabled');
     }
 
     function startScraperStatusPolling(sessionId) {
@@ -15328,8 +15716,8 @@ Keep it concise and professional.`;
             cachedScrapedData = data.scrapedData;
             updatePreviewTable(cachedFields, data.scrapedData);
             updateReportSummary(data.report, cachedFields, data.scrapedData.length);
-            
             document.getElementById('btn-export-excel').style.display = '';
+            if(document.getElementById('btn-header-export-excel')) document.getElementById('btn-header-export-excel').style.display = 'flex';
             document.getElementById('export-excel-disabled').style.display = 'none';
           }
 
@@ -15352,14 +15740,14 @@ Keep it concise and professional.`;
           addScraperLog(`Polling error: ${err.message}`, 'error');
           clearInterval(scraperPollInterval);
           scraperPollInterval = null;
-          document.getElementById('btn-start-scrape').disabled = false;
+          document.getElementById('btn-start-scrape')?.removeAttribute('disabled');
           document.getElementById('btn-stop-scrape').disabled = true;
         }
       }, 2000);
     }
 
     function handleScraperSessionCompletion(data) {
-      document.getElementById('btn-start-scrape').disabled = false;
+      document.getElementById('btn-start-scrape')?.removeAttribute('disabled');
       document.getElementById('btn-stop-scrape').disabled = true;
       
       document.getElementById('scrape-metric-status').textContent = data.status.toUpperCase();
@@ -15373,8 +15761,7 @@ Keep it concise and professional.`;
         cachedScrapedData = data.scrapedData;
         updatePreviewTable(cachedFields, data.scrapedData);
         updateReportSummary(data.report, cachedFields, data.scrapedData.length);
-        addScraperLog(`Automatically generating Excel workbook for download...`, 'success');
-        exportCollectedToExcel();
+        addScraperLog(`Scrape session finished. Use Save .XLSX to export when ready.`, 'info');
       } else {
         addScraperLog(`No records collected. Skipping excel compilation.`, 'warn');
       }
@@ -15460,7 +15847,13 @@ Keep it concise and professional.`;
     }
 
     function exportCollectedToExcel() {
-      if (cachedScrapedData.length === 0) {
+      const visibleTypes = typeof window.getVisibleRecordTypesData === 'function'
+        ? window.getVisibleRecordTypesData()
+        : [];
+      const hasDeepData = visibleTypes.length > 0 && visibleTypes.some((rt) => rt.records?.length > 0);
+      const exportRows = hasDeepData ? null : cachedScrapedData;
+
+      if (!hasDeepData && (!exportRows || exportRows.length === 0)) {
         alert("No data available to export.");
         return;
       }
@@ -15468,18 +15861,35 @@ Keep it concise and professional.`;
       try {
         addScraperLog(`Compiling Excel workbook...`, 'info');
         
-        const wsData = XLSX.utils.json_to_sheet(cachedScrapedData);
+        const wb = XLSX.utils.book_new();
+
+        if (hasDeepData) {
+          visibleTypes.forEach((rt) => {
+            if (!rt.records || rt.records.length === 0) return;
+            const sheetName = String(rt.type_name || 'data').substring(0, 31).replace(/[\\/*?:\[\]]/g, '_');
+            XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(rt.records), sheetName);
+          });
+        } else {
+          XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(exportRows), 'Scraped Data');
+        }
         
         const collectedSet = new Set();
-        cachedScrapedData.forEach(row => {
-          cachedFields.forEach(f => {
+        const fieldsForSummary = hasDeepData
+          ? visibleTypes.flatMap((rt) => rt.fields || [])
+          : cachedFields;
+        const rowsForSummary = hasDeepData
+          ? visibleTypes.flatMap((rt) => rt.records || [])
+          : exportRows;
+
+        rowsForSummary.forEach((row) => {
+          fieldsForSummary.forEach((f) => {
             if (row[f] && row[f] !== 'N/A' && row[f] !== '') {
               collectedSet.add(f);
             }
           });
         });
         
-        const summaryRows = cachedFields.map(field => {
+        const summaryRows = fieldsForSummary.map((field) => {
           const isCollected = collectedSet.has(field);
           return {
             "Data Field": field,
@@ -15491,14 +15901,10 @@ Keep it concise and professional.`;
         summaryRows.push({});
         summaryRows.push({ "Data Field": "Scraper Execution Metadata" });
         summaryRows.push({ "Data Field": "Export Time", "Status": new Date().toLocaleString() });
-        summaryRows.push({ "Data Field": "Total Records Scraped", "Status": cachedScrapedData.length });
-        summaryRows.push({ "Data Field": "Total Confirmed Fields", "Status": `${collectedSet.size} of ${cachedFields.length}` });
+        summaryRows.push({ "Data Field": "Total Records Scraped", "Status": rowsForSummary.length });
+        summaryRows.push({ "Data Field": "Total Confirmed Fields", "Status": `${collectedSet.size} of ${fieldsForSummary.length}` });
         
-        const wsSummary = XLSX.utils.json_to_sheet(summaryRows);
-        
-        const wb = XLSX.utils.book_new();
-        XLSX.utils.book_append_sheet(wb, wsData, "Scraped Data");
-        XLSX.utils.book_append_sheet(wb, wsSummary, "Scraper Report Summary");
+        XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(summaryRows), "Scraper Report Summary");
         
         const filename = `webscrape_data_${Date.now()}.xlsx`;
         XLSX.writeFile(wb, filename);
@@ -15516,96 +15922,111 @@ Keep it concise and professional.`;
       const reader = new FileReader();
       reader.onload = function(e) {
         document.getElementById('html-paste-area').value = e.target.result;
-        addScraperLog(`Loaded file: ${file.name} (${file.size} bytes). Click 'Parse HTML Content' to extract data fields.`, 'info');
+        addScraperLog(`Loaded file: ${file.name} (${file.size} bytes). Click 'AI Discover Variable Fields' to analyze the HTML.`, 'info');
       };
       reader.readAsText(file);
     }
 
-    async function parsePastedHTML() {
-      const html = document.getElementById('html-paste-area').value.trim();
-      const fieldsInput = document.getElementById('scrape-fields').value;
-      const fields = fieldsInput.split(',').map(f => f.trim()).filter(Boolean);
-      
-      const itemSelector = document.getElementById('scrape-item-selector').value.trim();
-      const startSelector = document.getElementById('scrape-start-selector').value.trim();
-      const endSelector = document.getElementById('scrape-end-selector').value.trim();
-
-      const textFormatter = document.getElementById('format-text').checked;
-      const dateFormatter = document.getElementById('format-date').checked;
-      const numberFormatter = document.getElementById('format-number').checked;
-      const translate = document.getElementById('scrape-translate').checked;
-      const expandReadMore = document.getElementById('scrape-expand').checked;
-
-      if (!html) {
-        alert("Please upload an HTML file or paste raw HTML content.");
-        return;
-      }
-      if (!fields.length) {
-        alert("Please list at least one data field to collect.");
+    async function discoverFieldsFromUrl() {
+      const url = document.getElementById('scrape-url').value.trim();
+      if (!url) {
+        alert("Please enter a target URL.");
         return;
       }
 
-      addScraperLog(`Parsing local HTML document...`, 'info');
-      document.getElementById('scrape-metric-status').textContent = 'Parsing...';
+      const discoverBtn = document.getElementById('btn-discover-url');
+      if (discoverBtn) discoverBtn.disabled = true;
+      addScraperLog(`Discovering variable fields from public URL: ${url}...`, 'info');
+      document.getElementById('scrape-metric-status').textContent = 'ANALYZING...';
       document.getElementById('scrape-metric-status').style.color = 'var(--gold)';
 
-      const body = {
-        html: html,
-        fields: fields,
-        options: {
-          translate: translate,
-          expandReadMore: expandReadMore,
-          itemSelector: itemSelector,
-          startSelector: startSelector,
-          endSelector: endSelector,
-          formatters: {
-            text: textFormatter,
-            date: dateFormatter,
-            number: numberFormatter
-          }
-        }
-      };
-
       try {
-        const res = await fetch(`${API_BASE}/crm/scraper/upload-html`, {
+        const res = await fetch(`${API_BASE}/crm/scraper/discover-fields`, {
           method: 'POST',
           headers: {
             'Authorization': 'Bearer lm_123456',
             'Content-Type': 'application/json'
           },
-          body: JSON.stringify(body)
+          body: JSON.stringify({
+            sourceType: 'url',
+            url,
+            html: ''
+          })
         });
-        
+
         const data = await res.json();
-        if (!res.ok) throw new Error(data.error || 'Failed to parse local HTML');
-        
-        addScraperLog(`HTML parsed successfully. Extracted ${data.results?.length || 0} records.`, 'success');
-        
-        document.getElementById('scrape-metric-status').textContent = 'COMPLETED';
-        document.getElementById('scrape-metric-status').style.color = 'var(--green)';
-        document.getElementById('scrape-metric-collected').textContent = `${data.results?.length || 0} records`;
-        document.getElementById('scrape-metric-page').textContent = 'Local File';
+        if (!res.ok) throw new Error(data.error || 'Failed to discover variable fields');
 
-        if (data.results && data.results.length > 0) {
-          cachedScrapedData = data.results;
-          cachedFields = fields;
-          updatePreviewTable(fields, data.results);
-          updateReportSummary(data.report, fields, data.results.length);
-          
-          document.getElementById('btn-export-excel').style.display = '';
-          document.getElementById('export-excel-disabled').style.display = 'none';
+        pendingScrapeSource = { sourceType: 'url', url, html: '' };
+        applyDiscoveryResult(data);
 
-          addScraperLog(`Automatically generating Excel workbook for download...`, 'success');
-          exportCollectedToExcel();
-        } else {
-          addScraperLog(`No records could be extracted from this HTML content. Try adjusting fields or inspect the HTML source.`, 'warn');
-        }
+        const fieldCount = (data.discovery_record_types || data.record_types || [])
+          .flatMap((rt) => rt.variable_fields || [])
+          .length;
+        addScraperLog(`Found ${fieldCount} variable field(s). Choose which to keep, then click Scrape Data.`, 'success');
+        if (data.page_title) addScraperLog(`Page title: ${data.page_title}`, 'info');
+        if (data.ai_used) addScraperLog(`AI-assisted field discovery applied.`, 'success');
       } catch (err) {
-        addScraperLog(`Error parsing HTML: ${err.message}`, 'error');
+        addScraperLog(`Field discovery error: ${err.message}`, 'error');
         document.getElementById('scrape-metric-status').textContent = 'Error';
         document.getElementById('scrape-metric-status').style.color = 'var(--red)';
+      } finally {
+        if (discoverBtn) discoverBtn.disabled = false;
       }
     }
+
+    async function discoverFieldsFromHTML() {
+      const html = document.getElementById('html-paste-area').value.trim();
+      const url = document.getElementById('manual-html-source-url').value.trim();
+
+      if (!html) {
+        alert("Please upload an HTML file or paste raw HTML content.");
+        return;
+      }
+
+      const discoverBtn = document.querySelector('[onclick="discoverFieldsFromHTML()"]');
+      if (discoverBtn) discoverBtn.disabled = true;
+      addScraperLog(`Discovering variable fields from pasted HTML...`, 'info');
+      addScraperLog(`This is the recommended workflow for login / 2FA-protected pages.`, 'success');
+      document.getElementById('scrape-metric-status').textContent = 'ANALYZING...';
+      document.getElementById('scrape-metric-status').style.color = 'var(--gold)';
+
+      try {
+        const res = await fetch(`${API_BASE}/crm/scraper/discover-fields`, {
+          method: 'POST',
+          headers: {
+            'Authorization': 'Bearer lm_123456',
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            sourceType: 'manual_html',
+            url,
+            html
+          })
+        });
+
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Failed to discover variable fields');
+
+        pendingScrapeSource = { sourceType: 'manual_html', url, html };
+        applyDiscoveryResult(data);
+
+        const fieldCount = (data.discovery_record_types || data.record_types || [])
+          .flatMap((rt) => rt.variable_fields || [])
+          .length;
+        addScraperLog(`Found ${fieldCount} variable field(s). Choose which to keep, then click Scrape Data.`, 'success');
+        if (data.page_title) addScraperLog(`Page title: ${data.page_title}`, 'info');
+        if (data.ai_used) addScraperLog(`AI-assisted field discovery applied.`, 'success');
+      } catch (err) {
+        addScraperLog(`Field discovery error: ${err.message}`, 'error');
+        document.getElementById('scrape-metric-status').textContent = 'Error';
+        document.getElementById('scrape-metric-status').style.color = 'var(--red)';
+      } finally {
+        if (discoverBtn) discoverBtn.disabled = false;
+      }
+    }
+
+    setWebScrapeMode('manual_html');
 
     // ── n8n WORKFLOW TESTER ──────────────────────────────────────────────────────
 
@@ -33847,14 +34268,16 @@ ${plainText}`;
             <td style="font-family:'JetBrains Mono';font-size:12px;">${displayDest}</td>
             <td>${escHtml(log.duration)}</td>
             <td><span class="badge ${typeClass}">${log.call_type}</span></td>
+            <td>${renderContactTagsBadges(log.contact_tags)}</td>
             <td style="font-size:11px;color:var(--muted2);">${escHtml(log.trunk || '-')}</td>
             <td>${recordingCell}</td>
             <td>
               <div style="display:flex;gap:4px;">
                 ${!contactName && callerPhone ? `<button class="btn btn-ghost btn-xs" onclick="event.stopPropagation();pbxSaveContactModal(${jsArg(callerPhone)})" title="Save Contact"><i class="fas fa-user-plus"></i></button>` : ''}
-                ${contactName && callerPhone ? `<button class="btn btn-ghost btn-xs" onclick="event.stopPropagation();pbxSaveContactModal(${jsArg(callerPhone)},${jsArg(contactName)},${jsArg(log.saved_company||'')},${jsArg(log.saved_notes||log.contact_notes||'')},${jsArg(log.email||'')},${jsArg(log.mobile_phone||'')})" title="Edit Contact"><i class="fas fa-pen"></i></button>` : ''}
+                ${contactName && callerPhone ? `<button class="btn btn-ghost btn-xs" onclick="event.stopPropagation();pbxSaveContactModal(${jsArg(callerPhone)},${jsArg(contactName)},${jsArg(log.saved_company||'')},${jsArg(log.saved_notes||log.contact_notes||'')},${jsArg(log.email||'')},${jsArg(log.mobile_phone||'')},${JSON.stringify(log.contact_tags||[])})" title="Edit Contact"><i class="fas fa-pen"></i></button>` : ''}
                 <button class="btn btn-ghost btn-xs" onclick="event.stopPropagation();openCallRecordDetails(${log.id})" title="View Details"><i class="fas fa-eye"></i></button>
                 <button class="btn btn-ghost btn-xs" onclick="event.stopPropagation();doSummarizeCall(${log.id})" title="AI Summarize"><i class="fas fa-magic"></i></button>
+                <button class="btn btn-ghost btn-xs" onclick="event.stopPropagation();openLeadModalFromCall(${jsArg(callerPhone||'')},${jsArg(contactName||'')})" title="Add Lead" style="color:var(--gold);"><i class="fas fa-star"></i></button>
                 <button class="btn btn-ghost btn-xs" onclick="event.stopPropagation();deleteCallLog(${log.id})" title="Delete Call Log" style="color:var(--red2);"><i class="fas fa-trash"></i></button>
               </div>
             </td>
@@ -34255,7 +34678,7 @@ ${plainText}`;
     // PBX Contacts functionality migrated to CRM Contacts module
     // pbxShowTab('contacts') and associated functions removed from here.
 
-    function pbxSaveContactModal(phone, existingName, existingCompany, existingNotes, existingEmail, existingMobile) {
+    function pbxSaveContactModal(phone, existingName, existingCompany, existingNotes, existingEmail, existingMobile, existingTags) {
       const isUpdate = !!(existingName);
       document.getElementById('pbx-save-modal-title').textContent = isUpdate ? 'Update PBX Contact' : 'Save PBX Contact';
       document.getElementById('pbx-save-submit-btn').innerHTML = isUpdate
@@ -34269,6 +34692,10 @@ ${plainText}`;
       document.getElementById('pbx-save-mobile').value = existingMobile || '';
       document.getElementById('pbx-save-email-warn').style.display = 'none';
       document.getElementById('pbx-save-mobile-warn').style.display = 'none';
+      // Load existing tags into tag UI
+      pbxContactTagsState = Array.isArray(existingTags) ? [...existingTags] : [];
+      pbxRenderTagsUI();
+      document.getElementById('pbx-custom-tag-input').value = '';
       openModal('pbx-save-contact-modal');
       setTimeout(() => document.getElementById('pbx-save-name').focus(), 100);
     }
@@ -34280,6 +34707,7 @@ ${plainText}`;
       const notes = document.getElementById('pbx-save-notes').value.trim();
       const email = document.getElementById('pbx-save-email').value.trim();
       const mobile_phone = document.getElementById('pbx-save-mobile').value.trim();
+      const tags = pbxContactTagsState || [];
 
       if (!name) return notify('Required', 'Please enter a name', 'var(--red2)', 'fas fa-exclamation');
 
@@ -34292,7 +34720,7 @@ ${plainText}`;
         const res = await fetch(`${API_BASE}/calls/contacts/save`, {
           method: 'POST',
           headers: getAuthHeaders(),
-          body: JSON.stringify({ phone, name, company, notes, email: email || null, mobile_phone: mobile_phone || null })
+          body: JSON.stringify({ phone, name, company, notes, email: email || null, mobile_phone: mobile_phone || null, tags })
         });
         if (res.ok) {
           notify('Contact Saved', name, 'var(--green2)', 'fas fa-user-check');
@@ -34346,6 +34774,378 @@ ${plainText}`;
         notify('Error', err.message, 'var(--red2)', 'fas fa-exclamation-circle');
       }
     }
+
+    // ══════════════════════════════════════════════════════════════════
+    // CONTACT TAGS — state + UI helpers
+    // ══════════════════════════════════════════════════════════════════
+    let pbxContactTagsState = [];
+
+    const TAG_COLORS = {
+      'Lead Call':  { bg: 'rgba(245,158,11,0.15)', border: 'rgba(245,158,11,0.5)', color: '#f59e0b' },
+      'Follow Up':  { bg: 'rgba(59,130,246,0.15)', border: 'rgba(59,130,246,0.5)', color: '#60a5fa' },
+      _default:     { bg: 'rgba(255,255,255,0.07)', border: 'rgba(255,255,255,0.2)', color: '#ccc' },
+    };
+
+    function getTagStyle(tag) {
+      return TAG_COLORS[tag] || TAG_COLORS._default;
+    }
+
+    function pbxRenderTagsUI() {
+      const list = document.getElementById('pbx-save-tags-list');
+      if (!list) return;
+      if (!pbxContactTagsState.length) {
+        list.innerHTML = '<span style="font-size:11px;color:var(--muted);font-style:italic;">No tags yet</span>';
+      } else {
+        list.innerHTML = pbxContactTagsState.map(t => {
+          const s = getTagStyle(t);
+          return `<span style="display:inline-flex;align-items:center;gap:4px;padding:3px 8px;border-radius:12px;font-size:11.5px;font-weight:600;background:${s.bg};border:1px solid ${s.border};color:${s.color};">
+            ${escHtml(t)}
+            <span onclick="pbxRemoveTag('${escAttr(t)}')" style="cursor:pointer;margin-left:2px;opacity:0.7;font-size:10px;" title="Remove">&times;</span>
+          </span>`;
+        }).join('');
+      }
+      // Highlight preset buttons if active
+      const leadBtn = document.getElementById('tag-preset-lead');
+      const followBtn = document.getElementById('tag-preset-followup');
+      if (leadBtn) leadBtn.style.opacity = pbxContactTagsState.includes('Lead Call') ? '1' : '0.5';
+      if (followBtn) followBtn.style.opacity = pbxContactTagsState.includes('Follow Up') ? '1' : '0.5';
+    }
+
+    function pbxTogglePresetTag(tag) {
+      if (pbxContactTagsState.includes(tag)) {
+        pbxContactTagsState = pbxContactTagsState.filter(t => t !== tag);
+      } else {
+        pbxContactTagsState.push(tag);
+      }
+      pbxRenderTagsUI();
+    }
+
+    function pbxAddCustomTag() {
+      const inp = document.getElementById('pbx-custom-tag-input');
+      if (!inp) return;
+      const val = inp.value.trim();
+      if (!val) return;
+      if (!pbxContactTagsState.includes(val)) pbxContactTagsState.push(val);
+      inp.value = '';
+      pbxRenderTagsUI();
+    }
+
+    function pbxRemoveTag(tag) {
+      pbxContactTagsState = pbxContactTagsState.filter(t => t !== tag);
+      pbxRenderTagsUI();
+    }
+
+    function renderContactTagsBadges(tags) {
+      if (!Array.isArray(tags) || !tags.length) return '<span style="font-size:10px;color:var(--muted2);">—</span>';
+      return tags.map(t => {
+        const s = getTagStyle(t);
+        return `<span style="display:inline-block;padding:2px 7px;border-radius:10px;font-size:10.5px;font-weight:600;background:${s.bg};border:1px solid ${s.border};color:${s.color};white-space:nowrap;">${escHtml(t)}</span>`;
+      }).join(' ');
+    }
+
+    // ══════════════════════════════════════════════════════════════════
+    // LEADS — full CRUD
+    // ══════════════════════════════════════════════════════════════════
+    let _leadsCache = [];
+    let _leadsLoaded = false;
+    let _currentViewLeadId = null;
+    let _leadsCurrentPage = 1;
+    const _leadsPerPage = 15;
+
+    const PLATFORM_ICONS = {
+      pbx:       '<i class="fas fa-phone-alt" style="color:#7cb9e8;"></i>',
+      whatsapp:  '<i class="fab fa-whatsapp" style="color:#25d366;"></i>',
+      outlook:   '<i class="fab fa-microsoft" style="color:#00a8e8;"></i>',
+    };
+
+    async function loadLeads() {
+      try {
+        const res = await fetch(`${API_BASE}/calls/leads`, { headers: getAuthHeaders() });
+        if (!res.ok) throw new Error('Failed to load leads');
+        const data = await res.json();
+        _leadsCache = data.leads || [];
+        _leadsLoaded = true;
+        renderLeadsTable();
+        updateLeadsBadge();
+      } catch (err) {
+        console.error('[Leads] load error:', err.message);
+      }
+    }
+
+    function updateLeadsBadge() {
+      const badge = document.getElementById('main-nav-leads-badge');
+      if (!badge) return;
+      const n = _leadsCache.length;
+      badge.textContent = n;
+      badge.style.display = n ? 'inline-flex' : 'none';
+    }
+
+    function renderLeadsTable() {
+      const tbody = document.getElementById('leads-tbody');
+      const countBar = document.getElementById('leads-count-bar');
+      if (!tbody) return;
+      const search = (document.getElementById('leads-search')?.value || '').toLowerCase();
+      const platform = document.getElementById('leads-filter-platform')?.value || '';
+
+      let visible = _leadsCache.filter(l => {
+        if (platform && l.platform !== platform) return false;
+        if (search) {
+          const hay = [l.lead_name, l.subject, l.notes, l.contact_name, l.contact_company].join(' ').toLowerCase();
+          if (!hay.includes(search)) return false;
+        }
+        return true;
+      });
+      
+      const totalPages = Math.ceil(visible.length / _leadsPerPage) || 1;
+      if (_leadsCurrentPage > totalPages) _leadsCurrentPage = totalPages;
+      if (_leadsCurrentPage < 1) _leadsCurrentPage = 1;
+      
+      const startIndex = (_leadsCurrentPage - 1) * _leadsPerPage;
+      const paginated = visible.slice(startIndex, startIndex + _leadsPerPage);
+
+      if (countBar) {
+        let pagHtml = '';
+        if (totalPages > 1) {
+          pagHtml = `
+            <div style="display:flex;gap:4px;align-items:center;">
+              <button class="btn btn-ghost btn-xs" onclick="_leadsCurrentPage--;renderLeadsTable()" ${(_leadsCurrentPage === 1) ? 'disabled' : ''}><i class="fas fa-chevron-left"></i></button>
+              <span style="padding:0 8px;font-weight:600;">Page ${_leadsCurrentPage} of ${totalPages}</span>
+              <button class="btn btn-ghost btn-xs" onclick="_leadsCurrentPage++;renderLeadsTable()" ${(_leadsCurrentPage === totalPages) ? 'disabled' : ''}><i class="fas fa-chevron-right"></i></button>
+            </div>
+          `;
+        }
+        countBar.innerHTML = `
+          <div style="display:flex;justify-content:space-between;align-items:center;">
+            <span>Showing ${visible.length ? startIndex + 1 : 0}-${Math.min(startIndex + _leadsPerPage, visible.length)} of ${visible.length} lead${visible.length !== 1 ? 's' : ''}</span>
+            ${pagHtml}
+          </div>
+        `;
+      }
+
+      if (!visible.length) {
+        tbody.innerHTML = `<tr><td colspan="8" style="text-align:center;padding:30px;color:var(--muted);font-size:12.5px;"><i class="fas fa-star" style="font-size:24px;display:block;margin-bottom:8px;opacity:0.3;"></i>${_leadsLoaded ? 'No leads found. Click <b>Add Lead</b> to create one.' : 'Loading...'}</td></tr>`;
+        return;
+      }
+
+      tbody.innerHTML = paginated.map((l, i) => {
+        const globalIndex = startIndex + i + 1;
+        const dateStr = l.lead_date ? new Date(l.lead_date).toLocaleDateString('en-IN') : '—';
+        const timeStr = l.lead_time ? l.lead_time.slice(0,5) : '—';
+        const notesShort = l.notes ? (l.notes.length > 50 ? l.notes.slice(0, 50) + '…' : l.notes) : '—';
+        const platformIcon = PLATFORM_ICONS[l.platform] || '';
+        const platformLabel = (l.platform || 'pbx').toUpperCase();
+        return `
+          <tr>
+            <td style="font-size:11.5px;color:var(--muted);">${globalIndex}</td>
+            <td style="font-weight:600;color:var(--text);">${escHtml(l.lead_name)}</td>
+            <td style="font-size:12px;color:var(--muted2);">${escHtml(l.subject || '—')}</td>
+            <td><span style="display:inline-flex;align-items:center;gap:4px;font-size:11px;">${platformIcon} ${escHtml(platformLabel)}</span></td>
+            <td style="font-size:12px;">${dateStr}</td>
+            <td style="font-size:12px;">${timeStr}</td>
+            <td style="font-size:11.5px;color:var(--muted2);" title="${escAttr(l.notes||'')}">${escHtml(notesShort)}</td>
+            <td>
+              <div style="display:flex;gap:4px;">
+                <button class="btn btn-ghost btn-xs" onclick="viewLeadDetail(${l.id})" title="View Detail"><i class="fas fa-eye"></i></button>
+                <button class="btn btn-ghost btn-xs" onclick="editLead(${l.id})" title="Edit" style="color:var(--gold);"><i class="fas fa-pen"></i></button>
+                <button class="btn btn-ghost btn-xs" onclick="deleteLead(${l.id})" title="Delete" style="color:var(--red2);"><i class="fas fa-trash"></i></button>
+              </div>
+            </td>
+          </tr>`;
+      }).join('');
+    }
+
+    function openLeadModal(prefill) {
+      document.getElementById('lead-modal-title').textContent = 'Add Lead';
+      document.getElementById('lead-edit-id').value = '';
+      document.getElementById('lead-form-name').value = prefill?.name || '';
+      document.getElementById('lead-form-subject').value = '';
+      document.getElementById('lead-form-notes').innerHTML = '';
+      document.getElementById('lead-form-platform').value = prefill?.platform || 'pbx';
+      document.getElementById('lead-form-phone').value = prefill?.phone || '';
+      // Default to today/now
+      const now = new Date();
+      document.getElementById('lead-form-date').value = now.toISOString().split('T')[0];
+      document.getElementById('lead-form-time').value = now.toTimeString().slice(0,5);
+      openModal('lead-form-modal');
+      setTimeout(() => document.getElementById('lead-form-name').focus(), 100);
+    }
+
+    function openLeadModalFromCall(phone, contactName) {
+      openLeadModal({ phone, name: contactName, platform: 'pbx' });
+    }
+
+    function editLead(id) {
+      const l = _leadsCache.find(x => x.id === id);
+      if (!l) return;
+      document.getElementById('lead-modal-title').textContent = 'Edit Lead';
+      document.getElementById('lead-edit-id').value = id;
+      document.getElementById('lead-form-name').value = l.lead_name || '';
+      document.getElementById('lead-form-subject').value = l.subject || '';
+      document.getElementById('lead-form-notes').innerHTML = l.notes || '';
+      document.getElementById('lead-form-platform').value = l.platform || 'pbx';
+      document.getElementById('lead-form-phone').value = l.contact_phone || '';
+      document.getElementById('lead-form-date').value = l.lead_date ? l.lead_date.split('T')[0] : '';
+      document.getElementById('lead-form-time').value = l.lead_time ? l.lead_time.slice(0,5) : '';
+      openModal('lead-form-modal');
+      setTimeout(() => document.getElementById('lead-form-name').focus(), 100);
+    }
+
+    async function submitLeadForm() {
+      const id = document.getElementById('lead-edit-id').value;
+      const lead_name = document.getElementById('lead-form-name').value.trim();
+      const subject = document.getElementById('lead-form-subject').value.trim();
+      const notes = document.getElementById('lead-form-notes').innerHTML.trim();
+      const platform = document.getElementById('lead-form-platform').value;
+      const contact_phone = document.getElementById('lead-form-phone').value.trim();
+      const lead_date = document.getElementById('lead-form-date').value;
+      const lead_time = document.getElementById('lead-form-time').value;
+
+      if (!lead_name) return notify('Required', 'Lead Name is required', 'var(--red2)', 'fas fa-exclamation');
+
+      const body = { lead_name, subject, notes, platform, contact_phone, lead_date, lead_time };
+      const url = id ? `${API_BASE}/calls/leads/${id}` : `${API_BASE}/calls/leads`;
+      const method = id ? 'PUT' : 'POST';
+
+      try {
+        const res = await fetch(url, {
+          method,
+          headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
+          body: JSON.stringify(body)
+        });
+        if (!res.ok) { const e = await res.json(); throw new Error(e.error); }
+        notify(id ? 'Lead Updated' : 'Lead Added', lead_name, 'var(--green2)', 'fas fa-star');
+        closeModal('lead-form-modal');
+        await loadLeads();
+      } catch (err) {
+        notify('Error', err.message, 'var(--red2)', 'fas fa-exclamation-circle');
+      }
+    }
+
+    async function deleteLead(id) {
+      const l = _leadsCache.find(x => x.id === id);
+      if (!confirm(`Delete lead "${l?.lead_name || id}"?`)) return;
+      try {
+        const res = await fetch(`${API_BASE}/calls/leads/${id}`, { method: 'DELETE', headers: getAuthHeaders() });
+        if (!res.ok) { const e = await res.json(); throw new Error(e.error); }
+        notify('Lead Deleted', l?.lead_name || '', 'var(--red2)', 'fas fa-trash');
+        await loadLeads();
+      } catch (err) {
+        notify('Error', err.message, 'var(--red2)', 'fas fa-exclamation-circle');
+      }
+    }
+
+    function viewLeadDetail(id) {
+      const l = _leadsCache.find(x => x.id === id);
+      if (!l) return;
+      _currentViewLeadId = id;
+      const dateStr = l.lead_date ? new Date(l.lead_date).toLocaleDateString('en-IN', { dateStyle: 'long' }) : '—';
+      const timeStr = l.lead_time ? l.lead_time.slice(0,5) : '—';
+      const platformIcon = PLATFORM_ICONS[l.platform] || '';
+      const body = document.getElementById('lead-detail-body');
+      body.innerHTML = `
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px;">
+          <div>
+            <div style="font-size:10.5px;color:var(--muted);margin-bottom:3px;text-transform:uppercase;letter-spacing:0.5px;">Lead Name</div>
+            <div style="font-size:15px;font-weight:700;color:var(--text);">${escHtml(l.lead_name)}</div>
+          </div>
+          <div>
+            <div style="font-size:10.5px;color:var(--muted);margin-bottom:3px;text-transform:uppercase;letter-spacing:0.5px;">Platform</div>
+            <div style="font-size:13px;">${platformIcon} <b>${escHtml((l.platform||'pbx').toUpperCase())}</b></div>
+          </div>
+        </div>
+        ${l.subject ? `<div style="margin-bottom:10px;"><div style="font-size:10.5px;color:var(--muted);margin-bottom:3px;text-transform:uppercase;letter-spacing:0.5px;">Subject</div><div style="font-size:13px;color:var(--text);">${escHtml(l.subject)}</div></div>` : ''}
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:10px;">
+          <div><div style="font-size:10.5px;color:var(--muted);margin-bottom:3px;text-transform:uppercase;letter-spacing:0.5px;">Date</div><div style="font-size:13px;">${dateStr}</div></div>
+          <div><div style="font-size:10.5px;color:var(--muted);margin-bottom:3px;text-transform:uppercase;letter-spacing:0.5px;">Time</div><div style="font-size:13px;">${timeStr}</div></div>
+        </div>
+        ${l.contact_phone ? `<div style="margin-bottom:10px;"><div style="font-size:10.5px;color:var(--muted);margin-bottom:3px;text-transform:uppercase;letter-spacing:0.5px;">Contact</div><div style="font-size:13px;">${l.contact_name ? `<b>${escHtml(l.contact_name)}</b> · ` : ''}${escHtml(l.contact_phone)}${l.contact_company ? ` · <i style="color:var(--muted);">${escHtml(l.contact_company)}</i>` : ''}</div></div>` : ''}
+        ${(() => {
+          if (!l.notes) return '';
+          let actualNotes = l.notes;
+          let mailSnippet = '';
+          if (l.notes.includes('\n---\n')) {
+            const parts = l.notes.split('\n---\n');
+            actualNotes = parts[0];
+            mailSnippet = parts.slice(1).join('\n---\n');
+          }
+          
+          let html = '';
+          const isHtml = (str) => {
+            const s = str.trim().toLowerCase();
+            return s.startsWith('<html') || s.startsWith('<!doctype html>') || s.startsWith('<div') || s.startsWith('<meta');
+          };
+
+          if (isHtml(actualNotes)) {
+             const uidNotes = 'lead-notes-' + Math.random().toString(36).substr(2, 9);
+             html += `<div style="margin-bottom:6px;"><div style="font-size:10.5px;color:var(--muted);margin-bottom:5px;text-transform:uppercase;letter-spacing:0.5px;">Notes</div><iframe id="${uidNotes}" class="email-body-iframe" style="width:100%;height:350px;border:1px solid var(--border);border-radius:8px;background:#fff;" sandbox="allow-same-origin allow-popups allow-popups-to-escape-sandbox allow-scripts"></iframe></div>`;
+             setTimeout(() => {
+                const iframe = document.getElementById(uidNotes);
+                if (iframe) {
+                    const blob = new Blob([actualNotes], { type: 'text/html' });
+                    iframe.src = URL.createObjectURL(blob);
+                    iframe.onload = () => {
+                        try { URL.revokeObjectURL(iframe.src); } catch(e){}
+                        try {
+                            const h = iframe.contentDocument.documentElement.scrollHeight || iframe.contentDocument.body.scrollHeight;
+                            if (h > 100) iframe.style.height = Math.max(350, h + 20) + 'px';
+                        } catch(e){}
+                    };
+                }
+             }, 50);
+          } else {
+             html += `<div style="margin-bottom:6px;"><div style="font-size:10.5px;color:var(--muted);margin-bottom:5px;text-transform:uppercase;letter-spacing:0.5px;">Notes</div><div style="font-size:12.5px;color:var(--text);background:rgba(255,255,255,0.04);border:1px solid var(--border);border-radius:8px;padding:10px;line-height:1.6;white-space:pre-wrap;">${escHtml(actualNotes)}</div></div>`;
+          }
+          
+          if (mailSnippet) {
+            let snippetPreview = '';
+            if (isHtml(mailSnippet)) {
+                const uid = 'lead-mail-' + Math.random().toString(36).substr(2, 9);
+                snippetPreview = `<iframe id="${uid}" class="email-body-iframe" style="width:100%;height:400px;border:1px solid var(--border);border-radius:4px;background:#fff;margin-top:8px;display:block;" sandbox="allow-same-origin allow-popups allow-popups-to-escape-sandbox allow-scripts"></iframe>`;
+                setTimeout(() => {
+                    const iframe = document.getElementById(uid);
+                    if (iframe) {
+                        const blob = new Blob([mailSnippet], { type: 'text/html' });
+                        iframe.src = URL.createObjectURL(blob);
+                        iframe.onload = () => {
+                            try { URL.revokeObjectURL(iframe.src); } catch(e){}
+                            // Auto-resize
+                            try {
+                                const h = iframe.contentDocument.documentElement.scrollHeight || iframe.contentDocument.body.scrollHeight;
+                                if (h > 100) iframe.style.height = Math.max(400, h + 20) + 'px';
+                            } catch(e){}
+                        };
+                    }
+                }, 50);
+            } else {
+                snippetPreview = `<div class="outlook-session-preview" style="white-space:pre-wrap;font-size:12px;margin-top:4px;">${escHtml(mailSnippet)}</div>`;
+            }
+            html += `
+              <div class="outlook-session-card" style="margin-top:12px;cursor:default;">
+                <div style="display:flex;gap:10px;align-items:flex-start;">
+                  <i class="fas fa-envelope" style="color:#0078d4;margin-top:2px;"></i>
+                  <div style="min-width:0;flex:1;">
+                    <div class="outlook-session-title">Email Content Snapshot</div>
+                    ${snippetPreview}
+                  </div>
+                </div>
+              </div>
+            `;
+          }
+          return html;
+        })()}
+        <div style="font-size:10.5px;color:var(--muted);margin-top:8px;">Created: ${l.created_at ? new Date(l.created_at).toLocaleString('en-IN') : '—'}</div>
+      `;
+      openModal('lead-detail-modal');
+    }
+
+    function editLeadFromDetail() {
+      closeModal('lead-detail-modal');
+      if (_currentViewLeadId) editLead(_currentViewLeadId);
+    }
+
+    // Auto-load leads badge on page init
+    loadLeads();
+
     let currentRecordingPage = 1;
     let totalRecordingPages = 1;
     let pbxRecordingLimit = 10;
@@ -39593,5 +40393,7 @@ Nagpur, Maharashtra, 440017, India<br>
 
 
 
+  <script src="./applyDeepExtractionResult.js"></script>
+  <script src="./Applystructuredextractionresult.js"></script>
 </body>
 </html>

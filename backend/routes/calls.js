@@ -203,6 +203,7 @@ async function ensurePbxContactsTable() {
   // Migrate existing table
   await pool.query(`ALTER TABLE pbx_contacts ADD COLUMN IF NOT EXISTS email VARCHAR(254)`);
   await pool.query(`ALTER TABLE pbx_contacts ADD COLUMN IF NOT EXISTS mobile_phone VARCHAR(50)`);
+  await pool.query(`ALTER TABLE pbx_contacts ADD COLUMN IF NOT EXISTS tags TEXT[] DEFAULT '{}'`);
   // Clean garbage rows — SMDR import pollution: rows with no name and no real phone
   const cleaned = await pool.query(`DELETE FROM pbx_contacts WHERE name IS NULL`);
   if (cleaned.rowCount > 0) console.log(`[Calls] Cleaned ${cleaned.rowCount} unnamed garbage rows from pbx_contacts.`);
@@ -351,12 +352,13 @@ router.get('/contacts/list', async (req, res) => {
 // POST /api/calls/contacts/save  — save/update a PBX contact
 // ═══════════════════════════════════════════════════════════════════
 router.post('/contacts/save', async (req, res) => {
-  const { phone, name, company, notes, email, mobile_phone } = req.body;
+  const { phone, name, company, notes, email, mobile_phone, tags } = req.body;
   if (!phone) return res.status(400).json({ error: 'phone is required.' });
   try {
     const cleanPhone = phone.trim();
     const cleanEmail = email ? email.trim().toLowerCase() : null;
     const cleanMobile = mobile_phone ? mobile_phone.trim() : null;
+    const cleanTags = Array.isArray(tags) ? tags.filter(t => t && t.trim()).map(t => t.trim()) : [];
 
     // Duplicate-name check: reject if another contact (different phone) already has this name
     if (name && name.trim()) {
@@ -382,25 +384,197 @@ router.post('/contacts/save', async (req, res) => {
     const result = existing.rowCount
       ? await pool.query(`
           UPDATE pbx_contacts
-          SET name = $1, company = $2, notes = $3, email = $4, mobile_phone = $5, updated_at = NOW()
-          WHERE id = $6
+          SET name = $1, company = $2, notes = $3, email = $4, mobile_phone = $5, tags = $6, updated_at = NOW()
+          WHERE id = $7
           RETURNING *
-        `, [name || null, company || null, notes || null, cleanEmail, cleanMobile, existing.rows[0].id])
+        `, [name || null, company || null, notes || null, cleanEmail, cleanMobile, cleanTags, existing.rows[0].id])
       : await pool.query(`
-          INSERT INTO pbx_contacts (phone, name, company, notes, email, mobile_phone, updated_at)
-          VALUES ($1, $2, $3, $4, $5, $6, NOW())
+          INSERT INTO pbx_contacts (phone, name, company, notes, email, mobile_phone, tags, updated_at)
+          VALUES ($1, $2, $3, $4, $5, $6, $7, NOW())
           ON CONFLICT (phone) DO UPDATE
             SET name = EXCLUDED.name, company = EXCLUDED.company,
                 notes = EXCLUDED.notes, email = EXCLUDED.email,
-                mobile_phone = EXCLUDED.mobile_phone, updated_at = NOW()
+                mobile_phone = EXCLUDED.mobile_phone, tags = EXCLUDED.tags, updated_at = NOW()
           RETURNING *
-        `, [cleanPhone, name || null, company || null, notes || null, cleanEmail, cleanMobile]);
+        `, [cleanPhone, name || null, company || null, notes || null, cleanEmail, cleanMobile, cleanTags]);
     const io = req.app.get('io');
     if (io) io.emit('suggestions:update');
     return res.json(result.rows[0]);
   } catch (err) {
     console.error('[Calls] save contact error:', err.message);
     return res.status(500).json({ error: 'Failed to save PBX contact.' });
+  }
+});
+
+// ═══════════════════════════════════════════════════════════════════
+// PATCH /api/calls/contacts/:phone/tags  — update tags for a PBX contact
+// ═══════════════════════════════════════════════════════════════════
+router.patch('/contacts/:phone/tags', async (req, res) => {
+  const { tags } = req.body;
+  if (!Array.isArray(tags)) return res.status(400).json({ error: 'tags must be an array.' });
+  try {
+    const cleanTags = tags.filter(t => t && t.trim()).map(t => t.trim());
+    const existing = await pool.query(
+      `SELECT id FROM pbx_contacts WHERE phone_norm(phone) = phone_norm($1)
+       ORDER BY (name IS NULL), updated_at DESC NULLS LAST, id DESC LIMIT 1`,
+      [req.params.phone]
+    );
+    if (!existing.rowCount) return res.status(404).json({ error: 'Contact not found.' });
+    const result = await pool.query(
+      `UPDATE pbx_contacts SET tags = $1, updated_at = NOW() WHERE id = $2 RETURNING *`,
+      [cleanTags, existing.rows[0].id]
+    );
+    return res.json(result.rows[0]);
+  } catch (err) {
+    console.error('[Calls] tag update error:', err.message);
+    return res.status(500).json({ error: 'Failed to update tags.' });
+  }
+});
+
+// ═══════════════════════════════════════════════════════════════════
+// LEADS CRUD  —  GET|POST /api/calls/leads   PUT|DELETE /api/calls/leads/:id
+// ═══════════════════════════════════════════════════════════════════
+async function ensureLeadsTable() {
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS leads (
+      id            SERIAL PRIMARY KEY,
+      lead_name     VARCHAR(200) NOT NULL,
+      subject       VARCHAR(300),
+      notes         TEXT,
+      platform      VARCHAR(50) DEFAULT 'pbx',
+      lead_date     DATE,
+      lead_time     TIME,
+      contact_phone VARCHAR(50),
+      contact_tags  TEXT[],
+      created_by    INTEGER,
+      created_at    TIMESTAMPTZ DEFAULT NOW(),
+      updated_at    TIMESTAMPTZ DEFAULT NOW()
+    )
+  `);
+  await pool.query(`ALTER TABLE leads ADD COLUMN IF NOT EXISTS contact_phone VARCHAR(50)`);
+  await pool.query(`ALTER TABLE leads ADD COLUMN IF NOT EXISTS contact_tags TEXT[]`);
+  await pool.query(`ALTER TABLE leads ADD COLUMN IF NOT EXISTS created_by INTEGER`);
+  console.log('[Leads] Table ensured.');
+}
+ensureLeadsTable().catch(err => console.warn('[Leads] table error:', err.message));
+
+// GET /api/calls/leads — list all leads (newest first)
+router.get('/leads', async (req, res) => {
+  try {
+    const { rows } = await pool.query(`
+      SELECT l.*,
+             pc.name    AS contact_name,
+             pc.company AS contact_company
+      FROM leads l
+      LEFT JOIN pbx_contacts pc
+        ON pc.id = (
+          SELECT id FROM pbx_contacts
+          WHERE phone_norm(phone) = phone_norm(l.contact_phone)
+          ORDER BY (name IS NULL), updated_at DESC NULLS LAST LIMIT 1
+        )
+      ORDER BY COALESCE(l.lead_date::timestamp + COALESCE(l.lead_time, TIME '00:00:00'), l.created_at) DESC, l.id DESC
+    `);
+    return res.json({ leads: rows });
+  } catch (err) {
+    console.error('[Leads] list error:', err.message);
+    return res.status(500).json({ error: 'Failed to fetch leads.' });
+  }
+});
+
+// GET /api/calls/leads/:id — single lead
+router.get('/leads/:id', async (req, res) => {
+  const id = parseInt(req.params.id, 10);
+  if (!id) return res.status(400).json({ error: 'Invalid id.' });
+  try {
+    const { rows } = await pool.query(
+      `SELECT l.*, pc.name AS contact_name, pc.company AS contact_company
+       FROM leads l
+       LEFT JOIN pbx_contacts pc
+         ON pc.id = (
+           SELECT id FROM pbx_contacts
+           WHERE phone_norm(phone) = phone_norm(l.contact_phone)
+           ORDER BY (name IS NULL), updated_at DESC NULLS LAST LIMIT 1
+         )
+       WHERE l.id = $1`,
+      [id]
+    );
+    if (!rows.length) return res.status(404).json({ error: 'Lead not found.' });
+    return res.json(rows[0]);
+  } catch (err) {
+    return res.status(500).json({ error: 'Failed to fetch lead.' });
+  }
+});
+
+// POST /api/calls/leads — create a lead
+router.post('/leads', async (req, res) => {
+  const { lead_name, subject, notes, platform, lead_date, lead_time, contact_phone, contact_tags } = req.body;
+  if (!lead_name || !lead_name.trim()) return res.status(400).json({ error: 'lead_name is required.' });
+  try {
+    const userId = req.user?.id || null;
+    const { rows } = await pool.query(
+      `INSERT INTO leads (lead_name, subject, notes, platform, lead_date, lead_time, contact_phone, contact_tags, created_by)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING *`,
+      [
+        lead_name.trim(),
+        subject?.trim() || null,
+        notes?.trim() || null,
+        platform || 'pbx',
+        lead_date || null,
+        lead_time || null,
+        contact_phone || null,
+        Array.isArray(contact_tags) ? contact_tags : [],
+        userId
+      ]
+    );
+    return res.status(201).json(rows[0]);
+  } catch (err) {
+    console.error('[Leads] create error:', err.message);
+    return res.status(500).json({ error: 'Failed to create lead.' });
+  }
+});
+
+// PUT /api/calls/leads/:id — update a lead
+router.put('/leads/:id', async (req, res) => {
+  const id = parseInt(req.params.id, 10);
+  if (!id) return res.status(400).json({ error: 'Invalid id.' });
+  const { lead_name, subject, notes, platform, lead_date, lead_time, contact_phone, contact_tags } = req.body;
+  try {
+    const { rows } = await pool.query(
+      `UPDATE leads
+       SET lead_name=$1, subject=$2, notes=$3, platform=$4,
+           lead_date=$5, lead_time=$6, contact_phone=$7, contact_tags=$8, updated_at=NOW()
+       WHERE id=$9 RETURNING *`,
+      [
+        lead_name?.trim() || null,
+        subject?.trim() || null,
+        notes?.trim() || null,
+        platform || 'pbx',
+        lead_date || null,
+        lead_time || null,
+        contact_phone || null,
+        Array.isArray(contact_tags) ? contact_tags : [],
+        id
+      ]
+    );
+    if (!rows.length) return res.status(404).json({ error: 'Lead not found.' });
+    return res.json(rows[0]);
+  } catch (err) {
+    console.error('[Leads] update error:', err.message);
+    return res.status(500).json({ error: 'Failed to update lead.' });
+  }
+});
+
+// DELETE /api/calls/leads/:id — delete a lead
+router.delete('/leads/:id', async (req, res) => {
+  const id = parseInt(req.params.id, 10);
+  if (!id) return res.status(400).json({ error: 'Invalid id.' });
+  try {
+    const { rowCount } = await pool.query(`DELETE FROM leads WHERE id = $1`, [id]);
+    if (!rowCount) return res.status(404).json({ error: 'Lead not found.' });
+    return res.json({ success: true });
+  } catch (err) {
+    console.error('[Leads] delete error:', err.message);
+    return res.status(500).json({ error: 'Failed to delete lead.' });
   }
 });
 
@@ -821,18 +995,21 @@ router.get('/', async (req, res) => {
       `SELECT cl.*, TO_CHAR(cl.call_date, 'YYYY-MM-DD') AS call_date_str,
               COALESCE(pc1.name, pc2.name) AS saved_name,
               COALESCE(pc1.company, pc2.company) AS saved_company,
-              COALESCE(pc1.notes, pc2.notes) AS saved_notes
+              COALESCE(pc1.notes, pc2.notes) AS saved_notes,
+              COALESCE(pc1.tags, pc2.tags, '{}') AS contact_tags,
+              COALESCE(pc1.email, pc2.email) AS email,
+              COALESCE(pc1.mobile_phone, pc2.mobile_phone) AS mobile_phone
        FROM call_logs_deduped cl
        LEFT JOIN (
          SELECT DISTINCT ON (phone_norm(phone))
-           phone_norm(phone) AS phone_digits, phone, name, company, notes
+           phone_norm(phone) AS phone_digits, phone, name, company, notes, tags, email, mobile_phone
          FROM pbx_contacts
          WHERE name IS NOT NULL
          ORDER BY phone_norm(phone), (name IS NULL), updated_at DESC NULLS LAST, id DESC
        ) pc1 ON pc1.phone_digits = phone_norm(cl.caller)
        LEFT JOIN (
          SELECT DISTINCT ON (phone_norm(phone))
-           phone_norm(phone) AS phone_digits, phone, name, company, notes
+           phone_norm(phone) AS phone_digits, phone, name, company, notes, tags, email, mobile_phone
          FROM pbx_contacts
          WHERE name IS NOT NULL
          ORDER BY phone_norm(phone), (name IS NULL), updated_at DESC NULLS LAST, id DESC
