@@ -411,11 +411,7 @@ router.get('/chats', authenticate, async (req, res) => {
             AND m.sender_name != ''
             AND m.sender_name !~* '^you$'
             AND m.sender_name !~ '^\\+?[0-9]'
-            AND (
-              m.sender = wc.jid
-              OR regexp_replace(split_part(COALESCE(m.sender, ''), '@', 1), '[^0-9]', '', 'g')
-                = regexp_replace(COALESCE(wc.phone, ''), '[^0-9]', '', 'g')
-            )
+            AND m.sender = wc.jid
           ORDER BY m.timestamp DESC NULLS LAST
           LIMIT 1
         ) msg ON true
@@ -423,13 +419,7 @@ router.get('/chats', authenticate, async (req, res) => {
           SELECT c.fname, c.lname
           FROM contacts c
           WHERE wc.phone IS NOT NULL
-            AND regexp_replace(COALESCE(c.phone, c.wa, ''), '[^0-9]', '', 'g') != ''
-            AND (
-              regexp_replace(COALESCE(c.phone, c.wa, ''), '[^0-9]', '', 'g')
-                = regexp_replace(COALESCE(wc.phone, ''), '[^0-9]', '', 'g')
-              OR right(regexp_replace(COALESCE(c.phone, c.wa, ''), '[^0-9]', '', 'g'), 10)
-                = right(regexp_replace(COALESCE(wc.phone, ''), '[^0-9]', '', 'g'), 10)
-            )
+            AND (c.wa = wc.phone OR c.phone = wc.phone OR c.wa LIKE '%' || wc.phone || '%')
           LIMIT 1
         ) crm ON true
         WHERE wc.account_phone = $1

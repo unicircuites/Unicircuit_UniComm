@@ -5416,25 +5416,48 @@
 
         </div>
 
-        <!-- ── MAIN SECTION: LEADS ── -->
+        <!-- MAIN SECTION: LEADS -->
         <div class="section-view fu" id="sec-leads">
-          <div class="card" style="margin-bottom:14px;">
+          <style>
+            #sec-leads .leads-shell { margin-bottom: 14px; overflow: hidden; }
+            #sec-leads .leads-toolbar { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+            #sec-leads .leads-search { width: 160px; font-size: 12px; padding: 5px 10px; }
+            #sec-leads .leads-filter { width: auto; font-size: 12px; padding: 5px 8px; }
+            #sec-leads .leads-table-wrap { overflow-x: auto; }
+            #sec-leads .outlook-leads-table { min-width: 1220px; table-layout: fixed; }
+            #sec-leads .outlook-leads-table th { white-space: nowrap; }
+            #sec-leads .outlook-leads-table th:nth-child(1), #sec-leads .outlook-leads-table td:nth-child(1) { width: 38px; }
+            #sec-leads .outlook-leads-table th:nth-child(2), #sec-leads .outlook-leads-table td:nth-child(2) { width: 34%; }
+            #sec-leads .outlook-leads-table th:nth-child(3), #sec-leads .outlook-leads-table td:nth-child(3) { width: 29%; }
+            #sec-leads .outlook-leads-table th:nth-child(4), #sec-leads .outlook-leads-table td:nth-child(4) { width: 92px; }
+            #sec-leads .outlook-leads-table th:nth-child(5), #sec-leads .outlook-leads-table td:nth-child(5) { width: 86px; }
+            #sec-leads .outlook-leads-table th:nth-child(6), #sec-leads .outlook-leads-table td:nth-child(6) { width: 58px; }
+            #sec-leads .outlook-leads-table th:nth-child(7), #sec-leads .outlook-leads-table td:nth-child(7) { width: 18%; }
+            #sec-leads .outlook-leads-table th:nth-child(8), #sec-leads .outlook-leads-table td:nth-child(8) { width: 112px; text-align: right; }
+            #sec-leads .lead-cell-primary { color: var(--text); font-weight: 700; line-height: 1.25; }
+            #sec-leads .lead-cell-muted { color: var(--muted2); font-size: 12px; line-height: 1.35; }
+            #sec-leads .lead-clamp { overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+            #sec-leads .lead-platform-pill { display: inline-flex; align-items: center; gap: 4px; color: var(--text); font-size: 11px; font-weight: 800; white-space: nowrap; }
+            #sec-leads .lead-actions { display: flex; justify-content: flex-end; gap: 5px; }
+            #sec-leads .leads-count-bar { padding: 8px 16px; border-top: 1px solid var(--border); font-size: 11.5px; color: var(--muted); }
+          </style>
+          <div class="card leads-shell">
             <div class="card-header">
               <h3><i class="fas fa-star" style="color:var(--gold);"></i> Lead Tracker</h3>
-              <div style="display:flex;gap:8px;align-items:center;">
-                <input class="inp" id="leads-search" placeholder="Search leads..." style="width:160px;font-size:12px;padding:5px 10px;" oninput="_leadsCurrentPage=1; renderLeadsTable()">
-                <select class="inp" id="leads-filter-platform" style="width:auto;font-size:12px;padding:5px 8px;" onchange="_leadsCurrentPage=1; renderLeadsTable()">
+              <div class="leads-toolbar">
+                <input class="inp leads-search" id="leads-search" placeholder="Search leads..." oninput="_leadsCurrentPage=1; renderLeadsTable()">
+                <select class="inp leads-filter" id="leads-filter-platform" onchange="_leadsCurrentPage=1; loadLeads()">
+                  <option value="outlook">Outlook Leads</option>
                   <option value="">All Platforms</option>
                   <option value="pbx">PBX</option>
                   <option value="whatsapp">WhatsApp</option>
-                  <option value="outlook">Outlook</option>
                 </select>
                 <button class="btn btn-ghost btn-sm" onclick="loadLeads()"><i class="fas fa-sync-alt"></i> Refresh</button>
                 <button class="btn btn-gold btn-sm" onclick="openLeadModal()"><i class="fas fa-plus"></i> Add Lead</button>
               </div>
             </div>
-            <div style="overflow-x:auto;">
-              <table class="data-table" id="leads-table">
+            <div class="leads-table-wrap">
+              <table class="data-table outlook-leads-table" id="leads-table">
                 <thead>
                   <tr>
                     <th>#</th>
@@ -5452,10 +5475,9 @@
                 </tbody>
               </table>
             </div>
-            <div style="padding:8px 16px;border-top:1px solid var(--border);font-size:11.5px;color:var(--muted);" id="leads-count-bar">0 leads</div>
+            <div class="leads-count-bar" id="leads-count-bar">0 leads</div>
           </div>
         </div>
-
         <!-- PBX CALL DETAILS MODAL -->
         <div class="modal-overlay" id="pbx-call-details-modal">
           <div class="modal" style="max-width:720px;">
@@ -8961,7 +8983,7 @@ Always write in a professional yet warm Indian B2B communication style. Use form
       const topCompose = document.getElementById('topbar-compose-email');
       if (topCompose) topCompose.style.display = id === 'email' ? '' : 'none';
       if (id === 'contacts') { refreshContactsSection(); }
-      if (id === 'leads') { if (!_leadsLoaded) loadLeads(); }
+      if (id === 'leads') { loadLeads(); }
       if (id === 'whatsapp') checkWAStatus(true);
       if (id === 'calls') { initWASocket(); refreshPbxCallLogsLatest('nav'); }
       if (id === 'marketing') { initWASocket(); loadMarketingData(); loadBroadcasts(); loadWaBroadcasts(); mktLoadTemplates(); }
@@ -34850,124 +34872,200 @@ ${plainText}`;
     let _leadsLoaded = false;
     let _currentViewLeadId = null;
     let _leadsCurrentPage = 1;
+    let _leadsRequestId = 0;
+    let _leadsLoadError = '';
     const _leadsPerPage = 15;
+    const _leadsFetchTimeoutMs = 8000;
 
     const PLATFORM_ICONS = {
-      pbx:       '<i class="fas fa-phone-alt" style="color:#7cb9e8;"></i>',
-      whatsapp:  '<i class="fab fa-whatsapp" style="color:#25d366;"></i>',
-      outlook:   '<i class="fab fa-microsoft" style="color:#00a8e8;"></i>',
+      pbx: '<i class="fas fa-phone-alt" style="color:#7cb9e8;"></i>',
+      whatsapp: '<i class="fab fa-whatsapp" style="color:#25d366;"></i>',
+      outlook: '<i class="fab fa-microsoft" style="color:#00a8e8;"></i>'
     };
 
-    async function loadLeads() {
-      try {
-        const res = await fetch(`${API_BASE}/calls/leads`, { headers: getAuthHeaders() });
-        if (!res.ok) throw new Error('Failed to load leads');
-        const data = await res.json();
-        _leadsCache = data.leads || [];
-        _leadsLoaded = true;
-        renderLeadsTable();
-        updateLeadsBadge();
-      } catch (err) {
-        console.error('[Leads] load error:', err.message);
-      }
+    function leadPlatformValue(lead) {
+      return String(lead?.platform || 'pbx').toLowerCase();
+    }
+
+    function leadPlainText(value) {
+      const div = document.createElement('div');
+      div.innerHTML = String(value || '').split('\n---\n')[0];
+      return (div.textContent || div.innerText || '').replace(/\s+/g, ' ').trim();
+    }
+
+    function leadShortText(value, length = 90) {
+      const text = leadPlainText(value);
+      if (!text) return '-';
+      return text.length > length ? `${text.slice(0, length - 3).trimEnd()}...` : text;
+    }
+
+    function leadDateText(value, long = false) {
+      if (!value) return '-';
+      const d = new Date(value);
+      if (Number.isNaN(d.getTime())) return '-';
+      return d.toLocaleDateString('en-IN', long ? { dateStyle: 'long' } : undefined);
+    }
+
+    function leadTimeText(value) {
+      return value ? String(value).slice(0, 5) : '-';
+    }
+
+    function setLeadsMessage(html) {
+      const tbody = document.getElementById('leads-tbody');
+      if (tbody) tbody.innerHTML = `<tr><td colspan="8" style="text-align:center;padding:30px;color:var(--muted);font-size:12.5px;">${html}</td></tr>`;
     }
 
     function updateLeadsBadge() {
       const badge = document.getElementById('main-nav-leads-badge');
       if (!badge) return;
-      const n = _leadsCache.length;
-      badge.textContent = n;
-      badge.style.display = n ? 'inline-flex' : 'none';
+      badge.textContent = _leadsCache.length;
+      badge.style.display = _leadsCache.length ? 'inline-flex' : 'none';
+    }
+
+    async function loadLeads() {
+      const requestId = ++_leadsRequestId;
+      const platform = document.getElementById('leads-filter-platform')?.value || 'outlook';
+      const params = new URLSearchParams({ limit: '500' });
+      if (platform) params.set('platform', platform);
+      
+      console.log(`[LEADS] loadLeads started. Request ID: ${requestId}, Platform filter: ${platform}`);
+
+      _leadsLoaded = false;
+      _leadsLoadError = '';
+      setLeadsMessage('<div class="spin-loader" style="margin:0 auto 10px;"></div>Loading leads...');
+
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), _leadsFetchTimeoutMs);
+
+      try {
+        const url = `${API_BASE}/calls/leads?${params.toString()}`;
+        console.log(`[LEADS] Fetching from API: ${url}`);
+        const res = await fetch(url, {
+          headers: getAuthHeaders(),
+          cache: 'no-store',
+          signal: controller.signal
+        });
+        
+        let data = {};
+        try { data = await res.json(); } catch (_) {}
+        
+        console.log(`[LEADS] API Response status: ${res.status}`);
+        
+        if (!res.ok) {
+          throw new Error(data.error || (res.status === 401 ? 'Session expired. Please login again.' : `HTTP ${res.status}`));
+        }
+        if (requestId !== _leadsRequestId) {
+            console.log(`[LEADS] Stale request aborted (ID: ${requestId})`);
+            return;
+        }
+        _leadsCache = Array.isArray(data.leads) ? data.leads : [];
+        console.log(`[LEADS] Successfully loaded ${_leadsCache.length} leads into cache`);
+        _leadsLoaded = true;
+        _leadsLoadError = '';
+      } catch (err) {
+        console.error(`[LEADS] Fetch error for request ${requestId}:`, err);
+        if (requestId !== _leadsRequestId) return;
+        _leadsCache = [];
+        _leadsLoaded = true;
+        _leadsLoadError = err.name === 'AbortError'
+          ? 'Leads request timed out. Backend/database did not respond within 8 seconds.'
+          : (err.message || 'Failed to load leads.');
+      } finally {
+        clearTimeout(timeout);
+        if (requestId === _leadsRequestId) {
+          console.log(`[LEADS] Rendering leads table for request ${requestId}...`);
+          renderLeadsTable();
+          updateLeadsBadge();
+        }
+      }
     }
 
     function renderLeadsTable() {
       const tbody = document.getElementById('leads-tbody');
       const countBar = document.getElementById('leads-count-bar');
       if (!tbody) return;
-      const search = (document.getElementById('leads-search')?.value || '').toLowerCase();
-      const platform = document.getElementById('leads-filter-platform')?.value || '';
 
-      let visible = _leadsCache.filter(l => {
-        if (platform && l.platform !== platform) return false;
-        if (search) {
-          const hay = [l.lead_name, l.subject, l.notes, l.contact_name, l.contact_company].join(' ').toLowerCase();
-          if (!hay.includes(search)) return false;
-        }
-        return true;
+      const search = (document.getElementById('leads-search')?.value || '').trim().toLowerCase();
+      const platform = document.getElementById('leads-filter-platform')?.value || 'outlook';
+      const visible = _leadsCache.filter(lead => {
+        if (platform && leadPlatformValue(lead) !== platform) return false;
+        if (!search) return true;
+        return [lead.lead_name, lead.subject, leadPlainText(lead.notes), lead.contact_phone, lead.contact_name, lead.contact_company]
+          .join(' ')
+          .toLowerCase()
+          .includes(search);
       });
-      
-      const totalPages = Math.ceil(visible.length / _leadsPerPage) || 1;
-      if (_leadsCurrentPage > totalPages) _leadsCurrentPage = totalPages;
-      if (_leadsCurrentPage < 1) _leadsCurrentPage = 1;
-      
-      const startIndex = (_leadsCurrentPage - 1) * _leadsPerPage;
-      const paginated = visible.slice(startIndex, startIndex + _leadsPerPage);
+
+      const totalPages = Math.max(1, Math.ceil(visible.length / _leadsPerPage));
+      _leadsCurrentPage = Math.min(Math.max(_leadsCurrentPage, 1), totalPages);
+      const start = (_leadsCurrentPage - 1) * _leadsPerPage;
+      const pageRows = visible.slice(start, start + _leadsPerPage);
 
       if (countBar) {
-        let pagHtml = '';
-        if (totalPages > 1) {
-          pagHtml = `
-            <div style="display:flex;gap:4px;align-items:center;">
-              <button class="btn btn-ghost btn-xs" onclick="_leadsCurrentPage--;renderLeadsTable()" ${(_leadsCurrentPage === 1) ? 'disabled' : ''}><i class="fas fa-chevron-left"></i></button>
-              <span style="padding:0 8px;font-weight:600;">Page ${_leadsCurrentPage} of ${totalPages}</span>
-              <button class="btn btn-ghost btn-xs" onclick="_leadsCurrentPage++;renderLeadsTable()" ${(_leadsCurrentPage === totalPages) ? 'disabled' : ''}><i class="fas fa-chevron-right"></i></button>
-            </div>
-          `;
-        }
-        countBar.innerHTML = `
-          <div style="display:flex;justify-content:space-between;align-items:center;">
-            <span>Showing ${visible.length ? startIndex + 1 : 0}-${Math.min(startIndex + _leadsPerPage, visible.length)} of ${visible.length} lead${visible.length !== 1 ? 's' : ''}</span>
-            ${pagHtml}
-          </div>
-        `;
+        const controls = totalPages > 1 ? `
+          <div style="display:flex;gap:4px;align-items:center;">
+            <button class="btn btn-ghost btn-xs" onclick="_leadsCurrentPage--;renderLeadsTable()" ${_leadsCurrentPage === 1 ? 'disabled' : ''}><i class="fas fa-chevron-left"></i></button>
+            <span style="padding:0 8px;font-weight:600;">Page ${_leadsCurrentPage} of ${totalPages}</span>
+            <button class="btn btn-ghost btn-xs" onclick="_leadsCurrentPage++;renderLeadsTable()" ${_leadsCurrentPage === totalPages ? 'disabled' : ''}><i class="fas fa-chevron-right"></i></button>
+          </div>` : '';
+        countBar.innerHTML = `<div style="display:flex;justify-content:space-between;align-items:center;gap:10px;"><span>Showing ${visible.length ? start + 1 : 0}-${Math.min(start + _leadsPerPage, visible.length)} of ${visible.length} lead${visible.length === 1 ? '' : 's'}</span>${controls}</div>`;
       }
 
-      if (!visible.length) {
-        tbody.innerHTML = `<tr><td colspan="8" style="text-align:center;padding:30px;color:var(--muted);font-size:12.5px;"><i class="fas fa-star" style="font-size:24px;display:block;margin-bottom:8px;opacity:0.3;"></i>${_leadsLoaded ? 'No leads found. Click <b>Add Lead</b> to create one.' : 'Loading...'}</td></tr>`;
+      if (_leadsLoadError) {
+        setLeadsMessage(`<i class="fas fa-triangle-exclamation" style="font-size:24px;display:block;margin-bottom:8px;color:var(--red2);opacity:0.8;"></i>${escHtml(_leadsLoadError)}<br><button class="btn btn-ghost btn-sm" style="margin-top:10px;" onclick="loadLeads()"><i class="fas fa-sync-alt"></i> Retry</button>`);
         return;
       }
 
-      tbody.innerHTML = paginated.map((l, i) => {
-        const globalIndex = startIndex + i + 1;
-        const dateStr = l.lead_date ? new Date(l.lead_date).toLocaleDateString('en-IN') : '—';
-        const timeStr = l.lead_time ? l.lead_time.slice(0,5) : '—';
-        const notesShort = l.notes ? (l.notes.length > 50 ? l.notes.slice(0, 50) + '…' : l.notes) : '—';
-        const platformIcon = PLATFORM_ICONS[l.platform] || '';
-        const platformLabel = (l.platform || 'pbx').toUpperCase();
+      if (!_leadsLoaded) {
+        setLeadsMessage('<div class="spin-loader" style="margin:0 auto 10px;"></div>Loading leads...');
+        return;
+      }
+
+      if (!pageRows.length) {
+        const icon = platform === 'outlook' ? 'fab fa-microsoft' : 'fas fa-star';
+        const text = platform === 'outlook' ? 'No Outlook leads found.' : 'No leads found.';
+        setLeadsMessage(`<i class="${icon}" style="font-size:24px;display:block;margin-bottom:8px;color:#00a8e8;opacity:0.75;"></i>${text}`);
+        return;
+      }
+
+      tbody.innerHTML = pageRows.map((lead, index) => {
+        const platformKey = leadPlatformValue(lead);
+        const name = lead.lead_name || lead.contact_name || 'Untitled lead';
+        const subject = lead.subject || '-';
+        const notes = leadShortText(lead.notes, 90);
+        const rowNo = start + index + 1;
         return `
           <tr>
-            <td style="font-size:11.5px;color:var(--muted);">${globalIndex}</td>
-            <td style="font-weight:600;color:var(--text);">${escHtml(l.lead_name)}</td>
-            <td style="font-size:12px;color:var(--muted2);">${escHtml(l.subject || '—')}</td>
-            <td><span style="display:inline-flex;align-items:center;gap:4px;font-size:11px;">${platformIcon} ${escHtml(platformLabel)}</span></td>
-            <td style="font-size:12px;">${dateStr}</td>
-            <td style="font-size:12px;">${timeStr}</td>
-            <td style="font-size:11.5px;color:var(--muted2);" title="${escAttr(l.notes||'')}">${escHtml(notesShort)}</td>
-            <td>
-              <div style="display:flex;gap:4px;">
-                <button class="btn btn-ghost btn-xs" onclick="viewLeadDetail(${l.id})" title="View Detail"><i class="fas fa-eye"></i></button>
-                <button class="btn btn-ghost btn-xs" onclick="editLead(${l.id})" title="Edit" style="color:var(--gold);"><i class="fas fa-pen"></i></button>
-                <button class="btn btn-ghost btn-xs" onclick="deleteLead(${l.id})" title="Delete" style="color:var(--red2);"><i class="fas fa-trash"></i></button>
-              </div>
-            </td>
+            <td style="font-size:11.5px;color:var(--muted);">${rowNo}</td>
+            <td><div class="lead-cell-primary lead-clamp" title="${escAttr(name)}">${escHtml(name)}</div></td>
+            <td><div class="lead-cell-muted lead-clamp" title="${escAttr(subject)}">${escHtml(subject)}</div></td>
+            <td><span class="lead-platform-pill">${PLATFORM_ICONS[platformKey] || ''} ${escHtml(platformKey.toUpperCase())}</span></td>
+            <td style="font-size:12px;font-weight:700;color:var(--text);white-space:nowrap;">${leadDateText(lead.lead_date)}</td>
+            <td style="font-size:12px;font-weight:700;color:var(--text);white-space:nowrap;">${leadTimeText(lead.lead_time)}</td>
+            <td><div class="lead-cell-muted lead-clamp" title="${escAttr(leadPlainText(lead.notes))}">${escHtml(notes)}</div></td>
+            <td><div class="lead-actions">
+              <button class="btn btn-ghost btn-xs" onclick="viewLeadDetail(${lead.id})" title="View Detail"><i class="fas fa-eye"></i></button>
+              <button class="btn btn-ghost btn-xs" onclick="editLead(${lead.id})" title="Edit" style="color:var(--gold);"><i class="fas fa-pen"></i></button>
+              <button class="btn btn-ghost btn-xs" onclick="deleteLead(${lead.id})" title="Delete" style="color:var(--red2);"><i class="fas fa-trash"></i></button>
+            </div></td>
           </tr>`;
       }).join('');
     }
 
     function openLeadModal(prefill) {
+      const platform = prefill?.platform || document.getElementById('leads-filter-platform')?.value || 'outlook';
+      const now = new Date();
       document.getElementById('lead-modal-title').textContent = 'Add Lead';
       document.getElementById('lead-edit-id').value = '';
       document.getElementById('lead-form-name').value = prefill?.name || '';
       document.getElementById('lead-form-subject').value = '';
       document.getElementById('lead-form-notes').innerHTML = '';
-      document.getElementById('lead-form-platform').value = prefill?.platform || 'pbx';
+      document.getElementById('lead-form-platform').value = platform || 'outlook';
       document.getElementById('lead-form-phone').value = prefill?.phone || '';
-      // Default to today/now
-      const now = new Date();
       document.getElementById('lead-form-date').value = now.toISOString().split('T')[0];
-      document.getElementById('lead-form-time').value = now.toTimeString().slice(0,5);
+      document.getElementById('lead-form-time').value = now.toTimeString().slice(0, 5);
       openModal('lead-form-modal');
-      setTimeout(() => document.getElementById('lead-form-name').focus(), 100);
+      setTimeout(() => document.getElementById('lead-form-name')?.focus(), 100);
     }
 
     function openLeadModalFromCall(phone, contactName) {
@@ -34975,166 +35073,84 @@ ${plainText}`;
     }
 
     function editLead(id) {
-      const l = _leadsCache.find(x => x.id === id);
-      if (!l) return;
+      const lead = _leadsCache.find(x => x.id === id);
+      if (!lead) return;
       document.getElementById('lead-modal-title').textContent = 'Edit Lead';
       document.getElementById('lead-edit-id').value = id;
-      document.getElementById('lead-form-name').value = l.lead_name || '';
-      document.getElementById('lead-form-subject').value = l.subject || '';
-      document.getElementById('lead-form-notes').innerHTML = l.notes || '';
-      document.getElementById('lead-form-platform').value = l.platform || 'pbx';
-      document.getElementById('lead-form-phone').value = l.contact_phone || '';
-      document.getElementById('lead-form-date').value = l.lead_date ? l.lead_date.split('T')[0] : '';
-      document.getElementById('lead-form-time').value = l.lead_time ? l.lead_time.slice(0,5) : '';
+      document.getElementById('lead-form-name').value = lead.lead_name || '';
+      document.getElementById('lead-form-subject').value = lead.subject || '';
+      document.getElementById('lead-form-notes').innerHTML = lead.notes || '';
+      document.getElementById('lead-form-platform').value = leadPlatformValue(lead);
+      document.getElementById('lead-form-phone').value = lead.contact_phone || '';
+      document.getElementById('lead-form-date').value = lead.lead_date ? String(lead.lead_date).split('T')[0] : '';
+      document.getElementById('lead-form-time').value = leadTimeText(lead.lead_time) === '-' ? '' : leadTimeText(lead.lead_time);
       openModal('lead-form-modal');
-      setTimeout(() => document.getElementById('lead-form-name').focus(), 100);
     }
 
     async function submitLeadForm() {
       const id = document.getElementById('lead-edit-id').value;
       const lead_name = document.getElementById('lead-form-name').value.trim();
-      const subject = document.getElementById('lead-form-subject').value.trim();
-      const notes = document.getElementById('lead-form-notes').innerHTML.trim();
-      const platform = document.getElementById('lead-form-platform').value;
-      const contact_phone = document.getElementById('lead-form-phone').value.trim();
-      const lead_date = document.getElementById('lead-form-date').value;
-      const lead_time = document.getElementById('lead-form-time').value;
-
       if (!lead_name) return notify('Required', 'Lead Name is required', 'var(--red2)', 'fas fa-exclamation');
 
-      const body = { lead_name, subject, notes, platform, contact_phone, lead_date, lead_time };
-      const url = id ? `${API_BASE}/calls/leads/${id}` : `${API_BASE}/calls/leads`;
-      const method = id ? 'PUT' : 'POST';
+      const body = {
+        lead_name,
+        subject: document.getElementById('lead-form-subject').value.trim(),
+        notes: document.getElementById('lead-form-notes').innerHTML.trim(),
+        platform: document.getElementById('lead-form-platform').value || 'outlook',
+        contact_phone: document.getElementById('lead-form-phone').value.trim(),
+        lead_date: document.getElementById('lead-form-date').value,
+        lead_time: document.getElementById('lead-form-time').value
+      };
 
       try {
-        const res = await fetch(url, {
-          method,
+        const res = await fetch(id ? `${API_BASE}/calls/leads/${id}` : `${API_BASE}/calls/leads`, {
+          method: id ? 'PUT' : 'POST',
           headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
           body: JSON.stringify(body)
         });
-        if (!res.ok) { const e = await res.json(); throw new Error(e.error); }
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
         notify(id ? 'Lead Updated' : 'Lead Added', lead_name, 'var(--green2)', 'fas fa-star');
         closeModal('lead-form-modal');
         await loadLeads();
       } catch (err) {
-        notify('Error', err.message, 'var(--red2)', 'fas fa-exclamation-circle');
+        notify('Error', err.message || 'Failed to save lead.', 'var(--red2)', 'fas fa-exclamation-circle');
       }
     }
 
     async function deleteLead(id) {
-      const l = _leadsCache.find(x => x.id === id);
-      if (!confirm(`Delete lead "${l?.lead_name || id}"?`)) return;
+      const lead = _leadsCache.find(x => x.id === id);
+      if (!confirm(`Delete lead "${lead?.lead_name || id}"?`)) return;
       try {
         const res = await fetch(`${API_BASE}/calls/leads/${id}`, { method: 'DELETE', headers: getAuthHeaders() });
-        if (!res.ok) { const e = await res.json(); throw new Error(e.error); }
-        notify('Lead Deleted', l?.lead_name || '', 'var(--red2)', 'fas fa-trash');
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+        notify('Lead Deleted', lead?.lead_name || '', 'var(--red2)', 'fas fa-trash');
         await loadLeads();
       } catch (err) {
-        notify('Error', err.message, 'var(--red2)', 'fas fa-exclamation-circle');
+        notify('Error', err.message || 'Failed to delete lead.', 'var(--red2)', 'fas fa-exclamation-circle');
       }
     }
 
     function viewLeadDetail(id) {
-      const l = _leadsCache.find(x => x.id === id);
-      if (!l) return;
+      const lead = _leadsCache.find(x => x.id === id);
+      if (!lead) return;
       _currentViewLeadId = id;
-      const dateStr = l.lead_date ? new Date(l.lead_date).toLocaleDateString('en-IN', { dateStyle: 'long' }) : '—';
-      const timeStr = l.lead_time ? l.lead_time.slice(0,5) : '—';
-      const platformIcon = PLATFORM_ICONS[l.platform] || '';
+      const platformKey = leadPlatformValue(lead);
       const body = document.getElementById('lead-detail-body');
       body.innerHTML = `
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px;">
-          <div>
-            <div style="font-size:10.5px;color:var(--muted);margin-bottom:3px;text-transform:uppercase;letter-spacing:0.5px;">Lead Name</div>
-            <div style="font-size:15px;font-weight:700;color:var(--text);">${escHtml(l.lead_name)}</div>
-          </div>
-          <div>
-            <div style="font-size:10.5px;color:var(--muted);margin-bottom:3px;text-transform:uppercase;letter-spacing:0.5px;">Platform</div>
-            <div style="font-size:13px;">${platformIcon} <b>${escHtml((l.platform||'pbx').toUpperCase())}</b></div>
-          </div>
+          <div><div style="font-size:10.5px;color:var(--muted);margin-bottom:3px;text-transform:uppercase;letter-spacing:0.5px;">Lead Name</div><div style="font-size:15px;font-weight:700;color:var(--text);">${escHtml(lead.lead_name || '-')}</div></div>
+          <div><div style="font-size:10.5px;color:var(--muted);margin-bottom:3px;text-transform:uppercase;letter-spacing:0.5px;">Platform</div><div style="font-size:13px;">${PLATFORM_ICONS[platformKey] || ''} <b>${escHtml(platformKey.toUpperCase())}</b></div></div>
         </div>
-        ${l.subject ? `<div style="margin-bottom:10px;"><div style="font-size:10.5px;color:var(--muted);margin-bottom:3px;text-transform:uppercase;letter-spacing:0.5px;">Subject</div><div style="font-size:13px;color:var(--text);">${escHtml(l.subject)}</div></div>` : ''}
+        <div style="margin-bottom:10px;"><div style="font-size:10.5px;color:var(--muted);margin-bottom:3px;text-transform:uppercase;letter-spacing:0.5px;">Subject</div><div style="font-size:13px;color:var(--text);">${escHtml(lead.subject || '-')}</div></div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:10px;">
-          <div><div style="font-size:10.5px;color:var(--muted);margin-bottom:3px;text-transform:uppercase;letter-spacing:0.5px;">Date</div><div style="font-size:13px;">${dateStr}</div></div>
-          <div><div style="font-size:10.5px;color:var(--muted);margin-bottom:3px;text-transform:uppercase;letter-spacing:0.5px;">Time</div><div style="font-size:13px;">${timeStr}</div></div>
+          <div><div style="font-size:10.5px;color:var(--muted);margin-bottom:3px;text-transform:uppercase;letter-spacing:0.5px;">Date</div><div style="font-size:13px;">${leadDateText(lead.lead_date, true)}</div></div>
+          <div><div style="font-size:10.5px;color:var(--muted);margin-bottom:3px;text-transform:uppercase;letter-spacing:0.5px;">Time</div><div style="font-size:13px;">${leadTimeText(lead.lead_time)}</div></div>
         </div>
-        ${l.contact_phone ? `<div style="margin-bottom:10px;"><div style="font-size:10.5px;color:var(--muted);margin-bottom:3px;text-transform:uppercase;letter-spacing:0.5px;">Contact</div><div style="font-size:13px;">${l.contact_name ? `<b>${escHtml(l.contact_name)}</b> · ` : ''}${escHtml(l.contact_phone)}${l.contact_company ? ` · <i style="color:var(--muted);">${escHtml(l.contact_company)}</i>` : ''}</div></div>` : ''}
-        ${(() => {
-          if (!l.notes) return '';
-          let actualNotes = l.notes;
-          let mailSnippet = '';
-          if (l.notes.includes('\n---\n')) {
-            const parts = l.notes.split('\n---\n');
-            actualNotes = parts[0];
-            mailSnippet = parts.slice(1).join('\n---\n');
-          }
-          
-          let html = '';
-          const isHtml = (str) => {
-            const s = str.trim().toLowerCase();
-            return s.startsWith('<html') || s.startsWith('<!doctype html>') || s.startsWith('<div') || s.startsWith('<meta');
-          };
-
-          if (isHtml(actualNotes)) {
-             const uidNotes = 'lead-notes-' + Math.random().toString(36).substr(2, 9);
-             html += `<div style="margin-bottom:6px;"><div style="font-size:10.5px;color:var(--muted);margin-bottom:5px;text-transform:uppercase;letter-spacing:0.5px;">Notes</div><iframe id="${uidNotes}" class="email-body-iframe" style="width:100%;height:350px;border:1px solid var(--border);border-radius:8px;background:#fff;" sandbox="allow-same-origin allow-popups allow-popups-to-escape-sandbox allow-scripts"></iframe></div>`;
-             setTimeout(() => {
-                const iframe = document.getElementById(uidNotes);
-                if (iframe) {
-                    const blob = new Blob([actualNotes], { type: 'text/html' });
-                    iframe.src = URL.createObjectURL(blob);
-                    iframe.onload = () => {
-                        try { URL.revokeObjectURL(iframe.src); } catch(e){}
-                        try {
-                            const h = iframe.contentDocument.documentElement.scrollHeight || iframe.contentDocument.body.scrollHeight;
-                            if (h > 100) iframe.style.height = Math.max(350, h + 20) + 'px';
-                        } catch(e){}
-                    };
-                }
-             }, 50);
-          } else {
-             html += `<div style="margin-bottom:6px;"><div style="font-size:10.5px;color:var(--muted);margin-bottom:5px;text-transform:uppercase;letter-spacing:0.5px;">Notes</div><div style="font-size:12.5px;color:var(--text);background:rgba(255,255,255,0.04);border:1px solid var(--border);border-radius:8px;padding:10px;line-height:1.6;white-space:pre-wrap;">${escHtml(actualNotes)}</div></div>`;
-          }
-          
-          if (mailSnippet) {
-            let snippetPreview = '';
-            if (isHtml(mailSnippet)) {
-                const uid = 'lead-mail-' + Math.random().toString(36).substr(2, 9);
-                snippetPreview = `<iframe id="${uid}" class="email-body-iframe" style="width:100%;height:400px;border:1px solid var(--border);border-radius:4px;background:#fff;margin-top:8px;display:block;" sandbox="allow-same-origin allow-popups allow-popups-to-escape-sandbox allow-scripts"></iframe>`;
-                setTimeout(() => {
-                    const iframe = document.getElementById(uid);
-                    if (iframe) {
-                        const blob = new Blob([mailSnippet], { type: 'text/html' });
-                        iframe.src = URL.createObjectURL(blob);
-                        iframe.onload = () => {
-                            try { URL.revokeObjectURL(iframe.src); } catch(e){}
-                            // Auto-resize
-                            try {
-                                const h = iframe.contentDocument.documentElement.scrollHeight || iframe.contentDocument.body.scrollHeight;
-                                if (h > 100) iframe.style.height = Math.max(400, h + 20) + 'px';
-                            } catch(e){}
-                        };
-                    }
-                }, 50);
-            } else {
-                snippetPreview = `<div class="outlook-session-preview" style="white-space:pre-wrap;font-size:12px;margin-top:4px;">${escHtml(mailSnippet)}</div>`;
-            }
-            html += `
-              <div class="outlook-session-card" style="margin-top:12px;cursor:default;">
-                <div style="display:flex;gap:10px;align-items:flex-start;">
-                  <i class="fas fa-envelope" style="color:#0078d4;margin-top:2px;"></i>
-                  <div style="min-width:0;flex:1;">
-                    <div class="outlook-session-title">Email Content Snapshot</div>
-                    ${snippetPreview}
-                  </div>
-                </div>
-              </div>
-            `;
-          }
-          return html;
-        })()}
-        <div style="font-size:10.5px;color:var(--muted);margin-top:8px;">Created: ${l.created_at ? new Date(l.created_at).toLocaleString('en-IN') : '—'}</div>
-      `;
+        ${lead.contact_phone ? `<div style="margin-bottom:10px;"><div style="font-size:10.5px;color:var(--muted);margin-bottom:3px;text-transform:uppercase;letter-spacing:0.5px;">Contact</div><div style="font-size:13px;">${escHtml(lead.contact_phone)}</div></div>` : ''}
+        <div style="margin-bottom:6px;"><div style="font-size:10.5px;color:var(--muted);margin-bottom:5px;text-transform:uppercase;letter-spacing:0.5px;">Notes</div><div style="font-size:12.5px;color:var(--text);background:rgba(255,255,255,0.04);border:1px solid var(--border);border-radius:8px;padding:10px;line-height:1.6;white-space:pre-wrap;">${escHtml(leadPlainText(lead.notes) || '-')}</div></div>
+        <div style="font-size:10.5px;color:var(--muted);margin-top:8px;">Created: ${lead.created_at ? new Date(lead.created_at).toLocaleString('en-IN') : '-'}</div>`;
       openModal('lead-detail-modal');
     }
 
@@ -35142,10 +35158,6 @@ ${plainText}`;
       closeModal('lead-detail-modal');
       if (_currentViewLeadId) editLead(_currentViewLeadId);
     }
-
-    // Auto-load leads badge on page init
-    loadLeads();
-
     let currentRecordingPage = 1;
     let totalRecordingPages = 1;
     let pbxRecordingLimit = 10;
