@@ -417,8 +417,8 @@ router.get('/chats', authenticate, async (req, res) => {
             CASE WHEN c.id NOT LIKE '%@lid' THEN split_part(c.id, '@', 1) ELSE NULL END
           ) AS phone,
           COALESCE(ec.is_group_member, wc.is_group_member, false) AS is_group_member,
-          COALESCE(ec.verified_name, wc.verified_name, lid_biz.verified_name) AS verified_name,
-          COALESCE(ec.is_business, wc.is_business, lid_biz.is_business, false) AS is_business,
+          COALESCE(ec.verified_name, wc.verified_name) AS verified_name,
+          COALESCE(ec.is_business, wc.is_business, false) AS is_business,
           c.is_group,
           COALESCE(NULLIF(latest.body, ''), NULLIF(c.last_message, ''), c.last_message) AS last_message,
           COALESCE(latest.timestamp, c.last_time) AS last_time,
@@ -439,15 +439,6 @@ router.get('/chats', authenticate, async (req, res) => {
           ON wc.jid = c.id AND wc.account_phone = c.account_phone
         LEFT JOIN enriched_contacts ec
           ON ec.jid = c.id AND ec.account_phone = c.account_phone
-        LEFT JOIN LATERAL (
-          SELECT wc2.verified_name, wc2.is_business
-          FROM wa_contacts wc2
-          WHERE wc2.account_phone = c.account_phone
-            AND wc2.jid LIKE '%@lid'
-            AND wc2.phone IS NOT NULL
-            AND regexp_replace(wc2.phone, '[^0-9]', '', 'g') = split_part(c.id, '@', 1)
-          LIMIT 1
-        ) lid_biz ON true
         WHERE c.account_phone = $1
           AND c.id NOT LIKE '%@newsletter'
           AND c.id NOT LIKE '%@broadcast'

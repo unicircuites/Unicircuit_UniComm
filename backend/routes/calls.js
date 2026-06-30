@@ -48,6 +48,52 @@ function makePbxTraceId(prefix = 'PBX') {
   return `${prefix}-${Date.now()}-${Math.random().toString(16).slice(2, 8)}`;
 }
 
+function normalizePhoneDigits(value) {
+  const digits = String(value || '').replace(/\D/g, '');
+  return digits ? digits.slice(-10) : '';
+}
+
+async function queryWithStatementTimeout(sql, params = [], timeoutMs = 5000) {
+  const client = await pool.connect();
+  try {
+    await client.query(`SET statement_timeout = ${Number(timeoutMs) || 5000}`);
+    return await client.query(sql, params);
+  } finally {
+    try { await client.query('RESET statement_timeout'); } catch (_) {}
+    client.release();
+  }
+}
+
+async function enrichLeadsWithContacts(leads) {
+  const phones = [...new Set((leads || []).map(l => normalizePhoneDigits(l.contact_phone)).filter(Boolean))];
+  if (!phones.length) return leads;
+
+  try {
+    const { rows } = await queryWithStatementTimeout(
+      `SELECT DISTINCT ON (phone_digits)
+          phone_digits,
+          name,
+          company
+       FROM (
+         SELECT phone_norm(phone) AS phone_digits, name, company, updated_at, id
+         FROM pbx_contacts
+         WHERE phone IS NOT NULL
+       ) pc
+       WHERE phone_digits = ANY($1::text[])
+       ORDER BY phone_digits, (name IS NULL), updated_at DESC NULLS LAST, id DESC`,
+      [phones],
+      2500
+    );
+    const byPhone = new Map(rows.map(r => [r.phone_digits, r]));
+    return leads.map(lead => {
+      const match = byPhone.get(normalizePhoneDigits(lead.contact_phone));
+      return match ? { ...lead, contact_name: match.name, contact_company: match.company } : lead;
+    });
+  } catch (err) {
+    console.warn('[Leads] contact enrichment skipped:', err.message);
+    return leads;
+  }
+}
 // ── Recordings directory (PBX may store files here via network share/FTP) ──
 const REC_DIR = process.env.PBX_RECORDINGS_DIR
   || path.join(__dirname, '../../recordings');
@@ -462,28 +508,41 @@ async function ensureLeadsTable() {
 ensureLeadsTable().catch(err => console.warn('[Leads] table error:', err.message));
 
 // GET /api/calls/leads — list all leads (newest first)
+// GET /api/calls/leads - list all leads (newest first)
 router.get('/leads', async (req, res) => {
   try {
-    const { rows } = await pool.query(`
-      SELECT l.*,
-             pc.name    AS contact_name,
-             pc.company AS contact_company
-      FROM leads l
-      LEFT JOIN pbx_contacts pc
-        ON pc.id = (
-          SELECT id FROM pbx_contacts
-          WHERE phone_norm(phone) = phone_norm(l.contact_phone)
-          ORDER BY (name IS NULL), updated_at DESC NULLS LAST LIMIT 1
-        )
-      ORDER BY COALESCE(l.lead_date::timestamp + COALESCE(l.lead_time, TIME '00:00:00'), l.created_at) DESC, l.id DESC
-    `);
-    return res.json({ leads: rows });
+    const limit = Math.min(Math.max(parseInt(req.query.limit || '250', 10) || 250, 1), 1000);
+    const platform = String(req.query.platform || '').trim().toLowerCase();
+    const params = [];
+    let where = '';
+
+    if (platform) {
+      params.push(platform);
+      where = `WHERE LOWER(COALESCE(platform, 'pbx')) = $${params.length}`;
+    }
+
+    params.push(limit);
+    const { rows } = await queryWithStatementTimeout(
+      `SELECT id, lead_name, subject, notes, platform, lead_date, lead_time,
+              contact_phone, contact_tags, created_by, created_at, updated_at
+       FROM leads
+       ${where}
+       ORDER BY COALESCE(lead_date::timestamp + COALESCE(lead_time, TIME '00:00:00'), created_at) DESC, id DESC
+       LIMIT $${params.length}`,
+      params,
+      5000
+    );
+
+    const leads = await enrichLeadsWithContacts(rows);
+    return res.json({ leads, count: leads.length });
   } catch (err) {
     console.error('[Leads] list error:', err.message);
-    return res.status(500).json({ error: 'Failed to fetch leads.' });
+    const isTimeout = /timeout|statement timeout|canceling statement/i.test(err.message || '');
+    return res.status(isTimeout ? 504 : 500).json({
+      error: isTimeout ? 'Leads database query timed out.' : 'Failed to fetch leads.'
+    });
   }
 });
-
 // GET /api/calls/leads/:id — single lead
 router.get('/leads/:id', async (req, res) => {
   const id = parseInt(req.params.id, 10);

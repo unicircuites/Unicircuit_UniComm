@@ -18,10 +18,11 @@ const pool = new Pool({
   database: process.env.DB_NAME     || 'unicomm_db',
   user:     process.env.DB_USER     || 'postgres',
   password: process.env.DB_PASSWORD || '',
-  max: 50, // Increased to prevent pool exhaustion during startup
-  idleTimeoutMillis: 60000, // 60s
-  connectionTimeoutMillis: 30000, // 30s
-  options: '-c client_encoding=UTF8',
+  max: 30, // Keep enough concurrency without letting hung requests pile up
+  idleTimeoutMillis: 30000, // 30s
+  connectionTimeoutMillis: 6000, // Fail fast instead of buffering UI requests
+  query_timeout: 10000, // Client-side guard for long-running queries
+  options: '-c client_encoding=UTF8 -c statement_timeout=10000',
 });
 
 pool.on('error', (err) => {
