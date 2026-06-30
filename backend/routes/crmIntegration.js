@@ -18,6 +18,7 @@ const DEAL_WRITABLE_COLUMNS = new Set([
 ]);
 
 const schemaReady = ensureCrmIntegrationSchema();
+schemaReady.catch(err => console.error('[CRM Integration] Schema init failed:', err.message));
 
 async function ensureCrmIntegrationSchema() {
   await pool.query(`
