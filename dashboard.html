@@ -5445,7 +5445,7 @@
             <div class="card-header">
               <h3><i class="fas fa-star" style="color:var(--gold);"></i> Lead Tracker</h3>
               <div class="leads-toolbar">
-                <input class="inp leads-search" id="leads-search" placeholder="Search leads..." oninput="_leadsCurrentPage=1; renderLeadsTable()">
+                <input class="inp leads-search" id="leads-search" placeholder="Search leads..." oninput="_leadsCurrentPage=1; renderMainLeadsTable()">
                 <select class="inp leads-filter" id="leads-filter-platform" onchange="_leadsCurrentPage=1; loadLeads()">
                   <option value="outlook">Outlook Leads</option>
                   <option value="">All Platforms</option>
@@ -34972,32 +34972,37 @@ ${plainText}`;
           : (err.message || 'Failed to load leads.');
       } finally {
         clearTimeout(timeout);
+        console.error('[LEADS-DEBUG] FINALLY BLOCK REACHED. requestId:', requestId, 'vs _leadsRequestId:', _leadsRequestId);
         if (requestId === _leadsRequestId) {
-          renderLeadsTable();
+          console.error('[LEADS-DEBUG] MATCH! Calling renderMainLeadsTable() now...');
+          renderMainLeadsTable();
+          console.error('[LEADS-DEBUG] renderMainLeadsTable() finished. Calling updateLeadsBadge()...');
           updateLeadsBadge();
+        } else {
+          console.error('[LEADS-DEBUG] NO MATCH! Request ID superseded.');
         }
       }
     }
 
-    function renderLeadsTable() {
+    function renderMainLeadsTable() {
       try {
-        console.log('[LEADS-DEBUG] STEP 1: Entering renderLeadsTable. Finding tbody...');
+        console.error('[LEADS-DEBUG] STEP 1: Entering renderMainLeadsTable. Finding tbody...');
         const tbody = document.getElementById('leads-tbody');
-        console.log('[LEADS-DEBUG] STEP 2: Finding countBar...');
+        console.error('[LEADS-DEBUG] STEP 2: Finding countBar...');
         const countBar = document.getElementById('leads-count-bar');
         
         if (!tbody) {
-          console.log('[LEADS-DEBUG] STEP 3: Error: tbody is null! Aborting render.');
+          console.error('[LEADS-DEBUG] STEP 3: Error: tbody is null! Aborting render.');
           return;
         }
 
-        console.log('[LEADS-DEBUG] STEP 4: Reading search value...');
+        console.error('[LEADS-DEBUG] STEP 4: Reading search value...');
         const search = (document.getElementById('leads-search')?.value || '').trim().toLowerCase();
         
-        console.log('[LEADS-DEBUG] STEP 5: Reading platform value...');
+        console.error('[LEADS-DEBUG] STEP 5: Reading platform value...');
         const platform = document.getElementById('leads-filter-platform')?.value || 'outlook';
         
-        console.log('[LEADS-DEBUG] STEP 6: Starting filter loop over ' + _leadsCache.length + ' cached leads.');
+        console.error('[LEADS-DEBUG] STEP 6: Starting filter loop over ' + _leadsCache.length + ' cached leads.');
         
         const visible = _leadsCache.filter((lead, idx) => {
           if (platform && leadPlatformValue(lead) !== platform) return false;
@@ -35008,51 +35013,51 @@ ${plainText}`;
             .includes(search);
         });
 
-        console.log('[LEADS-DEBUG] STEP 7: Filter loop finished! Visible leads count:', visible.length);
+        console.error('[LEADS-DEBUG] STEP 7: Filter loop finished! Visible leads count:', visible.length);
 
-        console.log('[LEADS-DEBUG] STEP 8: Calculating pagination...');
+        console.error('[LEADS-DEBUG] STEP 8: Calculating pagination...');
         const totalPages = Math.max(1, Math.ceil(visible.length / _leadsPerPage));
         _leadsCurrentPage = Math.min(Math.max(_leadsCurrentPage, 1), totalPages);
         const start = (_leadsCurrentPage - 1) * _leadsPerPage;
         const pageRows = visible.slice(start, start + _leadsPerPage);
 
-        console.log('[LEADS-DEBUG] STEP 9: Pagination done. Start index:', start, '| Page rows:', pageRows.length);
+        console.error('[LEADS-DEBUG] STEP 9: Pagination done. Start index:', start, '| Page rows:', pageRows.length);
 
         if (countBar) {
-          console.log('[LEADS-DEBUG] STEP 10: Updating countBar HTML...');
+          console.error('[LEADS-DEBUG] STEP 10: Updating countBar HTML...');
           const controls = totalPages > 1 ? `
             <div style="display:flex;gap:4px;align-items:center;">
-              <button class="btn btn-ghost btn-xs" onclick="_leadsCurrentPage--;renderLeadsTable()" ${_leadsCurrentPage === 1 ? 'disabled' : ''}><i class="fas fa-chevron-left"></i></button>
+              <button class="btn btn-ghost btn-xs" onclick="_leadsCurrentPage--;renderMainLeadsTable()" ${_leadsCurrentPage === 1 ? 'disabled' : ''}><i class="fas fa-chevron-left"></i></button>
               <span style="padding:0 8px;font-weight:600;">Page ${_leadsCurrentPage} of ${totalPages}</span>
-              <button class="btn btn-ghost btn-xs" onclick="_leadsCurrentPage++;renderLeadsTable()" ${_leadsCurrentPage === totalPages ? 'disabled' : ''}><i class="fas fa-chevron-right"></i></button>
+              <button class="btn btn-ghost btn-xs" onclick="_leadsCurrentPage++;renderMainLeadsTable()" ${_leadsCurrentPage === totalPages ? 'disabled' : ''}><i class="fas fa-chevron-right"></i></button>
             </div>` : '';
           countBar.innerHTML = `<div style="display:flex;justify-content:space-between;align-items:center;gap:10px;"><span>Showing ${visible.length ? start + 1 : 0}-${Math.min(start + _leadsPerPage, visible.length)} of ${visible.length} lead${visible.length === 1 ? '' : 's'}</span>${controls}</div>`;
         }
 
-        console.log('[LEADS-DEBUG] STEP 11: Checking for _leadsLoadError...');
+        console.error('[LEADS-DEBUG] STEP 11: Checking for _leadsLoadError...');
         if (_leadsLoadError) {
-          console.log('[LEADS-DEBUG] STEP 12: _leadsLoadError is present. Displaying error.');
+          console.error('[LEADS-DEBUG] STEP 12: _leadsLoadError is present. Displaying error.');
           setLeadsMessage(`<i class="fas fa-triangle-exclamation" style="font-size:24px;display:block;margin-bottom:8px;color:var(--red2);opacity:0.8;"></i>${escHtml(_leadsLoadError)}<br><button class="btn btn-ghost btn-sm" style="margin-top:10px;" onclick="loadLeads()"><i class="fas fa-sync-alt"></i> Retry</button>`);
           return;
         }
 
-        console.log('[LEADS-DEBUG] STEP 13: Checking if _leadsLoaded is false...');
+        console.error('[LEADS-DEBUG] STEP 13: Checking if _leadsLoaded is false...');
         if (!_leadsLoaded) {
-          console.log('[LEADS-DEBUG] STEP 14: _leadsLoaded is false. Showing spinner.');
+          console.error('[LEADS-DEBUG] STEP 14: _leadsLoaded is false. Showing spinner.');
           setLeadsMessage('<div class="spin-loader" style="margin:0 auto 10px;"></div>Loading leads...');
           return;
         }
 
-        console.log('[LEADS-DEBUG] STEP 15: Checking if pageRows.length is 0...');
+        console.error('[LEADS-DEBUG] STEP 15: Checking if pageRows.length is 0...');
         if (!pageRows.length) {
-          console.log('[LEADS-DEBUG] STEP 16: No rows to display. Showing empty state.');
+          console.error('[LEADS-DEBUG] STEP 16: No rows to display. Showing empty state.');
           const icon = platform === 'outlook' ? 'fab fa-microsoft' : 'fas fa-star';
           const text = platform === 'outlook' ? 'No Outlook leads found.' : 'No leads found.';
           setLeadsMessage(`<i class="${icon}" style="font-size:24px;display:block;margin-bottom:8px;color:#00a8e8;opacity:0.75;"></i>${text}`);
           return;
         }
 
-        console.log('[LEADS-DEBUG] STEP 17: Generating HTML for ' + pageRows.length + ' rows...');
+        console.error('[LEADS-DEBUG] STEP 17: Generating HTML for ' + pageRows.length + ' rows...');
         tbody.innerHTML = pageRows.map((lead, index) => {
           const platformKey = leadPlatformValue(lead);
           const name = lead.lead_name || lead.contact_name || 'Untitled lead';
@@ -35075,9 +35080,9 @@ ${plainText}`;
               </div></td>
             </tr>`;
         }).join('');
-        console.log('[LEADS-DEBUG] STEP 18: Render FINISHED successfully! HTML replaced.');
+        console.error('[LEADS-DEBUG] STEP 18: Render FINISHED successfully! HTML replaced.');
       } catch (err) {
-        console.error('[LEADS-DEBUG] STEP CRITICAL CRASH: renderLeadsTable threw an exception!', err);
+        console.error('[LEADS-DEBUG] STEP CRITICAL CRASH: renderMainLeadsTable threw an exception!', err);
       }
     }
 
