@@ -34981,27 +34981,37 @@ ${plainText}`;
     }
 
     function renderLeadsTable() {
-      const tbody = document.getElementById('leads-tbody');
-      const countBar = document.getElementById('leads-count-bar');
-      if (!tbody) return;
+      try {
+        console.log('[LEADS-DEBUG] renderLeadsTable starting...');
+        const tbody = document.getElementById('leads-tbody');
+        const countBar = document.getElementById('leads-count-bar');
+        console.log('[LEADS-DEBUG] elements:', { tbody: !!tbody, countBar: !!countBar });
+        if (!tbody) return;
 
-      const search = (document.getElementById('leads-search')?.value || '').trim().toLowerCase();
-      const platform = document.getElementById('leads-filter-platform')?.value || 'outlook';
-      const visible = _leadsCache.filter(lead => {
-        if (platform && leadPlatformValue(lead) !== platform) return false;
-        if (!search) return true;
-        return [lead.lead_name, lead.subject, leadPlainText(lead.notes), lead.contact_phone, lead.contact_name, lead.contact_company]
-          .join(' ')
-          .toLowerCase()
-          .includes(search);
-      });
+        const search = (document.getElementById('leads-search')?.value || '').trim().toLowerCase();
+        const platform = document.getElementById('leads-filter-platform')?.value || 'outlook';
+        
+        console.log('[LEADS-DEBUG] Filtering', _leadsCache.length, 'leads for platform:', platform, 'search:', search);
+        
+        const visible = _leadsCache.filter(lead => {
+          if (platform && leadPlatformValue(lead) !== platform) return false;
+          if (!search) return true;
+          return [lead.lead_name, lead.subject, leadPlainText(lead.notes), lead.contact_phone, lead.contact_name, lead.contact_company]
+            .join(' ')
+            .toLowerCase()
+            .includes(search);
+        });
 
-      const totalPages = Math.max(1, Math.ceil(visible.length / _leadsPerPage));
-      _leadsCurrentPage = Math.min(Math.max(_leadsCurrentPage, 1), totalPages);
-      const start = (_leadsCurrentPage - 1) * _leadsPerPage;
-      const pageRows = visible.slice(start, start + _leadsPerPage);
+        console.log('[LEADS-DEBUG] Visible leads:', visible.length);
 
-      if (countBar) {
+        const totalPages = Math.max(1, Math.ceil(visible.length / _leadsPerPage));
+        _leadsCurrentPage = Math.min(Math.max(_leadsCurrentPage, 1), totalPages);
+        const start = (_leadsCurrentPage - 1) * _leadsPerPage;
+        const pageRows = visible.slice(start, start + _leadsPerPage);
+
+        console.log('[LEADS-DEBUG] Page rows computed:', pageRows.length);
+
+        if (countBar) {
         const controls = totalPages > 1 ? `
           <div style="display:flex;gap:4px;align-items:center;">
             <button class="btn btn-ghost btn-xs" onclick="_leadsCurrentPage--;renderLeadsTable()" ${_leadsCurrentPage === 1 ? 'disabled' : ''}><i class="fas fa-chevron-left"></i></button>
@@ -35050,6 +35060,10 @@ ${plainText}`;
             </div></td>
           </tr>`;
       }).join('');
+      console.log('[LEADS-DEBUG] renderLeadsTable completed successfully.');
+      } catch (err) {
+        console.error('[LEADS-DEBUG] renderLeadsTable CRASHED:', err);
+      }
     }
 
     function openLeadModal(prefill) {

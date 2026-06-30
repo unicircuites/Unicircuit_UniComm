@@ -398,30 +398,9 @@ router.get('/chats', authenticate, async (req, res) => {
           wc.verified_name,
           wc.is_business,
           wc.updated_at,
-          msg.sender_name AS msg_name,
-          NULLIF(trim(concat(crm.fname, ' ', crm.lname)), '') AS crm_name
+          NULL AS msg_name,
+          NULL AS crm_name
         FROM wa_contacts wc
-        LEFT JOIN LATERAL (
-          SELECT m.sender_name
-          FROM wa_messages m
-          WHERE wc.name IS NULL AND wc.notify IS NULL
-            AND m.account_phone = wc.account_phone
-            AND m.from_me = false
-            AND m.sender_name IS NOT NULL
-            AND m.sender_name != ''
-            AND m.sender_name !~* '^you$'
-            AND m.sender_name !~ '^\\+?[0-9]'
-            AND m.sender = wc.jid
-          ORDER BY m.timestamp DESC NULLS LAST
-          LIMIT 1
-        ) msg ON true
-        LEFT JOIN LATERAL (
-          SELECT c.fname, c.lname
-          FROM contacts c
-          WHERE wc.phone IS NOT NULL
-            AND (c.wa = wc.phone OR c.phone = wc.phone OR c.wa LIKE '%' || wc.phone || '%')
-          LIMIT 1
-        ) crm ON true
         WHERE wc.account_phone = $1
       ),
       chat_rows AS (
