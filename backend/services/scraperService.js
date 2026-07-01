@@ -1,7 +1,10 @@
 const axios = require('axios');
 const fs = require('fs');
+const os = require('os');
 const path = require('path');
+const { exec } = require('child_process');
 const { JSDOM } = require('jsdom');
+const { transcribeRecording } = require('./transcriptionService');
 const { chromium } = require('playwright');
 const { renderUrlWithChrome } = require('../../chromeRenderer');
 const {
@@ -729,11 +732,13 @@ async function capturePageForAnalysis(page, url, hostname) {
   const html = await page.content();
   const elementShots = await captureElementShots(page);
   let reels = [];
+  let posts = [];
   if (isFacebookHost(hostname)) {
     reels = await extractFacebookReels(page, url, hostname);
+    posts = await extractFacebookPosts(page, url, hostname);
   }
 
-  return { html, profileData, elementShots, reels };
+  return { html, profileData, elementShots, reels, posts };
 }
 
 // Build a Facebook tab URL (e.g. /<username>/reels/) forcing English locale.
@@ -788,12 +793,29 @@ async function extractFacebookReels(page, url, hostname) {
         const viewMatch = text.match(/([\d.,]+\s*[KMB]?)/);
         const views = viewMatch ? viewMatch[1].replace(/\s+/g, '') : '';
 
+        // Best-effort published date from the card (aria-label / title / time el /
+        // Unix data-utime). Often absent in the grid — enriched on transcribe.
+        let published = '';
+        const timeEl = a.querySelector('abbr[data-utime], time[datetime]');
+        if (timeEl) {
+          const ut = timeEl.getAttribute('data-utime');
+          const dt = timeEl.getAttribute('datetime');
+          if (dt) published = dt.split('T')[0];
+          else if (ut) published = new Date(parseInt(ut, 10) * 1000).toISOString().split('T')[0];
+        }
+        if (!published) {
+          const lab = a.getAttribute('aria-label') || a.getAttribute('title') || '';
+          const dm = lab.match(/\b(\d{1,2}\s+\w+\s+\d{4}|\w+\s+\d{1,2},?\s*\d{4})\b/);
+          if (dm) published = dm[1];
+        }
+
         out.push({
           reel_id: id,
           open_link: href,           // reel page — click to watch
           download_link: thumb,      // poster/thumbnail media (direct video needs playback)
           reel_thumbnail_url: thumb,
           reel_views: views,
+          published_date: published, // may be blank; filled on transcribe
         });
       }
       return out.slice(0, 80);
@@ -802,6 +824,129 @@ async function extractFacebookReels(page, url, hostname) {
     return reels;
   } catch (err) {
     console.warn(`[SCRAPER] Reels extraction failed: ${err.message}`);
+    return [];
+  }
+}
+
+// Scrape the page's timeline posts. Expands every "See more" first, then reads
+// each post's time, media (image/video), content, hashtags and like count.
+// Field names follow the spec's POST / CONTENT FIELDS.
+async function extractFacebookPosts(page, url, hostname) {
+  let timelineUrl = url;
+  try {
+    const p = new URL(url);
+    p.searchParams.set('locale', 'en_US');
+    timelineUrl = p.toString();
+  } catch (_) {}
+
+  try {
+    console.log(`[SCRAPER] Loading posts timeline: ${timelineUrl}`);
+    await page.goto(timelineUrl, { timeout: 30000, waitUntil: 'domcontentloaded' });
+    await waitForDynamicContent(page, hostname);
+
+    // Expand all "See more" / "Read more" (repeat as lazy content loads).
+    for (let pass = 0; pass < 4; pass++) {
+      const clicked = await page.evaluate(() => {
+        let n = 0;
+        const labels = ['see more', 'read more', '… more', '...more', 'see original'];
+        const els = Array.from(document.querySelectorAll('div[role="button"], span[role="button"], span, a[role="link"]'));
+        for (const el of els) {
+          const t = (el.textContent || '').trim().toLowerCase();
+          if (labels.includes(t)) { try { el.click(); n++; } catch (_) {} }
+        }
+        return n;
+      }).catch(() => 0);
+      await sleep(1200);
+      if (!clicked) break;
+    }
+
+    const posts = await page.evaluate(() => {
+      const toAsciiDigits = (str) => (str || '').replace(/[०-९٠-٩]/g, (d) => {
+        const code = d.charCodeAt(0);
+        return String(code >= 0x0966 ? code - 0x0966 : code - 0x0660);
+      });
+      const clean = (s) => (s || '').replace(/\s+/g, ' ').trim();
+      const out = [];
+      const seen = new Set();
+      const articles = Array.from(document.querySelectorAll('[role="article"]'));
+
+      for (const art of articles) {
+        // Skip nested articles (comments) — keep only top-level posts.
+        if (art.parentElement && art.parentElement.closest('[role="article"]')) continue;
+
+        const fullText = clean(art.innerText);
+        if (!fullText || fullText.length < 5) continue;
+
+        // Content: prefer FB's message markers, else the longest dir="auto" block.
+        let content = '';
+        const msgEl = art.querySelector('[data-ad-preview="message"], [data-ad-comet-preview="message"], [data-testid="post_message"]');
+        if (msgEl) content = clean(msgEl.innerText);
+        if (!content) {
+          art.querySelectorAll('div[dir="auto"]').forEach((b) => {
+            const t = clean(b.innerText);
+            if (t.length > content.length && !/^like\b|^comment\b|^share\b/i.test(t)) content = t;
+          });
+        }
+
+        // Post time — a link/aria-label carrying a date or relative time.
+        let time = '';
+        for (const a of Array.from(art.querySelectorAll('a[href], abbr'))) {
+          const al = a.getAttribute('aria-label') || '';
+          const tx = clean(a.textContent);
+          if (/\b\d{4}\b/.test(al) || /\bat\s+\d/i.test(al)) { time = al; break; }
+          if (!time && tx.length <= 32 && /(\b\d{1,2}\s+\w{3,}|\w{3,}\s+\d{1,2}|\b\d+\s*[hmdw]\b|yesterday|just now)/i.test(tx)) time = tx;
+        }
+
+        // Media — a post video, else the largest content image (skip avatars).
+        let media = '';
+        let mediaType = '';
+        const vid = art.querySelector('video');
+        if (vid && vid.src && /^https?:/.test(vid.src)) { media = vid.src; mediaType = 'video'; }
+        if (!media) {
+          let best = null, bestArea = 0;
+          art.querySelectorAll('img[src]').forEach((im) => {
+            const w = im.naturalWidth || im.width || 0;
+            const h = im.naturalHeight || im.height || 0;
+            if (w > 130 && h > 130 && /scontent|fbcdn/i.test(im.src) && w * h > bestArea) { best = im; bestArea = w * h; }
+          });
+          if (best) { media = best.src; mediaType = 'image'; }
+        }
+
+        // Hashtags — from links and from the content text.
+        const tags = new Set();
+        art.querySelectorAll('a[href*="/hashtag/"]').forEach((a) => {
+          const t = clean(a.textContent);
+          if (t.startsWith('#')) tags.add(t);
+        });
+        (content.match(/#[\wऀ-ॿ]+/g) || []).forEach((t) => tags.add(t));
+
+        // Likes / reactions count.
+        let likes = '';
+        const rEl = art.querySelector('[aria-label*="reaction" i], [aria-label*="Like:" i], [aria-label*="like" i]');
+        if (rEl) { const m = toAsciiDigits(rEl.getAttribute('aria-label') || '').match(/([\d,.]+[KMB]?)/); if (m) likes = m[1]; }
+        if (!likes) { const m = toAsciiDigits(fullText).match(/([\d,.]+[KMB]?)\s*(reactions?|likes?)/i); if (m) likes = m[1]; }
+
+        if (!content && !media) continue;
+        const key = (content.slice(0, 60) + '|' + media).trim();
+        if (seen.has(key)) continue;
+        seen.add(key);
+
+        out.push({
+          post_timestamp: time,
+          post_type: mediaType || 'text',
+          post_media_url: media,
+          post_content: content,
+          post_hashtags: Array.from(tags).join(' '),
+          post_likes_count: likes,
+        });
+      }
+      return out.slice(0, 40);
+    });
+
+    console.log(`[SCRAPER] Extracted ${posts.length} post(s).`);
+    return posts;
+  } catch (err) {
+    console.warn(`[SCRAPER] Posts extraction failed: ${err.message}`);
     return [];
   }
 }
@@ -1741,6 +1886,7 @@ async function analyzeURL(url, cookies = null, showBrowser = false) {
     let profileData = null;
     let elementShots = null;
     let reels = null;
+    let posts = null;
     const parsedCookies = parseCookies(cookies);
 
     // 2. Always use a visible Playwright browser for analysis regardless of showBrowser flag
@@ -1813,6 +1959,7 @@ async function analyzeURL(url, cookies = null, showBrowser = false) {
         profileData = captured.profileData;
         elementShots = captured.elementShots;
         reels = captured.reels;
+        posts = captured.posts;
         extractedCookies = await context.cookies();
         usedPlaywright = true;
         clearLoginWaitStatus();
@@ -1836,6 +1983,7 @@ async function analyzeURL(url, cookies = null, showBrowser = false) {
         profileData = captured.profileData;
         elementShots = captured.elementShots;
         reels = captured.reels;
+        posts = captured.posts;
         extractedCookies = await context.cookies();
         usedPlaywright = true;
         await playwrightBrowser.close();
@@ -2157,12 +2305,21 @@ async function analyzeURL(url, cookies = null, showBrowser = false) {
       console.log(`[SCRAPER] Translated ${before} profile field(s) to English via Google Translate.`);
     }
 
+    // Translate each post's content to English (best-effort, in parallel).
+    if (posts && posts.length) {
+      await Promise.all(posts.map(async (p) => {
+        if (p.post_content) p.post_content = await googleTranslateToEnglish(p.post_content);
+      }));
+      console.log(`[SCRAPER] Translated content for ${posts.length} post(s).`);
+    }
+
     return {
       success: true,
       url,
       html, // full page HTML so the frontend can run its client-side DOM/pattern analysis
       elementShots: elementShots && elementShots.length ? elementShots : undefined, // per-element snapshots (buttons, dropdowns, inputs…)
       reels: reels && reels.length ? reels : undefined, // list of reels (open + download links)
+      posts: posts && posts.length ? posts : undefined, // timeline posts (time, media, content, hashtags, likes)
       itemSelector: detectedItemSelector,
       pagination: detectedPagination,
       suggestedFields: uniqueFields,
@@ -2473,6 +2630,153 @@ async function loginAndSaveSession(url) {
   }
 }
 
+// Probe a media file for an actual audio stream via ffmpeg. Returns true only
+// if ffmpeg reports an "Audio:" stream — so we skip transcribing silent/graphic
+// reels (e.g. a "Happy Gudi Padwa" image reel with no sound). Resolves null if
+// ffmpeg isn't available (so callers can fall back to attempting transcription).
+function mediaHasAudioStream(filePath) {
+  return new Promise((resolve) => {
+    exec(`ffmpeg -hide_banner -i "${filePath}"`, (error, stdout, stderr) => {
+      const output = `${stdout || ''}${stderr || ''}`;
+      if (/ffmpeg.*not (recognized|found)|is not recognized|ENOENT/i.test(output) || (error && error.code === 127)) {
+        return resolve(null); // ffmpeg unavailable — unknown
+      }
+      resolve(/Stream #\d+:\d+.*:\s*Audio:/i.test(output));
+    });
+  });
+}
+
+// Open a single reel, capture its streaming video URL, download the audio, and
+// transcribe it to an "audio script". Also reads the reel's published date from
+// the page. Best-effort: Facebook streams reels via protected/DASH media, so
+// capture can fail — in that case we return a clear error (and any date found).
+async function transcribeReel(reelUrl) {
+  if (!reelUrl) return { success: false, error: 'reel_url is required.' };
+
+  let context = null;
+  let tmpFile = null;
+  try {
+    context = await openStealthSession();
+    const page = context.pages()[0] || await context.newPage();
+
+    // Capture the first progressive video/mp4 response Facebook fetches.
+    let videoUrl = '';
+    page.on('response', (resp) => {
+      try {
+        const u = resp.url();
+        const ct = resp.headers()['content-type'] || '';
+        if (!videoUrl && (ct.includes('video/mp4') || /\.mp4(\?|$)/i.test(u)) && /fbcdn|video/i.test(u)) {
+          videoUrl = u;
+        }
+      } catch (_) {}
+    });
+
+    await page.goto(reelUrl, { timeout: 30000, waitUntil: 'domcontentloaded' });
+    await sleep(2500);
+    // Kick playback so the media request fires.
+    await page.evaluate(() => {
+      const v = document.querySelector('video');
+      if (v) { try { v.muted = true; v.play(); } catch (_) {} }
+    }).catch(() => {});
+
+    // Read published date + any direct http video src from the page.
+    const meta = await page.evaluate(() => {
+      const res = {};
+      const v = document.querySelector('video');
+      if (v) {
+        if (v.src && /^https?:/.test(v.src)) res.videoSrc = v.src;
+        // Best-effort "does this reel have an audio track?" hint from the player.
+        res.audioHint = !!(
+          v.mozHasAudio ||
+          (typeof v.webkitAudioDecodedByteCount !== 'undefined' && v.webkitAudioDecodedByteCount > 0) ||
+          (v.audioTracks && v.audioTracks.length > 0)
+        );
+      }
+      const timeEl = document.querySelector('abbr[data-utime], time[datetime]');
+      if (timeEl) {
+        const ut = timeEl.getAttribute('data-utime');
+        const dt = timeEl.getAttribute('datetime');
+        if (dt) res.date = dt.split('T')[0];
+        else if (ut) res.date = new Date(parseInt(ut, 10) * 1000).toISOString().split('T')[0];
+      }
+      if (!res.date) {
+        const t = (document.querySelector('[role="main"]') || document.body).innerText || '';
+        const m = t.match(/\b(\d{1,2}\s+\w+\s+\d{4}|\w+\s+\d{1,2},?\s*\d{4})\b/);
+        if (m) res.date = m[1];
+      }
+      return res;
+    }).catch(() => ({}));
+
+    // Give the network a few seconds to expose the mp4 URL.
+    for (let i = 0; i < 8 && !videoUrl; i++) await sleep(1000);
+    const finalVideo = videoUrl || meta.videoSrc || '';
+    const publishedDate = meta.date || '';
+
+    await context.close();
+    context = null;
+
+    if (!finalVideo || finalVideo.startsWith('blob:')) {
+      return {
+        success: false,
+        published_date: publishedDate,
+        error: 'Could not capture the reel\'s audio stream (Facebook serves reels via protected/DASH media). Try again, or download the reel manually and use the transcription tool.',
+      };
+    }
+
+    // Download the media, then transcribe. Use a .m4a extension so the existing
+    // transcription pipeline (ffmpeg → Groq Whisper) handles it.
+    tmpFile = path.join(os.tmpdir(), `reel_${Date.now()}.m4a`);
+    const dl = await axios.get(finalVideo.replace(/([?&])(bytestart|byteend)=\d+/gi, ''), {
+      responseType: 'arraybuffer',
+      timeout: 45000,
+      maxContentLength: 60 * 1024 * 1024,
+      headers: { 'User-Agent': 'Mozilla/5.0', 'Accept': '*/*' },
+    });
+    fs.writeFileSync(tmpFile, Buffer.from(dl.data));
+
+    // Check the reel actually has an audio track before spending a Whisper call.
+    // (Many reels are silent graphics — e.g. a festival-greeting image reel.)
+    const hasAudio = await mediaHasAudioStream(tmpFile);
+    if (hasAudio === false) {
+      try { fs.unlinkSync(tmpFile); } catch (_) {}
+      console.log('[SCRAPER] Reel has no audio track — skipping transcription.');
+      return {
+        success: true,
+        no_audio: true,
+        audio_script: '(no audio track — this is a silent/graphic reel, nothing to transcribe)',
+        published_date: publishedDate,
+      };
+    }
+    if (hasAudio === null && meta.audioHint === false) {
+      // ffmpeg unavailable but the player reported no audio — trust that hint.
+      try { fs.unlinkSync(tmpFile); } catch (_) {}
+      return {
+        success: true,
+        no_audio: true,
+        audio_script: '(no audio track detected — likely a silent/graphic reel)',
+        published_date: publishedDate,
+      };
+    }
+
+    const segments = await transcribeRecording(tmpFile);
+    const script = (segments || []).map((s) => s.text).join(' ').replace(/\s+/g, ' ').trim();
+
+    try { fs.unlinkSync(tmpFile); } catch (_) {}
+    try { fs.unlinkSync(tmpFile.replace(/\.m4a$/i, '_transcript.json')); } catch (_) {}
+
+    return {
+      success: true,
+      audio_script: script || '(no speech detected in this reel)',
+      published_date: publishedDate,
+    };
+  } catch (err) {
+    try { if (context) await context.close(); } catch (_) {}
+    try { if (tmpFile) fs.unlinkSync(tmpFile); } catch (_) {}
+    console.warn(`[SCRAPER] Reel transcription failed: ${err.message}`);
+    return { success: false, error: err.message };
+  }
+}
+
 module.exports = {
   startScrape,
   stopScrape,
@@ -2480,7 +2784,8 @@ module.exports = {
   parseLocalHTML,
   analyzeURL,
   getLoginWaitStatus,
-  loginAndSaveSession
+  loginAndSaveSession,
+  transcribeReel
   ,extractAllFieldsWithAI
   ,discoverVariableFields
 };

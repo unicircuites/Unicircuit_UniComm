@@ -7975,16 +7975,7 @@
                 <div id="ws-snapshot-grid" style="max-height:360px;overflow:auto;display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px;padding:4px;"></div>
               </div>
 
-              <!-- Reels List -->
-              <div class="ws-card" id="ws-reels-card" style="display:none;padding:14px;flex-shrink:0;">
-                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
-                  <div style="font-size:13px;font-weight:600;color:var(--text);"><i class="fas fa-film" style="color:var(--gold);margin-right:6px;"></i>Reels <span id="ws-reels-count" style="color:var(--muted);font-weight:400;"></span></div>
-                  <button class="btn btn-ghost btn-sm" id="ws-reels-export" onclick="wsExportReels()" style="border:1px solid var(--border);font-size:11px;height:26px;"><i class="fas fa-file-excel" style="color:var(--green);margin-right:5px;"></i>Export Reels</button>
-                </div>
-                <div id="ws-reels-grid" style="max-height:340px;overflow:auto;display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:10px;padding:4px;"></div>
-              </div>
-
-              <!-- Live Preview Table -->
+              <!-- Live Preview Tables (Company Profile + Reels) -->
               <div class="ws-card" style="flex:1;padding:14px;display:flex;flex-direction:column;overflow:hidden;min-height:0;">
                 <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;flex-shrink:0;">
                   <div style="font-size:13px;font-weight:600;color:var(--text);"><i class="fas fa-table" style="color:var(--gold);margin-right:6px;"></i>Scraped Data Preview</div>
@@ -7993,11 +7984,62 @@
                     <span id="ws-row-count" style="font-size:11px;color:var(--muted);">0 rows</span>
                   </div>
                 </div>
-                <div style="flex:1;overflow:auto;border:1px solid var(--border);border-radius:6px;background:rgba(0,0,0,0.15);">
-                  <table class="ws-preview-table" id="ws-preview-table">
-                    <thead><tr id="ws-table-head" style="background:var(--bg2);"><th style="padding:10px;font-weight:600;">No Data Yet</th></tr></thead>
-                    <tbody id="ws-table-body"><tr><td style="padding:20px;text-align:center;color:var(--muted);font-style:italic;">Paste HTML above and click "Analyze DOM &amp; Detect Patterns" to begin.</td></tr></tbody>
-                  </table>
+                <div style="flex:1;overflow:auto;display:flex;flex-direction:column;gap:12px;min-height:0;">
+
+                  <!-- Table 1: Company Profile (own inner scroll) -->
+                  <div style="border:1px solid var(--border);border-radius:6px;background:rgba(0,0,0,0.15);display:flex;flex-direction:column;flex-shrink:0;">
+                    <div style="font-size:11px;font-weight:700;color:var(--gold2);text-transform:uppercase;letter-spacing:.5px;padding:8px 10px;border-bottom:1px solid var(--border);flex-shrink:0;"><i class="fas fa-building" style="margin-right:5px;"></i>Company Profile</div>
+                    <div style="max-height:300px;overflow:auto;">
+                      <table class="ws-preview-table" id="ws-preview-table">
+                        <thead><tr id="ws-table-head" style="background:var(--bg2);position:sticky;top:0;z-index:2;"><th style="padding:10px;font-weight:600;">No Data Yet</th></tr></thead>
+                        <tbody id="ws-table-body"><tr><td style="padding:20px;text-align:center;color:var(--muted);font-style:italic;">Paste HTML above and click "Analyze DOM &amp; Detect Patterns" to begin.</td></tr></tbody>
+                      </table>
+                    </div>
+                  </div>
+
+                  <!-- Table 2: Reels (own inner scroll) -->
+                  <div id="ws-reels-section" style="display:none;border:1px solid var(--border);border-radius:6px;background:rgba(0,0,0,0.15);flex-direction:column;flex-shrink:0;">
+                    <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 10px;border-bottom:1px solid var(--border);flex-shrink:0;">
+                      <div style="font-size:11px;font-weight:700;color:var(--gold2);text-transform:uppercase;letter-spacing:.5px;"><i class="fas fa-film" style="margin-right:5px;"></i>Reels <span id="ws-reels-count" style="color:var(--muted);font-weight:400;text-transform:none;"></span></div>
+                      <button class="btn btn-ghost btn-sm" id="ws-reels-export" onclick="wsExportReels()" style="border:1px solid var(--border);font-size:11px;height:26px;"><i class="fas fa-file-excel" style="color:var(--green);margin-right:5px;"></i>Export Reels</button>
+                    </div>
+                    <div style="max-height:360px;overflow:auto;">
+                      <table class="ws-preview-table" id="ws-reels-table">
+                        <thead><tr style="background:var(--bg2);position:sticky;top:0;z-index:2;">
+                          <th style="padding:8px 10px;width:36px;">#</th>
+                          <th style="padding:8px 10px;">Thumbnail</th>
+                          <th style="padding:8px 10px;">Views</th>
+                          <th style="padding:8px 10px;">Date</th>
+                          <th style="padding:8px 10px;">Open Link</th>
+                          <th style="padding:8px 10px;">Download Link</th>
+                          <th style="padding:8px 10px;min-width:220px;">Audio Script</th>
+                        </tr></thead>
+                        <tbody id="ws-reels-tbody"></tbody>
+                      </table>
+                    </div>
+                  </div>
+
+                  <!-- Table 3: Posts (own inner scroll) -->
+                  <div id="ws-posts-section" style="display:none;border:1px solid var(--border);border-radius:6px;background:rgba(0,0,0,0.15);flex-direction:column;flex-shrink:0;">
+                    <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 10px;border-bottom:1px solid var(--border);flex-shrink:0;">
+                      <div style="font-size:11px;font-weight:700;color:var(--gold2);text-transform:uppercase;letter-spacing:.5px;"><i class="fas fa-newspaper" style="margin-right:5px;"></i>Posts <span id="ws-posts-count" style="color:var(--muted);font-weight:400;text-transform:none;"></span></div>
+                      <button class="btn btn-ghost btn-sm" id="ws-posts-export" onclick="wsExportPosts()" style="border:1px solid var(--border);font-size:11px;height:26px;"><i class="fas fa-file-excel" style="color:var(--green);margin-right:5px;"></i>Export Posts</button>
+                    </div>
+                    <div style="max-height:400px;overflow:auto;">
+                      <table class="ws-preview-table" id="ws-posts-table">
+                        <thead><tr style="background:var(--bg2);position:sticky;top:0;z-index:2;">
+                          <th style="padding:8px 10px;width:36px;">#</th>
+                          <th style="padding:8px 10px;">Media</th>
+                          <th style="padding:8px 10px;">Time</th>
+                          <th style="padding:8px 10px;min-width:280px;">Content</th>
+                          <th style="padding:8px 10px;">Hashtags</th>
+                          <th style="padding:8px 10px;">Likes</th>
+                        </tr></thead>
+                        <tbody id="ws-posts-tbody"></tbody>
+                      </table>
+                    </div>
+                  </div>
+
                 </div>
               </div>
 
@@ -15076,9 +15118,16 @@ Keep it concise and professional.`;
       document.getElementById('ws-patterns-panel').style.display = 'none';
       const snapCard = document.getElementById('ws-snapshot-card');
       if (snapCard) snapCard.style.display = 'none';
-      const reelsCard = document.getElementById('ws-reels-card');
-      if (reelsCard) reelsCard.style.display = 'none';
+      const reelsSection = document.getElementById('ws-reels-section');
+      if (reelsSection) reelsSection.style.display = 'none';
+      const reelsBody = document.getElementById('ws-reels-tbody');
+      if (reelsBody) reelsBody.innerHTML = '';
       _wsReels = [];
+      const postsSection = document.getElementById('ws-posts-section');
+      if (postsSection) postsSection.style.display = 'none';
+      const postsBody = document.getElementById('ws-posts-tbody');
+      if (postsBody) postsBody.innerHTML = '';
+      _wsPosts = [];
       document.getElementById('ws-patterns-list').innerHTML = '';
       document.getElementById('ws-dom-tree').innerHTML = '';
       document.getElementById('ws-m-status').textContent = 'Idle';
@@ -15133,6 +15182,12 @@ Keep it concise and professional.`;
           if (Array.isArray(data.reels) && data.reels.length) {
             wsShowReels(data.reels);
             wsLog(`Scraped ${data.reels.length} reel(s) — see "Reels" below.`, 'success');
+          }
+
+          // Show the scraped Posts list (time, media, content, hashtags, likes).
+          if (Array.isArray(data.posts) && data.posts.length) {
+            wsShowPosts(data.posts);
+            wsLog(`Scraped ${data.posts.length} post(s) — see "Posts" below.`, 'success');
           }
 
           // Facebook / profile pages: the server already extracted a clean
@@ -15233,35 +15288,137 @@ Keep it concise and professional.`;
       }
     }
 
-    /* ── Reels list (each with thumbnail, views, open link, download link) ── */
+    /* ── Reels table (thumbnail, views, open link, download link) ── */
     let _wsReels = [];
     function wsShowReels(reels) {
-      const card = document.getElementById('ws-reels-card');
-      const grid = document.getElementById('ws-reels-grid');
-      const cnt  = document.getElementById('ws-reels-count');
-      if (!card || !grid || !Array.isArray(reels) || reels.length === 0) return;
+      const section = document.getElementById('ws-reels-section');
+      const tbody   = document.getElementById('ws-reels-tbody');
+      const cnt     = document.getElementById('ws-reels-count');
+      if (!section || !tbody || !Array.isArray(reels) || reels.length === 0) return;
       _wsReels = reels;
 
-      grid.innerHTML = reels.map((r, i) => {
+      tbody.innerHTML = reels.map((r, i) => {
         const thumb = r.reel_thumbnail_url || r.download_link || '';
-        const views = r.reel_views ? `${wsEsc(r.reel_views)} views` : '';
-        const img = thumb
-          ? `<img src="${wsEsc(thumb)}" alt="reel ${i+1}" style="width:100%;aspect-ratio:9/16;object-fit:cover;display:block;background:#111;">`
-          : `<div style="width:100%;aspect-ratio:9/16;background:#111;"></div>`;
-        return `
-          <div style="border:1px solid var(--border);border-radius:6px;background:rgba(0,0,0,0.2);overflow:hidden;display:flex;flex-direction:column;">
-            <a href="${wsEsc(r.open_link||'#')}" target="_blank" rel="noopener" title="Open reel">${img}</a>
-            <div style="padding:5px 6px;display:flex;flex-direction:column;gap:3px;">
-              <span style="font-size:10px;color:var(--text2);"><i class="fas fa-eye" style="color:var(--muted);margin-right:3px;"></i>${views || '—'}</span>
-              <div style="display:flex;gap:6px;">
-                <a href="${wsEsc(r.open_link||'#')}" target="_blank" rel="noopener" style="font-size:10px;color:#59c2c9;text-decoration:none;" title="Open reel page"><i class="fas fa-external-link-alt"></i> Open</a>
-                ${r.download_link ? `<a href="${wsEsc(r.download_link)}" target="_blank" rel="noopener" download style="font-size:10px;color:var(--gold2);text-decoration:none;" title="Download thumbnail media"><i class="fas fa-download"></i> Download</a>` : ''}
-              </div>
-            </div>
-          </div>`;
+        const thumbCell = thumb
+          ? `<a href="${wsEsc(r.open_link||thumb)}" target="_blank" rel="noopener"><img src="${wsEsc(thumb)}" alt="reel ${i+1}" style="width:46px;height:80px;object-fit:cover;border-radius:4px;background:#111;display:block;"></a>`
+          : '—';
+        const views = r.reel_views ? `${wsEsc(r.reel_views)}` : '—';
+        const openCell = r.open_link
+          ? `<a href="${wsEsc(r.open_link)}" target="_blank" rel="noopener" style="color:#59c2c9;text-decoration:none;font-size:11px;" title="${wsEsc(r.open_link)}"><i class="fas fa-external-link-alt" style="margin-right:4px;"></i>Open reel</a>`
+          : '—';
+        const dlCell = r.download_link
+          ? `<a href="${wsEsc(r.download_link)}" target="_blank" rel="noopener" download style="color:var(--gold2);text-decoration:none;font-size:11px;" title="${wsEsc(r.download_link)}"><i class="fas fa-download" style="margin-right:4px;"></i>Download</a>`
+          : '—';
+        const dateCell = `<span id="ws-reel-date-${i}" style="font-size:11px;color:var(--text2);">${r.published_date ? wsEsc(r.published_date) : '—'}</span>`;
+        const scriptCell = `
+          <div id="ws-reel-script-${i}" style="font-size:10px;color:var(--text2);max-width:320px;max-height:70px;overflow:auto;">${r.audio_script ? wsEsc(r.audio_script) : ''}</div>
+          <button id="ws-reel-btn-${i}" onclick="wsTranscribeReel(${i})" class="btn btn-ghost btn-sm" style="border:1px solid var(--border);font-size:10px;height:24px;margin-top:3px;${r.audio_script ? 'display:none;' : ''}"><i class="fas fa-closed-captioning" style="margin-right:4px;"></i>Transcribe</button>`;
+        const cell = (c) => `<td style="padding:7px 10px;border-bottom:1px solid var(--border);vertical-align:middle;">${c}</td>`;
+        return `<tr>
+          <td style="padding:7px 10px;border-bottom:1px solid var(--border);color:var(--muted);">${i+1}</td>
+          ${cell(thumbCell)}
+          <td style="padding:7px 10px;border-bottom:1px solid var(--border);"><i class="fas fa-eye" style="color:var(--muted);margin-right:4px;"></i>${views}</td>
+          ${cell(dateCell)}
+          ${cell(openCell)}
+          ${cell(dlCell)}
+          <td style="padding:7px 10px;border-bottom:1px solid var(--border);vertical-align:top;">${scriptCell}</td>
+        </tr>`;
       }).join('');
       if (cnt) cnt.textContent = `(${reels.length})`;
-      card.style.display = '';
+      section.style.display = 'flex';
+    }
+
+    /* ── Posts table (time, media, content, hashtags, likes) ── */
+    let _wsPosts = [];
+    function wsShowPosts(posts) {
+      const section = document.getElementById('ws-posts-section');
+      const tbody   = document.getElementById('ws-posts-tbody');
+      const cnt     = document.getElementById('ws-posts-count');
+      if (!section || !tbody || !Array.isArray(posts) || posts.length === 0) return;
+      _wsPosts = posts;
+
+      tbody.innerHTML = posts.map((p, i) => {
+        let mediaCell = '—';
+        if (p.post_media_url) {
+          if (p.post_type === 'video') {
+            mediaCell = `<a href="${wsEsc(p.post_media_url)}" target="_blank" rel="noopener" style="color:#59c2c9;font-size:11px;text-decoration:none;"><i class="fas fa-play-circle" style="margin-right:4px;"></i>Video</a>`;
+          } else {
+            mediaCell = `<a href="${wsEsc(p.post_media_url)}" target="_blank" rel="noopener"><img src="${wsEsc(p.post_media_url)}" alt="post ${i+1}" style="width:64px;height:64px;object-fit:cover;border-radius:4px;background:#111;display:block;"></a>`;
+          }
+        }
+        const tags = (p.post_hashtags || '').trim()
+          ? `<span style="color:#7c9cff;font-size:10px;">${wsEsc(p.post_hashtags)}</span>` : '—';
+        const content = p.post_content
+          ? `<div style="font-size:11px;color:var(--text2);max-width:380px;max-height:90px;overflow:auto;white-space:pre-wrap;">${wsEsc(p.post_content)}</div>` : '—';
+        const td = (c, extra) => `<td style="padding:7px 10px;border-bottom:1px solid var(--border);vertical-align:top;${extra||''}">${c}</td>`;
+        return `<tr>
+          <td style="padding:7px 10px;border-bottom:1px solid var(--border);color:var(--muted);vertical-align:top;">${i+1}</td>
+          ${td(mediaCell)}
+          ${td(`<span style="font-size:11px;color:var(--text2);white-space:nowrap;">${p.post_timestamp ? wsEsc(p.post_timestamp) : '—'}</span>`)}
+          ${td(content)}
+          ${td(tags)}
+          ${td(`<span style="font-size:11px;"><i class="fas fa-thumbs-up" style="color:var(--muted);margin-right:4px;"></i>${p.post_likes_count ? wsEsc(p.post_likes_count) : '—'}</span>`)}
+        </tr>`;
+      }).join('');
+      if (cnt) cnt.textContent = `(${posts.length})`;
+      section.style.display = 'flex';
+    }
+
+    function wsExportPosts() {
+      if (!_wsPosts.length) { alert('No posts to export.'); return; }
+      try {
+        const rows = _wsPosts.map((p, i) => ({
+          '#': i + 1,
+          'Time': p.post_timestamp || '',
+          'Type': p.post_type || '',
+          'Content': p.post_content || '',
+          'Hashtags': p.post_hashtags || '',
+          'Likes': p.post_likes_count || '',
+          'Media URL': p.post_media_url || ''
+        }));
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(rows), 'Posts');
+        XLSX.writeFile(wb, `posts_${Date.now()}.xlsx`);
+        wsLog(`Exported ${rows.length} post(s) to Excel.`, 'success');
+      } catch (err) {
+        wsLog(`Posts export error: ${err.message}`, 'error');
+      }
+    }
+
+    /* ── Fetch the audio script (transcript) for one reel, on demand ── */
+    async function wsTranscribeReel(i) {
+      const reel = _wsReels[i];
+      if (!reel || !reel.open_link) return;
+      const btn    = document.getElementById(`ws-reel-btn-${i}`);
+      const script = document.getElementById(`ws-reel-script-${i}`);
+      const dateEl = document.getElementById(`ws-reel-date-${i}`);
+      if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin" style="margin-right:4px;"></i>Transcribing...'; }
+      wsLog(`Transcribing reel ${i+1} (opens browser, downloads audio, runs Whisper)...`, 'info');
+      try {
+        const res = await fetch(`${API_BASE}/scraper/reel-transcript`, {
+          method: 'POST',
+          headers: typeof getAuthHeaders === 'function' ? getAuthHeaders() : { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ reel_url: reel.open_link })
+        });
+        const data = await res.json().catch(() => ({}));
+        if (data.published_date && dateEl && dateEl.textContent === '—') {
+          dateEl.textContent = data.published_date;
+          reel.published_date = data.published_date;
+        }
+        if (data.success) {
+          reel.audio_script = data.audio_script || '';
+          if (script) script.textContent = reel.audio_script;
+          if (btn) btn.style.display = 'none';
+          wsLog(`Reel ${i+1} transcribed.`, 'success');
+        } else {
+          if (script) script.innerHTML = `<span style="color:var(--red2);">${wsEsc(data.error || 'Transcription failed.')}</span>`;
+          if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fas fa-redo" style="margin-right:4px;"></i>Retry'; }
+          wsLog(`Reel ${i+1} transcription failed: ${data.error || 'unknown'}`, 'error');
+        }
+      } catch (err) {
+        if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fas fa-redo" style="margin-right:4px;"></i>Retry'; }
+        wsLog(`Reel ${i+1} transcription error: ${err.message}`, 'error');
+      }
     }
 
     function wsExportReels() {
@@ -15271,9 +15428,11 @@ Keep it concise and professional.`;
           '#': i + 1,
           'Reel ID': r.reel_id || '',
           'Views': r.reel_views || '',
+          'Published Date': r.published_date || '',
           'Open Link': r.open_link || '',
           'Download Link': r.download_link || '',
-          'Thumbnail URL': r.reel_thumbnail_url || ''
+          'Thumbnail URL': r.reel_thumbnail_url || '',
+          'Audio Script': r.audio_script || ''
         }));
         const wb = XLSX.utils.book_new();
         XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(rows), 'Reels');
