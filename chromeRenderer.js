@@ -61,7 +61,7 @@ async function renderUrlWithChrome(url, options = {}) {
   const puppeteer = (await import('puppeteer')).default;
 
   const browser = await puppeteer.launch({
-    headless: 'new',
+    headless: false,
     args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage'],
   });
 

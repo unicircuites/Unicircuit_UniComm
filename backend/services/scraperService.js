@@ -1765,8 +1765,8 @@ async function fetchPublicPageHtml(url) {
   try {
     console.log(`[SCRAPER] Rendering URL with headless Chrome: ${url}`);
     const rendered = await renderUrlWithChrome(url, {
-      navigationTimeoutMs: 45000,
-      extraWaitMs: 1500,
+      navigationTimeoutMs: 60000,
+      extraWaitMs: 20000,
       autoScrollSteps: 8,
     });
 
