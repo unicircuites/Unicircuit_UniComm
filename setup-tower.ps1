@@ -1,4 +1,4 @@
-# UniComm Pro — Tower Server Setup & Startup Installer
+﻿# UniComm Pro — Tower Server Setup & Startup Installer
 # Run this script as Administrator on the Tower Server.
 # Usage: powershell -ExecutionPolicy Bypass -File .\setup-tower.ps1
 
@@ -94,8 +94,8 @@ $config["PORT"] = "8088"
 $config["HOST"] = "0.0.0.0"
 $config["SSL_KEY_PATH"] = "certs/server.key"
 $config["SSL_CERT_PATH"] = "certs/server.crt"
-$config["APP_PUBLIC_URL"] = "https://192.168.0.200:8088"
-$config["MS_REDIRECT_URI"] = "https://192.168.0.200:8088/auth/callback"
+$config["APP_PUBLIC_URL"] = "https://192.168.0.55:8088"
+$config["MS_REDIRECT_URI"] = "https://192.168.0.55:8088/auth/callback"
 $config["SMDR_PORT"] = "5001"
 $config["CTI_PORT"] = "4000"
 
@@ -141,12 +141,12 @@ if (-not (Test-Path $openssl)) {
 
 if ($openssl) {
     Write-Host "Using OpenSSL to generate modern certificates: $openssl" -ForegroundColor Gray
-    & $openssl req -x509 -nodes -days 3650 -newkey rsa:2048 -keyout $certKey -out $certCrt -subj "/CN=192.168.0.200" 2>$null
+    & $openssl req -x509 -nodes -days 3650 -newkey rsa:2048 -keyout $certKey -out $certCrt -subj "/CN=192.168.0.55" 2>$null
     Write-Host "Self-signed certificate generated in backend/certs/" -ForegroundColor Green
 } else {
     Write-Host "WARNING: OpenSSL was not found. Attempting to create certificate via PowerShell fallback..." -ForegroundColor Yellow
     # Self-signed certificate fallback via PowerShell
-    $cert = New-SelfSignedCertificate -DnsName "192.168.0.200" -CertStoreLocation "cert:\LocalMachine\My" -NotAfter (Get-Date).AddYears(10)
+    $cert = New-SelfSignedCertificate -DnsName "192.168.0.55" -CertStoreLocation "cert:\LocalMachine\My" -NotAfter (Get-Date).AddYears(10)
     
     # Export certificate & private key (requires password)
     $pwd = ConvertTo-SecureString -String "unicomm" -Force -AsPlainText
@@ -213,6 +213,6 @@ Write-Host "`n=========================================================" -Foregr
 Write-Host "             SETUP COMPLETED SUCCESSFULLY!                " -ForegroundColor Green
 Write-Host "=========================================================" -ForegroundColor Green
 Write-Host "You can access the CRM locally at: https://localhost:8088" -ForegroundColor Gray
-Write-Host "Or on the LAN network at: https://192.168.0.200:8088" -ForegroundColor Gray
+Write-Host "Or on the LAN network at: https://192.168.0.55:8088" -ForegroundColor Gray
 Write-Host "All media files and backups are redirected to your OneDrive folder." -ForegroundColor Gray
 Write-Host "=========================================================" -ForegroundColor Green

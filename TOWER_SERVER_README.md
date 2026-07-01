@@ -1,6 +1,6 @@
-# 🚀 UniComm Pro — Tower Server Quick Start & Setup Guide
+﻿# 🚀 UniComm Pro — Tower Server Quick Start & Setup Guide
 
-This guide describes how to deploy the UniComm Pro CRM service on your freshly formatted **Tower Server (IP: 192.168.0.200)** from scratch.
+This guide describes how to deploy the UniComm Pro CRM service on your freshly formatted **Tower Server (IP: 192.168.0.55)** from scratch.
 
 > [!NOTE]
 > n8n is a developer-machine-only workflow editor for this project. It runs locally at `http://localhost:5678` when you run `npm start` on your dev machine. It is not installed or started on the Tower server.
@@ -64,12 +64,12 @@ pm2 status
 
 Open your web browser (on the server or any PC on the same network) and go to:
 
-* **UniComm CRM Portal**: `https://192.168.0.200:8088`
+* **UniComm CRM Portal**: `https://192.168.0.55:8088`
 
 The n8n automation console is only available on a dev machine at `http://localhost:5678` after running `npm start` locally.
 
 > [!NOTE]
-> Since we use a self-signed SSL certificate for network security, your browser will show an **"Unsafe Connection / Certificate Invalid"** warning the first time you load the page. Click **Advanced** ⮕ **Proceed to 192.168.0.200 (unsafe)** to open the dashboard. This is normal and expected for local servers.
+> Since we use a self-signed SSL certificate for network security, your browser will show an **"Unsafe Connection / Certificate Invalid"** warning the first time you load the page. Click **Advanced** ⮕ **Proceed to 192.168.0.55 (unsafe)** to open the dashboard. This is normal and expected for local servers.
 
 ---
 
@@ -96,7 +96,7 @@ Run these commands inside `C:\setup0\Unicircuit_UniComm` to manage the server:
 
 ### 2. Matrix PBX call logs are not showing up
 
-* Open the **Matrix Jeeves Portal** (`https://192.168.0.81:1026`) and verify that the **Destination IP Address** under `SMDR Settings` is set to the Tower Server's IP: `192.168.0.200` and Port: `5001`.
+* Open the **Matrix Jeeves Portal** (`https://192.168.0.81:1026`) and verify that the **Destination IP Address** under `SMDR Settings` is set to the Tower Server's IP: `192.168.0.55` and Port: `5001`.
 * Ensure that the PBX SMDR port is allowed through the firewall. If needed, re-run the firewall command:
   ```powershell
   netsh advfirewall firewall add rule name="Matrix PBX SMDR 5001" dir=in action=allow protocol=TCP localport=5001

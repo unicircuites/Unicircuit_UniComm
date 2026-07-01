@@ -1,4 +1,4 @@
-# UniComm Pro — Tower Server Prerequisite Installer & Bootstrap Script
+﻿# UniComm Pro — Tower Server Prerequisite Installer & Bootstrap Script
 # Copy this script to the Tower Server, open PowerShell as Administrator, and run it.
 # Usage: powershell -ExecutionPolicy Bypass -File .\bootstrap-tower.ps1
 
@@ -189,5 +189,5 @@ try {
 Write-Host "`n=========================================================" -ForegroundColor Green
 Write-Host "         BOOTSTRAP INSTALLATION COMPLETED!                " -ForegroundColor Green
 Write-Host "=========================================================" -ForegroundColor Green
-Write-Host "You can now test the server at: https://192.168.0.200:8088" -ForegroundColor Gray
+Write-Host "You can now test the server at: https://192.168.0.55:8088" -ForegroundColor Gray
 Write-Host "=========================================================" -ForegroundColor Green

@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="en">
 
 <head>
@@ -5452,7 +5452,7 @@
                   <option value="pbx">PBX</option>
                   <option value="whatsapp">WhatsApp</option>
                 </select>
-                <button class="btn btn-ghost btn-sm" onclick="loadLeads()"><i class="fas fa-sync-alt"></i> Refresh</button>
+                <button class="btn btn-ghost btn-sm" onclick="_leadsCurrentPage=1; loadLeads()"><i class="fas fa-sync-alt"></i> Refresh</button>
                 <button class="btn btn-gold btn-sm" onclick="openLeadModal()"><i class="fas fa-plus"></i> Add Lead</button>
               </div>
             </div>
@@ -7788,353 +7788,200 @@
           </div>
         </div>
 
-        <!-- ─── WEB SCRAPER SECTION ──────────────────────────────────────────────── -->
+        <!-- \u2500\u2500\u2500 WEB SCRAPER SECTION \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500 -->
         <div class="section-view fu" id="sec-webscraper">
-          <div style="display: grid; grid-template-columns: 380px 1fr; gap: 20px; height: calc(100vh - 140px); overflow: hidden;">
-            
-            <!-- Left Panel: Scraper Controls & Inputs -->
-            <div style="display: flex; flex-direction: column; gap: 16px; height: 100%; min-height: 0; overflow-y: auto; padding-right: 4px;">
-              
-              <div class="card" style="background: var(--bg3); border: 1px solid var(--border2); border-radius: 12px; padding: 20px; display: flex; flex-direction: column; max-height: 480px;">
-                <div style="font-size: 14px; font-weight: 600; color: var(--text); margin-bottom: 16px; display: flex; align-items: center; gap: 8px; flex-shrink: 0;">
-                  <i class="fas fa-spider" style="color: var(--gold);"></i> Web Scraper Config
-                </div>
-                
-                <!-- Scrollable fields wrapper -->
-                <div style="flex: 1; overflow-y: auto; padding-right: 6px; margin-bottom: 12px; min-height: 0;">
-                
-                <div style="display:flex; gap:8px; margin-bottom:12px;">
-                  <button type="button" id="scrape-mode-manual" class="btn btn-primary btn-sm" onclick="setWebScrapeMode('manual_html')" style="flex:1; justify-content:center; height:32px;">
-                    <i class="fas fa-file-code" style="margin-right:6px;"></i> Paste HTML
-                  </button>
-                  <button type="button" id="scrape-mode-url" class="btn btn-ghost btn-sm" onclick="setWebScrapeMode('url')" style="flex:1; justify-content:center; height:32px; border:1px solid var(--border2);">
-                    <i class="fas fa-link" style="margin-right:6px;"></i> Public URL
-                  </button>
-                </div>
+          <style>
+            /* ===== SCRAPER PANEL STYLES ===== */
+            .ws-shell { display:grid; grid-template-columns:390px 1fr; gap:18px; height:calc(100vh - 140px); overflow:hidden; }
+            .ws-left  { display:flex; flex-direction:column; gap:14px; height:100%; min-height:0; overflow-y:auto; padding-right:4px; }
+            .ws-right { display:flex; flex-direction:column; gap:14px; height:100%; min-height:0; overflow:hidden; }
+            .ws-card  { background:var(--bg3); border:1px solid var(--border2); border-radius:12px; padding:18px; }
 
-                <div id="scrape-mode-note" style="font-size: 10px; color: var(--muted2); margin-bottom: 12px; line-height: 1.45; padding: 10px 12px; border: 1px solid var(--border2); border-radius: 8px; background: rgba(212,175,55,0.06);">
-                  Paste HTML is the recommended mode. For authenticated or 2FA-protected pages, open the page in your own browser, complete login, then copy <strong style="color:var(--gold2);">View Page Source</strong> into this tab.
-                </div>
+            /* Step badges */
+            .ws-step-badge { display:inline-flex; align-items:center; justify-content:center; width:22px; height:22px; border-radius:50%; background:var(--gold); color:#000; font-size:11px; font-weight:800; flex-shrink:0; }
+            .ws-step-title { font-size:13px; font-weight:700; color:var(--text); display:flex; align-items:center; gap:8px; margin-bottom:12px; }
 
-                <div id="url-specific-fields">
-                <div class="form-group" style="margin-bottom: 12px;">
-                  <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
-                    <label class="form-label" style="font-size: 11px; color: var(--muted); font-weight: 600; text-transform: uppercase; margin: 0;">Target URL</label>
-                    <button id="btn-analyze-url" class="btn btn-ghost" onclick="analyzeTargetURL()" style="color: var(--gold); border: 1px solid rgba(212,175,55,0.3); padding: 2px 6px; font-size: 9px; border-radius: 4px; display: inline-flex; align-items: center; gap: 4px; height: auto; cursor: pointer; background: transparent;">
-                      <i class="fas fa-magic"></i> Preview Public Page
-                    </button>
-                  </div>
-                  <input class="inp" id="scrape-url" placeholder="https://example.com/leads" style="font-size: 12px; padding: 8px 12px;" value="https://example.com/leads" />
-                  <div style="font-size: 10px; color: var(--muted2); margin-top: 4px; line-height: 1.4;">
-                    Public URL mode uses headless Chrome to render JS-heavy pages, then AI-extracts all repeating record types. For login / 2FA pages, switch to <strong style="color: var(--gold2);">Paste HTML</strong>.
-                  </div>
-                </div>
+            /* DOM tree */
+            .dom-tree-wrap { max-height:220px; overflow-y:auto; font-family:monospace; font-size:11px; color:var(--text2); background:rgba(0,0,0,0.3); border:1px solid var(--border); border-radius:6px; padding:8px; line-height:1.6; }
+            .dom-node { cursor:default; padding:1px 0 1px 12px; border-left:1px solid rgba(255,255,255,0.05); }
+            .dom-node:hover { background:rgba(212,175,55,0.06); }
+            .dom-tag { color:var(--gold2); font-weight:600; }
+            .dom-attr { color:#7dd3fc; }
+            .dom-val  { color:#86efac; }
+            .dom-count-badge { font-size:9px; background:rgba(212,175,55,0.15); border:1px solid rgba(212,175,55,0.3); color:var(--gold2); padding:1px 5px; border-radius:4px; margin-left:4px; }
 
-                <!-- Start & End Points -->
-                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px;">
-                  <div class="form-group">
-                    <label class="form-label" style="font-size: 11px; color: var(--muted); font-weight: 600; text-transform: uppercase;">Start Page</label>
-                    <input class="inp" type="number" id="scrape-start" value="1" min="1" style="font-size: 12px; padding: 8px 12px;" />
-                  </div>
-                  <div class="form-group">
-                    <label class="form-label" style="font-size: 11px; color: var(--muted); font-weight: 600; text-transform: uppercase;">End Page</label>
-                    <input class="inp" type="number" id="scrape-end" value="3" min="1" style="font-size: 12px; padding: 8px 12px;" />
-                  </div>
-                </div>
+            /* Pattern cards */
+            .pattern-card { border:1px solid var(--border2); border-radius:8px; padding:12px; background:rgba(0,0,0,0.18); margin-bottom:10px; }
+            .pattern-card.selected { border-color:var(--gold); background:rgba(212,175,55,0.05); }
+            .pattern-header { display:flex; align-items:center; gap:8px; margin-bottom:8px; }
+            .pattern-name { font-size:12px; font-weight:700; color:var(--gold2); }
+            .pattern-meta  { font-size:10px; color:var(--muted); }
+            .pattern-fields { display:flex; flex-wrap:wrap; gap:6px; margin-top:8px; }
+            .pf-chip { display:inline-flex; align-items:center; gap:5px; padding:3px 8px; border:1px solid var(--border2); border-radius:5px; font-size:10px; color:var(--text2); background:rgba(0,0,0,0.2); cursor:pointer; transition:all 0.15s; }
+            .pf-chip:hover { border-color:var(--gold); color:var(--gold); }
+            .pf-chip input[type=checkbox] { margin:0; cursor:pointer; }
+            .pf-chip.checked { border-color:var(--gold); background:rgba(212,175,55,0.1); color:var(--gold2); }
 
-                <!-- Pagination Parameter -->
-                <div style="display: flex; gap: 12px; align-items: center; margin-bottom: 12px; background: rgba(255,255,255,0.02); padding: 8px; border-radius: 6px;">
-                  <div style="display: flex; align-items: center; gap: 6px;">
-                    <input type="checkbox" id="scrape-page-enabled" checked style="cursor: pointer; width: 15px; height: 15px;" />
-                    <label for="scrape-page-enabled" style="font-size: 11px; color: var(--text2); font-weight: 600; cursor: pointer; text-transform: uppercase;">Pagination</label>
-                  </div>
-                  <input class="inp" id="scrape-page-param" value="page" placeholder="page" style="font-size: 12px; padding: 4px 8px; flex: 1;" />
-                </div>
-                </div>
+            /* Metrics */
+            .ws-metrics { display:grid; grid-template-columns:repeat(4,1fr); gap:10px; flex-shrink:0; }
+            .ws-metric-card { padding:12px; background:var(--bg3); border:1px solid var(--border2); border-radius:10px; display:flex; align-items:center; gap:10px; }
+            .ws-metric-icon { width:32px; height:32px; border-radius:7px; display:flex; align-items:center; justify-content:center; font-size:14px; flex-shrink:0; }
+            .ws-metric-label { font-size:9px; color:var(--muted); font-weight:600; text-transform:uppercase; }
+            .ws-metric-val   { font-size:13px; font-weight:700; color:var(--text); }
 
-                <div id="advanced-selector-fields">
-                <!-- DOM SELECTORS (Item, Start, End, Pagination Bar Selector) -->
-                <div style="background: rgba(39, 150, 196, 0.04); border: 1px solid var(--border2); padding: 12px; border-radius: 8px; margin-bottom: 12px; display: flex; flex-direction: column; gap: 10px;">
-                  <div style="font-size: 11px; font-weight: 700; color: var(--gold2); letter-spacing: 0.4px; text-transform: uppercase;">
-                    <i class="fas fa-code"></i> DOM Selector Boundaries
-                  </div>
-                  
-                  <div class="form-group">
-                    <label class="form-label" style="font-size: 10px; color: var(--muted); font-weight: 600; text-transform: uppercase;">Item Container Selector</label>
-                    <input class="inp" id="scrape-item-selector" placeholder="e.g. .lead-row, tr, div.card" style="font-size: 11px; padding: 6px 10px;" />
-                  </div>
-                  
-                  <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
-                    <div class="form-group">
-                      <label class="form-label" style="font-size: 10px; color: var(--muted); font-weight: 600; text-transform: uppercase;">Start Selector</label>
-                      <input class="inp" id="scrape-start-selector" placeholder="e.g. #start-lead" style="font-size: 11px; padding: 6px 10px;" />
-                    </div>
-                    <div class="form-group">
-                      <label class="form-label" style="font-size: 10px; color: var(--muted); font-weight: 600; text-transform: uppercase;">End Selector</label>
-                      <input class="inp" id="scrape-end-selector" placeholder="e.g. #end-lead" style="font-size: 11px; padding: 6px 10px;" />
-                    </div>
-                  </div>
+            /* Preview table */
+            .ws-preview-table { width:100%; border-collapse:collapse; font-size:11px; }
+            .ws-preview-table th { padding:8px 10px; background:var(--bg2); border:1px solid var(--border); color:var(--text2); font-weight:600; text-align:left; white-space:nowrap; }
+            .ws-preview-table td { padding:7px 10px; border:1px solid var(--border); color:var(--text); word-break:break-word; }
+            .ws-preview-table tr:hover td { background:rgba(212,175,55,0.04); }
 
-                  <div class="form-group">
-                    <label class="form-label" style="font-size: 10px; color: var(--muted); font-weight: 600; text-transform: uppercase;">Pagination Bar Selector</label>
-                    <input class="inp" id="scrape-pagination-selector" placeholder="e.g. .pagination, nav.pages" style="font-size: 11px; padding: 6px 10px;" />
-                  </div>
-                </div>
-                </div>
+            /* Logs console */
+            .ws-console { font-family:'Consolas','Monaco',monospace; font-size:11px; color:#a6b2c9; overflow-y:auto; flex:1; white-space:pre-wrap; word-break:break-all; padding:6px; background:rgba(0,0,0,0.4); border-radius:4px; border:1px solid var(--border); margin:0; }
 
-                <!-- Fields List -->
-                <div class="form-group" style="margin-bottom: 12px;">
-                  <label class="form-label" style="font-size: 11px; color: var(--muted); font-weight: 600; text-transform: uppercase;">Fields to Scrape (comma-separated)</label>
-                  <input class="inp" id="scrape-fields" value="name, company, email, phone, address" placeholder="name, company, email, phone" style="font-size: 12px; padding: 8px 12px;" />
-                </div>
+            /* Upload zone */
+            .ws-drop-zone { border:2px dashed var(--border2); border-radius:8px; padding:14px; text-align:center; background:rgba(0,0,0,0.2); cursor:pointer; transition:border-color 0.2s; }
+            .ws-drop-zone:hover { border-color:var(--gold); }
+          </style>
 
-                <div id="buffer-fields">
-                <!-- Buffer and Scroll -->
-                <div class="form-group" style="margin-bottom: 12px;">
-                  <label class="form-label" style="font-size: 11px; color: var(--muted); font-weight: 600; text-transform: uppercase;">Buffer Reload Delay (ms)</label>
-                  <input class="inp" type="number" id="scrape-buffer" value="1500" placeholder="e.g. 1500" style="font-size: 12px; padding: 8px 12px;" />
-                </div>
-                </div>
+          <div class="ws-shell">
 
-                <!-- Checkboxes for optional settings -->
-                <div style="display: flex; flex-direction: column; gap: 8px; margin-bottom: 16px; background: rgba(0,0,0,0.15); padding: 12px; border-radius: 8px; border: 1px solid var(--border);">
-                  <div style="display: flex; align-items: center; gap: 8px;">
-                    <input type="checkbox" id="scrape-expand" checked style="cursor: pointer;" />
-                    <label for="scrape-expand" style="font-size: 12px; color: var(--text2); cursor: pointer;">Expand hidden "Read More" text</label>
-                  </div>
-                  <div style="display: flex; align-items: center; gap: 8px;">
-                    <input type="checkbox" id="scrape-translate" checked style="cursor: pointer;" />
-                    <label for="scrape-translate" style="font-size: 12px; color: var(--text2); cursor: pointer;">Translate to English (Auto)</label>
-                  </div>
-                  <div style="font-size: 10px; color: var(--muted); font-weight: 600; margin-top: 4px; border-top: 1px solid var(--border); padding-top: 4px;">FORMATTERS</div>
-                  
-                  <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
-                    <div style="display: flex; align-items: center; gap: 6px;">
-                      <input type="checkbox" id="format-text" checked style="cursor: pointer;" />
-                      <label for="format-text" style="font-size: 11px; color: var(--text2); cursor: pointer;">Text</label>
-                    </div>
-                    <div style="display: flex; align-items: center; gap: 6px;">
-                      <input type="checkbox" id="format-date" checked style="cursor: pointer;" />
-                      <label for="format-date" style="font-size: 11px; color: var(--text2); cursor: pointer;">Date</label>
-                    </div>
-                    <div style="display: flex; align-items: center; gap: 6px;">
-                      <input type="checkbox" id="format-number" checked style="cursor: pointer;" />
-                      <label for="format-number" style="font-size: 11px; color: var(--text2); cursor: pointer;">Number</label>
-                    </div>
-                  </div>
-                </div>
-                </div> <!-- End of scrollable fields wrapper -->
+            <!-- ===== LEFT PANEL ===== -->
+            <div class="ws-left">
 
-                <!-- Buttons -->
-                <div style="display: flex; gap: 10px; flex-shrink: 0;">
-                  <button class="btn btn-secondary" id="btn-discover-url" onclick="discoverFieldsFromUrl()" style="flex: 1; justify-content: center; height: 38px;">
-                    <i class="fas fa-search" style="margin-right: 6px;"></i> AI Discover Variable Fields
-                  </button>
-                  <button class="btn" id="btn-stop-scrape" onclick="stopWebScrape()" style="background: var(--red); color: white; flex: 1; justify-content: center; height: 38px;" disabled>
-                    <i class="fas fa-stop" style="margin-right: 6px;"></i> Stop
-                  </button>
+              <!-- STEP 1: Input HTML -->
+              <div class="ws-card">
+                <div class="ws-step-title">
+                  <span class="ws-step-badge">1</span>
+                  Paste or Upload HTML Source
                 </div>
+                <div style="font-size:10px;color:var(--muted2);margin-bottom:10px;line-height:1.45;padding:8px 10px;border:1px solid var(--border2);border-radius:6px;background:rgba(212,175,55,0.05);">
+                  Open the Facebook/website page in your browser, press <strong style="color:var(--gold2);">Ctrl+U</strong> (View Source), select all, copy and paste below. Or upload the saved <code>.html</code> file.
+                </div>
+                <div class="ws-drop-zone" onclick="document.getElementById('ws-file-input').click()" style="margin-bottom:10px;">
+                  <i class="fas fa-cloud-upload-alt" style="font-size:22px;color:var(--muted);display:block;margin-bottom:4px;"></i>
+                  <div style="font-size:11px;color:var(--text2);font-weight:500;">Click to upload <code>.html</code> / <code>.txt</code></div>
+                  <input type="file" id="ws-file-input" accept=".html,.htm,.txt" style="display:none;" onchange="wsHandleFileUpload(event)">
+                </div>
+                <div style="font-size:10px;color:var(--muted);text-align:center;font-weight:600;margin-bottom:8px;">— OR PASTE HTML BELOW —</div>
+                <textarea id="ws-html-input" class="inp" placeholder="Paste &lt;html&gt; source here..." style="font-family:monospace;font-size:10px;height:120px;resize:vertical;padding:8px;background:rgba(0,0,0,0.3);border:1px solid var(--border);"></textarea>
+                <div style="display:flex;gap:8px;margin-top:10px;">
+                  <input class="inp" id="ws-source-url" placeholder="Source URL (optional, e.g. https://fb.com/...)" style="flex:1;font-size:11px;padding:6px 10px;">
+                </div>
+                <button class="btn btn-secondary" onclick="wsAnalyzeDOM()" style="width:100%;justify-content:center;height:36px;margin-top:10px;">
+                  <i class="fas fa-sitemap" style="margin-right:6px;"></i> Analyze DOM &amp; Detect Patterns
+                </button>
               </div>
 
-              <!-- Card 2: Upload/Paste HTML Document -->
-              <div class="card" style="background: var(--bg3); border: 1px solid var(--border2); border-radius: 12px; padding: 20px; max-height: 300px; overflow-y: auto; display: flex; flex-direction: column;">
-                <div style="font-size: 14px; font-weight: 600; color: var(--text); margin-bottom: 12px; display: flex; align-items: center; justify-content: space-between;">
-                  <span><i class="fas fa-file-code" style="color: var(--gold); margin-right: 6px;"></i>Authenticated Page Helper</span>
-                  <span style="font-size: 10px; color: var(--muted); border: 1px solid var(--border); padding: 2px 6px; border-radius: 4px;">RECOMMENDED</span>
+              <!-- STEP 2: DOM Map -->
+              <div class="ws-card" id="ws-dom-card" style="display:none;">
+                <div class="ws-step-title">
+                  <span class="ws-step-badge">2</span>
+                  DOM Structure Map
                 </div>
-                <p style="font-size: 11px; color: var(--muted2); margin-top: 0; margin-bottom: 12px; line-height: 1.4;">
-                  This is the Base44-style workflow for login / 2FA pages: paste HTML, click <strong style="color:var(--gold2);">AI Discover Variable Fields</strong>, choose which repeating fields to scrape, then click <strong style="color:var(--gold2);">Scrape Data</strong>.
-                </p>
-
-                <!-- Drop area / Upload button -->
-                <div style="display: flex; flex-direction: column; gap: 10px;">
-                  <input class="inp" id="manual-html-source-url" placeholder="Optional source URL for reference, e.g. https://example.com/account" style="font-size: 11px; padding: 8px 10px;" />
-                  <div style="border: 2px dashed var(--border2); border-radius: 8px; padding: 12px; text-align: center; background: rgba(0,0,0,0.2); cursor: pointer; position: relative;" onclick="document.getElementById('html-file-input').click()">
-                    <i class="fas fa-cloud-upload-alt" style="font-size: 20px; color: var(--muted); margin-bottom: 4px;"></i>
-                    <div style="font-size: 11px; color: var(--text2); font-weight: 500;">Click to upload HTML File</div>
-                    <input type="file" id="html-file-input" accept=".html,.txt" style="display: none;" onchange="handleHtmlFileUpload(event)" />
-                  </div>
-
-                  <div style="font-size: 10px; color: var(--muted); text-align: center; font-weight: 600;">— OR PASTE HTML —</div>
-
-                  <textarea class="inp" id="html-paste-area" placeholder="Paste <html> source code here..." style="font-family: monospace; font-size: 11px; height: 80px; resize: vertical; padding: 8px; background: rgba(0,0,0,0.3); border: 1px solid var(--border);"></textarea>
-
-                  <button class="btn btn-secondary btn-sm" onclick="discoverFieldsFromHTML()" style="justify-content: center; height: 32px; border: 1px solid var(--border2);">
-                    <i class="fas fa-search" style="margin-right: 6px;"></i> AI Discover Variable Fields
-                  </button>
-                </div>
+                <div style="font-size:10px;color:var(--muted2);margin-bottom:8px;">All tags &amp; attributes found. Repeated patterns are highlighted — these are your variable fields.</div>
+                <div class="dom-tree-wrap" id="ws-dom-tree"></div>
               </div>
 
-            </div>
-
-            <!-- Right Panel: Status, Metrics, Summary, Logs, Data Table -->
-            <div style="display: flex; flex-direction: column; gap: 16px; height: 100%; min-height: 0; overflow: hidden;">
-              
-              <!-- Metrics Dashboard -->
-              <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px;">
-                <div class="card" style="padding: 14px; background: var(--bg3); border: 1px solid var(--border2); display: flex; align-items: center; gap: 12px;">
-                  <div style="width: 36px; height: 36px; border-radius: 8px; display: flex; align-items: center; justify-content: center; background: rgba(39, 150, 196, 0.15); color: var(--gold); font-size: 16px;">
-                    <i class="fas fa-info-circle"></i>
-                  </div>
-                  <div>
-                    <div style="font-size: 10px; color: var(--muted); font-weight: 600; text-transform: uppercase;">Scraper Status</div>
-                    <div id="scrape-metric-status" style="font-size: 14px; font-weight: 700; color: var(--text);">Idle</div>
-                  </div>
+              <!-- STEP 3: Scrape button -->
+              <div class="ws-card" id="ws-scrape-card" style="display:none;">
+                <div class="ws-step-title">
+                  <span class="ws-step-badge">3</span>
+                  Scrape Selected Fields
                 </div>
+                <div style="font-size:10px;color:var(--muted2);margin-bottom:12px;">Check the fields you want, then click Scrape Data to extract all records.</div>
+                <button class="btn btn-gold" id="ws-btn-scrape" onclick="wsStartScrape()" style="width:100%;justify-content:center;height:38px;">
+                  <i class="fas fa-spider" style="margin-right:6px;"></i> Scrape Data
+                </button>
+                <button class="btn btn-ghost btn-sm" onclick="wsReset()" style="width:100%;justify-content:center;margin-top:8px;">
+                  <i class="fas fa-redo" style="margin-right:6px;"></i> Reset / Start Over
+                </button>
+              </div>
 
-                <div class="card" style="padding: 14px; background: var(--bg3); border: 1px solid var(--border2); display: flex; align-items: center; gap: 12px;">
-                  <div style="width: 36px; height: 36px; border-radius: 8px; display: flex; align-items: center; justify-content: center; background: rgba(16, 185, 129, 0.15); color: var(--green); font-size: 16px;">
-                    <i class="fas fa-database"></i>
-                  </div>
-                  <div>
-                    <div style="font-size: 10px; color: var(--muted); font-weight: 600; text-transform: uppercase;">Collected So Far</div>
-                    <div id="scrape-metric-collected" style="font-size: 14px; font-weight: 700; color: var(--green);">0 records</div>
-                  </div>
+            </div><!-- /ws-left -->
+
+            <!-- ===== RIGHT PANEL ===== -->
+            <div class="ws-right">
+
+              <!-- Metrics Row -->
+              <div class="ws-metrics" style="flex-shrink:0;">
+                <div class="ws-metric-card">
+                  <div class="ws-metric-icon" style="background:rgba(212,175,55,0.15);color:var(--gold);"><i class="fas fa-info-circle"></i></div>
+                  <div><div class="ws-metric-label">Status</div><div class="ws-metric-val" id="ws-m-status">Idle</div></div>
                 </div>
-
-                <div class="card" style="padding: 14px; background: var(--bg3); border: 1px solid var(--border2); display: flex; align-items: center; gap: 12px;">
-                  <div style="width: 36px; height: 36px; border-radius: 8px; display: flex; align-items: center; justify-content: center; background: rgba(59, 130, 246, 0.15); color: var(--blue); font-size: 16px;">
-                    <i class="fas fa-copy"></i>
-                  </div>
-                  <div>
-                    <div style="font-size: 10px; color: var(--muted); font-weight: 600; text-transform: uppercase;" id="scrape-metric-page-label">Current Page</div>
-                    <div id="scrape-metric-page" style="font-size: 14px; font-weight: 700; color: var(--blue);">Page -</div>
-                  </div>
+                <div class="ws-metric-card">
+                  <div class="ws-metric-icon" style="background:rgba(16,185,129,0.15);color:var(--green);"><i class="fas fa-layer-group"></i></div>
+                  <div><div class="ws-metric-label">Patterns Found</div><div class="ws-metric-val" id="ws-m-patterns">0</div></div>
                 </div>
-
-                <div class="card" style="padding: 14px; background: var(--bg3); border: 1px solid var(--border2); display: flex; align-items: center; gap: 12px;">
-                  <div style="width: 36px; height: 36px; border-radius: 8px; display: flex; align-items: center; justify-content: center; background: rgba(139, 92, 246, 0.15); color: var(--purple); font-size: 16px;">
-                    <i class="fas fa-file-excel"></i>
-                  </div>
+                <div class="ws-metric-card">
+                  <div class="ws-metric-icon" style="background:rgba(59,130,246,0.15);color:var(--blue);"><i class="fas fa-database"></i></div>
+                  <div><div class="ws-metric-label">Records Scraped</div><div class="ws-metric-val" id="ws-m-records">0</div></div>
+                </div>
+                <div class="ws-metric-card">
+                  <div class="ws-metric-icon" style="background:rgba(139,92,246,0.15);color:var(--purple);"><i class="fas fa-file-excel"></i></div>
                   <div>
-                    <div style="font-size: 10px; color: var(--muted); font-weight: 600; text-transform: uppercase;">Excel Export</div>
-                    <div>
-                      <button class="btn btn-ghost btn-sm" onclick="exportCollectedToExcel()" id="btn-export-excel" style="padding: 2px 6px; font-size: 11px; border: 1px solid var(--border); height: 20px; display: none;">
-                        <i class="fas fa-download"></i> Save .XLSX
-                      </button>
-                      <span id="export-excel-disabled" style="font-size: 11px; color: var(--muted);">No Data</span>
-                    </div>
+                    <div class="ws-metric-label">Export</div>
+                    <button class="btn btn-ghost btn-sm" onclick="wsExportExcel()" id="ws-btn-export" style="display:none;padding:2px 8px;font-size:10px;border:1px solid var(--border);height:20px;"><i class="fas fa-download"></i> .XLSX</button>
+                    <span id="ws-export-disabled" style="font-size:11px;color:var(--muted);">No Data</span>
                   </div>
                 </div>
               </div>
 
-              <!-- Report Summary & Logs -->
-              <div style="display: grid; grid-template-columns: 1fr 340px; gap: 16px; min-height: 150px; max-height: 220px; overflow: hidden;">
-                
-                <!-- Live Scraper Console Logs -->
-                <div class="card" style="background: #070913; border: 1px solid var(--border2); padding: 12px; display: flex; flex-direction: column; height: 100%;">
-                  <div style="font-size: 11px; font-weight: 600; color: var(--muted); margin-bottom: 6px; display: flex; justify-content: space-between; align-items: center;">
-                    <span><i class="fas fa-terminal"></i> SCRAPE ENGINE LOGS</span>
-                    <a href="#" onclick="clearScraperLogs(); return false;" style="color: var(--gold); text-decoration: none; font-size: 10px;">Clear</a>
-                  </div>
-                  <pre id="scraper-console-logs" style="margin: 0; font-family: 'Consolas', 'Monaco', monospace; font-size: 11px; color: #a6b2c9; overflow-y: auto; flex: 1; white-space: pre-wrap; word-break: break-all; padding: 6px; background: rgba(0,0,0,0.4); border-radius: 4px; border: 1px solid var(--border);"></pre>
+              <!-- Patterns + Fields picker (shown after analysis) -->
+              <div id="ws-patterns-panel" style="display:none;flex-shrink:0;max-height:300px;overflow-y:auto;" class="ws-card">
+                <div class="ws-step-title" style="margin-bottom:8px;">
+                  <i class="fas fa-repeat" style="color:var(--gold);"></i> Repeated Patterns (Variable Fields)
+                  <span style="font-size:10px;font-weight:400;color:var(--muted);margin-left:4px;">— check the fields you want to extract</span>
                 </div>
+                <div id="ws-patterns-list"></div>
+              </div>
 
-                <!-- Field Collection Report Card -->
-                <div class="card" style="background: var(--bg3); border: 1px solid var(--border2); padding: 14px; display: flex; flex-direction: column; justify-content: space-between; height: 100%;">
-                  <div>
-                    <div style="font-size: 12px; font-weight: 600; color: var(--text); margin-bottom: 10px;">
-                      <i class="fas fa-file-contract" style="color: var(--gold); margin-right: 6px;"></i>Scraper Report Summary
-                    </div>
-                    
-                    <div style="display: flex; flex-direction: column; gap: 10px; overflow-y: auto; max-height: 110px; padding-right: 4px;">
-                      <div>
-                        <div style="font-size: 10px; color: var(--green2); font-weight: 600; margin-bottom: 4px; text-transform: uppercase;">
-                          <i class="fas fa-check-circle"></i> Collected Fields:
-                        </div>
-                        <div id="report-collected-fields" style="display: flex; flex-wrap: wrap; gap: 4px; font-size: 10px; color: var(--muted2);">
-                          <span style="font-style: italic; color: var(--muted);">None yet</span>
-                        </div>
-                      </div>
-
-                      <div>
-                        <div style="font-size: 10px; color: var(--red2); font-weight: 600; margin-bottom: 4px; text-transform: uppercase;">
-                          <i class="fas fa-exclamation-triangle"></i> Not Collected:
-                        </div>
-                        <div id="report-missing-fields" style="display: flex; flex-wrap: wrap; gap: 4px; font-size: 10px; color: var(--muted2);">
-                          <span style="font-style: italic; color: var(--muted);">None yet</span>
-                        </div>
-                      </div>
-                    </div>
+              <!-- Logs + Preview split -->
+              <div style="display:grid;grid-template-columns:1fr 320px;gap:14px;flex-shrink:0;max-height:160px;overflow:hidden;">
+                <!-- Console -->
+                <div class="ws-card" style="background:#070913;padding:12px;display:flex;flex-direction:column;">
+                  <div style="font-size:11px;font-weight:600;color:var(--muted);margin-bottom:6px;display:flex;justify-content:space-between;align-items:center;">
+                    <span><i class="fas fa-terminal"></i> ENGINE LOG</span>
+                    <a href="#" onclick="document.getElementById('ws-console').innerHTML='';return false;" style="color:var(--gold);text-decoration:none;font-size:10px;">Clear</a>
                   </div>
-
-                  <div id="report-summary-stats" style="font-size: 10px; color: var(--muted); border-top: 1px solid var(--border); padding-top: 6px; margin-top: 4px; display: flex; justify-content: space-between;">
-                    <span>Success Rate: <b style="color: var(--text);" id="report-success-rate">0%</b></span>
-                    <span>Est. Errors: <b style="color: var(--text);" id="report-error-count">0</b></span>
+                  <pre id="ws-console" class="ws-console"></pre>
+                </div>
+                <!-- Summary -->
+                <div class="ws-card" style="padding:12px;display:flex;flex-direction:column;justify-content:space-between;">
+                  <div style="font-size:12px;font-weight:600;color:var(--text);margin-bottom:8px;"><i class="fas fa-file-contract" style="color:var(--gold);margin-right:6px;"></i>Field Summary</div>
+                  <div style="flex:1;overflow-y:auto;">
+                    <div style="font-size:10px;color:var(--green2);font-weight:600;margin-bottom:4px;"><i class="fas fa-check-circle"></i> Collected</div>
+                    <div id="ws-report-collected" style="display:flex;flex-wrap:wrap;gap:3px;font-size:10px;margin-bottom:8px;"><span style="font-style:italic;color:var(--muted);">None yet</span></div>
+                    <div style="font-size:10px;color:var(--red2);font-weight:600;margin-bottom:4px;"><i class="fas fa-exclamation-triangle"></i> Not Found</div>
+                    <div id="ws-report-missing" style="display:flex;flex-wrap:wrap;gap:3px;font-size:10px;"><span style="font-style:italic;color:var(--muted);">None yet</span></div>
+                  </div>
+                  <div style="font-size:10px;color:var(--muted);border-top:1px solid var(--border);padding-top:6px;margin-top:4px;display:flex;justify-content:space-between;">
+                    <span>Fill Rate: <b id="ws-fill-rate" style="color:var(--text);">0%</b></span>
+                    <span>Records: <b id="ws-total-records" style="color:var(--text);">0</b></span>
                   </div>
                 </div>
               </div>
 
-              <!-- Real-time Preview Table Container -->
-              <div class="card" style="flex: 1; background: var(--bg3); border: 1px solid var(--border2); border-radius: 12px; padding: 16px; display: flex; flex-direction: column; overflow: hidden;">
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
-                  <div style="font-size: 13px; font-weight: 600; color: var(--text);">
-                    <i class="fas fa-table" style="color: var(--gold); margin-right: 6px;"></i> Live Scraped Data Preview
-                  </div>
-                  <div style="display: flex; align-items: center; gap: 12px;">
-                    <button class="btn btn-ghost btn-sm" id="btn-header-export-excel" onclick="exportCollectedToExcel()" style="display: none; justify-content: center; height: 30px; font-size: 11px; border: 1px solid var(--border);">
-                      <i class="fas fa-file-excel" style="color: var(--green); margin-right: 6px;"></i> Export to Excel
-                    </button>
-                    <div id="preview-row-count" style="font-size: 11px; color: var(--muted);">Showing 0 rows</div>
+              <!-- Live Preview Table -->
+              <div class="ws-card" style="flex:1;padding:14px;display:flex;flex-direction:column;overflow:hidden;min-height:0;">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;flex-shrink:0;">
+                  <div style="font-size:13px;font-weight:600;color:var(--text);"><i class="fas fa-table" style="color:var(--gold);margin-right:6px;"></i>Scraped Data Preview</div>
+                  <div style="display:flex;align-items:center;gap:10px;">
+                    <button class="btn btn-ghost btn-sm" id="ws-header-export" onclick="wsExportExcel()" style="display:none;border:1px solid var(--border);font-size:11px;height:28px;"><i class="fas fa-file-excel" style="color:var(--green);margin-right:5px;"></i>Export Excel</button>
+                    <span id="ws-row-count" style="font-size:11px;color:var(--muted);">0 rows</span>
                   </div>
                 </div>
-
-                <div id="deep-extraction-meta" style="display: none; margin-bottom: 12px; padding: 10px 12px; border: 1px solid var(--border2); border-radius: 8px; background: rgba(0,0,0,0.2); font-size: 11px; color: var(--text2);">
-                  <div style="margin-bottom: 4px;"><span style="color: var(--muted); font-weight: 600;">Page:</span> <span id="pageTitleDisplay"></span></div>
-                  <div style="margin-bottom: 6px;"><span style="color: var(--muted); font-weight: 600;">URL:</span> <span id="sourceUrlDisplay" style="word-break: break-all;"></span></div>
-                  <div id="navigationLinksContainer"></div>
-                </div>
-
-                <div id="variableFieldsContainer" style="display: none; margin-bottom: 12px; padding: 12px; border: 1px solid var(--border2); border-radius: 8px; background: rgba(212,175,55,0.04); max-height: 220px; overflow-y: auto;"></div>
-
-                <div id="recordTypesContainer" style="flex: 1; overflow: auto; margin-bottom: 10px;"></div>
-
-                <style>
-                  #variableFieldsContainer .vf-section { margin-bottom: 14px; }
-                  #variableFieldsContainer .vf-heading { font-size: 11px; font-weight: 700; color: var(--gold2); margin: 0 0 8px; text-transform: uppercase; }
-                  #variableFieldsContainer .vf-hint { font-size: 10px; color: var(--muted2); margin: 0 0 8px; line-height: 1.4; }
-                  #variableFieldsContainer .vf-fields { display: flex; flex-wrap: wrap; gap: 6px 12px; }
-                  #variableFieldsContainer .vf-field-item { font-size: 10px; color: var(--text2); display: inline-flex; align-items: center; gap: 5px; cursor: pointer; padding: 4px 6px; border: 1px solid var(--border2); border-radius: 6px; background: rgba(0,0,0,0.2); }
-                  #variableFieldsContainer .vf-score { font-size: 9px; color: var(--muted); background: rgba(255,255,255,0.06); padding: 1px 4px; border-radius: 4px; }
-                  #variableFieldsContainer .vf-sample { font-size: 9px; color: var(--muted2); max-width: 140px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-                  #recordTypesContainer .record-type-section { margin-bottom: 18px; padding-bottom: 14px; border-bottom: 1px solid var(--border2); }
-                  #recordTypesContainer .record-type-heading { font-size: 12px; font-weight: 700; color: var(--gold2); margin: 0 0 8px; text-transform: uppercase; letter-spacing: 0.4px; }
-                  #recordTypesContainer .field-picker { display: flex; flex-wrap: wrap; gap: 6px 12px; margin-bottom: 8px; align-items: center; }
-                  #recordTypesContainer .field-picker-item { font-size: 10px; color: var(--text2); display: inline-flex; align-items: center; gap: 4px; cursor: pointer; }
-                  #recordTypesContainer .add-field-form { display: inline-flex; gap: 4px; align-items: center; }
-                  #recordTypesContainer .add-field-input { font-size: 10px; padding: 3px 6px; width: 110px; background: rgba(0,0,0,0.3); border: 1px solid var(--border); border-radius: 4px; color: var(--text); }
-                  #recordTypesContainer .add-field-button { font-size: 10px; padding: 3px 8px; background: var(--bg2); border: 1px solid var(--border2); border-radius: 4px; color: var(--gold2); cursor: pointer; }
-                  #recordTypesContainer .record-type-table { width: 100%; border-collapse: collapse; font-size: 11px; }
-                  #recordTypesContainer .record-type-table th { padding: 6px 8px; background: var(--bg2); border: 1px solid var(--border); color: var(--text2); font-weight: 600; text-align: left; white-space: nowrap; }
-                  #recordTypesContainer .record-type-table td { padding: 6px 8px; border: 1px solid var(--border); color: var(--text); max-width: 220px; overflow-wrap: anywhere; }
-                  #recordTypesContainer .record-type-table td[contenteditable="true"]:focus { outline: 1px solid var(--gold); background: rgba(212,175,55,0.08); }
-                  #recordTypesContainer .empty-state { font-size: 11px; color: var(--muted); font-style: italic; padding: 8px 0; }
-                  #navigationLinksContainer .nav-links-list { margin: 0; padding-left: 16px; font-size: 10px; color: var(--muted2); }
-                  #navigationLinksContainer .nav-links-list a { color: var(--blue); text-decoration: none; }
-                </style>
-
-                <div id="flat-preview-wrapper" style="flex: 1; overflow: auto; border: 1px solid var(--border); border-radius: 6px; background: rgba(0,0,0,0.15);">
-                  <table style="width: 100%; border-collapse: collapse; font-size: 12px; text-align: left;" id="scraper-preview-table">
-                    <thead>
-                      <tr id="scraper-table-header" style="background: var(--bg2); border-bottom: 1px solid var(--border); color: var(--text2);">
-                        <th style="padding: 10px; font-weight: 600;">No Data Available</th>
-                      </tr>
-                    </thead>
-                    <tbody id="scraper-table-body" style="color: var(--text);">
-                      <tr>
-                        <td style="padding: 20px; text-align: center; color: var(--muted); font-style: italic;">
-                          No scrape data loaded. Enter a URL above and click "Webscrape" or upload an HTML file.
-                        </td>
-                      </tr>
-                    </tbody>
+                <div style="flex:1;overflow:auto;border:1px solid var(--border);border-radius:6px;background:rgba(0,0,0,0.15);">
+                  <table class="ws-preview-table" id="ws-preview-table">
+                    <thead><tr id="ws-table-head" style="background:var(--bg2);"><th style="padding:10px;font-weight:600;">No Data Yet</th></tr></thead>
+                    <tbody id="ws-table-body"><tr><td style="padding:20px;text-align:center;color:var(--muted);font-style:italic;">Paste HTML above and click "Analyze DOM &amp; Detect Patterns" to begin.</td></tr></tbody>
                   </table>
                 </div>
               </div>
 
-            </div>
+            </div><!-- /ws-right -->
 
-          </div>
-        </div>
+          </div><!-- /ws-shell -->
+        </div><!-- /sec-webscraper -->
 
       </div><!-- /content-area -->
     </div><!-- /main-area -->
@@ -15162,893 +15009,568 @@ Keep it concise and professional.`;
       }, 200);
     });
 
-    // ── WEB SCRAPER TEST CONTROLLER ──────────────────────────────────────────────
-    let scraperPollInterval = null;
-    let analyzeLoginPollInterval = null;
-    let lastLoginWaitLogSecond = -1;
-    let loginWaitAnnounced = false;
-    let currentScraperSessionId = null;
-    let webScrapeMode = 'manual_html';
-    let cachedScrapedData = [];
-    let cachedFields = [];
-    let loggedErrorsCount = 0;
+    // \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550
+    // ══════════════════════════════════════════════════════════════════════
+    // LEAD WEB SCRAPER — CLIENT-SIDE DOM ANALYZER & PATTERN DETECTOR
+    // ══════════════════════════════════════════════════════════════════════
 
-    function addScraperLog(msg, type = 'info') {
-      const consoleEl = document.getElementById('scraper-console-logs');
-      if (!consoleEl) return;
-      const time = new Date().toLocaleTimeString();
-      let color = '#a6b2c9';
-      if (type === 'error') color = 'var(--red2)';
-      if (type === 'success') color = 'var(--green2)';
-      if (type === 'warn') color = 'var(--gold2)';
-      
-      consoleEl.innerHTML += `<span style="color:${color};">[${time}] ${msg}</span>\n`;
-      consoleEl.scrollTop = consoleEl.scrollHeight;
+    /* State */
+    let _wsParsedDoc      = null;   // DOMParser document from pasted HTML
+    let _wsPatterns       = [];     // detected repeating pattern groups
+    let _wsScrapedRows    = [];     // scraped result rows
+    let _wsScrapedFields  = [];     // column headers
+
+    /* ── Logging ── */
+    function wsLog(msg, type = 'info') {
+      const el = document.getElementById('ws-console');
+      if (!el) return;
+      const t = new Date().toLocaleTimeString();
+      const colors = { info:'#a6b2c9', success:'var(--green2)', error:'var(--red2)', warn:'var(--gold2)' };
+      el.innerHTML += `<span style="color:${colors[type]||colors.info}">[${t}] ${msg}</span>\n`;
+      el.scrollTop = el.scrollHeight;
     }
 
-    function clearScraperLogs() {
-      const consoleEl = document.getElementById('scraper-console-logs');
-      if (consoleEl) consoleEl.innerHTML = '';
-    }
-
-    function setWebScrapeMode(mode) {
-      webScrapeMode = mode === 'url' ? 'url' : 'manual_html';
-      const manualBtn = document.getElementById('scrape-mode-manual');
-      const urlBtn = document.getElementById('scrape-mode-url');
-      const noteEl = document.getElementById('scrape-mode-note');
-      const urlFields = document.getElementById('url-specific-fields');
-      const advancedFields = document.getElementById('advanced-selector-fields');
-      const bufferFields = document.getElementById('buffer-fields');
-      const helperCard = document.querySelector('#manual-html-source-url')?.closest('.card');
-      
-      if (manualBtn) manualBtn.className = webScrapeMode === 'manual_html' ? 'btn btn-primary btn-sm' : 'btn btn-ghost btn-sm';
-      if (urlBtn) urlBtn.className = webScrapeMode === 'url' ? 'btn btn-primary btn-sm' : 'btn btn-ghost btn-sm';
-      
-      if (urlFields) {
-        urlFields.style.display = webScrapeMode === 'manual_html' ? 'none' : 'block';
-      }
-      if (advancedFields) {
-        advancedFields.style.display = webScrapeMode === 'manual_html' ? 'none' : 'block';
-      }
-      if (bufferFields) {
-        bufferFields.style.display = webScrapeMode === 'manual_html' ? 'none' : 'block';
-      }
-      if (helperCard) {
-        helperCard.style.display = webScrapeMode === 'manual_html' ? 'flex' : 'none';
-      }
-      
-      if (noteEl) {
-        noteEl.innerHTML = webScrapeMode === 'manual_html'
-          ? 'Paste HTML → Discover Variable Fields (checkboxes) → Scrape Data. For login / 2FA pages, copy <strong style="color:var(--gold2);">View Page Source</strong> from your browser after signing in.'
-          : 'Public URL mode renders pages in headless Chrome (JS/lazy content) then runs deep AI extraction. It cannot access logged-in or 2FA-protected views — use Paste HTML for those.';
-      }
-    }
-
-    let cachedRecordTypes = [];
-    let pendingScrapeSource = null;
-    let discoveryRecordTypes = [];
-
-    function escapeHtmlScraper(value) {
-      return String(value)
-        .replace(/&/g, '&amp;')
-        .replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;')
-        .replace(/"/g, '&quot;')
-        .replace(/'/g, '&#39;');
-    }
-
-    function humanizeTypeNameScraper(typeName) {
-      return String(typeName)
-        .split('_')
-        .filter(Boolean)
-        .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
-        .join(' ');
-    }
-
-    function showScrapeDataButton(show) {
-      const btn = document.getElementById('btn-scrape-data');
-      if (btn) btn.style.display = show ? '' : 'none';
-    }
-
-    function renderVariableFieldPicker(discoveryTypes) {
-      const container = document.getElementById('variableFieldsContainer');
-      if (!container) return;
-
-      if (!discoveryTypes || discoveryTypes.length === 0) {
-        container.style.display = 'none';
-        container.innerHTML = '';
-        showScrapeDataButton(false);
-        return;
-      }
-
-      container.style.display = 'block';
-      
-      let html = '<div class="vf-hint">Variable fields are data attributes that repeat across most rows. Uncheck any you do not want scraped, then click <strong style="color:var(--gold2);">Scrape Data</strong>.</div>';
-      
-      html += '<table class="leads-table" style="width: 100%; border-collapse: collapse; margin-top: 12px; font-size: 12px;">';
-      html += '<thead><tr>';
-      html += '<th style="text-align: left; padding: 10px; border-bottom: 1px solid var(--border);">Record Type</th>';
-      html += '<th style="text-align: left; padding: 10px; border-bottom: 1px solid var(--border);">Data Preview (Fields)</th>';
-      html += '<th style="text-align: left; padding: 10px; border-bottom: 1px solid var(--border);">Action</th>';
-      html += '</tr></thead><tbody>';
-
-      discoveryTypes.forEach((rt) => {
-        const countLabel = rt.estimated_record_count ? `<br><span style="color: var(--muted); font-size: 10px; font-weight: normal;">~${rt.estimated_record_count} rows</span>` : '';
-        const titleText = `${humanizeTypeNameScraper(rt.type_name)}${countLabel}`;
-        
-        html += `<tr data-type-name="${rt.type_name}">`;
-        html += `<td style="padding: 10px; border-bottom: 1px solid var(--border); vertical-align: top; font-weight: 600;">${titleText}</td>`;
-        
-        // Fields column
-        html += `<td style="padding: 10px; border-bottom: 1px solid var(--border); vertical-align: top;">`;
-        html += `<div class="vf-fields" style="display: flex; flex-wrap: wrap; gap: 8px;">`;
-        
-        const variableFields = rt.variable_fields || rt.fields?.map((f) => ({
-          field_name: f,
-          repeat_score: 80,
-          sample_value: '',
-        })) || [];
-
-        variableFields.forEach((field) => {
-          const checked = (field.repeat_score ?? 50) >= 50 ? 'checked' : '';
-          const sampleHtml = field.sample_value ? `<span class="vf-sample" title="${escapeHtmlScraper(field.sample_value)}">"${escapeHtmlScraper(field.sample_value)}"</span>` : '';
-          
-          html += `
-            <label class="vf-field-item">
-              <input type="checkbox" class="vf-field-checkbox" data-type-name="${rt.type_name}" data-field-name="${escapeHtmlScraper(field.field_name)}" ${checked}>
-              <span>${escapeHtmlScraper(field.field_name)}</span>
-              <span class="vf-score">${field.repeat_score ?? 50}%</span>
-              ${sampleHtml}
-            </label>
-          `;
-        });
-        
-        html += `</div></td>`;
-        
-        // Action column
-        html += `<td style="padding: 10px; border-bottom: 1px solid var(--border); vertical-align: top; width: 120px;">`;
-        html += `<button class="btn btn-primary btn-sm" onclick="scrapeDataWithSelectedFields('${rt.type_name}')" style="padding: 4px 10px; font-size: 11px; width: 100%;">`;
-        html += `<i class="fas fa-play" style="margin-right: 4px;"></i> Scrape Data</button>`;
-        html += `</td>`;
-        
-        html += `</tr>`;
-      });
-      
-      html += '</tbody></table>';
-      container.innerHTML = html;
-
-      showScrapeDataButton(true);
-    }
-
-
-    function collectSelectedFieldsByType() {
-      const selected = {};
-      document.querySelectorAll('#variableFieldsContainer .vf-field-checkbox').forEach((checkbox) => {
-        if (!checkbox.checked) return;
-        const typeName = checkbox.dataset.typeName;
-        const fieldName = checkbox.dataset.fieldName;
-        if (!typeName || !fieldName) return;
-        if (!selected[typeName]) selected[typeName] = [];
-        selected[typeName].push(fieldName);
-      });
-      return selected;
-    }
-
-    function applyDiscoveryResult(data) {
-      discoveryRecordTypes = data.discovery_record_types || data.record_types || [];
-      pendingScrapeSource = {
-        sourceType: data.source_type || webScrapeMode,
-        url: data.url || data.source_url || '',
-        html: document.getElementById('html-paste-area')?.value?.trim() || '',
-      };
-
-      const metaEl = document.getElementById('deep-extraction-meta');
-      const recordContainer = document.getElementById('recordTypesContainer');
-      const flatWrapper = document.getElementById('flat-preview-wrapper');
-      if (metaEl) metaEl.style.display = 'block';
-      if (recordContainer) recordContainer.innerHTML = '';
-      if (flatWrapper) flatWrapper.style.display = 'none';
-
-      if (document.getElementById('pageTitleDisplay')) {
-        document.getElementById('pageTitleDisplay').textContent = data.page_title || '';
-      }
-      if (document.getElementById('sourceUrlDisplay')) {
-        document.getElementById('sourceUrlDisplay').textContent = data.source_url || data.url || '';
-      }
-      const navContainer = document.getElementById('navigationLinksContainer');
-      if (navContainer) {
-        const links = data.navigation_links || [];
-        if (!links.length) {
-          navContainer.innerHTML = '';
-        } else {
-          navContainer.innerHTML = '<ul class="nav-links-list">' + links.map((link) => {
-            const label = link.link_text && link.link_text.trim() ? link.link_text : link.url;
-            return `<li><a href="${escapeHtmlScraper(link.url)}" target="_blank" rel="noopener noreferrer">${escapeHtmlScraper(label)}</a></li>`;
-          }).join('') + '</ul>';
-        }
-      }
-
-      renderVariableFieldPicker(discoveryRecordTypes);
-
-      const allFieldNames = discoveryRecordTypes.flatMap((rt) =>
-        (rt.variable_fields || []).map((f) => f.field_name)
-      );
-      if (allFieldNames.length > 0) {
-        document.getElementById('scrape-fields').value = allFieldNames.join(', ');
-      }
-
-      cachedScrapedData = [];
-      cachedFields = allFieldNames;
-      updatePreviewTable([], []);
-      updateReportSummary({ collected: [], notCollected: allFieldNames }, allFieldNames, 0);
-
-      document.getElementById('scrape-metric-status').textContent = 'FIELDS READY';
-      document.getElementById('scrape-metric-status').style.color = 'var(--gold)';
-      document.getElementById('scrape-metric-collected').textContent = `${allFieldNames.length} variable fields`;
-      document.getElementById('scrape-metric-page').textContent = 'Choose fields, then Scrape Data';
-      document.getElementById('btn-export-excel').style.display = 'none';
-      if(document.getElementById('btn-header-export-excel')) document.getElementById('btn-header-export-excel').style.display = 'none';
-      document.getElementById('export-excel-disabled').style.display = '';
-    }
-
-    function applyStructuredExtractionResult(data, fallbackFields = []) {
-      const recordTypes = Array.isArray(data?.record_types) ? data.record_types : [];
-      const extracted = data?.extracted_fields;
-      let rows = [];
-      let fields = fallbackFields || [];
-
-      if (recordTypes.length > 0 && typeof window.applyDeepExtractionResult === 'function') {
-        cachedRecordTypes = recordTypes;
-        const metaEl = document.getElementById('deep-extraction-meta');
-        const flatWrapper = document.getElementById('flat-preview-wrapper');
-        const variableContainer = document.getElementById('variableFieldsContainer');
-        if (metaEl) metaEl.style.display = 'block';
-        if (flatWrapper) flatWrapper.style.display = recordTypes.length > 0 ? 'none' : 'block';
-        if (variableContainer) variableContainer.style.display = 'none';
-        showScrapeDataButton(false);
-
-        window.applyDeepExtractionResult({
-          page_title: data.page_title || '',
-          source_url: data.source_url || data.url || '',
-          navigation_links: data.navigation_links || [],
-          record_types: recordTypes,
-        });
-
-        const primary = recordTypes.find((rt) => rt.type_name === data.primary_type_name) || recordTypes[0];
-        rows = primary?.records || [];
-        fields = primary?.fields || [];
-      } else if (Array.isArray(extracted)) {
-        rows = extracted;
-        if (rows.length > 0) {
-          fields = Array.from(new Set(rows.flatMap((r) => Object.keys(r))));
-        }
-        const metaEl = document.getElementById('deep-extraction-meta');
-        const flatWrapper = document.getElementById('flat-preview-wrapper');
-        const recordContainer = document.getElementById('recordTypesContainer');
-        if (metaEl) metaEl.style.display = 'none';
-        if (flatWrapper) flatWrapper.style.display = 'block';
-        if (recordContainer) recordContainer.innerHTML = '';
-      } else if (extracted && typeof extracted === 'object') {
-        const keys = Object.keys(extracted);
-        if (keys.length > 0) {
-          fields = keys;
-          rows = [extracted];
-        }
-      }
-
-      cachedScrapedData = rows;
-      cachedFields = fields;
-      updatePreviewTable(fields, rows);
-      updateReportSummary({
-        collected: fields,
-        notCollected: []
-      }, fields, rows.length);
-
-      document.getElementById('scrape-metric-status').textContent = 'COMPLETED';
-      document.getElementById('scrape-metric-status').style.color = 'var(--green)';
-      const recordLabel = recordTypes.length > 1
-        ? `${recordTypes.length} record types`
-        : (data?.primary_type_name || (webScrapeMode === 'url' ? 'Public URL' : 'Pasted HTML'));
-      document.getElementById('scrape-metric-collected').textContent = data?.record_count != null
-        ? `${data.record_count} records`
-        : `${rows.length} records`;
-      document.getElementById('scrape-metric-page').textContent = recordLabel;
-
-      if (rows.length > 0 || recordTypes.length > 0) {
-        document.getElementById('btn-export-excel').style.display = '';
-        document.getElementById('export-excel-disabled').style.display = 'none';
-      }
-    }
-
-    function resetAnalyzeMetricLabels() {
-      const pageLabel = document.getElementById('scrape-metric-page-label');
-      if (pageLabel) pageLabel.textContent = 'Current Page';
-    }
-
-    function stopAnalyzeLoginPolling() {
-      if (analyzeLoginPollInterval) {
-        clearInterval(analyzeLoginPollInterval);
-        analyzeLoginPollInterval = null;
-      }
-      lastLoginWaitLogSecond = -1;
-      loginWaitAnnounced = false;
-      resetAnalyzeMetricLabels();
-    }
-
-    function formatLoginWaitTime(ms) {
-      const totalSec = Math.max(0, Math.ceil(ms / 1000));
-      const min = Math.floor(totalSec / 60);
-      const sec = totalSec % 60;
-      return `${min}:${String(sec).padStart(2, '0')}`;
-    }
-
-    function startAnalyzeLoginPolling() {
-      stopAnalyzeLoginPolling();
-      analyzeLoginPollInterval = setInterval(async () => {
-        try {
-          const response = await fetch('/api/crm/scraper/analyze/login-status', {
-            headers: { 'Authorization': 'Bearer lm_123456' }
-          });
-          if (!response.ok) return;
-          const status = await response.json();
-          if (!status.active) return;
-
-          if (!loginWaitAnnounced) {
-            loginWaitAnnounced = true;
-            addScraperLog(status.message || 'Login required — please sign in using the Chrome window (up to 5 min).', 'warn');
-          }
-
-          const statusEl = document.getElementById('scrape-metric-status');
-          const pageEl = document.getElementById('scrape-metric-page');
-          const pageLabel = document.getElementById('scrape-metric-page-label');
-          if (pageLabel) pageLabel.textContent = 'Login Timer';
-          if (statusEl) {
-            statusEl.textContent = status.phase === 'verification' ? 'AWAITING 2FA' : 'AWAITING LOGIN';
-            statusEl.style.color = 'var(--gold)';
-          }
-          if (pageEl) {
-            pageEl.textContent = `${formatLoginWaitTime(status.remainingMs)} left`;
-            pageEl.style.color = 'var(--gold)';
-          }
-
-          const remainingSec = Math.ceil((status.remainingMs || 0) / 1000);
-          if (remainingSec !== lastLoginWaitLogSecond && remainingSec % 10 === 0) {
-            lastLoginWaitLogSecond = remainingSec;
-            addScraperLog(status.message || `Waiting for login (${formatLoginWaitTime(status.remainingMs)} remaining)...`, 'warn');
-          }
-        } catch (_) {}
-      }, 1000);
-    }
-
-    async function analyzeTargetURL() {
-      const url = document.getElementById('scrape-url').value.trim();
-      if (!url) {
-        alert("Please enter a target URL first.");
-        return;
-      }
-      const btn = document.getElementById('btn-analyze-url');
-      const originalText = btn.innerHTML;
-
-      try {
-        btn.disabled = true;
-        btn.innerHTML = `<i class="fas fa-spinner fa-spin"></i> Previewing...`;
-
-        addScraperLog(`Previewing public page: ${url}`, 'info');
-        addScraperLog(`Authenticated pages are not fetched here. Use Paste HTML after logging in inside your own browser.`, 'warn');
-        document.getElementById('scrape-metric-status').textContent = 'PREVIEWING';
-        document.getElementById('scrape-metric-status').style.color = 'var(--gold)';
-        document.getElementById('scrape-metric-page').textContent = 'Public URL';
-        document.getElementById('scrape-metric-page').style.color = 'var(--blue)';
-
-        const response = await fetch(`${API_BASE}/crm/scraper/discover-fields`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': 'Bearer lm_123456'
-          },
-          body: JSON.stringify({ sourceType: 'url', url })
-        });
-
-        const data = await response.json();
-        if (!response.ok) {
-          addScraperLog(`Preview failed: ${data.error || 'Server error'}`, 'error');
-          document.getElementById('scrape-metric-status').textContent = 'FAILED';
-          document.getElementById('scrape-metric-status').style.color = 'var(--red)';
-          document.getElementById('scrape-metric-page').textContent = 'Page -';
-          document.getElementById('scrape-metric-page').style.color = 'var(--blue)';
-          alert(`Could not preview the public page: ${data.error || 'Check server logs'}`);
-          return;
-        }
-
-        pendingScrapeSource = { sourceType: 'url', url, html: '' };
-        const discoveryTypes = data.discovery_record_types || data.record_types || [];
-        const detectedFields = discoveryTypes.flatMap((rt) =>
-          (rt.variable_fields || []).map((f) => f.field_name)
-        );
-        addScraperLog(`Variable field discovery completed.`, 'success');
-        if (data.chrome_rendered) addScraperLog(`Page rendered with headless Chrome (JS/lazy content included).`, 'success');
-        document.getElementById('scrape-metric-status').textContent = 'FIELDS READY';
-        document.getElementById('scrape-metric-status').style.color = 'var(--gold)';
-        document.getElementById('scrape-metric-page').textContent = 'Choose fields, then Scrape Data';
-        document.getElementById('scrape-metric-page').style.color = 'var(--blue)';
-
-        if (detectedFields.length > 0) {
-          document.getElementById('scrape-fields').value = detectedFields.join(', ');
-          addScraperLog(`Discovered ${detectedFields.length} variable field(s): ${detectedFields.join(', ')}`, 'success');
-          applyDiscoveryResult(data);
-        } else {
-          addScraperLog(`No repeating variable fields were detected on this page.`, 'warn');
-        }
-
-      } catch (err) {
-        addScraperLog(`Preview error: ${err.message}`, 'error');
-        document.getElementById('scrape-metric-status').textContent = 'ERROR';
-        document.getElementById('scrape-metric-status').style.color = 'var(--red)';
-        document.getElementById('scrape-metric-page').textContent = 'Page -';
-        document.getElementById('scrape-metric-page').style.color = 'var(--blue)';
-        alert(`Preview error: ${err.message}`);
-      } finally {
-        btn.disabled = false;
-        btn.innerHTML = originalText;
-      }
-    }
-
-    async function startWebScrape() {
-      if (webScrapeMode === 'manual_html') {
-        if (discoveryRecordTypes.length > 0 && pendingScrapeSource) {
-          await scrapeDataWithSelectedFields();
-        } else {
-          await discoverFieldsFromHTML();
-        }
-        return;
-      }
-
-      if (!discoveryRecordTypes.length || !pendingScrapeSource) {
-        addScraperLog(`Discover variable fields first using Preview Public Page.`, 'warn');
-        await analyzeTargetURL();
-        return;
-      }
-
-      await scrapeDataWithSelectedFields();
-    }
-
-    async function scrapeDataWithSelectedFields(targetTypeName = null) {
-      let selectedFieldsByType = collectSelectedFieldsByType();
-      if (targetTypeName) {
-        const filtered = {};
-        if (selectedFieldsByType[targetTypeName]) {
-          filtered[targetTypeName] = selectedFieldsByType[targetTypeName];
-        }
-        selectedFieldsByType = filtered;
-      }
-
-      const selectedCount = Object.values(selectedFieldsByType).reduce((n, arr) => n + arr.length, 0);
-      if (selectedCount === 0) {
-        alert('Select at least one variable field to scrape for this record type.');
-        return;
-      }
-
-      const source = pendingScrapeSource || {
-        sourceType: webScrapeMode,
-        url: webScrapeMode === 'url'
-          ? document.getElementById('scrape-url').value.trim()
-          : document.getElementById('manual-html-source-url').value.trim(),
-        html: document.getElementById('html-paste-area').value.trim(),
-      };
-
-      if (source.sourceType === 'manual_html' && !source.html) {
-        alert('Paste HTML content before scraping.');
-        return;
-      }
-
-      if (source.sourceType === 'url' && !source.url) {
-        alert('Enter a target URL before scraping.');
-        return;
-      }
-
-      document.getElementById('btn-start-scrape')?.setAttribute('disabled', 'disabled');
-      document.getElementById('scrape-metric-status').textContent = 'SCRAPING...';
-      document.getElementById('scrape-metric-status').style.color = 'var(--gold)';
-      addScraperLog(`Scraping data for ${selectedCount} selected variable field(s)...`, 'info');
-
-      try {
-        const res = await fetch(`${API_BASE}/crm/scraper/extract-all`, {
-          method: 'POST',
-          headers: {
-            'Authorization': 'Bearer lm_123456',
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({
-            sourceType: source.sourceType,
-            url: source.url,
-            html: source.html,
-            mode: 'extract',
-            selectedFieldsByType
-          })
-        });
-
-        const data = await res.json();
-        if (!res.ok) throw new Error(data.error || 'Scrape request failed');
-
-        const fields = Array.isArray(data?.extracted_fields) && data.extracted_fields.length > 0
-          ? Array.from(new Set(data.extracted_fields.flatMap((r) => Object.keys(r))))
-          : Object.values(selectedFieldsByType).flat();
-        document.getElementById('scrape-fields').value = fields.join(', ');
-        
-        cachedScrapedData = Array.isArray(data?.extracted_data) ? data.extracted_data : (Array.isArray(data?.extracted_fields) ? data.extracted_fields : []);
-        cachedFields = fields;
-        updatePreviewTable(fields, cachedScrapedData);
-
-        document.getElementById('scrape-metric-status').textContent = 'Done';
-        document.getElementById('scrape-metric-status').style.color = 'var(--green)';
-        document.getElementById('scrape-metric-collected').textContent = cachedScrapedData.length;
-        document.getElementById('btn-export-excel').style.display = '';
-        if(document.getElementById('btn-header-export-excel')) document.getElementById('btn-header-export-excel').style.display = 'flex';
-        document.getElementById('export-excel-disabled').style.display = 'none';
-
-        addScraperLog(`Scrape complete. ${cachedScrapedData.length} record(s) collected.`, 'success');
-        if (data.page_title) addScraperLog(`Page title: ${data.page_title}`, 'info');
-        if (data.chrome_rendered) addScraperLog(`Headless Chrome rendered the page before scraping.`, 'success');
-        if (data.ai_used) addScraperLog(`AI-assisted extraction applied.`, 'success');
-        addScraperLog(`Use Save .XLSX when you are ready to export.`, 'info');
-      } catch (err) {
-        addScraperLog(`Scrape failed: ${err.message}`, 'error');
-        document.getElementById('scrape-metric-status').textContent = 'Error';
-        document.getElementById('scrape-metric-status').style.color = 'var(--red)';
-      } finally {
-        document.getElementById('btn-start-scrape')?.removeAttribute('disabled');
-        document.getElementById('btn-stop-scrape').disabled = true;
-      }
-    }
-
-    async function stopWebScrape() {
-      addScraperLog(`This extraction mode runs as a single request, so there is no live browser session to stop.`, 'warn');
-      document.getElementById('btn-stop-scrape').disabled = true;
-      document.getElementById('btn-start-scrape')?.removeAttribute('disabled');
-    }
-
-    function startScraperStatusPolling(sessionId) {
-      if (scraperPollInterval) clearInterval(scraperPollInterval);
-      
-      scraperPollInterval = setInterval(async () => {
-        try {
-          const res = await fetch(`${API_BASE}/crm/scraper/status?sessionId=${sessionId}`, {
-            headers: {
-              'Authorization': 'Bearer lm_123456'
-            }
-          });
-          const data = await res.json();
-          if (!res.ok) {
-            throw new Error(data.error || 'Failed to poll status');
-          }
-
-          document.getElementById('scrape-metric-status').textContent = data.status.toUpperCase();
-          if (data.status === 'running') {
-            document.getElementById('scrape-metric-status').style.color = 'var(--gold)';
-          } else if (data.status === 'completed') {
-            document.getElementById('scrape-metric-status').style.color = 'var(--green)';
-          } else {
-            document.getElementById('scrape-metric-status').style.color = 'var(--red)';
-          }
-          
-          document.getElementById('scrape-metric-collected').textContent = `${data.scrapedData?.length || 0} records`;
-          document.getElementById('scrape-metric-page').textContent = `Page ${data.progress?.currentPage || 1}`;
-
-          if (data.scrapedData && data.scrapedData.length > 0) {
-            cachedScrapedData = data.scrapedData;
-            updatePreviewTable(cachedFields, data.scrapedData);
-            updateReportSummary(data.report, cachedFields, data.scrapedData.length);
-            document.getElementById('btn-export-excel').style.display = '';
-            if(document.getElementById('btn-header-export-excel')) document.getElementById('btn-header-export-excel').style.display = 'flex';
-            document.getElementById('export-excel-disabled').style.display = 'none';
-          }
-
-          if (data.errors && data.errors.length > loggedErrorsCount) {
-            for (let i = loggedErrorsCount; i < data.errors.length; i++) {
-              addScraperLog(`[WARNING] ${data.errors[i]}`, 'warn');
-            }
-            loggedErrorsCount = data.errors.length;
-          }
-
-          addScraperLog(`Polling status: ${data.status}. Traversed page ${data.progress?.currentPage || 1}. Collected ${data.scrapedData?.length || 0} records.`, 'info');
-
-          if (data.status !== 'running') {
-            clearInterval(scraperPollInterval);
-            scraperPollInterval = null;
-            addScraperLog(`Scraper finished with status: ${data.status}.`, data.status === 'completed' ? 'success' : 'warn');
-            handleScraperSessionCompletion(data);
-          }
-        } catch (err) {
-          addScraperLog(`Polling error: ${err.message}`, 'error');
-          clearInterval(scraperPollInterval);
-          scraperPollInterval = null;
-          document.getElementById('btn-start-scrape')?.removeAttribute('disabled');
-          document.getElementById('btn-stop-scrape').disabled = true;
-        }
-      }, 2000);
-    }
-
-    function handleScraperSessionCompletion(data) {
-      document.getElementById('btn-start-scrape')?.removeAttribute('disabled');
-      document.getElementById('btn-stop-scrape').disabled = true;
-      
-      document.getElementById('scrape-metric-status').textContent = data.status.toUpperCase();
-      document.getElementById('scrape-metric-status').style.color = data.status === 'completed' ? 'var(--green)' : 'var(--red)';
-      
-      if (data.error) {
-        addScraperLog(`Scraper Run Failed: ${data.error}`, 'error');
-      }
-
-      if (data.scrapedData && data.scrapedData.length > 0) {
-        cachedScrapedData = data.scrapedData;
-        updatePreviewTable(cachedFields, data.scrapedData);
-        updateReportSummary(data.report, cachedFields, data.scrapedData.length);
-        addScraperLog(`Scrape session finished. Use Save .XLSX to export when ready.`, 'info');
-      } else {
-        addScraperLog(`No records collected. Skipping excel compilation.`, 'warn');
-      }
-    }
-
-    function updateReportSummary(report, fields, totalCount) {
-      const collectedContainer = document.getElementById('report-collected-fields');
-      const missingContainer = document.getElementById('report-missing-fields');
-      
-      if (!collectedContainer || !missingContainer) return;
-      
-      collectedContainer.innerHTML = '';
-      missingContainer.innerHTML = '';
-      
-      const col = report?.collected || [];
-      const mis = report?.notCollected || [];
-      
-      if (col.length === 0) {
-        collectedContainer.innerHTML = `<span style="font-style: italic; color: var(--muted);">None</span>`;
-      } else {
-        col.forEach(f => {
-          collectedContainer.innerHTML += `<span style="background: rgba(16, 185, 129, 0.2); border: 1px solid var(--green); color: var(--green2); padding: 2px 6px; border-radius: 4px; font-weight: 500; font-size: 10px;">${f}</span>`;
-        });
-      }
-      
-      if (mis.length === 0) {
-        missingContainer.innerHTML = `<span style="font-style: italic; color: var(--muted);">None</span>`;
-      } else {
-        mis.forEach(f => {
-          missingContainer.innerHTML += `<span style="background: rgba(239, 68, 68, 0.2); border: 1px solid var(--red); color: var(--red2); padding: 2px 6px; border-radius: 4px; font-weight: 500; font-size: 10px;">${f}</span>`;
-        });
-      }
-      
-      const totalFields = fields.length;
-      const colFields = col.length;
-      const rate = totalFields ? Math.round((colFields / totalFields) * 100) : 0;
-      
-      document.getElementById('report-success-rate').textContent = `${rate}%`;
-      document.getElementById('report-success-rate').style.color = rate > 75 ? 'var(--green2)' : (rate > 40 ? 'var(--gold2)' : 'var(--red2)');
-      
-      const errorCount = totalCount === 0 && colFields === 0 ? 1 : 0;
-      document.getElementById('report-error-count').textContent = errorCount;
-      document.getElementById('report-error-count').style.color = errorCount > 0 ? 'var(--red2)' : 'var(--muted)';
-    }
-
-    function updatePreviewTable(fields, data) {
-      const headerRow = document.getElementById('scraper-table-header');
-      const tableBody = document.getElementById('scraper-table-body');
-      const countEl = document.getElementById('preview-row-count');
-      
-      if (!headerRow || !tableBody) return;
-      
-      headerRow.innerHTML = `<th style="padding: 10px; font-weight: 600; width: 50px;">#</th>`;
-      fields.forEach(f => {
-        headerRow.innerHTML += `<th style="padding: 10px; font-weight: 600; text-transform: capitalize;">${f}</th>`;
-      });
-      
-      tableBody.innerHTML = '';
-      if (data.length === 0) {
-        countEl.textContent = `Showing 0 rows`;
-        tableBody.innerHTML = `
-          <tr>
-            <td colspan="${fields.length + 1}" style="padding: 20px; text-align: center; color: var(--muted); font-style: italic;">
-              No scrape data loaded yet.
-            </td>
-          </tr>
-        `;
-        return;
-      }
-      
-      countEl.textContent = `Showing ${data.length} rows`;
-      
-      data.forEach((row, idx) => {
-        let cells = `<td style="padding: 8px 10px; border-bottom: 1px solid var(--border); color: var(--muted);">${idx + 1}</td>`;
-        fields.forEach(f => {
-          const val = row[f] || 'N/A';
-          let cellStyle = '';
-          if (val === 'N/A') cellStyle = 'color: var(--muted); font-style: italic;';
-          cells += `<td style="padding: 8px 10px; border-bottom: 1px solid var(--border); ${cellStyle}">${val}</td>`;
-        });
-        tableBody.innerHTML += `<tr>${cells}</tr>`;
-      });
-    }
-
-    function exportCollectedToExcel() {
-      const visibleTypes = typeof window.getVisibleRecordTypesData === 'function'
-        ? window.getVisibleRecordTypesData()
-        : [];
-      const hasDeepData = visibleTypes.length > 0 && visibleTypes.some((rt) => rt.records?.length > 0);
-      const exportRows = hasDeepData ? null : cachedScrapedData;
-
-      if (!hasDeepData && (!exportRows || exportRows.length === 0)) {
-        alert("No data available to export.");
-        return;
-      }
-      
-      try {
-        addScraperLog(`Compiling Excel workbook...`, 'info');
-        
-        const wb = XLSX.utils.book_new();
-
-        if (hasDeepData) {
-          visibleTypes.forEach((rt) => {
-            if (!rt.records || rt.records.length === 0) return;
-            const sheetName = String(rt.type_name || 'data').substring(0, 31).replace(/[\\/*?:\[\]]/g, '_');
-            XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(rt.records), sheetName);
-          });
-        } else {
-          XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(exportRows), 'Scraped Data');
-        }
-        
-        const collectedSet = new Set();
-        const fieldsForSummary = hasDeepData
-          ? visibleTypes.flatMap((rt) => rt.fields || [])
-          : cachedFields;
-        const rowsForSummary = hasDeepData
-          ? visibleTypes.flatMap((rt) => rt.records || [])
-          : exportRows;
-
-        rowsForSummary.forEach((row) => {
-          fieldsForSummary.forEach((f) => {
-            if (row[f] && row[f] !== 'N/A' && row[f] !== '') {
-              collectedSet.add(f);
-            }
-          });
-        });
-        
-        const summaryRows = fieldsForSummary.map((field) => {
-          const isCollected = collectedSet.has(field);
-          return {
-            "Data Field": field,
-            "Status": isCollected ? "Collected" : "Missing / Not Found",
-            "Fill Rate": isCollected ? "100%" : "0%"
-          };
-        });
-        
-        summaryRows.push({});
-        summaryRows.push({ "Data Field": "Scraper Execution Metadata" });
-        summaryRows.push({ "Data Field": "Export Time", "Status": new Date().toLocaleString() });
-        summaryRows.push({ "Data Field": "Total Records Scraped", "Status": rowsForSummary.length });
-        summaryRows.push({ "Data Field": "Total Confirmed Fields", "Status": `${collectedSet.size} of ${fieldsForSummary.length}` });
-        
-        XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(summaryRows), "Scraper Report Summary");
-        
-        const filename = `webscrape_data_${Date.now()}.xlsx`;
-        XLSX.writeFile(wb, filename);
-        
-        addScraperLog(`Excel workbook exported successfully: ${filename}`, 'success');
-      } catch (err) {
-        addScraperLog(`Failed to compile Excel file: ${err.message}`, 'error');
-      }
-    }
-
-    function handleHtmlFileUpload(event) {
+    /* ── File upload ── */
+    function wsHandleFileUpload(event) {
       const file = event.target.files[0];
       if (!file) return;
-      
       const reader = new FileReader();
-      reader.onload = function(e) {
-        document.getElementById('html-paste-area').value = e.target.result;
-        addScraperLog(`Loaded file: ${file.name} (${file.size} bytes). Click 'AI Discover Variable Fields' to analyze the HTML.`, 'info');
+      reader.onload = e => {
+        document.getElementById('ws-html-input').value = e.target.result;
+        wsLog(`Loaded: ${file.name} (${(file.size/1024).toFixed(1)} KB). Click "Analyze DOM" to continue.`, 'success');
       };
       reader.readAsText(file);
     }
 
-    async function discoverFieldsFromUrl() {
-      const url = document.getElementById('scrape-url').value.trim();
-      if (!url) {
-        alert("Please enter a target URL.");
-        return;
-      }
+    /* ── Reset ── */
+    function wsReset() {
+      _wsParsedDoc = null;
+      _wsPatterns = [];
+      _wsScrapedRows = [];
+      _wsScrapedFields = [];
+      document.getElementById('ws-dom-card').style.display = 'none';
+      document.getElementById('ws-scrape-card').style.display = 'none';
+      document.getElementById('ws-patterns-panel').style.display = 'none';
+      document.getElementById('ws-patterns-list').innerHTML = '';
+      document.getElementById('ws-dom-tree').innerHTML = '';
+      document.getElementById('ws-m-status').textContent = 'Idle';
+      document.getElementById('ws-m-patterns').textContent = '0';
+      document.getElementById('ws-m-records').textContent = '0';
+      wsUpdatePreviewTable([], []);
+      wsUpdateSummary([], []);
+      wsLog('Reset complete.', 'info');
+    }
 
-      const discoverBtn = document.getElementById('btn-discover-url');
-      if (discoverBtn) discoverBtn.disabled = true;
-      addScraperLog(`Discovering variable fields from public URL: ${url}...`, 'info');
-      document.getElementById('scrape-metric-status').textContent = 'ANALYZING...';
-      document.getElementById('scrape-metric-status').style.color = 'var(--gold)';
+    /* ═══════════════════════════════════════════════
+       STEP 1 — ANALYZE DOM
+    ═══════════════════════════════════════════════ */
+    function wsAnalyzeDOM() {
+      const html = document.getElementById('ws-html-input').value.trim();
+      if (!html) { alert('Paste or upload HTML first.'); return; }
+
+      wsLog('Parsing HTML document...', 'info');
+      document.getElementById('ws-m-status').textContent = 'Analyzing...';
+      document.getElementById('ws-m-status').style.color = 'var(--gold)';
 
       try {
-        const res = await fetch(`${API_BASE}/crm/scraper/discover-fields`, {
-          method: 'POST',
-          headers: {
-            'Authorization': 'Bearer lm_123456',
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({
-            sourceType: 'url',
-            url,
-            html: ''
-          })
-        });
+        const parser = new DOMParser();
+        _wsParsedDoc = parser.parseFromString(html, 'text/html');
+        wsLog(`DOM parsed. Title: "${_wsParsedDoc.title || 'N/A'}"`, 'success');
 
-        const data = await res.json();
-        if (!res.ok) throw new Error(data.error || 'Failed to discover variable fields');
+        // Build DOM map
+        const domMap = wsCollectDOMMap(_wsParsedDoc.body);
+        wsRenderDOMTree(domMap);
+        document.getElementById('ws-dom-card').style.display = '';
 
-        pendingScrapeSource = { sourceType: 'url', url, html: '' };
-        applyDiscoveryResult(data);
+        // Detect patterns
+        _wsPatterns = wsDetectPatterns(_wsParsedDoc);
+        wsLog(`Found ${_wsPatterns.length} repeating pattern(s).`, _wsPatterns.length > 0 ? 'success' : 'warn');
 
-        const fieldCount = (data.discovery_record_types || data.record_types || [])
-          .flatMap((rt) => rt.variable_fields || [])
-          .length;
-        addScraperLog(`Found ${fieldCount} variable field(s). Choose which to keep, then click Scrape Data.`, 'success');
-        if (data.page_title) addScraperLog(`Page title: ${data.page_title}`, 'info');
-        if (data.ai_used) addScraperLog(`AI-assisted field discovery applied.`, 'success');
+        document.getElementById('ws-m-patterns').textContent = _wsPatterns.length;
+        document.getElementById('ws-m-status').textContent = 'Patterns Ready';
+        document.getElementById('ws-m-status').style.color = 'var(--gold)';
+
+        wsRenderPatternPicker();
+
+        if (_wsPatterns.length > 0) {
+          document.getElementById('ws-scrape-card').style.display = '';
+          document.getElementById('ws-patterns-panel').style.display = '';
+          wsLog(`Select variable fields above and click "Scrape Data".`, 'info');
+        } else {
+          wsLog(`No repeating patterns found. Try a page with tables, lists, or card grids.`, 'warn');
+        }
+
       } catch (err) {
-        addScraperLog(`Field discovery error: ${err.message}`, 'error');
-        document.getElementById('scrape-metric-status').textContent = 'Error';
-        document.getElementById('scrape-metric-status').style.color = 'var(--red)';
-      } finally {
-        if (discoverBtn) discoverBtn.disabled = false;
+        wsLog(`Parse error: ${err.message}`, 'error');
+        document.getElementById('ws-m-status').textContent = 'Error';
+        document.getElementById('ws-m-status').style.color = 'var(--red)';
       }
     }
 
-    async function discoverFieldsFromHTML() {
-      const html = document.getElementById('html-paste-area').value.trim();
-      const url = document.getElementById('manual-html-source-url').value.trim();
+    /* ───────────────────────────────────────────
+       DOM MAP COLLECTOR
+    ─────────────────────────────────────────── */
+    function wsCollectDOMMap(root) {
+      if (!root) return [];
+      const tagStats = {};  // tagName -> { count, attrs: Set<string>, classSet: Set<string> }
 
-      if (!html) {
-        alert("Please upload an HTML file or paste raw HTML content.");
+      function walk(node) {
+        if (node.nodeType !== 1) return;
+        const tag = node.tagName.toLowerCase();
+        if (['script','style','noscript','svg','path','g','defs'].includes(tag)) return;
+
+        if (!tagStats[tag]) tagStats[tag] = { count: 0, attrs: new Set(), classes: new Set() };
+        tagStats[tag].count++;
+        for (const attr of node.attributes) {
+          tagStats[tag].attrs.add(attr.name);
+          if (attr.name === 'class') {
+            attr.value.trim().split(/\s+/).forEach(c => c && tagStats[tag].classes.add(c));
+          }
+        }
+        for (const child of node.children) walk(child);
+      }
+      walk(root);
+
+      // Sort by count descending
+      return Object.entries(tagStats)
+        .map(([tag, s]) => ({ tag, count: s.count, attrs: [...s.attrs], classes: [...s.classes].slice(0, 8) }))
+        .sort((a, b) => b.count - a.count);
+    }
+
+    function wsRenderDOMTree(domMap) {
+      const el = document.getElementById('ws-dom-tree');
+      if (!el) return;
+      let html = '';
+      domMap.forEach(({ tag, count, attrs, classes }) => {
+        const isRepeating = count >= 3;
+        const badge = isRepeating ? `<span class="dom-count-badge">×${count}</span>` : '';
+        const attrHtml = attrs.map(a => `<span class="dom-attr">${wsEsc(a)}</span>`).join(' ');
+        const classHtml = classes.length
+          ? `<span class="dom-attr">class</span>=<span class="dom-val">"${wsEsc(classes.join(' '))}"</span>`
+          : '';
+        html += `<div class="dom-node"><span class="dom-tag">&lt;${tag}&gt;</span>${badge} ${attrHtml} ${classHtml}</div>`;
+      });
+      el.innerHTML = html || '<span style="color:var(--muted);">Empty body</span>';
+    }
+
+    /* ───────────────────────────────────────────
+       PATTERN DETECTOR — finds repeating element groups
+       A "pattern" = a set of sibling elements that share the same tag/class
+       and appear >= 3 times → they form "variable fields" (rows/cards/items)
+    ─────────────────────────────────────────── */
+    function wsDetectPatterns(doc) {
+      const patterns = [];
+      const seen = new Set();
+
+      // Strategy 1: table rows
+      doc.querySelectorAll('table').forEach((table, ti) => {
+        const rows = [...table.querySelectorAll('tr')].filter(r => r.cells?.length > 0);
+        if (rows.length < 2) return;
+        // Get headers from first row or thead
+        const headerRow = table.querySelector('thead tr') || rows[0];
+        const dataRows  = table.querySelector('thead') ? [...table.querySelectorAll('tbody tr')] : rows.slice(1);
+        if (dataRows.length < 1) return;
+
+        const headers = [...(headerRow.querySelectorAll('th,td'))].map(c => wsCleanText(c.textContent) || `col_${c.cellIndex+1}`);
+        if (headers.length === 0) return;
+
+        const key = `table_${ti}`;
+        if (seen.has(key)) return;
+        seen.add(key);
+
+        patterns.push({
+          id: `table_${ti}`,
+          name: `Table ${ti + 1} — "${headers.slice(0,3).join(' / ')}"`,
+          type: 'table',
+          container: table,
+          rowSelector: 'tbody tr, tr',
+          fields: headers.map((h, i) => ({ name: h, selector: `td:nth-child(${i+1}), th:nth-child(${i+1})`, sample: wsCleanText(dataRows[0]?.cells?.[i]?.textContent) || '' })),
+          rowCount: dataRows.length,
+        });
+      });
+
+      // Strategy 2: repeated sibling divs/li/article with same class
+      const candidateSelectors = [
+        'ul > li', 'ol > li',
+        'div.result', 'div.item', 'div.card', 'div.post', 'div.entry',
+        'div.listing', 'div.product', 'div.profile', 'div.contact',
+        'div.user', 'div.member', 'div.row', 'div.record',
+        'article', 'section.item', '[class*="item-"]', '[class*="card-"]',
+        '[class*="result-"]', '[class*="product-"]', '[class*="user-"]',
+        '[class*="profile-"]', '[class*="post-"]', '[class*="listing-"]',
+      ];
+
+      candidateSelectors.forEach(sel => {
+        try {
+          const els = [...doc.querySelectorAll(sel)];
+          if (els.length < 3) return;
+          const parent = els[0].parentElement;
+          if (!parent) return;
+          // Check siblings share the same parent
+          const siblings = [...parent.children].filter(c => c.matches(sel));
+          if (siblings.length < 3) return;
+
+          const key = `${sel}_${parent.className}_${parent.id}`.replace(/\s+/g,'_').substring(0,60);
+          if (seen.has(key)) return;
+          seen.add(key);
+
+          // Discover fields from first element's text-containing children
+          const fields = wsExtractFieldsFromElement(siblings[0]);
+          if (fields.length === 0) return;
+
+          patterns.push({
+            id: key,
+            name: `"${sel}" — ${siblings.length} items${parent.className ? ` (.${parent.className.split(' ')[0]})` : ''}`,
+            type: 'sibling',
+            container: parent,
+            selector: sel,
+            fields,
+            rowCount: siblings.length,
+          });
+        } catch (_) {}
+      });
+
+      // Strategy 3: generic — find parent containers with 3+ identical child tags
+      const genericTags = ['div','li','article','tr','span'];
+      genericTags.forEach(tag => {
+        doc.querySelectorAll('*').forEach(parent => {
+          const children = [...parent.children].filter(c => c.tagName.toLowerCase() === tag);
+          if (children.length < 4) return;
+          // Must be direct children
+          if (children.every(c => c.parentElement === parent)) {
+            const key = `generic_${tag}_${parent.id || ''}_${parent.className || ''}`.replace(/\s+/g,'_').substring(0,60);
+            if (seen.has(key)) return;
+            seen.add(key);
+            const fields = wsExtractFieldsFromElement(children[0]);
+            if (fields.length < 1) return;
+            const label = parent.id ? `#${parent.id}` : (parent.className ? `.${parent.className.split(' ')[0]}` : parent.tagName.toLowerCase());
+            patterns.push({
+              id: key,
+              name: `${children.length}× <${tag}> inside ${label}`,
+              type: 'generic',
+              container: parent,
+              selector: tag,
+              fields,
+              rowCount: children.length,
+            });
+          }
+        });
+      });
+
+      // De-duplicate by row count (merge near-identical patterns)
+      const deduped = [];
+      const countSeen = new Set();
+      patterns.forEach(p => {
+        const sig = `${p.rowCount}_${p.fields.map(f=>f.name).join('|')}`;
+        if (!countSeen.has(sig)) { countSeen.add(sig); deduped.push(p); }
+      });
+
+      return deduped.slice(0, 15); // max 15 patterns
+    }
+
+    function wsExtractFieldsFromElement(el) {
+      if (!el) return [];
+      const fields = [];
+      const seen = new Set();
+
+      // Try labelled children (dt/dd, strong/span, etc.)
+      el.querySelectorAll('[class],[id],[data-field],[data-key],[name]').forEach(child => {
+        const id   = child.id || '';
+        const cls  = (child.className || '').toString().split(' ')[0] || '';
+        const data = child.dataset?.field || child.dataset?.key || '';
+        const rawName = data || id || cls || '';
+        if (!rawName || seen.has(rawName)) return;
+        const text = wsCleanText(child.textContent);
+        if (!text) return;
+        seen.add(rawName);
+        fields.push({ name: rawName.replace(/[-_]/g,' '), selector: `[class="${child.className}"]`, sample: text.substring(0, 50) });
+      });
+
+      // Fallback: all direct text nodes / links / images
+      if (fields.length < 2) {
+        const fallback = ['a','span','p','h1','h2','h3','h4','strong','em','small','time','address','img'];
+        fallback.forEach(tag => {
+          [...el.querySelectorAll(tag)].slice(0, 5).forEach(child => {
+            const text = tag === 'img' ? (child.alt || child.src || '') : wsCleanText(child.textContent);
+            if (!text || text.length < 2) return;
+            const name = (child.className || '').toString().split(' ')[0] || tag;
+            if (seen.has(name)) return;
+            seen.add(name);
+            fields.push({ name: name.replace(/[-_]/g,' ') || tag, selector: tag, sample: text.substring(0, 50) });
+          });
+        });
+      }
+
+      return fields.slice(0, 20);
+    }
+
+    /* ───────────────────────────────────────────
+       PATTERN PICKER RENDERER
+    ─────────────────────────────────────────── */
+    function wsRenderPatternPicker() {
+      const container = document.getElementById('ws-patterns-list');
+      if (!container) return;
+
+      if (_wsPatterns.length === 0) {
+        container.innerHTML = '<div style="color:var(--muted);font-size:11px;font-style:italic;">No repeating patterns detected in this HTML.</div>';
         return;
       }
 
-      const discoverBtn = document.querySelector('[onclick="discoverFieldsFromHTML()"]');
-      if (discoverBtn) discoverBtn.disabled = true;
-      addScraperLog(`Discovering variable fields from pasted HTML...`, 'info');
-      addScraperLog(`This is the recommended workflow for login / 2FA-protected pages.`, 'success');
-      document.getElementById('scrape-metric-status').textContent = 'ANALYZING...';
-      document.getElementById('scrape-metric-status').style.color = 'var(--gold)';
+      let html = '';
+      _wsPatterns.forEach((pat, pi) => {
+        html += `
+          <div class="pattern-card" id="pat-card-${pi}">
+            <div class="pattern-header">
+              <input type="checkbox" id="pat-check-${pi}" onchange="wsTogglePattern(${pi})" style="width:15px;height:15px;cursor:pointer;">
+              <label for="pat-check-${pi}" style="cursor:pointer;flex:1;">
+                <span class="pattern-name">${wsEsc(pat.name)}</span>
+                <span class="pattern-meta"> — ${pat.rowCount} rows · ${pat.fields.length} fields</span>
+              </label>
+            </div>
+            <div class="pattern-fields">`;
 
-      try {
-        const res = await fetch(`${API_BASE}/crm/scraper/discover-fields`, {
-          method: 'POST',
-          headers: {
-            'Authorization': 'Bearer lm_123456',
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({
-            sourceType: 'manual_html',
-            url,
-            html
-          })
+        pat.fields.forEach((field, fi) => {
+          html += `
+              <label class="pf-chip checked" id="pf-chip-${pi}-${fi}">
+                <input type="checkbox" class="pf-field-cb" data-pattern="${pi}" data-field="${fi}" checked style="margin:0;cursor:pointer;">
+                <span>${wsEsc(field.name)}</span>
+                ${field.sample ? `<span style="font-size:9px;color:var(--muted);max-width:100px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${wsEsc(field.sample)}">"${wsEsc(field.sample)}"</span>` : ''}
+              </label>`;
         });
 
-        const data = await res.json();
-        if (!res.ok) throw new Error(data.error || 'Failed to discover variable fields');
+        html += `</div></div>`;
+      });
 
-        pendingScrapeSource = { sourceType: 'manual_html', url, html };
-        applyDiscoveryResult(data);
+      container.innerHTML = html;
 
-        const fieldCount = (data.discovery_record_types || data.record_types || [])
-          .flatMap((rt) => rt.variable_fields || [])
-          .length;
-        addScraperLog(`Found ${fieldCount} variable field(s). Choose which to keep, then click Scrape Data.`, 'success');
-        if (data.page_title) addScraperLog(`Page title: ${data.page_title}`, 'info');
-        if (data.ai_used) addScraperLog(`AI-assisted field discovery applied.`, 'success');
+      // Sync chip styling on change
+      container.querySelectorAll('.pf-field-cb').forEach(cb => {
+        cb.addEventListener('change', () => {
+          const chip = cb.closest('.pf-chip');
+          if (chip) chip.classList.toggle('checked', cb.checked);
+        });
+      });
+    }
+
+    function wsTogglePattern(pi) {
+      const checked = document.getElementById(`pat-check-${pi}`)?.checked;
+      const card = document.getElementById(`pat-card-${pi}`);
+      if (card) card.classList.toggle('selected', checked);
+    }
+
+    /* ═══════════════════════════════════════════════
+       STEP 2 — SCRAPE DATA
+    ═══════════════════════════════════════════════ */
+    function wsStartScrape() {
+      if (!_wsParsedDoc) { alert('Analyze DOM first.'); return; }
+
+      // Collect which patterns + fields user selected
+      const selectedPatterns = [];
+      _wsPatterns.forEach((pat, pi) => {
+        const patCb = document.getElementById(`pat-check-${pi}`);
+        if (!patCb?.checked) return;
+        const fields = [];
+        document.querySelectorAll(`.pf-field-cb[data-pattern="${pi}"]`).forEach(cb => {
+          if (cb.checked) fields.push(pat.fields[parseInt(cb.dataset.field)]);
+        });
+        if (fields.length > 0) selectedPatterns.push({ pat, fields });
+      });
+
+      if (selectedPatterns.length === 0) {
+        alert('Check at least one pattern (checkbox on the left of the pattern name) and at least one field within it.');
+        return;
+      }
+
+      wsLog(`Scraping ${selectedPatterns.length} pattern(s)...`, 'info');
+      document.getElementById('ws-m-status').textContent = 'Scraping...';
+      document.getElementById('ws-m-status').style.color = 'var(--gold)';
+      document.getElementById('ws-btn-scrape').disabled = true;
+
+      try {
+        _wsScrapedRows = [];
+        _wsScrapedFields = [];
+        let allFields = new Set();
+        const allRows = [];
+
+        selectedPatterns.forEach(({ pat, fields }) => {
+          const rows = wsExtractRows(pat, fields, _wsParsedDoc);
+          wsLog(`Pattern "${pat.name}": extracted ${rows.length} rows × ${fields.length} fields.`, 'success');
+          rows.forEach(r => allFields = new Set([...allFields, ...Object.keys(r)]));
+          allRows.push(...rows);
+        });
+
+        _wsScrapedFields = [...allFields];
+        _wsScrapedRows   = allRows;
+
+        wsLog(`Total: ${_wsScrapedRows.length} records, ${_wsScrapedFields.length} fields.`, 'success');
+
+        wsUpdatePreviewTable(_wsScrapedFields, _wsScrapedRows);
+        wsUpdateSummary(_wsScrapedFields, _wsScrapedRows);
+
+        document.getElementById('ws-m-status').textContent = 'Done';
+        document.getElementById('ws-m-status').style.color = 'var(--green)';
+        document.getElementById('ws-m-records').textContent = _wsScrapedRows.length;
+
+        const exportBtn = document.getElementById('ws-btn-export');
+        const exportDis = document.getElementById('ws-export-disabled');
+        const headerExp = document.getElementById('ws-header-export');
+        if (exportBtn) exportBtn.style.display = '';
+        if (exportDis) exportDis.style.display = 'none';
+        if (headerExp) headerExp.style.display = '';
+
       } catch (err) {
-        addScraperLog(`Field discovery error: ${err.message}`, 'error');
-        document.getElementById('scrape-metric-status').textContent = 'Error';
-        document.getElementById('scrape-metric-status').style.color = 'var(--red)';
+        wsLog(`Scrape error: ${err.message}`, 'error');
+        document.getElementById('ws-m-status').textContent = 'Error';
+        document.getElementById('ws-m-status').style.color = 'var(--red)';
       } finally {
-        if (discoverBtn) discoverBtn.disabled = false;
+        document.getElementById('ws-btn-scrape').disabled = false;
       }
     }
 
-    setWebScrapeMode('manual_html');
+    function wsExtractRows(pat, fields, doc) {
+      const rows = [];
+
+      if (pat.type === 'table') {
+        const allRows = [...pat.container.querySelectorAll('tbody tr, tr')].filter(r => r.cells?.length > 0);
+        const startIdx = pat.container.querySelector('thead') ? 0 : 1;
+        allRows.slice(startIdx).forEach(tr => {
+          const obj = {};
+          fields.forEach(f => {
+            const idx = pat.fields.indexOf(f);
+            const cell = tr.cells[idx];
+            obj[f.name] = cell ? wsCleanText(cell.textContent) : '';
+          });
+          if (Object.values(obj).some(v => v)) rows.push(obj);
+        });
+
+      } else if (pat.type === 'sibling' || pat.type === 'generic') {
+        const siblings = [...pat.container.children].filter(c => {
+          try { return c.matches(pat.selector); } catch (_) { return c.tagName.toLowerCase() === pat.selector; }
+        });
+        siblings.forEach(sibling => {
+          const obj = {};
+          fields.forEach(f => {
+            const origField = pat.fields.find(pf => pf.name === f.name);
+            if (!origField) return;
+            try {
+              const el = sibling.querySelector(origField.selector);
+              if (el) {
+                obj[f.name] = el.tagName === 'IMG' ? (el.alt || el.src || '') : wsCleanText(el.textContent);
+              } else {
+                // Fallback: search by tag
+                const byTag = sibling.querySelector(origField.selector.split('[')[0]);
+                obj[f.name] = byTag ? wsCleanText(byTag.textContent) : wsCleanText(sibling.textContent).substring(0, 120);
+              }
+            } catch (_) {
+              obj[f.name] = wsCleanText(sibling.textContent).substring(0, 120);
+            }
+          });
+          if (Object.values(obj).some(v => v)) rows.push(obj);
+        });
+      }
+
+      return rows;
+    }
+
+    /* ───────────────────────────────────────────
+       UI UPDATERS
+    ─────────────────────────────────────────── */
+    function wsUpdatePreviewTable(fields, data) {
+      const thead = document.getElementById('ws-table-head');
+      const tbody = document.getElementById('ws-table-body');
+      const cnt   = document.getElementById('ws-row-count');
+      if (!thead || !tbody) return;
+
+      thead.innerHTML = `<th style="padding:8px 10px;width:40px;">#</th>` +
+        fields.map(f => `<th style="padding:8px 10px;">${wsEsc(f)}</th>`).join('');
+
+      tbody.innerHTML = '';
+      if (data.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="${fields.length+1}" style="padding:20px;text-align:center;color:var(--muted);font-style:italic;">No records scraped yet.</td></tr>`;
+        if (cnt) cnt.textContent = '0 rows';
+        return;
+      }
+
+      data.forEach((row, i) => {
+        const cells = fields.map(f => {
+          const val = row[f] || '';
+          const style = val ? '' : 'color:var(--muted);font-style:italic;';
+          return `<td style="padding:7px 10px;border-bottom:1px solid var(--border);${style}">${wsEsc(val || '—')}</td>`;
+        }).join('');
+        tbody.innerHTML += `<tr><td style="padding:7px 10px;border-bottom:1px solid var(--border);color:var(--muted);">${i+1}</td>${cells}</tr>`;
+      });
+      if (cnt) cnt.textContent = `${data.length} rows`;
+    }
+
+    function wsUpdateSummary(fields, data) {
+      const colEl  = document.getElementById('ws-report-collected');
+      const misEl  = document.getElementById('ws-report-missing');
+      const rateEl = document.getElementById('ws-fill-rate');
+      const totEl  = document.getElementById('ws-total-records');
+
+      if (!colEl) return;
+
+      if (fields.length === 0) {
+        colEl.innerHTML = '<span style="font-style:italic;color:var(--muted);">None yet</span>';
+        if (misEl) misEl.innerHTML = '<span style="font-style:italic;color:var(--muted);">None yet</span>';
+        if (rateEl) rateEl.textContent = '0%';
+        if (totEl)  totEl.textContent = '0';
+        return;
+      }
+
+      // Find which fields have at least one non-empty value
+      const filled = new Set();
+      data.forEach(row => { fields.forEach(f => { if (row[f]) filled.add(f); }); });
+      const missing = fields.filter(f => !filled.has(f));
+
+      colEl.innerHTML  = [...filled].map(f => `<span style="background:rgba(16,185,129,0.2);border:1px solid var(--green);color:var(--green2);padding:2px 5px;border-radius:4px;font-size:10px;">${wsEsc(f)}</span>`).join(' ') || '<span style="font-style:italic;color:var(--muted);">None</span>';
+      if (misEl) misEl.innerHTML = missing.map(f => `<span style="background:rgba(239,68,68,0.2);border:1px solid var(--red);color:var(--red2);padding:2px 5px;border-radius:4px;font-size:10px;">${wsEsc(f)}</span>`).join(' ') || '<span style="font-style:italic;color:var(--muted);">None</span>';
+      const rate = fields.length ? Math.round((filled.size / fields.length) * 100) : 0;
+      if (rateEl) { rateEl.textContent = `${rate}%`; rateEl.style.color = rate > 75 ? 'var(--green2)' : rate > 40 ? 'var(--gold2)' : 'var(--red2)'; }
+      if (totEl)  totEl.textContent = data.length;
+    }
+
+    /* ───────────────────────────────────────────
+       EXCEL EXPORT
+    ─────────────────────────────────────────── */
+    function wsExportExcel() {
+      if (!_wsScrapedRows.length) { alert('No data to export.'); return; }
+      try {
+        wsLog('Compiling Excel workbook...', 'info');
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(_wsScrapedRows), 'Scraped Data');
+
+        // Summary sheet
+        const filled = new Set();
+        _wsScrapedRows.forEach(row => { _wsScrapedFields.forEach(f => { if (row[f]) filled.add(f); }); });
+        const summary = _wsScrapedFields.map(f => ({
+          'Field': f,
+          'Status': filled.has(f) ? 'Collected' : 'Missing',
+          'Fill Rate': filled.has(f) ? '100%' : '0%'
+        }));
+        summary.push({});
+        summary.push({ 'Field': 'Export Time',     'Status': new Date().toLocaleString() });
+        summary.push({ 'Field': 'Total Records',   'Status': _wsScrapedRows.length });
+        summary.push({ 'Field': 'Total Fields',    'Status': _wsScrapedFields.length });
+        XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(summary), 'Report');
+
+        const fn = `scrape_${Date.now()}.xlsx`;
+        XLSX.writeFile(wb, fn);
+        wsLog(`Excel exported: ${fn}`, 'success');
+      } catch (err) {
+        wsLog(`Export error: ${err.message}`, 'error');
+      }
+    }
+
+    /* ───────────────────────────────────────────
+       HELPERS
+    ─────────────────────────────────────────── */
+    function wsEsc(v) {
+      return String(v||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    }
+    function wsCleanText(t) {
+      return String(t||'').replace(/\s+/g,' ').replace(/[\r\n\t]/g,' ').trim();
+    }
 
     // ── n8n WORKFLOW TESTER ──────────────────────────────────────────────────────
 

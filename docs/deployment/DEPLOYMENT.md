@@ -1,11 +1,11 @@
-# UniComm Pro — Deployment & Maintenance Guide
+﻿# UniComm Pro — Deployment & Maintenance Guide
 
 ---
 
 ## Tower Server Info
-- **IP:** 192.168.0.200
+- **IP:** 192.168.0.55
 - **Port:** 8088
-- **URL:** https://192.168.0.200:8088
+- **URL:** https://192.168.0.55:8088
 - **Project Path:** `C:\setup0\Unicircuit_UniComm`
 - **OS:** Windows
 - **Node:** v24+
@@ -55,9 +55,9 @@ CTI_PORT=5001
 MS_TENANT_ID=407ec761-e4ad-4d41-9ea4-6ae7fe391047
 MS_CLIENT_ID=d6224f70-6728-4f68-93aa-75a91f4adaa8
 MS_CLIENT_SECRET=nzF8Q~v7eZui9WgYylxIebCoD2hCjzWao6gDpazR
-MS_REDIRECT_URI=https://192.168.0.200:8088/auth/callback
+MS_REDIRECT_URI=https://192.168.0.55:8088/auth/callback
 MS_USER_EMAIL=sales@unicircuites.com
-APP_PUBLIC_URL=https://192.168.0.200:8088
+APP_PUBLIC_URL=https://192.168.0.55:8088
 ENGAGEBAY_API_KEY=your_engagebay_api_key_here
 SMTP_HOST=smtp.office365.com
 SMTP_PORT=587
@@ -123,7 +123,7 @@ Newer versions of Node.js (20+) block legacy Windows certificate encryption form
 Run this in PowerShell on the Tower server:
 ```powershell
 mkdir -Path "C:\setup0\Unicircuit_UniComm\backend\certs" -ErrorAction SilentlyContinue
-& "C:\Program Files\Git\usr\bin\openssl.exe" req -x509 -nodes -days 3650 -newkey rsa:2048 -keyout "C:\setup0\Unicircuit_UniComm\backend\certs\server.key" -out "C:\setup0\Unicircuit_UniComm\backend\certs\server.crt" -subj "/CN=192.168.0.200"
+& "C:\Program Files\Git\usr\bin\openssl.exe" req -x509 -nodes -days 3650 -newkey rsa:2048 -keyout "C:\setup0\Unicircuit_UniComm\backend\certs\server.key" -out "C:\setup0\Unicircuit_UniComm\backend\certs\server.crt" -subj "/CN=192.168.0.55"
 ```
 
 ---
@@ -279,9 +279,9 @@ net stop postgresql-x64-16; net start postgresql-x64-16
 ```
 Matrix PBX (192.168.0.81)
     ↓ TCP SMDR push to whichever server is set in PBX
-Dev Machine (192.168.0.149:5001)  OR  Tower (192.168.0.200:5001)
+Dev Machine (192.168.0.149:5001)  OR  Tower (192.168.0.55:5001)
     ↓
-Tower PostgreSQL DB (192.168.0.200:5432)  ← both use same DB
+Tower PostgreSQL DB (192.168.0.55:5432)  ← both use same DB
 ```
 
 ### PBX Settings (SMDR Online page)
@@ -290,7 +290,7 @@ All three sections (Outgoing / Incoming / Internal):
 
 | Field | Dev Testing | Tower Production |
 |---|---|---|
-| Destination IP | `192.168.0.149` | `192.168.0.200` |
+| Destination IP | `192.168.0.149` | `192.168.0.55` |
 | Port | `5001` | `5001` |
 | Mode | Ethernet | Ethernet |
 
@@ -317,7 +317,7 @@ NODE_ENV=development
 > share doesn't exist — Windows will hang trying to resolve it and block server startup.
 > Leave them unset so the code falls back to local `recordings/` and `call_backups/` folders.
 
-### Tower .env (`https://192.168.0.200:8088`)
+### Tower .env (`https://192.168.0.55:8088`)
 ```
 DB_HOST=localhost
 DB_PORT=5432
@@ -331,8 +331,8 @@ HOST=0.0.0.0
 NODE_ENV=production
 SSL_KEY_PATH=certs/server.key
 SSL_CERT_PATH=certs/server.crt
-MS_REDIRECT_URI=https://192.168.0.200:8088/auth/callback
-APP_PUBLIC_URL=https://192.168.0.200:8088
+MS_REDIRECT_URI=https://192.168.0.55:8088/auth/callback
+APP_PUBLIC_URL=https://192.168.0.55:8088
 
 # Tower-specific paths — UNC network shares on UNISERVER
 PBX_RECORDINGS_DIR=\\UNISERVER\MatrixVMS\Voicemail_Backup
@@ -369,7 +369,7 @@ net stop postgresql-x64-16; net start postgresql-x64-16
 | Tenant ID | `407ec761-e4ad-4d41-9ea4-6ae7fe391047` |
 | Client ID | `d6224f70-6728-4f68-93aa-75a91f4adaa8` |
 | Redirect URI (Web) | `http://localhost:8088/auth/callback` |
-| Redirect URI (Web) | `https://192.168.0.200:8088/auth/callback` |
+| Redirect URI (Web) | `https://192.168.0.55:8088/auth/callback` |
 | Mailbox | `sales@unicircuites.com` |
 
 > **Azure Redirect URI Rules (important):**
@@ -380,8 +380,8 @@ net stop postgresql-x64-16; net start postgresql-x64-16
 > **Matlab:** Tower server pe Outlook connect karne ke liye **HTTPS** mandatory hai.
 > SSL certificate setup karo (self-signed bhi chalega) aur `.env` mein update karo:
 > ```
-> MS_REDIRECT_URI=https://192.168.0.200:8088/auth/callback
-> APP_PUBLIC_URL=https://192.168.0.200:8088
+> MS_REDIRECT_URI=https://192.168.0.55:8088/auth/callback
+> APP_PUBLIC_URL=https://192.168.0.55:8088
 > ```
 
 ---
@@ -417,7 +417,7 @@ Kya dikhe:
 
 ### Step 2 — Dashboard se reconnect karo (sabse pehle yeh try karo)
 
-1. Browser mein kholo: `http://192.168.0.200:8088/dashboard.html`
+1. Browser mein kholo: `http://192.168.0.55:8088/dashboard.html`
 2. Login karo (Uniadmin / Uniadmin@123)
 3. **Email / Outlook** tab pe jao
 4. **"Connect Outlook"** button dhundo — click karo
@@ -478,7 +478,7 @@ Agar Azure login ke baad error aaye: *"The reply URL specified in the request do
 3. **Web → Redirect URIs** mein yeh dono hone chahiye:
    ```
    http://localhost:8088/auth/callback
-   http://192.168.0.200:8088/auth/callback
+   http://192.168.0.55:8088/auth/callback
    ```
 4. Agar missing hai → **Add URI** → save karo
 5. Phir Step 2 dobara karo
@@ -639,7 +639,7 @@ mkdir certs -ErrorAction SilentlyContinue
 if (!(Test-Path ".\certs\server.key") -or !(Test-Path ".\certs\server.crt")) {
   Write-Host "SSL certs missing — generating..." -ForegroundColor Yellow
   & "C:\Program Files\Git\usr\bin\openssl.exe" req -x509 -nodes -days 3650 -newkey rsa:2048 `
-    -keyout ".\certs\server.key" -out ".\certs\server.crt" -subj "/CN=192.168.0.200"
+    -keyout ".\certs\server.key" -out ".\certs\server.crt" -subj "/CN=192.168.0.55"
 } else {
   Write-Host "SSL certs OK" -ForegroundColor Green
 }
@@ -682,7 +682,7 @@ pm2 stop unicomm-backend; cd C:\setup0\Unicircuit_UniComm; git config core.askye
 [ ] pm2 restart unicomm-backend --update-env
 [ ] pm2 status → "online" dikha
 [ ] pm2 logs unicomm-backend --lines 80 → koi crash nahi
-[ ] Browser: https://192.168.0.200:8088 → dashboard load hua
+[ ] Browser: https://192.168.0.55:8088 → dashboard load hua
 ```
 
 ---
@@ -695,7 +695,7 @@ pm2 stop unicomm-backend; cd C:\setup0\Unicircuit_UniComm; git config core.askye
 cd C:\setup0\Unicircuit_UniComm\backend
 mkdir certs -ErrorAction SilentlyContinue
 & "C:\Program Files\Git\usr\bin\openssl.exe" req -x509 -nodes -days 3650 -newkey rsa:2048 `
-  -keyout ".\certs\server.key" -out ".\certs\server.crt" -subj "/CN=192.168.0.200"
+  -keyout ".\certs\server.key" -out ".\certs\server.crt" -subj "/CN=192.168.0.55"
 pm2 restart unicomm-backend --update-env
 ```
 

@@ -1,6 +1,6 @@
-SELECT [POST_PARA_0] "SMDR-OG Posting Protocol (Handshaking and OG Call Record Format)" = «Matrix»  options: Blind Send / Matrix / Holidex / HOBIS A / HOBIS B / HOBIC / BELL HOBIC / MICROS A / MICROS B / Hilton / Xiox / Comm One / Call-Inn / RSI-CMS / Customized / AST
+﻿SELECT [POST_PARA_0] "SMDR-OG Posting Protocol (Handshaking and OG Call Record Format)" = «Matrix»  options: Blind Send / Matrix / Holidex / HOBIS A / HOBIS B / HOBIC / BELL HOBIC / MICROS A / MICROS B / Hilton / Xiox / Comm One / Call-Inn / RSI-CMS / Customized / AST
 SELECT [POST_PARA_1] "Destination Port" = «Ethernet»  options: None / Ethernet
-TEXT [POST_PARA_2] "Destination IP Address" = "192.168.0.200"
+TEXT [POST_PARA_2] "Destination IP Address" = "192.168.0.55"
 TEXT [POST_PARA_3] "Port" = "05001"
 SELECT [POST_PARA_4] "Process" = «Start»  options: Abort / Start
 TEXT [POST_HANDSHAK_PARA_0] "Response to ENQ Timeout (sec)" = "03"

@@ -1,4 +1,4 @@
-process.env.DB_HOST = '192.168.0.200';
+﻿process.env.DB_HOST = '192.168.0.55';
 process.env.DB_PASSWORD = 'Unicircuit@2026';
 const pool = require('./backend/db/pool');
 

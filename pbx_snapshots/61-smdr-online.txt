@@ -1,11 +1,11 @@
-SELECT [0] "" = «Ethernet»  options: None / Ethernet
-TEXT [1] "" = "192.168.0.200"
+﻿SELECT [0] "" = «Ethernet»  options: None / Ethernet
+TEXT [1] "" = "192.168.0.55"
 TEXT [2] "" = "05001"
 SELECT [3] "" = «Ethernet»  options: None / Ethernet
-TEXT [4] "" = "192.168.0.200"
+TEXT [4] "" = "192.168.0.55"
 TEXT [5] "" = "05001"
 SELECT [6] "" = «Ethernet»  options: None / Ethernet
-TEXT [7] "" = "192.168.0.200"
+TEXT [7] "" = "192.168.0.55"
 TEXT [8] "" = "05001"
 TEXT [9] "Serial Number" = "01"
 TEXT [10] "Serial Number" = "04"

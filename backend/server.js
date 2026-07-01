@@ -1,4 +1,4 @@
-/**
+﻿/**
  * UniComm Pro — Express REST API
  * Unicircuit Engineering Services LLP
  *
@@ -690,8 +690,8 @@ app.use(cors({
       'https://127.0.0.1:8088',
       'http://192.168.0.149:8088',
       'https://192.168.0.149:8088',
-      'http://192.168.0.200:8088',
-      'https://192.168.0.200:8088',
+      'http://192.168.0.55:8088',
+      'https://192.168.0.55:8088',
       'http://localhost:3000',
       'http://127.0.0.1:3000',
       'http://localhost:5500',

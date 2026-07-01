@@ -1,4 +1,4 @@
-  0 [checkbox] = "CHECKED"
+﻿  0 [checkbox] = "CHECKED"
   FROM_STATION [text] = "1"
   TO_STATION [text] = "999999"
   BLANK_EXTN_ALLOWED [checkbox] = "CHECKED"
@@ -58,7 +58,7 @@ Calls Print Normal Calls Print calls received on Built-In Auto Attendant Print U
 Number List
 Filter Calls
 Scheduled Report Generation
-Submit Default Incoming Call Reports View Send to Destination Port Incoming Call Reports on - 192.168.0.200 : 5001
+Submit Default Incoming Call Reports View Send to Destination Port Incoming Call Reports on - 192.168.0.55 : 5001
 [TABLE 1]
  |  | From | To
  | Calls routed on All Extensions |  | 
@@ -152,11 +152,11 @@ LoadTwoDigCombo('SCH_MONTHLY_DATE',1,1,31,"style='width:95%;'")01020304050607080
 [TABLE 17]
 Submit Default
 Incoming Call Reports
-View Send to Destination Port Incoming Call Reports on - 192.168.0.200 : 5001
+View Send to Destination Port Incoming Call Reports on - 192.168.0.55 : 5001
 [TABLE 18]
 Submit | Default | 
 [TABLE 19]
 View | 
-Send to Destination Port | Incoming Call Reports on - 192.168.0.200 : 5001
+Send to Destination Port | Incoming Call Reports on - 192.168.0.55 : 5001
 [TABLE 20]
 View
