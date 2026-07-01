@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 
 <head>
@@ -5452,6 +5452,7 @@
                   <option value="pbx">PBX</option>
                   <option value="whatsapp">WhatsApp</option>
                 </select>
+                <button class="btn btn-ghost btn-sm" id="leads-sync-outlook-btn" onclick="syncOutlookLeads()"><i class="fab fa-microsoft"></i> Sync Outlook</button>
                 <button class="btn btn-ghost btn-sm" onclick="_leadsCurrentPage=1; loadLeads()"><i class="fas fa-sync-alt"></i> Refresh</button>
                 <button class="btn btn-gold btn-sm" onclick="openLeadModal()"><i class="fas fa-plus"></i> Add Lead</button>
               </div>
@@ -34100,6 +34101,52 @@ ${plainText}`;
       if (badge) badge.style.display = 'inline-flex';
       updateServiceIndicator('pbx', true);
       pbxConsoleEnd(traceId, 'CONNECTED UI transition finished');
+    }
+
+    function updateLeadsBadge() {
+      const badge = document.getElementById('main-nav-leads-badge');
+      if (!badge) return;
+      badge.textContent = _leadsCache.length;
+      badge.style.display = _leadsCache.length ? 'inline-flex' : 'none';
+    }
+
+    async function syncOutlookLeads() {
+      const btn = document.getElementById('leads-sync-outlook-btn');
+      if (btn) btn.innerHTML = '<i class="fas fa-circle-notch fa-spin"></i> Syncing...';
+      try {
+        const res = await fetch(`${API_BASE}/outlook/categorize?top=100`, { headers: getAuthHeaders() });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Failed to fetch categories');
+        
+        const leads = (data.categorized || []).filter(e => e.category === 'LEAD');
+        let imported = 0;
+        
+        for (const lead of leads) {
+          const body = {
+            lead_name: lead.fromName || lead.from || 'Unknown',
+            subject: lead.subject,
+            notes: `Source: outlook | Buyer: ${lead.fromName || lead.from}\n---\nCategorized as LEAD\n---\nReceived: ${lead.received_time}`,
+            platform: 'outlook',
+            lead_date: (lead.received_time || '').split('T')[0] || new Date().toISOString().split('T')[0],
+            lead_time: ((lead.received_time || '').split('T')[1] || '').substring(0,8) || '00:00:00'
+          };
+          
+          await fetch(`${API_BASE}/calls/leads`, {
+            method: 'POST',
+            headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
+            body: JSON.stringify(body)
+          });
+          imported++;
+        }
+        
+        notify('Sync Complete', `Imported ${imported} new Outlook leads.`, 'var(--green2)', 'fas fa-check');
+        _leadsCurrentPage = 1;
+        loadLeads();
+      } catch (err) {
+        notify('Sync Failed', err.message, 'var(--red2)', 'fas fa-exclamation-triangle');
+      } finally {
+        if (btn) btn.innerHTML = '<i class="fab fa-microsoft"></i> Sync Outlook';
+      }
     }
 
     function pbxOnDisconnected(data) {
