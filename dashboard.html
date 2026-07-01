@@ -7795,7 +7795,7 @@
             /* ===== SCRAPER PANEL STYLES ===== */
             .ws-shell { display:grid; grid-template-columns:390px 1fr; gap:18px; height:calc(100vh - 140px); overflow:hidden; }
             .ws-left  { display:flex; flex-direction:column; gap:14px; height:100%; min-height:0; overflow-y:auto; padding-right:4px; }
-            .ws-right { display:flex; flex-direction:column; gap:14px; height:100%; min-height:0; overflow:hidden; }
+            .ws-right { display:flex; flex-direction:column; gap:14px; height:100%; min-height:0; overflow-y:auto; padding-right:4px; }
             .ws-card  { background:var(--bg3); border:1px solid var(--border2); border-radius:12px; padding:18px; }
 
             /* Step badges */
@@ -7856,7 +7856,7 @@
                   Paste or Upload HTML Source
                 </div>
                 <div style="font-size:10px;color:var(--muted2);margin-bottom:10px;line-height:1.45;padding:8px 10px;border:1px solid var(--border2);border-radius:6px;background:rgba(212,175,55,0.05);">
-                  Open the Facebook/website page in your browser, press <strong style="color:var(--gold2);">Ctrl+U</strong> (View Source), select all, copy and paste below. Or upload the saved <code>.html</code> file.
+                  Open the Facebook/website page in your browser, press <strong style="color:var(--gold2);">Ctrl+U</strong> (View Source), select all, copy and paste below. Or upload the saved <code>.html</code> file. <strong style="color:var(--gold2);">Or</strong> just enter a Source URL below and click Analyze — the server fetches the page for you.
                 </div>
                 <div class="ws-drop-zone" onclick="document.getElementById('ws-file-input').click()" style="margin-bottom:10px;">
                   <i class="fas fa-cloud-upload-alt" style="font-size:22px;color:var(--muted);display:block;margin-bottom:4px;"></i>
@@ -7866,11 +7866,15 @@
                 <div style="font-size:10px;color:var(--muted);text-align:center;font-weight:600;margin-bottom:8px;">— OR PASTE HTML BELOW —</div>
                 <textarea id="ws-html-input" class="inp" placeholder="Paste &lt;html&gt; source here..." style="font-family:monospace;font-size:10px;height:120px;resize:vertical;padding:8px;background:rgba(0,0,0,0.3);border:1px solid var(--border);"></textarea>
                 <div style="display:flex;gap:8px;margin-top:10px;">
-                  <input class="inp" id="ws-source-url" placeholder="Source URL (optional, e.g. https://fb.com/...)" style="flex:1;font-size:11px;padding:6px 10px;">
+                  <input class="inp" id="ws-source-url" placeholder="Source URL (e.g. https://fb.com/...) — used if no HTML is pasted" style="flex:1;font-size:11px;padding:6px 10px;">
                 </div>
                 <button class="btn btn-secondary" onclick="wsAnalyzeDOM()" style="width:100%;justify-content:center;height:36px;margin-top:10px;">
                   <i class="fas fa-sitemap" style="margin-right:6px;"></i> Analyze DOM &amp; Detect Patterns
                 </button>
+                <button class="btn btn-ghost" id="ws-login-btn" onclick="wsLoginSession()" style="width:100%;justify-content:center;height:32px;margin-top:8px;border:1px solid var(--border);font-size:11px;">
+                  <i class="fab fa-facebook" style="color:#1877F2;margin-right:6px;"></i> Log in &amp; save session
+                </button>
+                <div style="font-size:9px;color:var(--muted);text-align:center;margin-top:5px;line-height:1.4;">Opens a browser — log in once, and the session is saved for future scrapes.</div>
               </div>
 
               <!-- STEP 2: DOM Map -->
@@ -7960,6 +7964,24 @@
                     <span>Records: <b id="ws-total-records" style="color:var(--text);">0</b></span>
                   </div>
                 </div>
+              </div>
+
+              <!-- Captured Elements Snapshot -->
+              <div class="ws-card" id="ws-snapshot-card" style="display:none;padding:14px;flex-shrink:0;">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+                  <div style="font-size:13px;font-weight:600;color:var(--text);"><i class="fas fa-camera" style="color:var(--gold);margin-right:6px;"></i>Captured Elements <span id="ws-snapshot-count" style="color:var(--muted);font-weight:400;"></span></div>
+                  <span style="font-size:10px;color:var(--muted);">Buttons, dropdowns &amp; inputs the scraper saw</span>
+                </div>
+                <div id="ws-snapshot-grid" style="max-height:360px;overflow:auto;display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px;padding:4px;"></div>
+              </div>
+
+              <!-- Reels List -->
+              <div class="ws-card" id="ws-reels-card" style="display:none;padding:14px;flex-shrink:0;">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+                  <div style="font-size:13px;font-weight:600;color:var(--text);"><i class="fas fa-film" style="color:var(--gold);margin-right:6px;"></i>Reels <span id="ws-reels-count" style="color:var(--muted);font-weight:400;"></span></div>
+                  <button class="btn btn-ghost btn-sm" id="ws-reels-export" onclick="wsExportReels()" style="border:1px solid var(--border);font-size:11px;height:26px;"><i class="fas fa-file-excel" style="color:var(--green);margin-right:5px;"></i>Export Reels</button>
+                </div>
+                <div id="ws-reels-grid" style="max-height:340px;overflow:auto;display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:10px;padding:4px;"></div>
               </div>
 
               <!-- Live Preview Table -->
@@ -15052,6 +15074,11 @@ Keep it concise and professional.`;
       document.getElementById('ws-dom-card').style.display = 'none';
       document.getElementById('ws-scrape-card').style.display = 'none';
       document.getElementById('ws-patterns-panel').style.display = 'none';
+      const snapCard = document.getElementById('ws-snapshot-card');
+      if (snapCard) snapCard.style.display = 'none';
+      const reelsCard = document.getElementById('ws-reels-card');
+      if (reelsCard) reelsCard.style.display = 'none';
+      _wsReels = [];
       document.getElementById('ws-patterns-list').innerHTML = '';
       document.getElementById('ws-dom-tree').innerHTML = '';
       document.getElementById('ws-m-status').textContent = 'Idle';
@@ -15065,9 +15092,65 @@ Keep it concise and professional.`;
     /* ═══════════════════════════════════════════════
        STEP 1 — ANALYZE DOM
     ═══════════════════════════════════════════════ */
-    function wsAnalyzeDOM() {
-      const html = document.getElementById('ws-html-input').value.trim();
-      if (!html) { alert('Paste or upload HTML first.'); return; }
+    async function wsAnalyzeDOM() {
+      let html = document.getElementById('ws-html-input').value.trim();
+      const url = (document.getElementById('ws-source-url')?.value || '').trim();
+
+      // No pasted HTML but a URL is provided → fetch the page via the backend
+      // (server launches a real browser, so CORS/login walls are handled there).
+      if (!html) {
+        if (!url) { alert('Paste/upload HTML, or enter a Source URL to fetch.'); return; }
+
+        wsLog(`No HTML pasted — fetching page from URL: ${url}`, 'info');
+        document.getElementById('ws-m-status').textContent = 'Fetching URL...';
+        document.getElementById('ws-m-status').style.color = 'var(--gold)';
+        try {
+          const res = await fetch(`${API_BASE}/scraper/analyze`, {
+            method: 'POST',
+            headers: typeof getAuthHeaders === 'function' ? getAuthHeaders() : { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ url })
+          });
+          const data = await res.json().catch(() => ({}));
+          if (!res.ok || data.success === false || !data.html) {
+            const msg = data.error || `Failed to fetch URL (HTTP ${res.status}).`;
+            wsLog(`URL fetch failed: ${msg}`, 'error');
+            alert(msg);
+            document.getElementById('ws-m-status').textContent = 'Error';
+            document.getElementById('ws-m-status').style.color = 'var(--red)';
+            return;
+          }
+          html = data.html;
+          document.getElementById('ws-html-input').value = html;
+          wsLog(`Fetched ${(html.length / 1024).toFixed(1)} KB of HTML from ${url}.`, 'success');
+
+          // Show per-element snapshots (buttons, dropdowns, inputs) — clearer than raw DOM.
+          if (Array.isArray(data.elementShots) && data.elementShots.length) {
+            wsShowElementShots(data.elementShots);
+            wsLog(`Captured ${data.elementShots.length} element snapshot(s) — see "Captured Elements" below.`, 'info');
+          }
+
+          // Show the scraped Reels list (open + download links).
+          if (Array.isArray(data.reels) && data.reels.length) {
+            wsShowReels(data.reels);
+            wsLog(`Scraped ${data.reels.length} reel(s) — see "Reels" below.`, 'success');
+          }
+
+          // Facebook / profile pages: the server already extracted a clean
+          // structured record. Present it directly — the generic pattern
+          // detector only finds Facebook's obfuscated class names (x9f619…),
+          // which is useless noise.
+          if (data.isProfilePage && data.sampleRecord && Object.keys(data.sampleRecord).length) {
+            wsPresentProfileRecord(data.sampleRecord, html, url);
+            return;
+          }
+        } catch (err) {
+          wsLog(`URL fetch error: ${err.message}`, 'error');
+          alert(`Could not reach the backend to fetch the URL: ${err.message}`);
+          document.getElementById('ws-m-status').textContent = 'Error';
+          document.getElementById('ws-m-status').style.color = 'var(--red)';
+          return;
+        }
+      }
 
       wsLog('Parsing HTML document...', 'info');
       document.getElementById('ws-m-status').textContent = 'Analyzing...';
@@ -15103,6 +15186,210 @@ Keep it concise and professional.`;
 
       } catch (err) {
         wsLog(`Parse error: ${err.message}`, 'error');
+        document.getElementById('ws-m-status').textContent = 'Error';
+        document.getElementById('ws-m-status').style.color = 'var(--red)';
+      }
+    }
+
+    /* ── Facebook login → save persistent session ── */
+    let _wsLoginPoll = null;
+    async function wsLoginSession() {
+      const url = (document.getElementById('ws-source-url')?.value || '').trim() || 'https://www.facebook.com/';
+      const btn = document.getElementById('ws-login-btn');
+      const restore = () => { if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fab fa-facebook" style="color:#1877F2;margin-right:6px;"></i> Log in & save session'; } };
+      if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin" style="margin-right:6px;"></i> Waiting for login...'; }
+      wsLog(`Opening browser to log in: ${url}`, 'info');
+      wsLog('Complete the login (and any CAPTCHA) in the opened Chrome window. This can take a few minutes.', 'warn');
+
+      // Poll the backend for live login-wait status while we wait.
+      _wsLoginPoll = setInterval(async () => {
+        try {
+          const s = await fetch(`${API_BASE}/scraper/analyze/login-status`, { headers: getAuthHeaders() }).then(r => r.json());
+          if (s && s.active && s.message) wsLog(`· ${s.message}`, 'info');
+        } catch (_) {}
+      }, 5000);
+
+      try {
+        const res = await fetch(`${API_BASE}/scraper/login`, {
+          method: 'POST',
+          headers: typeof getAuthHeaders === 'function' ? getAuthHeaders() : { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ url })
+        });
+        const data = await res.json().catch(() => ({}));
+        if (data.success) {
+          const how = data.alreadyLoggedIn ? 'already logged in' : 'login successful';
+          wsLog(`Session saved — ${how} (${data.cookieCount || 0} cookies). Future scrapes will reuse it.`, 'success');
+          alert(`Facebook session saved (${how}). You can now Analyze without logging in again.`);
+        } else {
+          wsLog(`Login/session save failed: ${data.error || 'unknown error'}`, 'error');
+          alert(data.error || 'Login was not completed.');
+        }
+      } catch (err) {
+        wsLog(`Login request error: ${err.message}`, 'error');
+        alert(`Could not reach the backend: ${err.message}`);
+      } finally {
+        if (_wsLoginPoll) { clearInterval(_wsLoginPoll); _wsLoginPoll = null; }
+        restore();
+      }
+    }
+
+    /* ── Reels list (each with thumbnail, views, open link, download link) ── */
+    let _wsReels = [];
+    function wsShowReels(reels) {
+      const card = document.getElementById('ws-reels-card');
+      const grid = document.getElementById('ws-reels-grid');
+      const cnt  = document.getElementById('ws-reels-count');
+      if (!card || !grid || !Array.isArray(reels) || reels.length === 0) return;
+      _wsReels = reels;
+
+      grid.innerHTML = reels.map((r, i) => {
+        const thumb = r.reel_thumbnail_url || r.download_link || '';
+        const views = r.reel_views ? `${wsEsc(r.reel_views)} views` : '';
+        const img = thumb
+          ? `<img src="${wsEsc(thumb)}" alt="reel ${i+1}" style="width:100%;aspect-ratio:9/16;object-fit:cover;display:block;background:#111;">`
+          : `<div style="width:100%;aspect-ratio:9/16;background:#111;"></div>`;
+        return `
+          <div style="border:1px solid var(--border);border-radius:6px;background:rgba(0,0,0,0.2);overflow:hidden;display:flex;flex-direction:column;">
+            <a href="${wsEsc(r.open_link||'#')}" target="_blank" rel="noopener" title="Open reel">${img}</a>
+            <div style="padding:5px 6px;display:flex;flex-direction:column;gap:3px;">
+              <span style="font-size:10px;color:var(--text2);"><i class="fas fa-eye" style="color:var(--muted);margin-right:3px;"></i>${views || '—'}</span>
+              <div style="display:flex;gap:6px;">
+                <a href="${wsEsc(r.open_link||'#')}" target="_blank" rel="noopener" style="font-size:10px;color:#59c2c9;text-decoration:none;" title="Open reel page"><i class="fas fa-external-link-alt"></i> Open</a>
+                ${r.download_link ? `<a href="${wsEsc(r.download_link)}" target="_blank" rel="noopener" download style="font-size:10px;color:var(--gold2);text-decoration:none;" title="Download thumbnail media"><i class="fas fa-download"></i> Download</a>` : ''}
+              </div>
+            </div>
+          </div>`;
+      }).join('');
+      if (cnt) cnt.textContent = `(${reels.length})`;
+      card.style.display = '';
+    }
+
+    function wsExportReels() {
+      if (!_wsReels.length) { alert('No reels to export.'); return; }
+      try {
+        const rows = _wsReels.map((r, i) => ({
+          '#': i + 1,
+          'Reel ID': r.reel_id || '',
+          'Views': r.reel_views || '',
+          'Open Link': r.open_link || '',
+          'Download Link': r.download_link || '',
+          'Thumbnail URL': r.reel_thumbnail_url || ''
+        }));
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(rows), 'Reels');
+        XLSX.writeFile(wb, `reels_${Date.now()}.xlsx`);
+        wsLog(`Exported ${rows.length} reel(s) to Excel.`, 'success');
+      } catch (err) {
+        wsLog(`Reels export error: ${err.message}`, 'error');
+      }
+    }
+
+    /* ── Captured element snapshots (buttons, dropdowns, inputs…) ──
+       Each thumbnail links to what CLICKING the element does (its destination
+       URL), not to a bigger picture. Dropdown/menu triggers show the revealed
+       sub-navigation links underneath. */
+    function wsShowElementShots(shots) {
+      const card = document.getElementById('ws-snapshot-card');
+      const grid = document.getElementById('ws-snapshot-grid');
+      const cnt  = document.getElementById('ws-snapshot-count');
+      if (!card || !grid || !Array.isArray(shots) || shots.length === 0) return;
+
+      const typeColors = {
+        button: 'var(--gold2)', dropdown: '#7c9cff', tab: 'var(--green2)', link: '#59c2c9'
+      };
+      grid.innerHTML = shots.map(s => {
+        const t = (s.type || 'element').split(':')[0];
+        const color = typeColors[t] || 'var(--muted)';
+        const label = s.label ? wsEsc(s.label) : '';
+        // Image links to the click destination so you can see the effect of clicking.
+        const imgTag = `<img src="${s.image}" alt="${wsEsc(s.type||'')}" style="width:100%;display:block;background:#fff;">`;
+        const clickable = s.href
+          ? `<a href="${wsEsc(s.href)}" target="_blank" rel="noopener" title="Click to open: ${wsEsc(s.href)}">${imgTag}</a>`
+          : imgTag;
+
+        // Revealed dropdown/menu sub-navigation → list each item as a link.
+        let revealedHtml = '';
+        if (s.revealed && Array.isArray(s.revealed.items) && s.revealed.items.length) {
+          const items = s.revealed.items.map(it => it.href
+            ? `<a href="${wsEsc(it.href)}" target="_blank" rel="noopener" style="color:#7c9cff;text-decoration:none;display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" title="${wsEsc(it.href)}">${wsEsc(it.label)}</a>`
+            : `<span style="color:var(--text2);display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${wsEsc(it.label)}</span>`
+          ).join('');
+          revealedHtml = `<div style="border-top:1px dashed var(--border);padding:5px 6px;font-size:10px;">
+              <div style="color:var(--muted);font-size:8px;text-transform:uppercase;margin-bottom:2px;">▾ reveals</div>${items}
+            </div>`;
+        }
+
+        const openHint = s.href
+          ? `<span style="font-size:8px;color:${color};" title="${wsEsc(s.href)}">↗ opens on click</span>`
+          : (s.revealed ? `<span style="font-size:8px;color:#7c9cff;">▾ menu</span>` : '');
+
+        return `
+          <div style="border:1px solid var(--border);border-radius:6px;background:rgba(0,0,0,0.2);overflow:hidden;display:flex;flex-direction:column;">
+            ${clickable}
+            <div style="padding:5px 6px;display:flex;flex-direction:column;gap:1px;">
+              <span style="font-size:9px;font-weight:700;text-transform:uppercase;color:${color};">${wsEsc(s.type||'element')}</span>
+              ${label ? `<div style="font-size:10px;color:var(--text2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" title="${label}">${label}</div>` : ''}
+              ${openHint}
+            </div>
+            ${revealedHtml}
+          </div>`;
+      }).join('');
+      if (cnt) cnt.textContent = `(${shots.length})`;
+      card.style.display = '';
+    }
+
+    /* ───────────────────────────────────────────
+       PROFILE-PAGE RESULT (Facebook / single-entity pages)
+       The backend returns a clean, pre-extracted record. Show it as the
+       scraped result directly instead of running generic pattern detection.
+    ─────────────────────────────────────────── */
+    function wsPresentProfileRecord(record, html, url) {
+      try {
+        // Keep a parsed doc around so other helpers that guard on it still work.
+        try { _wsParsedDoc = new DOMParser().parseFromString(html || '', 'text/html'); } catch (_) { _wsParsedDoc = null; }
+
+        // Drop empty / "N/A" fields so the table only shows real data.
+        const clean = {};
+        Object.keys(record).forEach(k => {
+          const v = record[k];
+          if (v !== undefined && v !== null && String(v).trim() && String(v).trim().toUpperCase() !== 'N/A') {
+            clean[k] = String(v).trim();
+          }
+        });
+
+        _wsPatterns      = [];
+        _wsScrapedFields = Object.keys(clean);
+        _wsScrapedRows   = _wsScrapedFields.length ? [clean] : [];
+
+        // This is a single-record extraction — hide the repeating-pattern picker.
+        const patternsPanel = document.getElementById('ws-patterns-panel');
+        const scrapeCard    = document.getElementById('ws-scrape-card');
+        if (patternsPanel) patternsPanel.style.display = 'none';
+        if (scrapeCard)    scrapeCard.style.display = 'none';
+
+        wsLog(`Profile page detected — server extracted ${_wsScrapedFields.length} field(s): ${_wsScrapedFields.join(', ') || '(none)'}.`, _wsScrapedFields.length ? 'success' : 'warn');
+
+        wsUpdatePreviewTable(_wsScrapedFields, _wsScrapedRows);
+        wsUpdateSummary(_wsScrapedFields, _wsScrapedRows);
+
+        document.getElementById('ws-m-patterns').textContent = _wsScrapedFields.length;
+        document.getElementById('ws-m-records').textContent  = _wsScrapedRows.length;
+        document.getElementById('ws-m-status').textContent   = _wsScrapedRows.length ? 'Done' : 'No Data';
+        document.getElementById('ws-m-status').style.color   = _wsScrapedRows.length ? 'var(--green)' : 'var(--red)';
+
+        if (_wsScrapedRows.length) {
+          const exportBtn = document.getElementById('ws-btn-export');
+          const exportDis = document.getElementById('ws-export-disabled');
+          const headerExp = document.getElementById('ws-header-export');
+          if (exportBtn) exportBtn.style.display = '';
+          if (exportDis) exportDis.style.display = 'none';
+          if (headerExp) headerExp.style.display = '';
+          wsLog('Record ready. Review the preview below and click Export to Excel.', 'info');
+        } else {
+          wsLog('The page loaded but no lead fields could be extracted (it may need login, or be a restricted page).', 'warn');
+        }
+      } catch (err) {
+        wsLog(`Profile render error: ${err.message}`, 'error');
         document.getElementById('ws-m-status').textContent = 'Error';
         document.getElementById('ws-m-status').style.color = 'var(--red)';
       }

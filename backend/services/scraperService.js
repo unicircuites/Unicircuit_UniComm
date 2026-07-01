@@ -1,4 +1,6 @@
 const axios = require('axios');
+const fs = require('fs');
+const path = require('path');
 const { JSDOM } = require('jsdom');
 const { chromium } = require('playwright');
 const { renderUrlWithChrome } = require('../../chromeRenderer');
@@ -10,6 +12,72 @@ const {
 } = require('../../extractDeepFieldsWithAI');
 
 const activeSessions = new Map();
+
+// ── ANTI-BOT / PERSISTENT PROFILE LAYER ─────────────────────────────────────
+// Replaying a saved cookie blob (storageState) gives Facebook a half-authenticated
+// session, so it bounces you back to login in an endless loop. Instead we use a
+// REAL persistent Chrome profile on disk: you log in ONCE, the profile stays
+// logged in across runs exactly like a normal browser — no re-login, no puzzle
+// loop. Combined with stealth patches + the real installed Chrome, this is what
+// stops the CAPTCHA escalation.
+const SCRAPER_PROFILE_DIR = process.env.SCRAPER_PROFILE_DIR || path.join(__dirname, '..', '.scraper-chrome-profile');
+
+const STEALTH_ARGS = [
+  '--disable-blink-features=AutomationControlled',
+  '--no-first-run',
+  '--no-default-browser-check',
+  '--start-maximized',
+];
+
+const STEALTH_CONTEXT_OPTIONS = {
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+  locale: 'en-US',
+  timezoneId: 'Asia/Kolkata',
+  viewport: { width: 1366, height: 900 },
+  extraHTTPHeaders: { 'Accept-Language': 'en-US,en;q=0.9' },
+};
+
+// Patch away the most common automation tells before any page script runs.
+function stealthInitScript() {
+  Object.defineProperty(navigator, 'webdriver', { get: () => undefined });
+  Object.defineProperty(navigator, 'languages', { get: () => ['en-US', 'en'] });
+  Object.defineProperty(navigator, 'plugins', { get: () => [1, 2, 3, 4, 5] });
+  window.chrome = window.chrome || { runtime: {} };
+  const origQuery = window.navigator.permissions && window.navigator.permissions.query;
+  if (origQuery) {
+    window.navigator.permissions.query = (params) =>
+      params && params.name === 'notifications'
+        ? Promise.resolve({ state: Notification.permission })
+        : origQuery(params);
+  }
+}
+
+// Open a persistent, stealthed browser session. Returns a BrowserContext whose
+// cookies/localStorage live in SCRAPER_PROFILE_DIR and survive across runs.
+// Use context.close() to shut it down (there is no separate browser object).
+async function openStealthSession(extra = {}) {
+  const options = {
+    headless: false,
+    args: STEALTH_ARGS,
+    ...STEALTH_CONTEXT_OPTIONS,
+    ...extra,
+  };
+  let context;
+  try {
+    context = await chromium.launchPersistentContext(SCRAPER_PROFILE_DIR, { channel: 'chrome', ...options });
+  } catch (err) {
+    console.warn(`[SCRAPER] Real Chrome unavailable (${err.message}); using bundled Chromium profile.`);
+    context = await chromium.launchPersistentContext(SCRAPER_PROFILE_DIR, options);
+  }
+  try {
+    await context.addInitScript(stealthInitScript);
+  } catch (err) {
+    console.warn(`[SCRAPER] Failed to apply stealth init script: ${err.message}`);
+  }
+  console.log(`[SCRAPER] Using persistent Chrome profile: ${SCRAPER_PROFILE_DIR}`);
+  return context;
+}
+// ────────────────────────────────────────────────────────────────────────────
 
 const MANUAL_LOGIN_TIMEOUT_MS = 300000; // 5 minutes for user to complete login
 
@@ -310,7 +378,9 @@ async function waitForManualLogin(page, context, targetUrl, targetHostname) {
       }
     } catch (pageErr) {
       consecutiveErrors++;
-      const browserGone = !page.context().browser()?.isConnected();
+      // For a persistent context, context.browser() is null — detect a closed
+      // browser via the page instead so we don't false-positive "browser closed".
+      const browserGone = page.isClosed();
       if (browserGone || consecutiveErrors >= 8) {
         console.warn(`[SCRAPER WARNING] ${browserGone ? 'Browser closed by user' : '8 consecutive poll errors'}. Stopping login poll.`);
         break;
@@ -349,34 +419,50 @@ function getFacebookAboutUrl(url) {
   try {
     const parsed = new URL(url);
     const path = parsed.pathname.replace(/\/$/, '');
+    // Force English rendering so labels ("Followers", "About", "Contact info")
+    // are in English for the keyword heuristics.
+    parsed.searchParams.set('locale', 'en_US');
+    const query = parsed.searchParams.toString();
     if (path.endsWith('/about')) return parsed.toString();
-    return `${parsed.origin}${path}/about`;
+    return `${parsed.origin}${path}/about?${query}`;
   } catch (_) {
     return url;
   }
+}
+
+// Scroll the page down in steps, waiting after EACH scroll so lazy-loaded /
+// infinite-scroll content (like Facebook) has time to render before we capture.
+async function autoScrollForLazyContent(page, { maxSteps = 15, stepPx = 900, delayMs = 1500 } = {}) {
+  let lastHeight = 0;
+  let stableCount = 0;
+  for (let i = 0; i < maxSteps; i++) {
+    const atBottom = await page.evaluate((y) => {
+      window.scrollBy(0, y);
+      return (window.innerHeight + window.scrollY) >= (document.body.scrollHeight - 8);
+    }, stepPx).catch(() => true);
+
+    // Wait for network to settle, then a fixed delay for content to paint.
+    await page.waitForLoadState('networkidle', { timeout: delayMs + 3000 }).catch(() => {});
+    await sleep(delayMs);
+
+    const height = await page.evaluate(() => document.body.scrollHeight).catch(() => lastHeight);
+    // Stop once we're at the bottom and the page height hasn't grown twice in a row.
+    if (atBottom && height <= lastHeight) {
+      if (++stableCount >= 2) break;
+    } else {
+      stableCount = 0;
+    }
+    lastHeight = height;
+  }
+  await page.evaluate(() => window.scrollTo(0, 0)).catch(() => {});
+  await sleep(600);
 }
 
 async function waitForDynamicContent(page, hostname) {
   await page.waitForLoadState('networkidle', { timeout: 12000 }).catch(() => {});
   await sleep(2000);
 
-  await page.evaluate(async () => {
-    await new Promise((resolve) => {
-      let scrolled = 0;
-      const step = 500;
-      const timer = setInterval(() => {
-        window.scrollBy(0, step);
-        scrolled += step;
-        if (scrolled >= 3000) {
-          clearInterval(timer);
-          window.scrollTo(0, 0);
-          resolve();
-        }
-      }, 250);
-    });
-  }).catch(() => {});
-
-  await sleep(1500);
+  await autoScrollForLazyContent(page);
 
   if (isFacebookHost(hostname)) {
     await page.waitForSelector('[role="main"], meta[property="og:title"]', { timeout: 15000 }).catch(() => {});
@@ -388,104 +474,187 @@ async function extractFacebookProfileFields(page) {
   return page.evaluate(() => {
     const data = {};
     const clean = (value) => (value || '').replace(/\s+/g, ' ').trim();
+    // Normalise Devanagari (०-९) and Arabic-Indic digits to ASCII so counts match
+    // even when Facebook renders the page in a non-English locale.
+    const toAsciiDigits = (str) => (str || '').replace(/[०-९٠-٩]/g, (d) => {
+      const code = d.charCodeAt(0);
+      return String(code >= 0x0966 ? code - 0x0966 : code - 0x0660);
+    });
+    // Facebook wraps outbound links as l.facebook.com/l.php?u=<encoded real url>.
+    const unwrapFbLink = (href) => {
+      try {
+        const u = new URL(href, location.origin);
+        if (u.hostname.includes('facebook.com') && u.pathname.includes('/l.php')) {
+          const real = u.searchParams.get('u');
+          if (real) return decodeURIComponent(real);
+        }
+      } catch (_) {}
+      return href;
+    };
+    // Strip Facebook chrome from the page name: leading "(9) " notification count
+    // and trailing " | Facebook".
+    const cleanName = (n) => clean(String(n || '').replace(/^\(\d+\)\s*/, '').split('|')[0].split(' - ')[0]);
 
-    const ogTitle = document.querySelector('meta[property="og:title"]');
-    const ogDesc = document.querySelector('meta[property="og:description"]');
-    const ogUrl = document.querySelector('meta[property="og:url"]');
-    if (ogTitle) data.name = clean((ogTitle.getAttribute('content') || '').split('|')[0]);
-    if (ogDesc) data.description = clean(ogDesc.getAttribute('content') || '');
-    if (ogUrl) data.page_url = clean(ogUrl.getAttribute('content') || '');
+    // Field names follow the UNICIRCUIT_MEDIA_DATA_FIELDS spec (FACEBOOK sheet →
+    // PAGE / COMPANY PROFILE FIELDS).
+    const metaContent = (sel) => {
+      const m = document.querySelector(sel);
+      return m ? clean(m.getAttribute('content') || '') : '';
+    };
 
-    if (!data.name && document.title) {
-      data.name = clean(document.title.split('|')[0].split('-')[0]);
+    // Open Graph tags
+    const ogTitle = metaContent('meta[property="og:title"]');
+    const ogDesc = metaContent('meta[property="og:description"]');
+    const ogUrl = metaContent('meta[property="og:url"]');
+    const ogImage = metaContent('meta[property="og:image"]');
+    if (ogTitle) data.page_og_title = ogTitle;
+    if (ogDesc) data.page_og_description = ogDesc;
+    if (ogImage) data.page_og_image_url = ogImage;
+
+    // page_name — prefer <h1>, fall back to og:title / <title>, strip "(9)" count.
+    let name = cleanName(ogTitle) || cleanName(document.title);
+    const h1 = document.querySelector('[role="main"] h1, h1');
+    if (h1 && clean(h1.textContent)) name = cleanName(h1.textContent);
+    if (name) data.page_name = name;
+
+    if (ogDesc) data.page_description = ogDesc;
+
+    // page_url + page_username (URL slug)
+    const canonical = ogUrl || (document.querySelector('link[rel="canonical"]') || {}).href || location.href;
+    if (canonical) {
+      data.page_url = canonical;
+      try {
+        const seg = new URL(canonical).pathname.split('/').filter(Boolean);
+        if (seg[0] && seg[0] !== 'profile.php' && !/^\d+$/.test(seg[0])) data.page_username = seg[0];
+      } catch (_) {}
+    }
+
+    // page_id — from app-link metas or embedded config.
+    const alUrl = metaContent('meta[property="al:android:url"]') || metaContent('meta[property="al:ios:url"]');
+    let idMatch = alUrl.match(/(?:page|profile)\/?\??(?:id=)?(\d{5,})/i);
+    if (!idMatch) idMatch = (document.documentElement.innerHTML || '').match(/"pageID":"(\d+)"|"page_id":"?(\d+)"?|"delegate_page":\{"id":"(\d+)"/);
+    if (idMatch) data.page_id = idMatch[1] || idMatch[2] || idMatch[3];
+
+    // page_verified — blue badge.
+    if (document.querySelector('[aria-label*="Verified" i], svg[aria-label*="Verified" i], [title="Verified account"]')) {
+      data.page_verified = 'Yes';
+    }
+
+    // Profile & cover images.
+    const cover = document.querySelector('img[data-imgperflogname*="cover" i], img[alt*="cover photo" i]');
+    if (cover && cover.src) data.page_cover_image_url = cover.src;
+    if (name) {
+      const nameHead = name.split(' ')[0];
+      const profileImg = Array.from(document.querySelectorAll('img[src]')).find((im) => (im.getAttribute('alt') || '').includes(nameHead));
+      if (profileImg) data.page_profile_image_url = profileImg.src;
     }
 
     const main = document.querySelector('[role="main"]') || document.body;
-    const bodyText = clean(main.innerText || '');
+    const bodyText = toAsciiDigits(clean(main.innerText || ''));
     const emailRegex = /[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/;
     const phoneRegex = /(?:\+?\d{1,3}[-.\s]?)?\(?\d{3}\)?[-.\s]?\d{3,4}[-.\s]?\d{4,}/;
 
+    // Counts (English labels — page loads with locale=en_US; Devanagari digits normalised).
     const followerMatch = bodyText.match(/([\d,.]+[KMB]?)\s+followers?/i);
-    if (followerMatch) data.followers = followerMatch[1];
+    if (followerMatch) data.page_followers_count = followerMatch[1];
     const likeMatch = bodyText.match(/([\d,.]+[KMB]?)\s+likes?/i);
-    if (likeMatch) data.likes = likeMatch[1];
-    const ratingMatch = bodyText.match(/(\d+(?:\.\d+)?)\s*(?:out of 5|stars?)/i);
-    if (ratingMatch) data.rating = ratingMatch[1];
+    if (likeMatch) data.page_likes_count = likeMatch[1];
+    const checkinMatch = bodyText.match(/([\d,.]+[KMB]?)\s+(?:were here|check-?ins?)/i);
+    if (checkinMatch) data.page_checkins_count = checkinMatch[1];
 
     const links = Array.from(document.querySelectorAll('a[href]'));
     for (const link of links) {
-      const href = link.getAttribute('href') || '';
-      if (!data.email && href.startsWith('mailto:')) {
-        data.email = href.replace('mailto:', '').split('?')[0];
+      const rawHref = link.getAttribute('href') || '';
+      const href = unwrapFbLink(rawHref);
+      if (!data.page_email && rawHref.startsWith('mailto:')) {
+        data.page_email = rawHref.replace('mailto:', '').split('?')[0];
       }
-      if (!data.phone && href.startsWith('tel:')) {
-        data.phone = href.replace('tel:', '').trim();
+      if (!data.page_phone && rawHref.startsWith('tel:')) {
+        data.page_phone = rawHref.replace('tel:', '').trim();
       }
+      // page_website — external link after unwrapping FB's redirect, excluding FB hosts.
       if (
-        !data.website &&
+        !data.page_website &&
         /^https?:\/\//i.test(href) &&
-        !href.includes('facebook.com') &&
-        !href.includes('fb.com') &&
-        !href.includes('l.facebook.com')
+        !/(?:^|\.)facebook\.com/i.test(href) &&
+        !/(?:^|\.)fb\.com/i.test(href) &&
+        !/fbcdn\.net|messenger\.com/i.test(href)
       ) {
-        data.website = href;
+        data.page_website = href;
+      }
+      // page_category — links point at /pages/category/…
+      if (!data.page_category) {
+        const label = clean(link.textContent);
+        if (/\/pages\/category\//i.test(rawHref) && label && label.length < 60) {
+          data.page_category = label;
+        }
       }
     }
 
     const listItems = Array.from(main.querySelectorAll('[role="listitem"], li, div[data-pagelet]'));
-  const seenValues = new Set();
-
+    const seenValues = new Set();
+    const isEventish = (t) => /\bevent\b|\bpast\b|going\b|interested\b|\d{1,2}:\d{2}\s*(am|pm)/i.test(t);
+    let bestAddress = '';
     for (const item of listItems) {
-      const text = clean(item.innerText || '');
+      const text = toAsciiDigits(clean(item.innerText || ''));
       if (!text || text.length > 600 || seenValues.has(text)) continue;
       seenValues.add(text);
 
       const lower = text.toLowerCase();
-      if (!data.email && emailRegex.test(text)) {
+      if (!data.page_email && emailRegex.test(text)) {
         const match = text.match(emailRegex);
-        if (match) data.email = match[0];
+        if (match) data.page_email = match[0];
       }
-      if (!data.phone && phoneRegex.test(text)) {
+      if (!data.page_phone && phoneRegex.test(text)) {
         const match = text.match(phoneRegex);
         if (match) {
           const digits = match[0].replace(/\D/g, '');
-          if (digits.length >= 7 && digits.length <= 15) data.phone = match[0];
+          if (digits.length >= 7 && digits.length <= 15) data.page_phone = match[0];
         }
       }
       if (
-        !data.website &&
-        (text.includes('.com') || text.includes('.in') || text.includes('.org') || text.includes('.net')) &&
+        !data.page_website &&
+        /\.(com|in|org|net|co)\b/i.test(text) &&
         !text.includes('facebook.com')
       ) {
-        const urlMatch = text.match(/https?:\/\/[^\s]+|www\.[^\s]+/i);
-        if (urlMatch) data.website = urlMatch[0];
+        const urlMatch = text.match(/https?:\/\/[^\s]+|www\.[^\s]+|[a-z0-9-]+\.(?:com|in|org|net|co)(?:\.[a-z]{2})?/i);
+        if (urlMatch) data.page_website = urlMatch[0];
       }
-      if (!data.address && (lower.startsWith('address') || /\b(?:street|road|nagar|maharashtra|india|pincode|pin code)\b/i.test(text))) {
-        data.address = text.replace(/^address[:\s]*/i, '').trim();
+      // Address: prefer a PIN-code bearing, non-event line; keep the shortest match.
+      const hasPin = /\b\d{6}\b/.test(text);
+      const looksAddress = lower.startsWith('address') || hasPin || /\b(?:street|road|marg|nagar|plot no|opp\.)\b/i.test(text);
+      if (looksAddress && !isEventish(text)) {
+        const candidate = text.replace(/^address[:\s]*/i, '').trim();
+        if (!bestAddress || candidate.length < bestAddress.length) bestAddress = candidate;
       }
-      if (!data.hours && (lower.includes('hours') || lower.includes('open') || lower.includes('closed'))) {
-        data.hours = text;
+      if (!data.page_category && (lower.includes('category') || /\bservice\b|\bcompany\b/i.test(lower)) && text.length < 80) {
+        data.page_category = text.replace(/^category[:\s]*/i, '').trim();
       }
-      if (!data.category && (lower.includes('category') || lower.includes('business service') || lower.includes('company'))) {
-        if (text.length < 120) data.category = text.replace(/^category[:\s]*/i, '').trim();
-      }
-      if (!data.founded && lower.includes('founded')) {
-        data.founded = text.replace(/^founded[:\s]*/i, '').trim();
-      }
-      if (!data.products && lower.includes('products')) {
-        data.products = text.replace(/^products[:\s]*/i, '').trim();
-      }
-      if (!data.mission && lower.includes('mission')) {
-        data.mission = text.replace(/^mission[:\s]*/i, '').trim();
-      }
-      if (!data.price_range && lower.includes('price range')) {
-        data.price_range = text.replace(/^price range[:\s]*/i, '').trim();
+      if (!data.page_founded_year) {
+        const yr = text.match(/founded[^\d]*(\d{4})|(?:^|\s)(\d{4})\b(?=[^\d]*$)/i);
+        if (lower.includes('founded') && yr) data.page_founded_year = yr[1] || yr[2];
       }
     }
 
-  if (!data.description && bodyText.length > 40) {
-      const introMatch = bodyText.match(/(?:About|Intro|Overview)\s*[:\n]\s*([^\n]{20,400})/i);
-      if (introMatch) data.description = introMatch[1].trim();
+    // page_location_city / state / country — split the postal address.
+    if (bestAddress) {
+      data.page_address = bestAddress; // full address (convenience)
+      const parts = bestAddress.split(',').map((p) => p.trim()).filter(Boolean);
+      const states = ['Maharashtra','Gujarat','Karnataka','Delhi','Tamil Nadu','Telangana','Uttar Pradesh','Madhya Pradesh','Rajasthan','West Bengal','Kerala','Punjab','Haryana','Bihar','Andhra Pradesh','Odisha','Assam','Jharkhand','Chhattisgarh','Uttarakhand','Goa','Himachal Pradesh'];
+      const countries = ['India','United States','USA','United Kingdom','UK','UAE','Canada','Australia','Singapore'];
+      let idxCountry = -1, idxState = -1;
+      parts.forEach((p, i) => {
+        if (idxCountry < 0 && countries.some((c) => p.toLowerCase() === c.toLowerCase())) { idxCountry = i; data.page_location_country = p; }
+        const st = states.find((s) => p.toLowerCase().includes(s.toLowerCase()));
+        if (idxState < 0 && st) { idxState = i; data.page_location_state = st; }
+      });
+      const anchor = idxCountry >= 0 ? idxCountry : idxState;
+      if (anchor > 0) {
+        for (let i = anchor - 1; i >= 0; i--) {
+          const p = parts[i];
+          if (!/^\d/.test(p) && !/plot|no\b|s-\d|opp|road|street|nagar|gurudawara/i.test(p)) { data.page_location_city = p; break; }
+        }
+      }
     }
 
     Object.keys(data).forEach((key) => {
@@ -502,26 +671,39 @@ function extractFacebookProfileFromHTML(html) {
   const data = {};
   const clean = (value) => (value || '').replace(/\s+/g, ' ').trim();
 
-  const ogTitle = doc.querySelector('meta[property="og:title"]');
-  const ogDesc = doc.querySelector('meta[property="og:description"]');
-  const ogUrl = doc.querySelector('meta[property="og:url"]');
-  if (ogTitle) data.name = clean((ogTitle.getAttribute('content') || '').split('|')[0]);
-  if (ogDesc) data.description = clean(ogDesc.getAttribute('content') || '');
-  if (ogUrl) data.page_url = clean(ogUrl.getAttribute('content') || '');
+  // Field names follow the UNICIRCUIT_MEDIA_DATA_FIELDS spec (FACEBOOK sheet).
+  const meta = (sel) => { const m = doc.querySelector(sel); return m ? clean(m.getAttribute('content') || '') : ''; };
+  const cleanName = (n) => clean(String(n || '').replace(/^\(\d+\)\s*/, '').split('|')[0]);
+
+  const ogTitle = meta('meta[property="og:title"]');
+  const ogDesc = meta('meta[property="og:description"]');
+  const ogUrl = meta('meta[property="og:url"]');
+  const ogImage = meta('meta[property="og:image"]');
+  if (ogTitle) { data.page_og_title = ogTitle; data.page_name = cleanName(ogTitle); }
+  if (ogDesc) { data.page_og_description = ogDesc; data.page_description = ogDesc; }
+  if (ogUrl) data.page_url = ogUrl;
+  if (ogImage) data.page_og_image_url = ogImage;
+
+  if (ogUrl) {
+    try {
+      const seg = new URL(ogUrl).pathname.split('/').filter(Boolean);
+      if (seg[0] && seg[0] !== 'profile.php' && !/^\d+$/.test(seg[0])) data.page_username = seg[0];
+    } catch (_) {}
+  }
 
   const bodyText = clean(getCleanText(doc.body));
   const emailRegex = /[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/;
   const phoneRegex = /(?:\+?\d{1,3}[-.\s]?)?\(?\d{3}\)?[-.\s]?\d{3,4}[-.\s]?\d{4,}/;
 
   const emailMatch = bodyText.match(emailRegex);
-  if (emailMatch) data.email = emailMatch[0];
+  if (emailMatch) data.page_email = emailMatch[0];
   const phoneMatch = bodyText.match(phoneRegex);
-  if (phoneMatch) data.phone = phoneMatch[0];
+  if (phoneMatch) data.page_phone = phoneMatch[0];
 
   const followerMatch = bodyText.match(/([\d,.]+[KMB]?)\s+followers?/i);
-  if (followerMatch) data.followers = followerMatch[1];
+  if (followerMatch) data.page_followers_count = followerMatch[1];
   const likeMatch = bodyText.match(/([\d,.]+[KMB]?)\s+likes?/i);
-  if (likeMatch) data.likes = likeMatch[1];
+  if (likeMatch) data.page_likes_count = likeMatch[1];
 
   return data;
 }
@@ -542,10 +724,218 @@ async function capturePageForAnalysis(page, url, hostname) {
     console.log(`[SCRAPER] Facebook profile extraction found ${fieldCount} field(s): ${Object.keys(profileData).join(', ') || '(none)'}`);
   }
 
-  return {
-    html: await page.content(),
-    profileData
-  };
+  // Capture in this order: page HTML + element shots on the current (About) tab,
+  // THEN navigate to the Reels tab (which changes the page), so nothing above is lost.
+  const html = await page.content();
+  const elementShots = await captureElementShots(page);
+  let reels = [];
+  if (isFacebookHost(hostname)) {
+    reels = await extractFacebookReels(page, url, hostname);
+  }
+
+  return { html, profileData, elementShots, reels };
+}
+
+// Build a Facebook tab URL (e.g. /<username>/reels/) forcing English locale.
+function getFacebookTabUrl(url, tab) {
+  try {
+    const parsed = new URL(url);
+    const seg = parsed.pathname.split('/').filter(Boolean);
+    const base = seg[0] ? `/${seg[0]}` : '';
+    const u = new URL(`${parsed.origin}${base}/${tab}`);
+    u.searchParams.set('locale', 'en_US');
+    return u.toString();
+  } catch (_) {
+    return url;
+  }
+}
+
+// Scrape the Reels tab: returns a list of reels, each with its open link (reel
+// page), a download link (poster/thumbnail media), thumbnail URL and view count.
+async function extractFacebookReels(page, url, hostname) {
+  const reelsUrl = getFacebookTabUrl(url, 'reels');
+  try {
+    console.log(`[SCRAPER] Loading Reels tab: ${reelsUrl}`);
+    await page.goto(reelsUrl, { timeout: 30000, waitUntil: 'domcontentloaded' });
+    await waitForDynamicContent(page, hostname);
+  } catch (err) {
+    console.warn(`[SCRAPER] Could not load Reels tab: ${err.message}`);
+    return [];
+  }
+
+  try {
+    const reels = await page.evaluate(() => {
+      const toAsciiDigits = (str) => (str || '').replace(/[०-९٠-٩]/g, (d) => {
+        const code = d.charCodeAt(0);
+        return String(code >= 0x0966 ? code - 0x0966 : code - 0x0660);
+      });
+      const clean = (s) => (s || '').replace(/\s+/g, ' ').trim();
+      const out = [];
+      const seen = new Set();
+      const anchors = Array.from(document.querySelectorAll('a[href*="/reel/"], a[href*="/reels/"]'));
+      for (const a of anchors) {
+        const href = (a.href || '').split('?')[0];
+        const m = href.match(/\/reels?\/(\d+)/);
+        if (!m) continue;
+        const id = m[1];
+        if (seen.has(id)) continue;
+        seen.add(id);
+
+        const img = a.querySelector('img[src]');
+        const thumb = img ? img.src : '';
+        // View count = first number in the card overlay (Devanagari normalised).
+        const text = toAsciiDigits(clean(a.innerText));
+        const viewMatch = text.match(/([\d.,]+\s*[KMB]?)/);
+        const views = viewMatch ? viewMatch[1].replace(/\s+/g, '') : '';
+
+        out.push({
+          reel_id: id,
+          open_link: href,           // reel page — click to watch
+          download_link: thumb,      // poster/thumbnail media (direct video needs playback)
+          reel_thumbnail_url: thumb,
+          reel_views: views,
+        });
+      }
+      return out.slice(0, 80);
+    });
+    console.log(`[SCRAPER] Extracted ${reels.length} reel(s).`);
+    return reels;
+  } catch (err) {
+    console.warn(`[SCRAPER] Reels extraction failed: ${err.message}`);
+    return [];
+  }
+}
+
+// Click a dropdown/menu trigger and capture the menu it reveals (image + the
+// sub-navigation links inside it), then close it. This shows the *effect* of
+// clicking. Guards against clicks that navigate away. Never throws.
+async function revealElementMenu(page, handle) {
+  const urlBefore = page.url();
+  try {
+    await handle.click({ timeout: 2500 });
+  } catch (_) {
+    return null;
+  }
+  await sleep(700);
+
+  // If the click navigated instead of opening a menu, go back and bail.
+  if (page.url() !== urlBefore) {
+    try { await page.goBack({ waitUntil: 'domcontentloaded', timeout: 8000 }); await sleep(600); } catch (_) {}
+    return null;
+  }
+
+  let menuHandle = null;
+  try {
+    const menus = await page.$$('[role="menu"], [role="listbox"], [role="dialog"] [role="menu"]');
+    for (const m of menus) {
+      if (await m.isVisible()) {
+        const b = await m.boundingBox();
+        if (b && b.height > 20) { menuHandle = m; break; }
+      }
+    }
+  } catch (_) {}
+
+  let revealed = null;
+  if (menuHandle) {
+    try {
+      const buffer = await menuHandle.screenshot({ type: 'jpeg', quality: 65, timeout: 4000 });
+      const items = await menuHandle.evaluate((el) => {
+        const norm = (s) => (s || '').replace(/\s+/g, ' ').trim().slice(0, 60);
+        const out = [];
+        el.querySelectorAll('a[href], [role="menuitem"], [role="tab"]').forEach((it) => {
+          const label = norm(it.getAttribute('aria-label') || it.textContent);
+          const anchor = it.tagName === 'A' ? it : it.querySelector('a[href]');
+          const href = anchor ? anchor.href : '';
+          if (label) out.push({ label, href });
+        });
+        return out.slice(0, 20);
+      });
+      revealed = { image: `data:image/jpeg;base64,${buffer.toString('base64')}`, items };
+    } catch (_) {}
+  }
+
+  try { await page.keyboard.press('Escape'); await sleep(250); } catch (_) {}
+  return revealed;
+}
+
+// Screenshot individual interactive elements (buttons, dropdowns, inputs, tabs,
+// nav links) rather than the whole page. Each shot records the click DESTINATION
+// (href) so the UI can link to the effect of clicking it — and for dropdown/menu
+// triggers it opens the menu and captures the revealed sub-navigation.
+// Never throws — returns whatever it managed to capture.
+async function captureElementShots(page, max = 32, maxReveals = 6) {
+  const selector = [
+    'button',
+    '[role="button"]',
+    'select',
+    '[role="combobox"]',
+    '[aria-haspopup]',
+    '[role="tab"]',
+    // Nested navigation inside nav bars / tablists (All, Information, Photo, …)
+    '[role="tablist"] a[href]',
+    '[role="navigation"] a[href]',
+    'input:not([type="hidden"])',
+    'textarea',
+    'a[role="link"]',
+  ].join(',');
+
+  const shots = [];
+  let handles = [];
+  try {
+    handles = await page.$$(selector);
+  } catch (_) {
+    return shots;
+  }
+
+  const seen = new Set();
+  let reveals = 0;
+  for (const handle of handles) {
+    if (shots.length >= max) break;
+    try {
+      if (!(await handle.isVisible())) continue;
+      const box = await handle.boundingBox();
+      if (!box || box.width < 10 || box.height < 8 || box.width > 1400 || box.height > 900) continue;
+
+      // De-duplicate elements that occupy the same on-screen rectangle.
+      const key = `${Math.round(box.x)}:${Math.round(box.y)}:${Math.round(box.width)}:${Math.round(box.height)}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+
+      const info = await handle.evaluate((el) => {
+        const norm = (s) => (s || '').replace(/\s+/g, ' ').trim().slice(0, 70);
+        const tag = el.tagName.toLowerCase();
+        const hasPopup = !!el.getAttribute('aria-haspopup');
+        let type = tag;
+        if (hasPopup || tag === 'select' || el.getAttribute('role') === 'combobox') type = 'dropdown';
+        else if (el.getAttribute('role') === 'tab') type = 'tab';
+        else if (tag === 'input') type = `input:${el.getAttribute('type') || 'text'}`;
+        else if (tag === 'button' || el.getAttribute('role') === 'button') type = 'button';
+        else if (tag === 'a') type = 'link';
+        const label = norm(el.getAttribute('aria-label') || el.innerText || el.value || el.getAttribute('placeholder') || el.getAttribute('title') || '');
+        // Click destination = own href or the nearest ancestor link.
+        const anchor = tag === 'a' ? el : el.closest('a[href]');
+        const href = anchor && anchor.href && !anchor.href.startsWith('javascript:') ? anchor.href : '';
+        return { type, label, href, hasPopup };
+      });
+
+      const buffer = await handle.screenshot({ type: 'jpeg', quality: 65, timeout: 4000 });
+      const shot = { type: info.type, label: info.label, href: info.href, image: `data:image/jpeg;base64,${buffer.toString('base64')}` };
+
+      // For menu/dropdown triggers without a plain destination, open it and
+      // capture the revealed sub-navigation (the effect of clicking).
+      if ((info.hasPopup || info.type === 'dropdown') && !info.href && reveals < maxReveals) {
+        reveals++;
+        const revealed = await revealElementMenu(page, handle);
+        if (revealed) shot.revealed = revealed;
+      }
+
+      shots.push(shot);
+    } catch (_) {
+      // Skip elements that detach, move, or fail to capture.
+    }
+  }
+  console.log(`[SCRAPER] Captured ${shots.length} element screenshot(s), ${reveals} menu reveal attempt(s).`);
+  return shots;
 }
 
 // Helper to safely get the className of any element, handling SVGs and standard elements
@@ -565,6 +955,46 @@ function translateToEnglish(text) {
   return text
     .replace(/[^\x00-\x7F]/g, "") // remove non-ASCII characters
     .trim();
+}
+
+// Returns true if the string contains non-ASCII letters (e.g. Devanagari, Chinese)
+// worth translating. Pure-ASCII values (already English, numbers, URLs) are skipped.
+function needsTranslation(text) {
+  return typeof text === 'string' && [...text].some(ch => ch.charCodeAt(0) > 127);
+}
+
+// Real translation via Google Translate's public (gtx) endpoint. Auto-detects the
+// source language and translates to English. Never throws — returns the original
+// text on any failure so extraction always succeeds.
+async function googleTranslateToEnglish(text) {
+  const input = String(text || '').trim();
+  if (!input || !needsTranslation(input)) return input;
+  try {
+    const res = await axios.get('https://translate.googleapis.com/translate_a/single', {
+      params: { client: 'gtx', sl: 'auto', tl: 'en', dt: 't', q: input },
+      timeout: 8000,
+      headers: { 'User-Agent': 'Mozilla/5.0' },
+    });
+    // Response shape: [[["translated","original",...], ...], ...]
+    const segments = Array.isArray(res.data) && Array.isArray(res.data[0]) ? res.data[0] : [];
+    const translated = segments.map(seg => (Array.isArray(seg) ? seg[0] : '')).join('').trim();
+    return translated || input;
+  } catch (err) {
+    console.warn(`[SCRAPER] Google Translate failed (keeping original): ${err.message}`);
+    return input;
+  }
+}
+
+// Translate every non-ASCII string value of a record to English, in parallel.
+// Field keys (our own canonical names) are left untouched.
+async function translateRecordToEnglish(record) {
+  if (!record || typeof record !== 'object') return record;
+  const out = {};
+  const entries = Object.entries(record);
+  await Promise.all(entries.map(async ([key, value]) => {
+    out[key] = typeof value === 'string' ? await googleTranslateToEnglish(value) : value;
+  }));
+  return out;
 }
 
 // Date Formatter: Normalizes to YYYY-MM-DD
@@ -1038,10 +1468,9 @@ async function startScrape(sessionId, params) {
 
       console.log(`[SCRAPER] Session ${sessionId}: Starting visible Chrome browser for URL: ${url}`);
       try {
-        browserInstance = await chromium.launch({ headless: false });
-        const context = await browserInstance.newContext({
-          userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
-        });
+        // Persistent profile: the context IS the session (no separate browser).
+        const context = await openStealthSession();
+        browserInstance = context;
 
         // Inject parsed cookies if any
         if (parsedCookies.length > 0) {
@@ -1257,6 +1686,7 @@ async function startScrape(sessionId, params) {
       session.status = 'failed';
       session.error = err.message;
     } finally {
+      // Persistent profile auto-persists cookies/localStorage to disk on close.
       if (browserInstance) {
         try {
           await browserInstance.close();
@@ -1309,15 +1739,16 @@ async function analyzeURL(url, cookies = null, showBrowser = false) {
     let playwrightBrowser = null;
     let extractedCookies = null;
     let profileData = null;
+    let elementShots = null;
+    let reels = null;
     const parsedCookies = parseCookies(cookies);
 
     // 2. Always use a visible Playwright browser for analysis regardless of showBrowser flag
     try {
       console.log(`[SCRAPER] Analyzing URL with visible Chrome browser: ${url}`);
-      playwrightBrowser = await chromium.launch({ headless: false });
-      const context = await playwrightBrowser.newContext({
-        userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
-      });
+      // Persistent profile: context IS the session; closing it closes the browser.
+      const context = await openStealthSession();
+      playwrightBrowser = context;
 
       if (parsedCookies.length > 0) {
         const formattedCookies = parsedCookies.map(cookie => {
@@ -1380,6 +1811,8 @@ async function analyzeURL(url, cookies = null, showBrowser = false) {
         const captured = await capturePageForAnalysis(page, url, targetHostname);
         html = captured.html;
         profileData = captured.profileData;
+        elementShots = captured.elementShots;
+        reels = captured.reels;
         extractedCookies = await context.cookies();
         usedPlaywright = true;
         clearLoginWaitStatus();
@@ -1401,6 +1834,8 @@ async function analyzeURL(url, cookies = null, showBrowser = false) {
         const captured = await capturePageForAnalysis(page, url, targetHostname);
         html = captured.html;
         profileData = captured.profileData;
+        elementShots = captured.elementShots;
+        reels = captured.reels;
         extractedCookies = await context.cookies();
         usedPlaywright = true;
         await playwrightBrowser.close();
@@ -1714,9 +2149,20 @@ async function analyzeURL(url, cookies = null, showBrowser = false) {
     console.log(`[SCRAPER] ─────────────────────────────────────────────────────`);
     // ─────────────────────────────────────────────────────────────────────────
 
+    // Translate the extracted profile record to English via Google Translate so
+    // non-English pages (e.g. Marathi Facebook pages) yield English field values.
+    if (profileData && Object.keys(profileData).length > 0) {
+      const before = Object.keys(profileData).length;
+      profileData = await translateRecordToEnglish(profileData);
+      console.log(`[SCRAPER] Translated ${before} profile field(s) to English via Google Translate.`);
+    }
+
     return {
       success: true,
       url,
+      html, // full page HTML so the frontend can run its client-side DOM/pattern analysis
+      elementShots: elementShots && elementShots.length ? elementShots : undefined, // per-element snapshots (buttons, dropdowns, inputs…)
+      reels: reels && reels.length ? reels : undefined, // list of reels (open + download links)
       itemSelector: detectedItemSelector,
       pagination: detectedPagination,
       suggestedFields: uniqueFields,
@@ -1965,13 +2411,76 @@ async function extractAllFieldsWithAI({
   });
 }
 
+// Open the persistent Chrome profile, let the user log in to Facebook (or any
+// site) manually, then CLOSE the context so the login is flushed to the profile
+// on disk. After this, future analyze/scrape runs reuse the logged-in session.
+async function loginAndSaveSession(url) {
+  const target = url || 'https://www.facebook.com/';
+  let hostname = 'facebook.com';
+  try { hostname = new URL(target).hostname; } catch (_) {}
+
+  let context = null;
+  try {
+    context = await openStealthSession();
+  } catch (err) {
+    // launchPersistentContext throws if the profile is already open elsewhere.
+    const busy = /ProcessSingleton|already (in use|running)|SingletonLock|profile/i.test(err.message);
+    return {
+      success: false,
+      error: busy
+        ? 'The scraper Chrome profile is already open. Close any existing scraper browser window and try again.'
+        : `Could not start the browser: ${err.message}`,
+    };
+  }
+
+  try {
+    const page = context.pages()[0] || await context.newPage();
+    await page.goto(target, { timeout: 30000, waitUntil: 'domcontentloaded' });
+    await sleep(1500);
+
+    // Already logged in? (auth cookies present and not on a login page.)
+    if ((await hasSessionAuthCookies(context, hostname)) && !isLoginUrl(page.url())) {
+      const cookies = await context.cookies();
+      await context.close(); // flush profile to disk
+      clearLoginWaitStatus();
+      console.log(`[SCRAPER] Session already logged in (${cookies.length} cookies). Profile saved.`);
+      return { success: true, alreadyLoggedIn: true, cookieCount: cookies.length };
+    }
+
+    console.log('[SCRAPER] Waiting for manual Facebook login in the opened browser...');
+    const loggedIn = await waitForManualLogin(page, context, target, hostname);
+
+    // Give Chromium a beat to write cookies, then read + close to persist.
+    await sleep(2500);
+    const cookies = await context.cookies();
+    const authOk = await hasSessionAuthCookies(context, hostname);
+    await context.close(); // graceful close flushes the persistent profile to disk
+    clearLoginWaitStatus();
+
+    if (loggedIn && authOk) {
+      console.log(`[SCRAPER] Login successful — session saved to profile (${cookies.length} cookies).`);
+      return { success: true, loggedIn: true, cookieCount: cookies.length };
+    }
+    return {
+      success: false,
+      loggedIn: false,
+      error: 'Login was not completed (window closed or timed out before login finished).',
+    };
+  } catch (err) {
+    try { if (context) await context.close(); } catch (_) {}
+    clearLoginWaitStatus();
+    return { success: false, error: err.message };
+  }
+}
+
 module.exports = {
   startScrape,
   stopScrape,
   getScrapeStatus,
   parseLocalHTML,
   analyzeURL,
-  getLoginWaitStatus
+  getLoginWaitStatus,
+  loginAndSaveSession
   ,extractAllFieldsWithAI
   ,discoverVariableFields
 };

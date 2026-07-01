@@ -16,6 +16,10 @@ __pycache__/
 .mypy_cache/
 .ruff_cache/
 
+# Scraper persistent Chrome profile — machine-local, holds logged-in session
+backend/.scraper-chrome-profile/
+backend/.scraper-session.json
+
 # Environment variables — never commit secrets
 backend/.env
 

@@ -791,6 +791,7 @@ app.use('/api/system', apiLimiter, require('./routes/system'));
 app.use('/api/outlook-backups', apiLimiter, require('./routes/outlookBackups'));
 app.use('/api/matrix-backup', require('./routes/matrixBackup'));
 app.use('/api/pbx', require('./routes/pbx'));
+app.use('/api/scraper', apiLimiter, require('./routes/scraper'));
 app.use('/api/crm', require('./routes/crmIntegration'));
 
 // OAuth2 callback - must be at root level to match redirect URI
