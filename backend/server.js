@@ -1,4 +1,4 @@
-﻿/**
+/**
  * UniComm Pro — Express REST API
  * Unicircuit Engineering Services LLP
  *
@@ -758,7 +758,7 @@ const authLimiter = rateLimit({
 
 const apiLimiter = rateLimit({
   windowMs: 60 * 1000,        // 1 min
-  max: 600,                   // raised — dashboard makes ~8 calls on load
+  max: 5000,                  // drastically raised to avoid rate limit exceeded
   message: { error: 'Rate limit exceeded.' },
   skip: (req) => {
     // never rate-limit the sync endpoint, profile pictures, or media files
